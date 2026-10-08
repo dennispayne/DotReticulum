@@ -101,10 +101,10 @@ Foundation and interface milestone verification recorded 2026-10-08:
 - [x] Linux `linux-x64` NativeAOT publish passed without warnings and the native
   CLI help smoke test passed during this interface milestone.
 - [x] Foundation changes passed secret scanning and independent review.
-- [x] Interface changes passed secret scanning; automated code review/security
-  validation remains pending.
-- [ ] Obtain a completed C# CodeQL result: the foundation scan timed out; completed
-  Actions/Python analyses reported no alerts.
+- [x] Interface changes passed secret scanning; current C#/Python CodeQL reported
+  zero alerts.
+- [ ] Obtain an independent code review; the automated review executable was
+  unavailable in this environment.
 - [ ] Obtain live-node interoperability evidence; primitive vectors alone do not
   establish full wire compatibility.
 - [ ] Run hosted Windows/macOS interface loopback tests and a live Python node
