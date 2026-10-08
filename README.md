@@ -15,7 +15,7 @@ production or security-critical use.
 | --- | --- | --- |
 | `src/DotReticulum.Core` | Identities, wire packets, destinations, interface manager | Foundation primitives and bounded packet dispatch |
 | `src/DotReticulum.Crypto` | Ed25519, X25519, HKDF, RNS tokens | Primitives and vector tests |
-| `src/DotReticulum.Transport` | Announces, routing, links, resources | Reserved assembly |
+| `src/DotReticulum.Transport` | Announces, routing, links, resources | Signed announce creation/validation and bounded per-destination rate limiting; no packet propagation or routing |
 | `src/DotReticulum.Interfaces` | TCP, UDP, serial, radio and tunnels | UDP datagrams; HDLC-framed TCP client/server and serial |
 | `src/DotReticulum.Applications` | CLI tools and telemetry | Basic `rnid` identity commands |
 
@@ -103,9 +103,10 @@ transfers require the future Resource engine, not an invented fragmentation form
 
 - **Initial milestone:** repository governance, modular solution, cryptographic
   and wire-format tests, basic identity CLI, build/test/NativeAOT CI.
-- **P0:** bounded interface manager and UDP/TCP/serial adapters are implemented;
-  announces and multi-hop transport, links/resources, LXMF, `rnsd`, `rncp`, `rnx`,
-  and telemetry remain.
+- **P0:** bounded interface manager and UDP/TCP/serial adapters are implemented,
+  along with signed announce creation/validation and bounded per-destination
+  announce rate limiting. Announce propagation and multi-hop transport,
+  links/resources, LXMF, `rnsd`, `rncp`, `rnx`, and telemetry remain.
 - **P1:** NativeAOT codec bindings, low-latency voice frames, half-duplex PTT.
 - **P2:** adaptive low-bandwidth video and multi-party receiver proof of concept.
 
