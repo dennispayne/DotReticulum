@@ -6,7 +6,7 @@ namespace DotReticulum.Core;
 public sealed class PacketInterfaceManager : IAsyncDisposable
 {
     private readonly IPacketInterface[] _interfaces;
-    private readonly Channel<ReadOnlyMemory<byte>> _incoming;
+    private readonly Channel<ReceivedPacket> _incoming;
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private CancellationTokenSource? _lifetime;
     private Task[] _receivers = [];
@@ -23,7 +23,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         if (_interfaces.Any(packetInterface => packetInterface is null))
             throw new ArgumentException("Interfaces cannot contain null entries.", nameof(interfaces));
 
-        _incoming = Channel.CreateBounded<ReadOnlyMemory<byte>>(new BoundedChannelOptions(queueCapacity)
+        _incoming = Channel.CreateBounded<ReceivedPacket>(new BoundedChannelOptions(queueCapacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleReader = false,
@@ -86,9 +86,17 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
     public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        await foreach (var received in ReceiveWithSourceAsync(cancellationToken).ConfigureAwait(false))
+            yield return received.Packet;
+    }
+
+    /// <summary>Reads packets together with the interface they arrived on.</summary>
+    public async IAsyncEnumerable<ReceivedPacket> ReceiveWithSourceAsync(
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
         EnsureStarted();
-        await foreach (var packet in _incoming.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-            yield return packet;
+        await foreach (var received in _incoming.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            yield return received;
     }
 
     /// <summary>Sends a packet through every managed interface.</summary>
@@ -99,6 +107,24 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         EnsureStarted();
         await Task.WhenAll(_interfaces.Select(
             packetInterface => packetInterface.SendAsync(packet, cancellationToken).AsTask()))
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>Sends a packet through every managed interface except its ingress interface.</summary>
+    public async ValueTask SendExceptAsync(
+        ReadOnlyMemory<byte> packet,
+        IPacketInterface excludedInterface,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(excludedInterface);
+        EnsureStarted();
+        if (!_interfaces.Any(packetInterface => ReferenceEquals(packetInterface, excludedInterface)))
+            throw new ArgumentException("The excluded interface is not managed by this manager.",
+                nameof(excludedInterface));
+
+        await Task.WhenAll(_interfaces
+            .Where(packetInterface => !ReferenceEquals(packetInterface, excludedInterface))
+            .Select(packetInterface => packetInterface.SendAsync(packet, cancellationToken).AsTask()))
             .ConfigureAwait(false);
     }
 
@@ -158,7 +184,8 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
             await foreach (var packet in packetInterface.ReceiveAsync(cancellationToken).ConfigureAwait(false))
             {
                 if (Packet.TryParse(packet, out _))
-                    await _incoming.Writer.WriteAsync(packet.ToArray(), cancellationToken).ConfigureAwait(false);
+                    await _incoming.Writer.WriteAsync(new ReceivedPacket(packetInterface, packet.ToArray()),
+                        cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

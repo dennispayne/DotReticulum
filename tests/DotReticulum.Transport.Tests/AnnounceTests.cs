@@ -1,5 +1,6 @@
 using DotReticulum.Core;
 using DotReticulum.Transport;
+using System.Threading.Channels;
 
 namespace DotReticulum.Transport.Tests;
 
@@ -7,6 +8,9 @@ public class AnnounceTests
 {
     private static readonly byte[] ReferencePacket = Convert.FromHexString(
         "01008083452306ea7a0733216a502f5f6283008f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd73a2c54c2856d61ef90cca1b2c3d4e5006553f100e15e1c039cbb248d2b8bc0606239baf9d6d35697cfd974daf0a2166be6e38fb617427a0926f3bc68bc2817d41625bd8a8a5cf13618019a8ff04d6f286440c20d757073747265616d2d766563746f72");
+    // Generated with upstream Transport.mangle_hops; reproduce with GenerateAnnounceVector.py.
+    private static readonly byte[] ReferenceForwardedPacket = Convert.FromHexString(
+        "01018083452306ea7a0733216a502f5f6283008f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd73a2c54c2856d61ef90cca1b2c3d4e5006553f100e15e1c039cbb248d2b8bc0606239baf9d6d35697cfd974daf0a2166be6e38fb617427a0926f3bc68bc2817d41625bd8a8a5cf13618019a8ff04d6f286440c20d757073747265616d2d766563746f72");
 
     [Fact]
     public void ValidatesPinnedUpstreamPythonAnnounce()
@@ -73,6 +77,91 @@ public class AnnounceTests
         var tooShort = Packet.Create(PacketType.Announce, DestinationType.Single, new byte[16], new byte[1]);
         Assert.False(Announce.TryValidate(tooShort, out var announce));
         Assert.Null(announce);
+    }
+
+    [Fact]
+    public async Task PropagatorRelaysValidAnnouncesOnceAndExcludesIngress()
+    {
+        var ingress = new TestPacketInterface();
+        var egress = new TestPacketInterface();
+        await using var manager = new PacketInterfaceManager([ingress, egress]);
+        await manager.StartAsync();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var propagator = new AnnouncePropagator(manager,
+            new AnnounceRateLimiter(TimeSpan.FromSeconds(1)));
+        var propagation = propagator.RunAsync(cancellation.Token);
+
+        var invalid = (byte[])ReferencePacket.Clone();
+        invalid[^1] ^= 1;
+        var atHopLimit = (byte[])ReferencePacket.Clone();
+        atHopLimit[1] = Packet.HopLimit - 1;
+        await ingress.PublishAsync(invalid);
+        await ingress.PublishAsync(atHopLimit);
+        await ingress.PublishAsync(ReferencePacket);
+
+        var forwarded = await egress.ReadSentAsync(cancellation.Token);
+        Assert.Equal(ReferenceForwardedPacket, forwarded);
+        Assert.True(Announce.TryValidate(Packet.Parse(forwarded), out _));
+        Assert.Equal(0, ingress.SentCount);
+
+        await ingress.PublishAsync(ReferencePacket);
+        await ingress.WaitUntilReceivedAsync(4, cancellation.Token);
+        await Task.Delay(100, cancellation.Token);
+        Assert.False(egress.TryReadSent(out _));
+
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => propagation);
+    }
+
+    private sealed class TestPacketInterface : IPacketInterface
+    {
+        private readonly Channel<ReadOnlyMemory<byte>> _incoming =
+            Channel.CreateUnbounded<ReadOnlyMemory<byte>>();
+        private readonly Channel<byte[]> _sent = Channel.CreateUnbounded<byte[]>();
+        private int _received;
+        private int _sentCount;
+
+        internal int SentCount => Volatile.Read(ref _sentCount);
+
+        public ValueTask StartAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+
+        public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await foreach (var packet in _incoming.Reader.ReadAllAsync(cancellationToken))
+            {
+                Interlocked.Increment(ref _received);
+                yield return packet;
+            }
+        }
+
+        public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref _sentCount);
+            return _sent.Writer.WriteAsync(packet.ToArray(), cancellationToken);
+        }
+
+        internal ValueTask PublishAsync(byte[] packet) =>
+            _incoming.Writer.WriteAsync(packet.ToArray());
+
+        internal ValueTask<byte[]> ReadSentAsync(CancellationToken cancellationToken) =>
+            _sent.Reader.ReadAsync(cancellationToken);
+
+        internal bool TryReadSent(out byte[]? packet) => _sent.Reader.TryRead(out packet);
+
+        internal async Task WaitUntilReceivedAsync(int count, CancellationToken cancellationToken)
+        {
+            while (Volatile.Read(ref _received) < count)
+                await Task.Delay(10, cancellationToken);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            _incoming.Writer.TryComplete();
+            _sent.Writer.TryComplete();
+            return ValueTask.CompletedTask;
+        }
     }
 }
 

@@ -1,8 +1,8 @@
-"""Generate the pinned signed announce fixture from upstream Reticulum methods.
+"""Generate the pinned signed announce and forwarded packet fixtures.
 
 Run with PYTHONPATH pointing at Reticulum revision
 e40191b3d193b46b7f2d8a44424a594cd758839b. Generation uses upstream Identity and
-Destination methods plus the field order in Destination.announce().
+Destination methods plus Transport.mangle_hops from that checkout.
 """
 
 import subprocess
@@ -30,8 +30,10 @@ signed_data = (
 signature = identity.sign(signed_data)
 payload = identity.get_public_key() + name_hash + random_hash + signature + app_data
 packet = bytes([RNS.Packet.ANNOUNCE, 0]) + destination_hash + b"\x00" + payload
+forwarded_packet = RNS.Transport.mangle_hops(packet, 1)
 print(f"destination hash: {destination_hash.hex()}")
 print(f"name hash: {name_hash.hex()}")
 print(f"random hash: {random_hash.hex()}")
 print(f"signature: {signature.hex()}")
 print(f"packet: {packet.hex()}")
+print(f"forwarded packet: {forwarded_packet.hex()}")
