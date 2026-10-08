@@ -23,7 +23,7 @@ public sealed class TcpServerPacketInterface : IPacketInterface
     private readonly CancellationTokenSource _lifetime = new();
     private TcpListener? _listener;
     private Task? _acceptLoop;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     public TcpServerPacketInterface(IPEndPoint localEndPoint)
     {
@@ -32,6 +32,7 @@ public sealed class TcpServerPacketInterface : IPacketInterface
     }
 
     public IPEndPoint? LocalEndPoint => _listener?.LocalEndpoint as IPEndPoint;
+    public int ConnectedClientCount => _clients.Count;
 
     public ValueTask StartAsync(CancellationToken cancellationToken = default)
     {
@@ -52,6 +53,7 @@ public sealed class TcpServerPacketInterface : IPacketInterface
     {
         if (_listener is null)
             throw new InvalidOperationException("The TCP server interface has not been started.");
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
         await foreach (var packet in _incoming.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             yield return packet;
@@ -96,8 +98,6 @@ public sealed class TcpServerPacketInterface : IPacketInterface
         }
 
         _incoming.Writer.TryComplete();
-        foreach (var writeLock in _clients.Values)
-            writeLock.Dispose();
         _lifetime.Dispose();
     }
 
@@ -128,6 +128,7 @@ public sealed class TcpServerPacketInterface : IPacketInterface
 
     private async Task ReceiveClientAsync(TcpClient client, CancellationToken cancellationToken)
     {
+        await Task.Yield();
         var decoder = new HdlcPacketFraming.Decoder();
         var readBuffer = new byte[4096];
         var stream = client.GetStream();
@@ -152,6 +153,9 @@ public sealed class TcpServerPacketInterface : IPacketInterface
         {
         }
         catch (ObjectDisposedException)
+        {
+        }
+        catch (ChannelClosedException) when (cancellationToken.IsCancellationRequested)
         {
         }
         finally

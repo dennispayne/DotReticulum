@@ -11,7 +11,7 @@ public sealed class TcpClientPacketInterface : IPacketInterface
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private TcpClient? _client;
     private int _receiving;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     public TcpClientPacketInterface(IPEndPoint remoteEndPoint)
     {
@@ -108,7 +108,6 @@ public sealed class TcpClientPacketInterface : IPacketInterface
         _disposed = true;
         _client?.Dispose();
         _client = null;
-        _writeLock.Dispose();
         return ValueTask.CompletedTask;
     }
 }

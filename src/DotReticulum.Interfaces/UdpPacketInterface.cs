@@ -46,6 +46,14 @@ public sealed class UdpPacketInterface : IPacketInterface
             {
                 yield break;
             }
+            catch (SocketException) when (cancellationToken.IsCancellationRequested)
+            {
+                yield break;
+            }
+            catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
+            {
+                yield break;
+            }
 
             if (result.RemoteEndPoint.Equals(_remoteEndPoint)
                 && Packet.TryParse(result.Buffer, out _))

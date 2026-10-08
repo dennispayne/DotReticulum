@@ -94,6 +94,38 @@ public sealed class PacketInterfaceTests
         Assert.Equal(WirePacket, clientPackets.Current.ToArray());
     }
 
+    [Fact]
+    public async Task TcpClientMatchesPinnedUpstreamHdlcFramingVector()
+    {
+        // Extracted HDLC.escape from Reticulum e40191b3d193b46b7f2d8a44424a594cd758839b.
+        // Reproduce with GenerateHdlcVector.py; upstream TCPInterface.py SHA256:
+        // 0e397dbdd9ce47db533a7181a4b924ef351fb0dee8d8e43c0cc1c64be173668b.
+        var expectedFrame = Convert.FromHexString(
+            "7e000000000000000000000000000000000000007d5d7d5e7e");
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            var framingPacket = Packet.Create(
+                PacketType.Data, DestinationType.Single, new byte[16], [0x7d, 0x7e]).Raw;
+            var endpoint = Assert.IsType<IPEndPoint>(listener.LocalEndpoint);
+            await using var client = new TcpClientPacketInterface(endpoint);
+            await client.StartAsync();
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var peer = await listener.AcceptTcpClientAsync(cancellation.Token);
+
+            await client.SendAsync(framingPacket, cancellation.Token);
+            var actualFrame = new byte[expectedFrame.Length];
+            await peer.GetStream().ReadExactlyAsync(actualFrame, cancellation.Token);
+
+            Assert.Equal(expectedFrame, actualFrame);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
     private static int ReserveUdpPort()
     {
         using var socket = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));

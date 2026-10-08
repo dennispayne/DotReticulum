@@ -54,11 +54,25 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
                     .ToArray();
                 _ = CompleteWhenReceiversStopAsync(_receivers);
             }
-            catch
+            catch (Exception startException)
             {
                 _lifetime.Cancel();
-                await DisposeInterfacesAsync().ConfigureAwait(false);
-                _incoming.Writer.TryComplete();
+                _disposed = true;
+                Exception? disposeException = null;
+                try
+                {
+                    await DisposeInterfacesAsync().ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    disposeException = exception;
+                }
+
+                _incoming.Writer.TryComplete(startException);
+                _lifetime.Dispose();
+                if (disposeException is not null)
+                    throw new AggregateException("Starting and cleaning up packet interfaces failed.",
+                        startException, disposeException);
                 throw;
             }
         }
@@ -104,7 +118,16 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
             _lifecycle.Release();
         }
 
-        await DisposeInterfacesAsync().ConfigureAwait(false);
+        Exception? disposeException = null;
+        try
+        {
+            await DisposeInterfacesAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            disposeException = exception;
+        }
+
         try
         {
             await Task.WhenAll(_receivers).ConfigureAwait(false);
@@ -112,12 +135,20 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         catch (OperationCanceledException)
         {
         }
+        catch (Exception exception)
+        {
+            disposeException = disposeException is null
+                ? exception
+                : new AggregateException(disposeException, exception);
+        }
         finally
         {
             _incoming.Writer.TryComplete();
             _lifetime?.Dispose();
-            _lifecycle.Dispose();
         }
+
+        if (disposeException is not null)
+            throw disposeException;
     }
 
     private async Task ReceivePacketsAsync(IPacketInterface packetInterface, CancellationToken cancellationToken)

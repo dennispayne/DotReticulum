@@ -4,12 +4,13 @@ using DotReticulum.Core;
 if (args.Length == 0 || args is ["--help"] or ["-h"])
 {
     Console.WriteLine("""
-        DotReticulum — experimental Reticulum primitives
+        DotReticulum — experimental Reticulum stack
 
         rnid --generate <file>   Create a raw 64-byte private identity (never overwrite).
         rnid --show <file>       Show the identity hash and public key only.
 
-        Networking, routing, links, resources and LXMF are not implemented yet.
+        UDP/TCP packet interfaces are available as a library.
+        Discovery, routing, links, resources and LXMF are not implemented yet.
         """);
     return 0;
 }
