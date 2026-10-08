@@ -128,6 +128,60 @@ public sealed class PacketInterfaceTests
         }
     }
 
+    [Fact]
+    public async Task SerialInterfaceFramesPacketsOverDuplexStream()
+    {
+        var stream = new TestDuplexStream();
+        await using var serial = new SerialPacketInterface(stream);
+        await serial.StartAsync();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using var packets = serial.ReceiveAsync(cancellation.Token).GetAsyncEnumerator();
+
+        var packet = Packet.Create(PacketType.Data, DestinationType.Single, new byte[16], [0x7d, 0x7e]).Raw;
+        var expectedFrame = Convert.FromHexString("7e000000000000000000000000000000000000007d5d7d5e7e");
+        var receive = packets.MoveNextAsync().AsTask();
+        stream.Feed(expectedFrame.AsMemory(0, 7));
+        stream.Feed(expectedFrame.AsMemory(7));
+
+        Assert.True(await receive);
+        Assert.Equal(packet, packets.Current.ToArray());
+
+        await serial.SendAsync(packet, cancellation.Token);
+        Assert.Equal(expectedFrame, await stream.ReadWriteAsync(cancellation.Token));
+    }
+
+    [Fact]
+    public async Task SerialInterfaceRequiresStartAndAllowsOnlyOneReceiver()
+    {
+        var stream = new TestDuplexStream();
+        await using var serial = new SerialPacketInterface(stream);
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await serial.SendAsync(WirePacket));
+        await serial.StartAsync();
+
+        using var cancellation = new CancellationTokenSource();
+        await using var first = serial.ReceiveAsync(cancellation.Token).GetAsyncEnumerator();
+        await using var second = serial.ReceiveAsync(cancellation.Token).GetAsyncEnumerator();
+        var pendingReceive = first.MoveNextAsync().AsTask();
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await second.MoveNextAsync());
+        cancellation.Cancel();
+        Assert.False(await pendingReceive);
+    }
+
+    [Fact]
+    public async Task DisposingSerialInterfaceCancelsReceiveOnBorrowedStream()
+    {
+        var stream = new TestDuplexStream();
+        await using var serial = new SerialPacketInterface(stream);
+        await serial.StartAsync();
+
+        await using var packets = serial.ReceiveAsync().GetAsyncEnumerator();
+        var pendingReceive = packets.MoveNextAsync().AsTask();
+        await serial.DisposeAsync();
+
+        Assert.False(await pendingReceive);
+    }
+
     private static int ReserveUdpPort()
     {
         using var socket = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
@@ -173,6 +227,77 @@ public sealed class PacketInterfaceTests
         {
             _incoming.Writer.TryComplete();
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class TestDuplexStream : Stream
+    {
+        private readonly Channel<byte[]> _incoming = Channel.CreateUnbounded<byte[]>();
+        private readonly TaskCompletionSource<byte[]> _written = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private byte[]? _current;
+        private int _offset;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public void Feed(ReadOnlyMemory<byte> bytes) => _incoming.Writer.TryWrite(bytes.ToArray());
+
+        public Task<byte[]> ReadWriteAsync(CancellationToken cancellationToken) =>
+            _written.Task.WaitAsync(cancellationToken);
+
+        public override async ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            while (_current is null || _offset == _current.Length)
+            {
+                _current = await _incoming.Reader.ReadAsync(cancellationToken);
+                _offset = 0;
+            }
+
+            var count = Math.Min(buffer.Length, _current.Length - _offset);
+            _current.AsMemory(_offset, count).CopyTo(buffer);
+            _offset += count;
+            return count;
+        }
+
+        public override ValueTask WriteAsync(
+            ReadOnlyMemory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _written.TrySetResult(buffer.ToArray());
+            return ValueTask.CompletedTask;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) =>
+            throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) =>
+            throw new NotSupportedException();
+
+        public override void SetLength(long value) =>
+            throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                _incoming.Writer.TryComplete();
+            base.Dispose(disposing);
         }
     }
 }
