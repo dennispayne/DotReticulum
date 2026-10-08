@@ -121,6 +121,10 @@ Foundation and interface milestone verification recorded 2026-10-08:
   `tests/DotReticulum.Transport.Tests/GenerateAnnounceVector.py`.
 - [ ] Announce packet creation is unit-tested, but live announce exchange and
   propagation are not implemented or verified.
+- [x] Release solution build passed with zero warnings; all 223 tests passed
+  (162 Core + 47 Crypto + 8 Interfaces + 6 Transport), none skipped.
+- [x] Linux `linux-x64` NativeAOT publish passed with linker/compiler warnings
+  treated as errors.
 
 For protocol changes, require independently generated Python reference vectors
 with the exact upstream revision and generation method. Round-trip tests alone

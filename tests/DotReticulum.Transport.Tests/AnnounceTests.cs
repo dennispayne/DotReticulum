@@ -57,6 +57,10 @@ public class AnnounceTests
         Assert.False(packet.ContextFlag);
         Assert.True(Announce.TryValidate(packet, out var announce));
         Assert.Equal(new byte[] { 1, 2, 3 }, announce!.AppData.ToArray());
+        var maximum = Announce.Create(identity, "example.echo",
+            new byte[Announce.MaximumAppDataLength]);
+        Assert.Equal(Packet.Mtu, maximum.Raw.Length);
+        Assert.True(Announce.TryValidate(maximum, out _));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             Announce.Create(identity, "example.echo", new byte[Announce.MaximumAppDataLength + 1]));
         using var publicIdentity = Identity.FromPublicKey(identity.ExportPublicKey());
