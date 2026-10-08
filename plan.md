@@ -34,7 +34,9 @@ protocol or portability milestones complete.
 - [x] Implement interface lifecycle management and bounded packet processing.
 - [x] Implement UDP datagram and HDLC-framed TCP client/server interfaces.
 - [x] Implement HDLC-framed serial packet interfaces.
-- [ ] Implement announce creation, validation, propagation, and rate limiting.
+- [x] Implement signed announce packet creation, signature validation, and bounded
+  per-destination rate limiting (non-ratcheted announces).
+- [ ] Implement announce propagation through the transport and ratchet announces.
 - [ ] Implement path discovery, routing tables, hop handling, and multi-hop transport.
 - [ ] Validate routing resilience under packet loss and latency.
 
@@ -113,6 +115,16 @@ Foundation and interface milestone verification recorded 2026-10-08:
   lifecycle validation, single-reader enforcement, and disposal cancellation.
 - [ ] Verify a physical serial device and live Python-node interoperability; not
   covered by the current local tests.
+- [x] Announce signature fixture generated with upstream `Identity` and
+  `Destination.hash` methods at revision
+  `e40191b3d193b46b7f2d8a44424a594cd758839b`; reproduce with
+  `tests/DotReticulum.Transport.Tests/GenerateAnnounceVector.py`.
+- [ ] Announce packet creation is unit-tested, but live announce exchange and
+  propagation are not implemented or verified.
+- [x] Release solution build passed with zero warnings; all 223 tests passed
+  (162 Core + 47 Crypto + 8 Interfaces + 6 Transport), none skipped.
+- [x] Linux `linux-x64` NativeAOT publish passed with linker/compiler warnings
+  treated as errors.
 
 For protocol changes, require independently generated Python reference vectors
 with the exact upstream revision and generation method. Round-trip tests alone
