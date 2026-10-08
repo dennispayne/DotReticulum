@@ -65,8 +65,9 @@ backpressure to incoming packets (capacity defaults to 256), reads packets from
 all managed interfaces, and sends outgoing packets through each one. UDP sends
 one complete packet per datagram to its configured peer. TCP client/server
 interfaces use Reticulum's HDLC framing; TCP reconnect policy, serial, and other
-bearers are not implemented. These interfaces carry packets only—they do not
-provide discovery, routing, or link reliability.
+bearers are not implemented. The TCP server defaults to at most 64 simultaneous
+clients. These interfaces carry packets only—they do not provide discovery,
+routing, or link reliability.
 
 ```csharp
 var bearer = new UdpPacketInterface(localEndPoint, peerEndPoint);

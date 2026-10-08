@@ -10,6 +10,8 @@ internal static class HdlcPacketFraming
 
     internal static byte[] Encode(ReadOnlySpan<byte> packet)
     {
+        if (packet.Length < Packet.Header1Length + 1 || packet.Length > Packet.Mtu)
+            throw new ArgumentException("Data must contain one complete Reticulum packet.", nameof(packet));
         if (!Packet.TryParse(packet.ToArray(), out _))
             throw new ArgumentException("Data must contain one complete Reticulum packet.", nameof(packet));
 
@@ -46,7 +48,7 @@ internal static class HdlcPacketFraming
             {
                 if (value == Flag)
                 {
-                    if (_insideFrame && !_discarding && _frame.Count > 0)
+                    if (_insideFrame && !_discarding && !_escaped && _frame.Count > 0)
                     {
                         var packet = _frame.ToArray();
                         if (Packet.TryParse(packet, out _))

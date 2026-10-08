@@ -10,8 +10,8 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private CancellationTokenSource? _lifetime;
     private Task[] _receivers = [];
-    private bool _started;
-    private bool _disposed;
+    private volatile bool _started;
+    private volatile bool _disposed;
 
     public PacketInterfaceManager(IEnumerable<IPacketInterface> interfaces, int queueCapacity = 256)
     {
@@ -156,7 +156,10 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         try
         {
             await foreach (var packet in packetInterface.ReceiveAsync(cancellationToken).ConfigureAwait(false))
-                await _incoming.Writer.WriteAsync(packet, cancellationToken).ConfigureAwait(false);
+            {
+                if (Packet.TryParse(packet, out _))
+                    await _incoming.Writer.WriteAsync(packet.ToArray(), cancellationToken).ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

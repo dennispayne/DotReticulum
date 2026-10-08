@@ -10,6 +10,7 @@ namespace DotReticulum.Interfaces;
 public sealed class TcpServerPacketInterface : IPacketInterface
 {
     private readonly IPEndPoint _localEndPoint;
+    private readonly int _maximumClients;
     private readonly Channel<ReadOnlyMemory<byte>> _incoming =
         Channel.CreateBounded<ReadOnlyMemory<byte>>(new BoundedChannelOptions(64)
         {
@@ -25,10 +26,13 @@ public sealed class TcpServerPacketInterface : IPacketInterface
     private Task? _acceptLoop;
     private volatile bool _disposed;
 
-    public TcpServerPacketInterface(IPEndPoint localEndPoint)
+    public TcpServerPacketInterface(IPEndPoint localEndPoint, int maximumClients = 64)
     {
         ArgumentNullException.ThrowIfNull(localEndPoint);
+        if (maximumClients <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maximumClients));
         _localEndPoint = localEndPoint;
+        _maximumClients = maximumClients;
     }
 
     public IPEndPoint? LocalEndPoint => _listener?.LocalEndpoint as IPEndPoint;
@@ -108,6 +112,12 @@ public sealed class TcpServerPacketInterface : IPacketInterface
             while (!cancellationToken.IsCancellationRequested)
             {
                 var client = await listener.AcceptTcpClientAsync(cancellationToken).ConfigureAwait(false);
+                if (_clients.Count >= _maximumClients)
+                {
+                    client.Dispose();
+                    continue;
+                }
+
                 client.NoDelay = true;
                 var writeLock = new SemaphoreSlim(1, 1);
                 _clients[client] = writeLock;

@@ -98,9 +98,11 @@ Foundation and interface milestone verification recorded 2026-10-08:
 - [x] TCP HDLC frame vector generated from upstream `TCPInterface.py` at
   `e40191b3d193b46b7f2d8a44424a594cd758839b`; source SHA-256
   `0e397dbdd9ce47db533a7181a4b924ef351fb0dee8d8e43c0cc1c64be173668b`.
-- [x] Linux `linux-x64` NativeAOT publish and native CLI smoke checks passed without
-  warnings, including identity reload, Unix `0600`, and overwrite refusal.
-- [x] Changed files passed secret scanning; independent review found no issues.
+- [x] Linux `linux-x64` NativeAOT publish passed without warnings and the native
+  CLI help smoke test passed during this interface milestone.
+- [x] Foundation changes passed secret scanning and independent review.
+- [x] Interface changes passed secret scanning; automated code review/security
+  validation remains pending.
 - [ ] Obtain a completed C# CodeQL result: the foundation scan timed out; completed
   Actions/Python analyses reported no alerts.
 - [ ] Obtain live-node interoperability evidence; primitive vectors alone do not

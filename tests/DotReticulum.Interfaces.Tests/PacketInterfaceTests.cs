@@ -20,9 +20,11 @@ public sealed class PacketInterfaceTests
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await manager.ReceiveAsync().GetAsyncEnumerator().MoveNextAsync());
         await manager.StartAsync();
-        await fake.PublishAsync(WirePacket);
+        var mutablePacket = WirePacket.ToArray();
+        await fake.PublishAsync(mutablePacket);
 
         await fake.WaitUntilConsumedAsync(1);
+        Array.Fill(mutablePacket, (byte)0);
         await using var received = manager.ReceiveAsync().GetAsyncEnumerator();
         Assert.True(await received.MoveNextAsync());
         Assert.Equal(WirePacket, received.Current.ToArray());
