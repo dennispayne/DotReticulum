@@ -1,0 +1,16 @@
+name: Feature request
+description: Propose a feature aligned with the Reticulum roadmap
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and use case
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed capability
+      description: Describe protocol compatibility, platform constraints, and alternatives.
+    validations:
+      required: true
