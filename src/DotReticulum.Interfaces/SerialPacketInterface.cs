@@ -9,6 +9,7 @@ public sealed class SerialPacketInterface : IPacketInterface
     private readonly SerialPort? _serialPort;
     private readonly Stream? _providedStream;
     private readonly bool _ownsStream;
+    private readonly object _lifecycleLock = new();
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly CancellationTokenSource _lifetime = new();
     private Stream? _stream;
@@ -33,27 +34,32 @@ public sealed class SerialPacketInterface : IPacketInterface
 
     public ValueTask StartAsync(CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(Volatile.Read(ref _state) == 2, this);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (Interlocked.CompareExchange(ref _state, 1, 0) != 0)
-            throw new InvalidOperationException("The serial interface has already been started.");
+        lock (_lifecycleLock)
+        {
+            ObjectDisposedException.ThrowIf(_state == 2, this);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_state != 0)
+                throw new InvalidOperationException("The serial interface has already been started.");
 
-        try
-        {
-            if (_serialPort is not null)
+            try
             {
-                _serialPort.Open();
-                _stream = _serialPort.BaseStream;
+                if (_serialPort is not null)
+                {
+                    _serialPort.Open();
+                    _stream = _serialPort.BaseStream;
+                }
+                else
+                {
+                    _stream = _providedStream;
+                }
             }
-            else
+            catch
             {
-                _stream = _providedStream;
+                _stream = null;
+                throw;
             }
-        }
-        catch
-        {
-            Interlocked.Exchange(ref _state, 0);
-            throw;
+
+            Volatile.Write(ref _state, 1);
         }
 
         return ValueTask.CompletedTask;
@@ -128,9 +134,13 @@ public sealed class SerialPacketInterface : IPacketInterface
 
     public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _state, 2) == 2)
-            return ValueTask.CompletedTask;
+        lock (_lifecycleLock)
+        {
+            if (_state == 2)
+                return ValueTask.CompletedTask;
 
+            Volatile.Write(ref _state, 2);
+        }
         _lifetime.Cancel();
         if (_serialPort is not null)
             _serialPort.Dispose();
@@ -142,8 +152,9 @@ public sealed class SerialPacketInterface : IPacketInterface
 
     private Stream GetStartedStream()
     {
-        ObjectDisposedException.ThrowIf(Volatile.Read(ref _state) == 2, this);
-        return _state == 1
+        var state = Volatile.Read(ref _state);
+        ObjectDisposedException.ThrowIf(state == 2, this);
+        return state == 1
             ? _stream!
             : throw new InvalidOperationException("The serial interface has not been started.");
     }
