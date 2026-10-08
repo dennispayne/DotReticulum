@@ -31,8 +31,9 @@ protocol or portability milestones complete.
 ### Interfaces and routing
 
 - [x] Define a cancellation-aware asynchronous packet interface contract.
-- [ ] Implement interface lifecycle management and bounded packet processing.
-- [ ] Implement UDP, TCP client, TCP server, and serial interfaces.
+- [x] Implement interface lifecycle management and bounded packet processing.
+- [x] Implement UDP datagram and HDLC-framed TCP client/server interfaces.
+- [ ] Implement serial interfaces.
 - [ ] Implement announce creation, validation, propagation, and rate limiting.
 - [ ] Implement path discovery, routing tables, hop handling, and multi-hop transport.
 - [ ] Validate routing resilience under packet loss and latency.
@@ -88,17 +89,26 @@ protocol or portability milestones complete.
 
 ## Verification record and open gaps
 
-These results were recorded during the foundation implementation; they are not
-claims of new runs for this documentation update.
+Foundation and interface milestone verification recorded 2026-10-08:
 
-- [x] Release solution tests: 209 passed (162 Core + 47 Crypto), none skipped.
-- [x] Linux `linux-x64` NativeAOT publish and native CLI smoke checks passed without
-  warnings, including identity reload, Unix `0600`, and overwrite refusal.
-- [x] Changed files passed secret scanning; independent review found no issues.
-- [ ] Obtain a completed C# CodeQL result: the foundation scan timed out; completed
-  Actions/Python analyses reported no alerts.
+- [x] Release solution tests: 214 passed (162 Core + 47 Crypto + 5 Interfaces),
+  none skipped.
+- [x] UDP loopback, TCP bidirectional loopback, manager lifecycle/backpressure,
+  and upstream HDLC frame-vector tests passed.
+- [x] TCP HDLC frame vector generated from upstream `TCPInterface.py` at
+  `e40191b3d193b46b7f2d8a44424a594cd758839b`; source SHA-256
+  `0e397dbdd9ce47db533a7181a4b924ef351fb0dee8d8e43c0cc1c64be173668b`.
+- [x] Linux `linux-x64` NativeAOT publish passed without warnings and the native
+  CLI help smoke test passed during this interface milestone.
+- [x] Foundation changes passed secret scanning and independent review.
+- [x] Interface changes passed secret scanning; current C#/Python CodeQL reported
+  zero alerts.
+- [ ] Obtain an independent code review; the automated review executable was
+  unavailable in this environment.
 - [ ] Obtain live-node interoperability evidence; primitive vectors alone do not
   establish full wire compatibility.
+- [ ] Run hosted Windows/macOS interface loopback tests and a live Python node
+  test; this local run covered Linux loopback only.
 
 For protocol changes, require independently generated Python reference vectors
 with the exact upstream revision and generation method. Round-trip tests alone

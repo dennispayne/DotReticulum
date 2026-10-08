@@ -19,8 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\DotReticulum.Crypto\DotReticulum.Crypto.csproj" />
     <ProjectReference Include="..\..\src\DotReticulum.Core\DotReticulum.Core.csproj" />
+    <ProjectReference Include="..\..\src\DotReticulum.Interfaces\DotReticulum.Interfaces.csproj" />
   </ItemGroup>
 
 </Project>
