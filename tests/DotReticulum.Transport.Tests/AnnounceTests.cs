@@ -1,5 +1,6 @@
 using DotReticulum.Core;
 using DotReticulum.Transport;
+using System.Threading.Channels;
 
 namespace DotReticulum.Transport.Tests;
 
@@ -73,6 +74,93 @@ public class AnnounceTests
         var tooShort = Packet.Create(PacketType.Announce, DestinationType.Single, new byte[16], new byte[1]);
         Assert.False(Announce.TryValidate(tooShort, out var announce));
         Assert.Null(announce);
+    }
+
+    [Fact]
+    public async Task PropagatorRelaysValidAnnouncesOnceAndExcludesIngress()
+    {
+        var ingress = new TestPacketInterface();
+        var egress = new TestPacketInterface();
+        await using var manager = new PacketInterfaceManager([ingress, egress]);
+        await manager.StartAsync();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var propagator = new AnnouncePropagator(manager,
+            new AnnounceRateLimiter(TimeSpan.FromSeconds(1)));
+        var propagation = propagator.RunAsync(cancellation.Token);
+
+        var invalid = (byte[])ReferencePacket.Clone();
+        invalid[^1] ^= 1;
+        var atHopLimit = (byte[])ReferencePacket.Clone();
+        atHopLimit[1] = Packet.HopLimit - 1;
+        await ingress.PublishAsync(invalid);
+        await ingress.PublishAsync(atHopLimit);
+        await ingress.PublishAsync(ReferencePacket);
+
+        var forwarded = await egress.ReadSentAsync(cancellation.Token);
+        var expected = (byte[])ReferencePacket.Clone();
+        expected[1] = 1;
+        Assert.Equal(expected, forwarded);
+        Assert.True(Announce.TryValidate(Packet.Parse(forwarded), out _));
+        Assert.Equal(0, ingress.SentCount);
+
+        await ingress.PublishAsync(ReferencePacket);
+        await ingress.WaitUntilReceivedAsync(4, cancellation.Token);
+        await Task.Delay(100, cancellation.Token);
+        Assert.False(egress.TryReadSent(out _));
+
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => propagation);
+    }
+
+    private sealed class TestPacketInterface : IPacketInterface
+    {
+        private readonly Channel<ReadOnlyMemory<byte>> _incoming =
+            Channel.CreateUnbounded<ReadOnlyMemory<byte>>();
+        private readonly Channel<byte[]> _sent = Channel.CreateUnbounded<byte[]>();
+        private int _received;
+        private int _sentCount;
+
+        internal int SentCount => Volatile.Read(ref _sentCount);
+
+        public ValueTask StartAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+
+        public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await foreach (var packet in _incoming.Reader.ReadAllAsync(cancellationToken))
+            {
+                Interlocked.Increment(ref _received);
+                yield return packet;
+            }
+        }
+
+        public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref _sentCount);
+            return _sent.Writer.WriteAsync(packet.ToArray(), cancellationToken);
+        }
+
+        internal ValueTask PublishAsync(byte[] packet) =>
+            _incoming.Writer.WriteAsync(packet.ToArray());
+
+        internal ValueTask<byte[]> ReadSentAsync(CancellationToken cancellationToken) =>
+            _sent.Reader.ReadAsync(cancellationToken);
+
+        internal bool TryReadSent(out byte[]? packet) => _sent.Reader.TryRead(out packet);
+
+        internal async Task WaitUntilReceivedAsync(int count, CancellationToken cancellationToken)
+        {
+            while (Volatile.Read(ref _received) < count)
+                await Task.Delay(10, cancellationToken);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            _incoming.Writer.TryComplete();
+            _sent.Writer.TryComplete();
+            return ValueTask.CompletedTask;
+        }
     }
 }
 
