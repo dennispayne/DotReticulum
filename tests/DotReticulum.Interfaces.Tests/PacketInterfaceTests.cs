@@ -168,6 +168,20 @@ public sealed class PacketInterfaceTests
         Assert.False(await pendingReceive);
     }
 
+    [Fact]
+    public async Task DisposingSerialInterfaceCancelsReceiveOnBorrowedStream()
+    {
+        var stream = new TestDuplexStream();
+        await using var serial = new SerialPacketInterface(stream);
+        await serial.StartAsync();
+
+        await using var packets = serial.ReceiveAsync().GetAsyncEnumerator();
+        var pendingReceive = packets.MoveNextAsync().AsTask();
+        await serial.DisposeAsync();
+
+        Assert.False(await pendingReceive);
+    }
+
     private static int ReserveUdpPort()
     {
         using var socket = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
@@ -192,77 +206,6 @@ public sealed class PacketInterfaceTests
                 Interlocked.Increment(ref _consumed);
                 yield return packet;
             }
-
-            private sealed class TestDuplexStream : Stream
-            {
-                private readonly Channel<byte[]> _incoming = Channel.CreateUnbounded<byte[]>();
-                private readonly TaskCompletionSource<byte[]> _written = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                private byte[]? _current;
-                private int _offset;
-
-                public override bool CanRead => true;
-                public override bool CanSeek => false;
-                public override bool CanWrite => true;
-                public override long Length => throw new NotSupportedException();
-                public override long Position
-                {
-                    get => throw new NotSupportedException();
-                    set => throw new NotSupportedException();
-                }
-
-                public void Feed(ReadOnlyMemory<byte> bytes) => _incoming.Writer.TryWrite(bytes.ToArray());
-
-                public Task<byte[]> ReadWriteAsync(CancellationToken cancellationToken) =>
-                    _written.Task.WaitAsync(cancellationToken);
-
-                public override async ValueTask<int> ReadAsync(
-                    Memory<byte> buffer,
-                    CancellationToken cancellationToken = default)
-                {
-                    while (_current is null || _offset == _current.Length)
-                    {
-                        _current = await _incoming.Reader.ReadAsync(cancellationToken);
-                        _offset = 0;
-                    }
-
-                    var count = Math.Min(buffer.Length, _current.Length - _offset);
-                    _current.AsMemory(_offset, count).CopyTo(buffer);
-                    _offset += count;
-                    return count;
-                }
-
-                public override ValueTask WriteAsync(
-                    ReadOnlyMemory<byte> buffer,
-                    CancellationToken cancellationToken = default)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    _written.TrySetResult(buffer.ToArray());
-                    return ValueTask.CompletedTask;
-                }
-
-                public override void Flush()
-                {
-                }
-
-                public override int Read(byte[] buffer, int offset, int count) =>
-                    throw new NotSupportedException();
-
-                public override void Write(byte[] buffer, int offset, int count) =>
-                    throw new NotSupportedException();
-
-                public override long Seek(long offset, SeekOrigin origin) =>
-                    throw new NotSupportedException();
-
-                public override void SetLength(long value) =>
-                    throw new NotSupportedException();
-
-                protected override void Dispose(bool disposing)
-                {
-                    if (disposing)
-                        _incoming.Writer.TryComplete();
-                    base.Dispose(disposing);
-                }
-            }
         }
 
         public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken = default)
@@ -284,6 +227,77 @@ public sealed class PacketInterfaceTests
         {
             _incoming.Writer.TryComplete();
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class TestDuplexStream : Stream
+    {
+        private readonly Channel<byte[]> _incoming = Channel.CreateUnbounded<byte[]>();
+        private readonly TaskCompletionSource<byte[]> _written = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private byte[]? _current;
+        private int _offset;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public void Feed(ReadOnlyMemory<byte> bytes) => _incoming.Writer.TryWrite(bytes.ToArray());
+
+        public Task<byte[]> ReadWriteAsync(CancellationToken cancellationToken) =>
+            _written.Task.WaitAsync(cancellationToken);
+
+        public override async ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            while (_current is null || _offset == _current.Length)
+            {
+                _current = await _incoming.Reader.ReadAsync(cancellationToken);
+                _offset = 0;
+            }
+
+            var count = Math.Min(buffer.Length, _current.Length - _offset);
+            _current.AsMemory(_offset, count).CopyTo(buffer);
+            _offset += count;
+            return count;
+        }
+
+        public override ValueTask WriteAsync(
+            ReadOnlyMemory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _written.TrySetResult(buffer.ToArray());
+            return ValueTask.CompletedTask;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) =>
+            throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) =>
+            throw new NotSupportedException();
+
+        public override void SetLength(long value) =>
+            throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                _incoming.Writer.TryComplete();
+            base.Dispose(disposing);
         }
     }
 }

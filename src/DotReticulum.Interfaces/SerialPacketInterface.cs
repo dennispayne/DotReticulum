@@ -10,6 +10,7 @@ public sealed class SerialPacketInterface : IPacketInterface
     private readonly Stream? _providedStream;
     private readonly bool _ownsStream;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private readonly CancellationTokenSource _lifetime = new();
     private Stream? _stream;
     private int _state;
     private int _receiving;
@@ -65,6 +66,9 @@ public sealed class SerialPacketInterface : IPacketInterface
         if (Interlocked.Exchange(ref _receiving, 1) != 0)
             throw new InvalidOperationException("Only one receive operation is allowed.");
 
+        using var linkedCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+        var receiveToken = linkedCancellation.Token;
         var decoder = new HdlcPacketFraming.Decoder();
         var readBuffer = new byte[4096];
         var decodedPackets = new Queue<byte[]>();
@@ -75,9 +79,9 @@ public sealed class SerialPacketInterface : IPacketInterface
                 int count;
                 try
                 {
-                    count = await stream.ReadAsync(readBuffer, cancellationToken).ConfigureAwait(false);
+                    count = await stream.ReadAsync(readBuffer, receiveToken).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                catch (OperationCanceledException) when (receiveToken.IsCancellationRequested)
                 {
                     yield break;
                 }
@@ -108,10 +112,13 @@ public sealed class SerialPacketInterface : IPacketInterface
     {
         var stream = GetStartedStream();
         var frame = HdlcPacketFraming.Encode(packet.Span);
-        await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        using var linkedCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _lifetime.Token);
+        var sendToken = linkedCancellation.Token;
+        await _writeLock.WaitAsync(sendToken).ConfigureAwait(false);
         try
         {
-            await stream.WriteAsync(frame, cancellationToken).ConfigureAwait(false);
+            await stream.WriteAsync(frame, sendToken).ConfigureAwait(false);
         }
         finally
         {
@@ -124,6 +131,7 @@ public sealed class SerialPacketInterface : IPacketInterface
         if (Interlocked.Exchange(ref _state, 2) == 2)
             return ValueTask.CompletedTask;
 
+        _lifetime.Cancel();
         if (_serialPort is not null)
             _serialPort.Dispose();
         else if (_ownsStream)

@@ -33,7 +33,7 @@ protocol or portability milestones complete.
 - [x] Define a cancellation-aware asynchronous packet interface contract.
 - [x] Implement interface lifecycle management and bounded packet processing.
 - [x] Implement UDP datagram and HDLC-framed TCP client/server interfaces.
-- [ ] Implement serial interfaces.
+- [x] Implement HDLC-framed serial packet interfaces.
 - [ ] Implement announce creation, validation, propagation, and rate limiting.
 - [ ] Implement path discovery, routing tables, hop handling, and multi-hop transport.
 - [ ] Validate routing resilience under packet loss and latency.
@@ -109,6 +109,10 @@ Foundation and interface milestone verification recorded 2026-10-08:
   establish full wire compatibility.
 - [ ] Run hosted Windows/macOS interface loopback tests and a live Python node
   test; this local run covered Linux loopback only.
+- [x] Serial adapter tests cover HDLC framing over a deterministic duplex stream,
+  lifecycle validation, single-reader enforcement, and disposal cancellation.
+- [ ] Verify a physical serial device and live Python-node interoperability; not
+  covered by the current local tests.
 
 For protocol changes, require independently generated Python reference vectors
 with the exact upstream revision and generation method. Round-trip tests alone

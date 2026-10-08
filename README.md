@@ -5,7 +5,7 @@ aiming for wire compatibility with the Python reference and other conforming nod
 
 **Experimental partial stack, not a complete network stack.** Implemented so far:
 cryptography, raw identities, packet headers and destination hashes, a bounded
-packet-interface manager, and UDP/TCP packet interfaces. It does not yet discover
+packet-interface manager, and UDP/TCP/serial packet interfaces. It does not yet discover
 peers, route packets, establish links, or transfer files. Do not deploy it for
 production or security-critical use.
 
@@ -16,7 +16,7 @@ production or security-critical use.
 | `src/DotReticulum.Core` | Identities, wire packets, destinations, interface manager | Foundation primitives and bounded packet dispatch |
 | `src/DotReticulum.Crypto` | Ed25519, X25519, HKDF, RNS tokens | Primitives and vector tests |
 | `src/DotReticulum.Transport` | Announces, routing, links, resources | Reserved assembly |
-| `src/DotReticulum.Interfaces` | TCP, UDP, serial, radio and tunnels | UDP datagrams; HDLC-framed TCP client/server |
+| `src/DotReticulum.Interfaces` | TCP, UDP, serial, radio and tunnels | UDP datagrams; HDLC-framed TCP client/server and serial |
 | `src/DotReticulum.Applications` | CLI tools and telemetry | Basic `rnid` identity commands |
 
 Production projects enable trimming and NativeAOT analysis. AES-CBC, PKCS7,
@@ -64,10 +64,11 @@ disposed. `PacketInterfaceManager` owns its interfaces, applies bounded
 backpressure to incoming packets (capacity defaults to 256), reads packets from
 all managed interfaces, and sends outgoing packets through each one. UDP sends
 one complete packet per datagram to its configured peer. TCP client/server
-interfaces use Reticulum's HDLC framing; TCP reconnect policy, serial, and other
-bearers are not implemented. The TCP server defaults to at most 64 simultaneous
-clients. These interfaces carry packets only—they do not provide discovery,
-routing, or link reliability.
+interfaces use Reticulum's HDLC framing; TCP reconnect policy and other bearers
+are not implemented. Serial interfaces support configured ports and caller-provided
+duplex streams, using the same HDLC packet framing. The TCP server defaults to at
+most 64 simultaneous clients. These interfaces carry packets only—they do not
+provide discovery, routing, or link reliability.
 
 ```csharp
 var bearer = new UdpPacketInterface(localEndPoint, peerEndPoint);
@@ -88,6 +89,7 @@ await foreach (var packet in manager.ReceiveAsync(cancellationToken))
 | RNS token encryption / identity key layout | Python reference fixtures and unit tests |
 | Header 1 / header 2 / destination and packet hashes | Python reference fixtures and unit tests |
 | UDP datagrams and TCP client/server framing | Loopback tests; TCP HDLC frame checked against pinned Python source; no live-node test |
+| Serial packet framing | Deterministic duplex-stream tests; serial HDLC uses the tested TCP framing; no physical serial or live-node test |
 | Live Python announce discovery and encrypted delivery | Not implemented / not verified |
 | Links, bidirectional multi-megabyte resources | Not implemented |
 | LXMF / `lxmd` exchange | Not implemented |
@@ -101,7 +103,7 @@ transfers require the future Resource engine, not an invented fragmentation form
 
 - **Initial milestone:** repository governance, modular solution, cryptographic
   and wire-format tests, basic identity CLI, build/test/NativeAOT CI.
-- **P0:** bounded interface manager and UDP/TCP adapters are implemented; serial,
+- **P0:** bounded interface manager and UDP/TCP/serial adapters are implemented;
   announces and multi-hop transport, links/resources, LXMF, `rnsd`, `rncp`, `rnx`,
   and telemetry remain.
 - **P1:** NativeAOT codec bindings, low-latency voice frames, half-duplex PTT.
