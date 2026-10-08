@@ -91,7 +91,7 @@ protocol or portability milestones complete.
 
 Foundation and interface milestone verification recorded 2026-10-08:
 
-- [x] Release solution tests: 214 passed (162 Core + 47 Crypto + 5 Interfaces),
+- [x] Release solution tests: 217 passed (162 Core + 47 Crypto + 8 Interfaces),
   none skipped.
 - [x] UDP loopback, TCP bidirectional loopback, manager lifecycle/backpressure,
   and upstream HDLC frame-vector tests passed.
