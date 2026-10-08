@@ -146,7 +146,6 @@ public sealed class SerialPacketInterface : IPacketInterface
             _serialPort.Dispose();
         else if (_ownsStream)
             _providedStream?.Dispose();
-        _stream = null;
         return ValueTask.CompletedTask;
     }
 
