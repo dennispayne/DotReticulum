@@ -36,7 +36,8 @@ protocol or portability milestones complete.
 - [x] Implement HDLC-framed serial packet interfaces.
 - [x] Implement signed announce packet creation, signature validation, and bounded
   per-destination rate limiting (non-ratcheted announces).
-- [ ] Implement announce propagation through the transport and ratchet announces.
+- [ ] Implement full announce propagation and ratchet announces (valid non-ratcheted
+  announces currently have a bounded fan-out relay; no live-node verification yet).
 - [ ] Implement path discovery, routing tables, hop handling, and multi-hop transport.
 - [ ] Validate routing resilience under packet loss and latency.
 
@@ -118,9 +119,13 @@ Foundation and interface milestone verification recorded 2026-10-08:
 - [x] Announce signature fixture generated with upstream `Identity` and
   `Destination.hash` methods at revision
   `e40191b3d193b46b7f2d8a44424a594cd758839b`; reproduce with
-  `tests/DotReticulum.Transport.Tests/GenerateAnnounceVector.py`.
-- [ ] Announce packet creation is unit-tested, but live announce exchange and
-  propagation are not implemented or verified.
+  `tests/DotReticulum.Transport.Tests/GenerateAnnounceVector.py`. The forwarded
+  packet fixture uses that revision's `Transport.mangle_hops` method.
+- [x] Local announce relay tests cover signature rejection, hop-limit handling,
+  duplicate suppression, hop increment, and not sending back on ingress; all 7
+  transport tests passed in Release.
+- [ ] Verify live Python announce exchange and propagation; ratchet announces,
+  path discovery, and routing are not implemented.
 - [x] Release solution build passed with zero warnings; all 223 tests passed
   (162 Core + 47 Crypto + 8 Interfaces + 6 Transport), none skipped.
 - [x] Linux `linux-x64` NativeAOT publish passed with linker/compiler warnings

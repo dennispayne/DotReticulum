@@ -5,9 +5,10 @@ aiming for wire compatibility with the Python reference and other conforming nod
 
 **Experimental partial stack, not a complete network stack.** Implemented so far:
 cryptography, raw identities, packet headers and destination hashes, a bounded
-packet-interface manager, and UDP/TCP/serial packet interfaces. It does not yet discover
-peers, route packets, establish links, or transfer files. Do not deploy it for
-production or security-critical use.
+packet-interface manager, UDP/TCP/serial packet interfaces, and a bounded relay for
+valid non-ratcheted announces. It does not yet discover peers, route packets, establish
+links, or transfer files. Announce relay has no live-node interoperability evidence.
+Do not deploy it for production or security-critical use.
 
 ## Architecture
 
@@ -15,7 +16,7 @@ production or security-critical use.
 | --- | --- | --- |
 | `src/DotReticulum.Core` | Identities, wire packets, destinations, interface manager | Foundation primitives and bounded packet dispatch |
 | `src/DotReticulum.Crypto` | Ed25519, X25519, HKDF, RNS tokens | Primitives and vector tests |
-| `src/DotReticulum.Transport` | Announces, routing, links, resources | Signed announce creation/validation and bounded per-destination rate limiting; no packet propagation or routing |
+| `src/DotReticulum.Transport` | Announces, routing, links, resources | Signed announce creation/validation, bounded per-destination rate limiting, and non-ratcheted announce relay; no path discovery or routing |
 | `src/DotReticulum.Interfaces` | TCP, UDP, serial, radio and tunnels | UDP datagrams; HDLC-framed TCP client/server and serial |
 | `src/DotReticulum.Applications` | CLI tools and telemetry | Basic `rnid` identity commands |
 
@@ -90,6 +91,7 @@ await foreach (var packet in manager.ReceiveAsync(cancellationToken))
 | Header 1 / header 2 / destination and packet hashes | Python reference fixtures and unit tests |
 | UDP datagrams and TCP client/server framing | Loopback tests; TCP HDLC frame checked against pinned Python source; no live-node test |
 | Serial packet framing | Deterministic duplex-stream tests; serial HDLC uses the tested TCP framing; no physical serial or live-node test |
+| Non-ratcheted announce relay | Local tests only; no live-node test; ratchet announces are not implemented |
 | Live Python announce discovery and encrypted delivery | Not implemented / not verified |
 | Links, bidirectional multi-megabyte resources | Not implemented |
 | LXMF / `lxmd` exchange | Not implemented |
@@ -104,9 +106,10 @@ transfers require the future Resource engine, not an invented fragmentation form
 - **Initial milestone:** repository governance, modular solution, cryptographic
   and wire-format tests, basic identity CLI, build/test/NativeAOT CI.
 - **P0:** bounded interface manager and UDP/TCP/serial adapters are implemented,
-  along with signed announce creation/validation and bounded per-destination
-  announce rate limiting. Announce propagation and multi-hop transport,
-  links/resources, LXMF, `rnsd`, `rncp`, `rnx`, and telemetry remain.
+  along with signed announce creation/validation, bounded per-destination rate
+  limiting, and best-effort relay of valid non-ratcheted announces. Ratchets, path
+  discovery and multi-hop routing, links/resources, LXMF, `rnsd`, `rncp`, `rnx`, and
+  telemetry remain.
 - **P1:** NativeAOT codec bindings, low-latency voice frames, half-duplex PTT.
 - **P2:** adaptive low-bandwidth video and multi-party receiver proof of concept.
 
