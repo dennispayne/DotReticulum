@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">DotReticulum</title>
+  <desc id="desc">Violet and blue connected nodes form a D on a dark indigo tile.</desc>
+  <rect x="24" y="24" width="464" height="464" rx="104" fill="#11152d"/>
+  <g stroke="#47538c" stroke-width="5" stroke-linecap="round">
+    <line x1="144" y1="144" x2="260" y2="256"/>
+    <line x1="144" y1="256" x2="272" y2="144"/>
+    <line x1="144" y1="256" x2="272" y2="368"/>
+    <line x1="144" y1="368" x2="260" y2="256"/>
+    <line x1="272" y1="144" x2="260" y2="256"/>
+    <line x1="352" y1="200" x2="260" y2="256"/>
+    <line x1="376" y1="256" x2="260" y2="256"/>
+    <line x1="352" y1="312" x2="260" y2="256"/>
+    <line x1="272" y1="368" x2="260" y2="256"/>
+    <line x1="144" y1="256" x2="260" y2="256"/>
+  </g>
+  <g stroke="#9b85ff" stroke-width="12" stroke-linecap="round">
+    <line x1="144" y1="144" x2="144" y2="256"/>
+    <line x1="144" y1="256" x2="144" y2="368"/>
+    <line x1="144" y1="144" x2="272" y2="144"/>
+    <line x1="144" y1="368" x2="272" y2="368"/>
+  </g>
+  <g stroke="#68a6ff" stroke-width="12" stroke-linecap="round">
+    <line x1="272" y1="144" x2="352" y2="200"/>
+    <line x1="352" y1="200" x2="376" y2="256"/>
+    <line x1="376" y1="256" x2="352" y2="312"/>
+    <line x1="352" y1="312" x2="272" y2="368"/>
+  </g>
+  <g fill="#b5a2ff">
+    <circle cx="144" cy="144" r="20"/>
+    <circle cx="144" cy="256" r="20"/>
+    <circle cx="144" cy="368" r="20"/>
+    <circle cx="272" cy="144" r="18"/>
+    <circle cx="272" cy="368" r="18"/>
+  </g>
+  <g fill="#80bdff">
+    <circle cx="352" cy="200" r="17"/>
+    <circle cx="376" cy="256" r="20"/>
+    <circle cx="352" cy="312" r="17"/>
+  </g>
+  <circle cx="260" cy="256" r="19" fill="#e2e6ff"/>
+</svg>

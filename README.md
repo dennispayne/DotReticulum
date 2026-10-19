@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/branding/dotreticulum.svg" width="240" height="240" alt="DotReticulum: violet and blue mesh nodes forming a D">
+</p>
+
 # DotReticulum
 
 An **LLM-assisted learning project**: an experimental native C# / .NET 10 implementation of the [Reticulum Network Stack](https://reticulum.network), aiming for wire compatibility with the Python reference implementation. It was produced with AI assistance, is not an official or community-recognized Reticulum implementation, and is not endorsed by the Reticulum project or its maintainer. Do not use it for production or security-critical purposes.

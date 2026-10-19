@@ -12,6 +12,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <ApplicationIcon>..\..\assets\branding\dotreticulum.ico</ApplicationIcon>
     <PublishAot>true</PublishAot>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
