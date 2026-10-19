@@ -1,0 +1,13 @@
+DotReticulum artwork is an unofficial adaptation, not an endorsement.
+
+The foreground network motif and RNS lettering are manually traced from:
+https://reticulum.network/gfx/reticulum_logo_512.png
+https://github.com/markqvist/Reticulum/blob/master/docs/source/graphics/rns_logo_512.png
+
+Reticulum artwork: Copyright (c) 2016-2026 Mark Qvist.
+Distributed and adapted under the Reticulum License, reproduced in full in
+the repository root LICENSE. That notice and license must accompany copies.
+
+The circular backdrop is replaced by a geometric hexagon using the C# icon
+palette (#9b4f96 and #68217a). No C# lettering or Microsoft logo is included.
+The modified mark is not the official Reticulum or C# logo.

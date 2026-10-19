@@ -6,6 +6,63 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
+### Artwork lettering correction (2026-10-19)
+
+Removed square-cap protrusions from the R/S strokes and replaced the N's
+mitered stroke with a filled outline with flat top/bottom edges. The SVG and
+Windows exporter now agree on flat polyline caps and bevel joins. Regenerated
+the PNG and all ICO frames with
+`pwsh -NoProfile -File assets\branding\Export-Icons.ps1`; visually inspected
+the enlarged lettering crop. Native win-x64 publish with ILLink/ILC warnings
+as errors passed; the extracted icon matched the source ICO pixel-for-pixel.
+No protocol or runtime behavior changed.
+
+### Revised Reticulum-derived artwork (2026-10-19)
+
+Supersedes the original mesh D artwork below at user request. The SVG now
+manually traces the official Reticulum logo's foreground network and RNS
+lettering, replacing the circular backdrop with a two-tone purple hexagon
+using the C# icon palette. This is an adaptation, not a pixel-identical copy:
+the original raster shadows are omitted. Source attribution, Mark Qvist's
+copyright and the applicable root Reticulum License are identified in
+`assets/branding/NOTICE.txt` and the README; the modified mark remains
+explicitly unofficial. The Windows exporter now renders the revised SVG's
+polygons, polylines, lines and outlined circles to the same PNG/ICO sizes.
+
+`pwsh -NoProfile -File assets\branding\Export-Icons.ps1` regenerated the
+assets. `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`
+passed without warnings; native win-x64 publish with ILLink/ILC warnings as
+errors passed. The exported hero image was visually inspected, and the
+published native icon matched the ICO pixel-for-pixel at 32 pixels.
+Published `--help` passed. No protocol behavior changed or live-reference
+interoperability was rerun for this artwork revision.
+
+### Original application and README artwork (2026-10-19)
+
+Added an original violet/blue connected-mesh D mark, distinct from upstream
+Reticulum branding. `assets/branding/dotreticulum.svg` is the editable source;
+the README displays it at 240 pixels. A 1024-pixel transparent PNG and a
+Windows ICO containing 16/24/32/48/64/128/256-pixel frames are exported from
+that source with `pwsh -NoProfile -File assets\branding\Export-Icons.ps1`.
+The exporter requires Windows System.Drawing; consuming the checked-in assets
+does not. Applications uses `ApplicationIcon`, including NativeAOT executables
+and renamed copies such as `git-remote-rns.exe`. No parity claims changed.
+
+Validation:
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v minimal` passed
+  without warnings.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet`:
+  360 passed, 40 opt-in skipped, zero failed; live-reference tests not enabled.
+- `dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true --nologo -v minimal`
+  passed without warnings, with Visual Studio Installer on PATH.
+- Published native `--help`, `--generate <owned-temporary-file>` and
+  `--show <owned-temporary-file>` passed; the temporary private key was removed.
+  This asset-only change did not rerun native resource-transfer interoperability.
+- Visually inspected the PNG and extracted managed/native executable icons;
+  the native 32-pixel icon matched the source ICO pixel-for-pixel.
+  Repeated export produced identical PNG/ICO SHA-256 hashes.
+
 Upstream reference: markqvist/Reticulum @ `e40191b3d193b46b7f2d8a44424a594cd758839b`. Vectors are produced by executing upstream Python (`tests/**/Generate*.py`, fixtures in `tests/**/Fixtures`); this is vector/cross-check evidence, not live-node interop. Historical milestone records describe evidence at that milestone; the P0 closeout record identifies which limitations have since been resolved.
 
 ### Git helper UTF-8 closure (2026-10-19)
