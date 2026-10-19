@@ -24,13 +24,13 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] Verify remote-tracking refs, default/non-default branches, tags, incremental/no-change fetches and explicit rejection of unsupported operations
   - [x] Pester ordinary Git clone/fetch and error paths against a local upstream server using managed and published native implementations
   - [x] Fetch actual hosted-upstream objects through ordinary Git using our native helper; record object integrity, source provenance and any seeded history
-- [ ] Parity 1 - Repository-wide contract and architecture baseline
+- [x] Parity 1 - Repository-wide contract and architecture baseline
   - [x] Source-review Git, endpoint/transport, runtime/interface and utility contract families against existing code/tests
   - [x] Expand this checklist with concrete gaps discovered in the bounded source review, referenced in development history
-  - [ ] Close the exhaustive public-behavior/configuration/CLI/example matrix, including unreviewed housekeeping and malformed-input branches
-  - [ ] Classify each contract as implemented, partial, missing, unverified, not applicable or upstream placeholder; require evidence for implemented claims
-  - [ ] Map contracts onto existing .NET projects and define ownership, async lifecycle, cancellation, bounded buffering, persistence and error-reporting boundaries
-  - [ ] Define differential, live-reference, Pester and NativeAOT acceptance criteria for each feature; record intentional API/platform differences
+  - [x] Close the exhaustive public-behavior/configuration/CLI/example matrix, including unreviewed housekeeping and malformed-input branches
+  - [x] Classify each contract as implemented, partial, missing, unverified, not applicable or upstream placeholder; require evidence for implemented claims
+  - [x] Map contracts onto existing .NET projects and define ownership, async lifecycle, cancellation, bounded buffering, persistence and error-reporting boundaries
+  - [x] Define differential, live-reference, Pester and NativeAOT acceptance criteria for each feature; record intentional API/platform differences
 - [ ] Parity 2 - Remaining Git integration and hosting
   - [ ] Complete helper client configuration/aliases/ref batch settings and explicitly verify object-format/platform limits
   - [ ] Git push bundles, existing-object ref operations, force behavior, deletion and per-ref Git status reporting
@@ -40,6 +40,7 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [ ] Release list/view/fetch/create/delete/latest, artifacts, manifests and offline/signer verification
   - [ ] Work document list/view/create/propose/edit/delete/comment/complete/activate, scopes and permissions
   - [ ] NomadNet repository/tree/blob/commit/ref/statistics/release/work pages and downloads
+  - [ ] Static/executable Micron templates, Unicode-icon/media settings, rendering and explicitly authorized bounded editor/template processes
   - [ ] Upstream image/WebP media conversion, backend failure/timeout behavior and temporary-resource cleanup
   - [ ] rngcs SSHSIG/RSG signing, principal discovery, structural checking and author/tagger verification
   - [ ] Native Git utility executable discovery and full CLI/configuration/error/exit-code compatibility
@@ -52,6 +53,7 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [ ] Destination/identity usage and retain/unretain management operations
   - [ ] Persistent identities, known destinations, ratchets, paths, tunnels and caches with restart/expiry/corruption behavior
   - [ ] Interface attach/detach/reload, statistics, logging, housekeeping and graceful shutdown
+  - [ ] Complete per-interface/peer traffic, queue/drop/pressure/violation, PHY/device and optional profiling snapshots without synthesizing unsupported metrics
   - [ ] Logging levels through PATHING/EXTREME, timestamp controls, file rotation, service/interactive/version modes and signal persistence
   - [ ] Faulted-router cleanup, link/request/resource/stream settlement and explicit terminal-versus-restartable host ownership
   - [ ] Interface discovery, advertisements, stamps, autoconnect and bootstrap behavior
@@ -62,6 +64,7 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
 - [ ] Parity 4 - Transport and interface-control fidelity
   - [ ] Complete interface modes, routing/path selection, requests, proofs, receipt and cache semantics
   - [ ] Gravity/responsive-path selection, mode-specific replacement expiry and local outbound path-use refresh
+  - [ ] Failed pending/forwarded link rediscovery, shared-client/standalone and one-hop/boundary branches, throttled queued recovery and detached validated-link cleanup
   - [ ] Authenticated LRPROOF rebalance effects on destination paths and expected terminus hops
   - [ ] Concurrent path-request target delivery, held-announcement restoration, engaged/inflight scheduling and slow-medium limits
   - [ ] Receipt eligibility, culling/1024 limit, conclusion metadata and upstream timeout calculations
@@ -76,6 +79,7 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [ ] Interface bitrate/MTU handling and link MTU discovery
 - [ ] Parity 5 - Endpoint and transfer fidelity
   - [ ] Complete applicable Identity, Destination and Packet behavior beyond existing vectors
+  - [ ] Explicit AOT-safe MessagePack application-value domain, extension/timestamp support or diagnosed intentional restrictions, numeric/UTF-8/map-key and nesting/length failure behavior
   - [ ] Process/decrypt local packets and automatic proof strategies without event subscribers; isolate observer errors
   - [ ] Default link acceptance, direction/type validation, duplicate registration and plain/group endpoint encryption/key lifecycle
   - [ ] Known-destination local recall, use/retention-aware cleanup and signed ratchet persistence/reload/rotation races
@@ -107,9 +111,11 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [ ] TCP retry limits, KISS framing/IPv6/fixed MTU, optional-peer diagnostics and documented client-cap difference
   - [ ] Serial parity/data/stop-bit configuration, idle partial-frame reset and reconnect/unplug recovery
   - [ ] Backbone flap blocking/watermarks/egress-stall recovery and Pipe owned-child exit/respawn/cancellation
+  - [ ] Per-bearer bounded transmit bytes/frames, partial/zero/interrupted/would-block writes and egress hysteresis/accounting
   - [ ] RNodeMulti nested subinterface settings/shared queues and Android USB/Bluetooth permission/adaptor contracts
 - [ ] Parity 7 - Upstream utility coverage
   - [ ] rnid import/export, encryption/decryption, signing/verification, metadata, announcements and network lookup options
+  - [ ] rnid recursive/stdin/file/current/legacy/wrapped/embedded RSG/RSM and explicitly authorized bounded editor flows; CLI formatting/base256 and boundary output fidelity
   - [ ] rnstatus statistics and management options
   - [ ] rnpath inspection, request and path-management options
   - [ ] rnprobe request/reply and reporting options

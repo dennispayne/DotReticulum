@@ -63,7 +63,9 @@ Identity files hold 64 raw private-key bytes (X25519 then Ed25519). Generation r
 These are bounded verified slices, not complete module parity. The post-Git
 source audit found additional correctness and lifecycle gaps, including
 no-subscriber automatic proofs, resource-queue cancellation, stream shutdown,
-configuration defaults and persistent state. They remain open in
+configuration defaults and persistent state. Parity 1's source-backed public
+contract/configuration/CLI/example inventory and acceptance baseline is complete;
+the classified implementation gaps remain open in
 [plan.md](plan.md), with source references and acceptance criteria in the
 [development history](.github/development-history.md).
 

@@ -284,8 +284,10 @@ outbound/callback/reader buffers and registries; owned handler/resource work;
 ratchet key snapshots versus concurrent zeroing; diagnostic delivery; and stable
 interface/original-wire-announce references in restart stores.
 
-This is a **bounded expansion inventory, not completed Parity 1 or a parity
-certification**. The review did not exhaust every Transport jobs/preprocessing
+This was a **bounded expansion inventory, not completed Parity 1 or a parity
+certification**. The subsequent **Parity 1 public-contract inventory closure**
+record below supersedes its inventory-coverage limitation, not its implementation
+limitations. At this point the review did not exhaust every Transport jobs/preprocessing
 branch, every malformed advertisement combination, every CLI/config/manual
 option/default combination, vendored crypto internals or every example/test
 assertion. These remain explicit inventory-closure work, alongside the
@@ -298,6 +300,351 @@ serial/TNC/RNode/Weave hardware. Appropriate OSes/devices and I2P/firmware
 resources are needed for their own final acceptance, not a blanket blocker on
 ready parser/RPC/persistence/Windows bearer/CLI/simulator work. No CI workflows
 were created because earlier parity requirements remain open.
+
+### Parity 1 public-contract inventory closure (2026-10-19)
+
+This closes the **inventory and architecture baseline**, not the implementation
+of the classified gaps. It extends, and must be read together with, the three
+source-backed family matrices above. Those rows retain their narrower evidence
+boundaries. Every public family, configuration-reader family, installed command
+parser and shipped example now has a classification, owner and acceptance
+route. A row classified **unverified** is an accounted-for obligation, not a
+passing test. `plan.md` alone records implementation progress.
+
+**Provenance and method.** Read the existing verified hosted working tree at
+`C:\Users\dennis\.copilot\session-state\c075724f-f262-4902-9809-a6358920915f\files\upstream-reticulum-rns`,
+pin `a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7).
+Read-only syntax inspection used that environment's
+`refvenv\Scripts\python.exe` to enumerate reference declarations and argument/
+configuration readers; it did not import/start RNS, generate vectors or execute
+the reference's operations. Source bodies were inspected for the previously
+uncovered jobs, preprocessing, advertisement/HMU, Channel/Buffer, CLI dispatch,
+configuration and ancillary contracts. Existing .NET implementations and named
+tests below were inspected rather than inferring support from project names.
+No pin, stored vector, production code or test changed.
+
+The initiating session supplied a clean `main` baseline: warning-free Release
+build and **360 passed / 40 skipped**. These are **inherited results, not commands
+run by this documentation audit**. The earlier full live/native/coverage and
+Pester records remain historical evidence only; this audit did not repeat them.
+The integrating session completed current full tests, native execution and fresh
+coverage concurrently; its separate validation record below is not execution by
+the source auditor. No new hardware, platform, publisher-authentication or
+malformed-input execution evidence is implied by that regression run.
+
+#### Coverage boundary and supplementary public API ledger
+
+Source anchors here are relative to the pinned repository; `RNS/` is omitted
+from module names unless ambiguous. The original family tables cover
+Identity/Destination/Packet/Link/Resource/Channel/Buffer, Reticulum/Transport/
+Discovery, all bearer families, utilities and Git routes. This supplement closes
+the remaining observable families rather than cataloguing private helpers.
+
+| Public family and exact source anchors | Status / .NET ownership and audited evidence | Remaining measurable contract |
+| --- | --- | --- |
+| Identity hashes/randomness, raw key import/export, public files, sign/validate/prove, recall/app-data/ratchet access (`Identity.py:101-239,352-393,485-508,625-687,707-957`) | **Partial** family; bounded valid crypto/identity-file slices **implemented** by Core `Identity`, `IdentityFile`, Crypto; `IdentityTests`, `IdentityFileTests`, `RfcVectorTests`, `TokenTests`. Memory recall in Transport `KnownDestinations` is not persistent recall | Include public-only file roundtrip, local-destination fallback, retain/use/expiry, absent/corrupt storage, invalid signatures and private-key-required failure. Primitive byte compatibility does not imply Python object/API identity |
+| Destination key lifecycle, callbacks and request registration (`Destination.py:320-435,477-692`); Transport register/deregister destination/link/announce handler (`Transport.py:2877-2980`) | **Partial**: Core owns names/ratchets; Transport `LocalDestination`, router and `LinkManager` own registrations and policies. `DestinationTests` covers names, not full plain/group operation | Duplicate and invalid direction/type registration; removal during receive; replace/deregister request handler; allow NONE/ALL/LIST with identified/unidentified peers; APP proof returning true/false/throwing; default link acceptance, dynamic app-data and group key import/export |
+| Packet send/resend/prove/hash and PHY accessors (`Packet.py:123-389`), receipt state/RTT/deadline/callback setters (`Packet.py:417-587`) | Codec slices **implemented** in Core `Packet`/`PacketTests`; orchestration **partial** in Transport router/`PacketReceipt`; PHY **missing** as an upstream-compatible surface | Preserve codec separation; test send twice/resend without prior send, receipt eligibility and conclusion timestamps, optional RSSI/SNR/Q absent/present per ingress, callback changes and late/invalid proofs |
+| Link mode negotiation, metrics/time accessors, lifecycle, resource policies (`Link.py:73-183,186-227,512-704,920-935,1198-1306`) | **Partial** in Transport `Link`, `LinkTypes`, `LinkManager`; `LinkVectorTests`/`LinkTests` cover AES-256-CBC/normal RTT and teardown. Only AES-256-CBC is enabled upstream (`Link.py:121-144`) | Reserved/disabled AES-128/GCM/OTP/PQ modes are **upstream placeholders/disabled contracts**, not encryption features to invent. Differentially reject disabled/unknown modes, malformed 64/67-byte requests and signalling; verify age/inactivity/rate/PHY metrics, stale recovery and exactly-once close reasons |
+| RequestReceipt/status/progress/response/time (`Link.py:1324-1498`); Resource inspection/progress/segment/metadata and advertisement accessors (`Resource.py:1138-1247,1263-1376`) | **Partial** in Transport `Link.Requests`, `Resource`, `Link.Resources`; normal large/small request/resource tests exist | Compare all intermediate and terminal observations, final progress, timeout/rejection/cancel/close and metadata policy; an idiomatic result object is acceptable but cannot omit observable failure/progress |
+| Transport path/next-hop/bitrate/MTU/latency lookup, `await_path`, responsive states and queue/interface management (`Transport.py:2983-2992,3126-3322,3602-3722,3971-4116`) | **Partial** router `HasPath`/`HopsTo`/mode and bounded tables; **missing** upstream management, tunnels/cache/blackhole/persisted health. `TransportRouterTests` covers ordinary forwarding and expiry | Absent/detached path results, cancellation/deadline, fresh-vs-unresponsive selection, shared-client disappear/reappear, void queues versus orderly detach, authorized remote/local management |
+| Runtime statistics and management API (`Reticulum.py:1366-1437,1498-2041`); traffic/profiling (`Transport.py:591-676`; `RNS/__init__.py:357-615`) | **Missing** full upstream surface. Applications custom telemetry is **not applicable as a substitute**; Transport/Interfaces own counters, Applications owns snapshots/RPC/rendering | Every returned field: parent/child interface identity, rates/totals, queues/drops/pressure, IFAC/protocol/filter violations, burst/flap/PHY/device/discovery, paths/rates/links, RSS and optional profiler data. Compare absent/unsupported values, snapshot concurrency, remote ACLs and monitor cancellation; do not synthesize device measurements |
+| Logging/time/size/frequency/distance/PHY formatting, hex/base256 and exit (`RNS/__init__.py:91-349,641-664`) | **Partial** Applications `CliSupport` and utility-specific output; complete reference formatting/base256 **missing/unverified**. Python global log destination, decorator/context-manager syntax and abrupt interpreter exit are **not applicable as architecture** | Exact output where consumed by CLI/protocol; values at zero/unit transitions, negative/fractional/large values, Unicode/base256 roundtrip and invalid point rejection. Preserve observable levels/destination/errors while using native structured diagnostics and graceful ownership |
+| Generic request/response MessagePack domain (`vendor/umsgpack.py:66-181,370-415,685-750,1030-1042`; `Link.py:473-510,804-918`) | **Partial** Core `MsgPack` supports scalar/bin/string/array/map, depth 32; `MsgPackTests` verifies that subset. Extension/timestamp values **missing**, complete numeric/invalid UTF-8/map-key differential **unverified** | Reference-generated extension/timestamp and numeric boundary corpus plus malformed nesting/length/map/UTF-8 cases. Define AOT-safe explicit value types and limits, or explicitly diagnose unsupported application values; Python extension registration/reflection machinery itself is **not applicable** |
+| Dependency/platform and optional compiled backend (`Cryptography/__init__.py:34-68`, `Provider.py`; `vendor/platformutils.py:31-83`; `CRNS/__init__.py:1-100`) | **Not applicable** to reproduce Python imports, vendored AES/pure25519/SHA/ConfigObj/validator/I2P libraries, netinfo implementation, Cython loader/cache/CRNS_JOBS or Python version checks. Their resulting crypto, config, network/address, SAM and packaging contracts remain in the applicable rows | Native crypto providers and OS APIs must meet wire/observable contracts; AOT uses static code. Internal-provider malformed-input differences remain **unverified**, not excused by this architectural exclusion |
+| Extension scope (`Resolver.py:31-34`; `Utilities/rnir.py:40-72`; `rnpkg.py:39-83`; `Discovery.py:810-821`) | Resolver body, resolver/package functionality and automatic I2P/Yggdrasil/onion connection detection are **upstream placeholders**. CLI parser/config-init/example-output shells remain observable. Existing LXMF/telemetry are supported regressions; new absent audio/video features **not applicable** | Execute placeholder shell help/version/init/error/exit behavior without claiming resolver/package functionality. Full I2P interface is still required, independently of unimplemented autodetection |
+
+The Python `__all__` import surface is not a requirement to duplicate modules or
+names. All exported endpoint/transfer behavior, metrics, callbacks and errors
+map to the rows here/above; private crypto provider internals and private Git
+rendering helpers are not independent parity features. Upstream tests
+`tests/{channel,coalesced_transmit,egress,hashes,hdlc,hkdf,identity,ifac,link,throughput}.py`
+are additional acceptance input, not evidence that .NET passes those tests.
+
+#### Configuration schema ledger
+
+Every key below is a contract even when its status is **missing**. Source
+anchors identify the actual parser/default, not just a documentation example.
+For each listed key, acceptance requires reference observations for omission,
+one valid non-default, malformed type, boundary and conflicting alias where
+applicable; assert normalized effective settings, resulting behavior and
+diagnostic/exit, not merely parse success. Numeric clamp/ignore rules are part
+of that comparison. Whole-format parsing includes comments, quoting, lists,
+duplicate sections/keys, case, nested `[[...]]`/`[[[...]]]`, unknown keys, path/
+home expansion, encoding, default-file creation and CLI/environment precedence.
+
+| Section / complete key family | Reference parser and defaults | Current classification / owner |
+| --- | --- | --- |
+| Runtime sharing: `share_instance`, `instance_name`, `shared_instance_type`, `shared_instance_port`, `instance_control_port`, `rpc_key` | `Reticulum.py:215-327,478-507`; share true, ports 37428/37429; UNIX where supported, explicit tcp/unix; invalid hex RPC key logs and falls back | **Missing** Applications host/config + Interfaces local bearer; `.dotreticulum` versus reference search `/etc/reticulum`, `~/.config/reticulum`, `~/.reticulum` is an explicit path difference, not shared-instance support |
+| Node/policy: `enable_transport`, `static_transport_identity`, `local_hops_delta`, `network_identity`, `link_mtu_discovery`, `enable_remote_management`, `enable_interface_management`, `remote_management_allowed`, `respond_to_probes`, `force_shared_instance_bitrate`, `panic_on_interface_error`, `use_implicit_proof`, `default_gravity` | `Reticulum.py:263-297,509-588`; transport/static/delta/remote/probes/panic false; MTU discovery/implicit proof/interface management true; identity path create/load and validated 16-byte ACL entries | **Partial** only enable_transport/basic implicit proof behavior; remaining config **missing**. Applications policy/storage, Core/Crypto identities, Transport behavior |
+| Discovery/blackholes: `discover_interfaces`, `required_discovery_value`, `publish_blackhole`, `blackhole_sources`, `blackhole_update_interval`, `interface_discovery_sources`, `autoconnect_discovered_interfaces`, `autoconnect_unverified_implementations`, `autoconnect_interface_mode`, `autoconnect_interface_gravity`, `autoconnect_announces_to_internal` | `Reticulum.py:590-657`; disabled/empty unless configured, positive stamp/capacity, blackhole interval clamped to >=2 minutes; validated source hashes; mode aliases match interface modes | **Missing** Applications config/store + Transport discovery/blackhole coordination + Interfaces attach/detach |
+| Global rate/queues: `default_ar_target`, `default_ar_penalty`, `default_ar_grace`, `ic_max_held_announces`, `ic_burst_hold`, `ic_burst_freq_new`, `ic_burst_freq`, `ic_pr_burst_freq_new`, `ic_pr_burst_freq`, `ec_pr_freq`, `egress_control`, `ic_new_time`, `ic_burst_penalty`, `ic_held_release_interval`, `qlen_in_data`, `qlen_in_announce`, `qlen_in_pr`, `qlen_in_il` | `Reticulum.py:659-730`; `Interfaces/Interface.py:72-96`; `Transport.py:134-162`: default inbound 1024/128/128/8; held 256, gravity 0; AR 3600/0/5; IC new 7200 s, announce frequencies 3/10, PR 3/8, burst hold/penalty 15 s, release 5 s; EC PR 5 | **Missing** full configuration/control; **partial** bounded .NET manager=256 and global announce limiter are intentionally different architecture, not equivalent prioritized queues. Applications validates, Transport/Interfaces enforce |
+| Logging: `loglevel`, `logtimestamps`; constructor level/verbosity/logdest precedence | `Reticulum.py:232-245,306-315,460-472`; `RNS/__init__.py:58-156`; default level 4, range 0-8 | **Partial** Applications level 0-7 parser; timestamp/destination/rotation/level 8 **missing** |
+| Common bearer: `type`, `interface_enabled`, `enabled`, `interface_mode`, `mode`, `gravity`, `ifac_size`, `networkname`/`network_name`, `passphrase`/`pass_phrase`, `ingress_control`, `egress_control`, all per-interface `ic_*`/`ec_pr_freq` above, `bitrate`, `announce_rate_target`, `announce_rate_grace`, `announce_rate_penalty`, `announce_cap`, `bootstrap_only`, `recursive_prs`, `announces_from_internal`, `announces_to_internal`, `ignore_config_warnings` | `Reticulum.py:843-984,1029-1182`; explicit enables ORed; mode aliases full/access_point/accesspoint/ap/pointtopoint/ptp/roaming/boundary/gateway/gw/internal; announce cap 2%; derived IFAC identity/signature and per-bearer size | **Partial** Applications parser implements enabled/type/mode subset with differing enable/alias behavior; controls/IFAC **missing**. Disabled unknown types and enabled unsupported types require deliberate diagnostics |
+| Discoverable bearer: `discoverable`, `announce_interval`, `discovery_stamp_value`, `discovery_name`, `discovery_encrypt`, `reachable_on`, `publish_ifac`, `location_cmd`, `latitude`, `longitude`, `height`, `discovery_frequency`, `discovery_bandwidth`, `discovery_modulation`, `discovery_lxmf_address` | `Reticulum.py:988-1026`; `Discovery.py:136-258`; only eligible transport/discoverable interfaces; static identity implication and location command | **Missing**. Location command must be an owned, bounded child; no unattended arbitrary command execution during config inspection |
+| UDP: `name`, `device`, `port`, `listen_ip`, `listen_port`, `forward_ip`, `forward_port` | `Interfaces/UDPInterface.py:40-115`; independent listen/forward sides and port override; bitrate guess 10 Mbit/s | **Partial** Applications host + Interfaces UDP. Literal-address bidirectional slice implemented; independent sides/device/DNS/address-family behavior **missing/unverified** |
+| TCP server: `name`, `device`, `port`, `listen_ip`, `listen_port`, `prefer_ipv6`; client: `name`, `target_host`, `target_port`, `kiss_framing`, `i2p_tunneled`, `connect_timeout`, `max_reconnect_tries`, `fixed_mtu` | `Interfaces/TCPInterface.py:75-110,515-551`; default timeout/reconnect wait 5 s, unlimited tries; HW MTU 262144 | **Partial** Applications/Interfaces TCP; defaults/custom connect and HDLC peer-isolation slice exists, remaining settings/reconnect/large MTU **missing/unverified**. `i2p_tunneled` is construction metadata as well as a reader key, not a new standalone network protocol |
+| Serial: `name`, `port`, `speed`, `databits`, `parity`, `stopbits` | `Interfaces/SerialInterface.py:75-90,144-217`; 9600/8/N/1 | **Partial** port/speed and injected-stream framing; other settings/recovery **missing**, hardware **unverified** |
+| Auto: `name`, `group_id`, `discovery_scope`, `discovery_port`, `multicast_address_type`, `data_port`, `devices`, `ignored_devices`, `configured_bitrate` | `Interfaces/AutoInterface.py:43-113`; group reticulum, ports 29716/42671, MTU 1196, peer expiry 22 s; OS ignore lists/scope/address type | **Missing** Interfaces; simulate discovery and duplicate multicast first, then actual multi-device IPv6/OS evidence |
+| Backbone server/client: TCP address/port/device/prefer_ipv6 and `block_fast_flapping`, `fast_flapping_threshold`, `fast_flapping_grace`, `fast_flapping_block_time`; client `target_host`, `target_port`, `i2p_tunneled`, `connect_timeout`, `max_reconnect_tries` | `Interfaces/BackboneInterface.py:42-69,133-142,843-870`; MTU 1 MiB; flap true/20/5/12 h; ingress/egress watermarks, stall and hysteresis constants | **Missing** Interfaces; preserve peer-specific blocking, frame/byte accounting and egress recovery, not just TCP subclass API |
+| Local TCP/UNIX platform constructors; Pipe `name`, `command`, `respawn_delay` | `Interfaces/LocalInterface.py:53-85,153-183,303-325,356-390`; `PipeInterface.py:64-82,113-204`; local reconnect 8 s, pipe respawn 5 s | **Missing** Interfaces. Local endpoints are runtime-created, not invented `Reticulum` config keys; UNIX credentials/authentication and Windows TCP limits need distinct evidence |
+| KISS: serial keys + `preamble`, `txtail`, `persistence`, `slottime`, `flow_control`, `id_interval`, `id_callsign`; AX25KISS substitutes `callsign`, `ssid` for ID settings | `Interfaces/KISSInterface.py:85-115,178-202,292-381`; `AX25KISSInterface.py:92-125,191-215,320-396` | **Missing** Interfaces; KISS commands/escaping, AX.25 addressing, timing/beacon/flow control and unplug/reconnect must be tested on simulator and owned device separately |
+| RNode: `name`, `port`, `frequency`, `bandwidth`, `txpower`, `spreadingfactor`, `codingrate`, `flow_control`, `id_interval`, `id_callsign`, `airtime_limit_short`, `airtime_limit_long` | `Interfaces/RNodeInterface.py:150-169,428-483,738-781,1175-1257,1452-1477` | **Missing** Interfaces. Radio ranges/commands/firmware capabilities/status/errors/airtime and serial/Bluetooth transport; hardware **unverified** |
+| RNodeMulti parent `name`, `port`, `id_interval`, `id_callsign`; nested `interface_enabled`/`enabled`, `vport`, `frequency`, `bandwidth`, `txpower`, `spreadingfactor`, `codingrate`, `flow_control`, `airtime_limit_short`, `airtime_limit_long`, `outgoing` | `Interfaces/RNodeMultiInterface.py:146-228,938-1013`; up to 11 virtual interfaces and shared parent radio transport | **Missing** Interfaces + nested Applications parser; test duplicate/invalid vports, per-child state and shared queues without one child stopping siblings |
+| I2P: `name`, `storagepath`, `peers`, `connectable`, `ifac_size`, `ifac_netname`, `ifac_netkey`; Weave: `name`, `port`, `configured_bitrate` | `Interfaces/I2PInterface.py:76-113,322-330,729-762`; `WeaveInterface.py:49-83,560-622,816-884,1008-1041` | **Missing** Interfaces; I2P SAM/destination persistence/tunnel readiness/reconnect; Weave WDCL peers/switch/endpoint/telemetry/MTU. SAM/device failures and unavailable backend are distinct from unsupported config |
+| Android Serial/KISS: corresponding serial/KISS keys; Android RNode adds `allow_bluetooth`, `target_device_name`, `target_device_address`, `ble_name`, `ble_addr`, `tcp_host`, `force_ble`, `force_tcp` and radio/airtime settings | `Interfaces/Android/SerialInterface.py:87-92`; `KISSInterface.py:97-109`; `RNodeInterface.py:359-378` | **Missing** platform adapters; **unverified** actual Android permissions/USB/Bluetooth/BLE lifecycle. Desktop SerialPort presence is not Android evidence |
+| Git client `[client] ref_batch_size`; `[aliases]` destination hashes; `[logging] loglevel`; RNGIT_CONFIG/RNS_CONFIG, client_config/client_identity | `Utilities/rngit/client.py:55-76,130-213,679-718`; batch 25, clamp 0..1024, log -1..8 | **Partial** Applications helper; RNS_CONFIG and fixed 25 exist; aliases/client config **missing**. Zero batch is an upstream non-progress edge (`464-481`), not permission to hang .NET |
+| Git node `[rngit] node_name`, `announce_interval`, `mirror_interval`, `record_stats`, `stats_ignore_identities`, `stats_push_ignore_identities`, `blocked_identities`; `[repositories]` groups, `[aliases]`, `[access]`, `[pages] serve_nomadnet`, `[logging] loglevel` | `Utilities/rngit/server.py:1979-2250,4912-5074`; announce 360 minutes; mirror hours clamped >=0; repository descriptions, .allowed inheritance/admin and null identity | **Missing** Applications hosting/store; aliases used for identities are distinct from helper destination aliases. Group paths, templates and stats survive restart or fail diagnostically |
+| Git page `[pages] unicode_icons`, `media_conversion`; static/executable `templates/*.mu`; `RNGIT_MEDIA_BACKEND`; interactive `EDITOR` | `Utilities/rngit/pages.py:132-177,269-312`; `media.py:53-215`; `server.py:720,1844,1889`; page media default true, Unicode icons disable Nerd Fonts, custom template fallback/placeholders | **Missing** Applications. Compare icon/rendering/media policy, Markdown/Micron/syntax-highlighting and pagination/downloads; static template read/error, explicitly authorized executable template/editor timeout/output bounds/cleanup and absent backend. Defaults are not separate interface settings |
+
+The reference's generated default and verbose example configuration are
+observable outputs, not proof that all defaults occur in those examples.
+Body parser anchors above take precedence when comments/examples differ.
+
+#### Complete installed CLI option ledger
+
+`setup.py:176-190` installs fourteen commands: rnsd, rnstatus, rnprobe, rnpath,
+rnid, rncp, rnx, rnir, rnpkg, rnsh, rngit, rngcs, git-remote-rns and rnodeconf.
+The helper is a stdin/stdout protocol, not argparse. All argparse commands
+inherit `-h/--help`; common `--version`, verbosity and config switches below
+still require real process/exit/output tests even where omitted for brevity
+from earlier family headings. “Missing” includes packaging/dispatch:
+Applications `Program.cs` currently dispatches only rnid, rnsd, rncp, rnx,
+telemetry, rngit and git-remote-rns. No support is inferred for other names.
+
+| Parser anchor | Complete argument family (aliases are part of the contract) | Classification / required process acceptance |
+| --- | --- | --- |
+| `Utilities/rnsd.py:65-71` | `--config`, `-v/--verbose`, `-q/--quiet`, `-s/--service`, `-i/--interactive`, `--exampleconfig`, `--version` | **Partial** Applications RnsdApp; capture help/example/version, file logging versus stdout, interactive stdin/EOF, signals, startup failure and exit/restart |
+| `Utilities/rnid.py:109-154` | `--config`; `-i/--identity`, `-g/--generate`, `-m/--import-pub`, `-M/--import-prv`, `-x/--export-pub`, `-X/--export-prv`; `-v/--verbose`, `-q/--quiet`; `-a/--announce`, `-H/--hash`, `-d/--decrypt`, `-e/--encrypt`, `-V/--validate`, `-s/--sign`, `-S/--sign-message`, `-E/--embed-meta`, `--meta-spec`, `--raw`; `-w/--write`, `-r/--read`, `-f/--force`, `-I/--stdin`, `-O/--stdout`; `-R/--request`, `-N/--no-cache`, `-t`, `-p/--print-identity`, `-P/--print-private`; `-B/--base32`, `-b/--base64`, `-U/--base256`, `-F/--hex`, `--meta`, `--version` | **Partial** local generate/show only. Audit operation combinations via `validate_args:86-102`; all encoding/key-source/stdin/file/force/network/timeout paths, recursive multi-file crypto, RSG/RSM legacy/current/wrapped/embedded metadata (`397-1032`), EDITOR behavior (`1034-1058`). Secret output requires explicit request, not logs |
+| `Utilities/rncp.py:799-820` | positional `file destination`; `--config`, `-v/--verbose`, `-q/--quiet`, `-S/--silent`, `-l/--listen`, `-C/--no-compress`, `-F/--allow-fetch`, `-f/--fetch`, `-j/--jail`, `-s/--save`, `-O/--overwrite`, `-b`, repeated `-a`, `-n/--no-auth`, `-p/--print-identity`, `-i`, `-w`, `-P/--phy-rates`, `--version` | **Partial** RncpApp/Service; send/fetch both directions already evidenced. Add all switch combinations/policies, periodic announce -1/0/positive, jail/symlink/traversal, allow-file precedence, missing/readonly paths, interruption, output naming/collision and exit 4 |
+| `Utilities/rnx.py:556-576` | positional `destination command`; `--config`, `-v/--verbose`, `-q/--quiet`, `-p/--print-identity`, `-l/--listen`, `-i`, `-x/--interactive`, `-b/--no-announce`, repeated `-a`, `-n/--noauth`, `-N/--noid`, `-d/--detailed`, `-m`, `-w`, `-W`, `--stdin`, `--stdout`, `--stderr`, `--version` | **Partial** RnxApp/Service; authorized basic bidirectional execution evidenced. Require exact binary stdin/out/err, empty/negative/zero/large limits, failed spawn, timeout result, mirror return code, interactive EOF and bounded cancellation/child termination |
+| `Utilities/rnstatus.py:876-906` | `--config`, `--version`, `--attach`, `--detach`, `--reload`; `-a/--all`, `-A/--announce-stats`, `-P/--pr-stats`, `-l/--link-stats`, `-B/--burst`, `-b/--blocked-ips`, `-t/--totals`, `-p/--pps`, `-q/--queues`, `-z/--profiling`, `-s/--sort`, `-r/--reverse`, `-j/--json`, `-R`, `-i`, `-w`, `-d/--discovered`, `-D`, `--show-stale`, `--show-unknown`, `-m/--monitor`, `-I/--monitor-interval`, `-v/--verbose`, positional `filter` | **Missing** Applications + management API; every column/JSON key/filter/sort/remote-auth/status/view combination, monitor EOF/signal and attach/detach/reload failure; absent device/profiler values must remain honest |
+| `Utilities/rnpath.py:484-505` | `--config`, `--version`, `-t/--table`, `-m/--max`, `-r/--rates`, `-d/--drop`, `-D/--drop-announces`, `-x/--drop-via`, `-w`, `-R`, `-i`, `-W`, `-b/--blackholed`, `-B/--blackhole`, `-U/--unblackhole`, `--duration`, `--reason`, `-p/--blackholed-list`, `-j/--json`, positional `destination list_filter`, `-v/--verbose` | **Missing** Applications; local/remote table/rate/drop/lookup/blackhole results and auth, invalid hash/filter/max/duration, unreachable node, persisted and expired blackholes |
+| `Utilities/rnprobe.py:213-222` | `--config`, `-s/--size`, `-n/--probes`, `-t/--timeout`, `-w/--wait`, `--version`, positional `full_name destination_hash`, `-v/--verbose` | **Missing** Applications; proof-based payload size/count/interval, success/loss/timeout statistics, zero/negative/oversized inputs, probe responder disabled/denied and unreachable routes |
+| `Utilities/rnsh/args.py:47-104`; `rnsh.py:57-184` | `-c/--config`, `--rnsconfig`, `-i/--identity`, `-v/--verbose`, `-q/--quiet`, `-p/--print-identity`, `--version`; `-l/--listen`, `-s/--service`, `-b/--announce`, repeated `-a/--allowed`, `-n/--no-auth`, `-A/--remote-command-as-args`, `-C/--no-remote-command`; `-N/--no-id`, `-m/--mirror`, `-w/--timeout`, positional `destination`, `--` separates arbitrary command argv | **Missing**, not rnx interactive. Cover service-name identity sanitization/persistence, allowed-file reload, command restrictions/concatenation, mirrored exits, PTY/non-TTY, EOF/signal/window resize/retry/protocol mismatch and terminal restoration. Process TERM and RNS_REMOTE_IDENTITY environment (`session.py:335-337`) are observable too |
+| `Utilities/rnodeconf.py:1480-1547` | `-i/--info`, `-a/--autoinstall`, `-u/--update`, `-U/--force-update`, `--fw-version`, `--fw-url`, `--nocheck`, `-e/--extract`, `-E/--use-extracted`, `-C/--clear-cache`, `--baud-flash`; `-N/--normal`, `-T/--tnc`; `-b/--bluetooth-on`, `-B/--bluetooth-off`, `-p/--bluetooth-pair`; `-w/--wifi`, `--channel`, `--ssid`, `--psk`, `--show-psk`, `--ip`, `--nm`; `-D/--display`, `-t/--timeout`, `-R/--rotation`, `--display-addr`, `--recondition-display`, `--np`; `--freq`, `--bw`, `--txp`, `--sf`, `--cr`; `-x/--ia-enable`, `-X/--ia-disable`, `-c/--config`; `--eeprom-backup`, `--eeprom-dump`, `--eeprom-wipe`; `-P/--public`, `--trust-key`, `--version`; `-f/--flash`, `-r/--rom`, `-k/--key`, `-S/--sign`, `-H/--firmware-hash`, `-K/--get-target-firmware-hash`, `-L/--get-firmware-hash`, `--platform`, `--product`, `--model`, `--hwrev`, positional `port` | **Missing** Applications/device tooling; parser/info and simulated command byte/default/failure tests first. Firmware acquisition/cache/hash/signature/trust/EEPROM/manufacturing and actual flashing need separately authorized owned hardware; unavailable flash tool/network/device must fail clearly. Never log PSKs/private keys |
+| `Utilities/rnir.py:55-58`; `rnpkg.py:54-58` | both `--config`, `-v/--verbose`, `-q/--quiet`, `--version`; rnpkg also `--exampleconfig` | Functionality **upstream placeholder**; .NET shell **missing**. Compare initialization/exit and minimal example rather than invent resolution or package operations |
+| `Utilities/rngit/server.py:139-285` | common `--config`, `--rnsconfig`, `-v/--verbose`, `-q/--quiet`, `--version`; default/node: `-p/--print-identity`, `-s/--service`, `-i/--interactive`; create: `-i/--identity`, repository; release: identity, `-s/--signer`, `-n/--name`, `-L/--local`, `-o/--offline`, repository/operation/target; perms: identity, remote; work: identity, `--scope`, `-t/--title`, `-d/--id`, repository/operation; fork: identity, source/target; sync: identity, repository; mirror: identity, `--scope`, source/target | **Missing** upstream node/admin CLI. Direct .NET clone/fetch commands are additions, not substitutes. Release operations list/view/fetch/verify/create/latest/delete; work help lists list/view/create/propose/edit/delete/update/complete/activate/perms, while handlers also expose comments. Execute dispatch, not help text alone |
+| `Utilities/rngit/client.py:55-76,335-447,545-676`; `commitsigs.py:301-307` | helper invocation `name URL`; capability/list/list-for-push/option/fetch batch/push batch/blank/EOF; rngcs `-Y sign/find-principals/check-novalidate/verify`, `-n`, `-f`, `-I`, `-s`, optional file, repeated `-O` | Helper read-only subset **implemented**, full helper **partial**; rngcs **missing**. Exact stdout protocol, stderr-only diagnostics, partial per-ref status, option arity/value/EOF and offline negotiation. Signature checks distinguish structure, principal/author identity and actual verification |
+
+Existing process evidence is specifically `tests/Pester/Cli.Tests.ps1` identity,
+invalid rngit and authenticated rncp; `GitRemote.Tests.ps1` local-reference
+ordinary Git clone/fetch/errors; `Coverage.Tests.ps1` tooling. It is not coverage
+for the unimplemented installed commands. CLI completion requires independent
+processes, stdout/stderr bytes, exact exit statuses and persisted effects;
+Pester must not substitute calls to internal C# handlers.
+
+#### Housekeeping, preprocessing and persistent-state branch matrix
+
+These branches were the explicit boundary of the earlier inventory. They are
+now classified, not claimed implemented.
+
+| Observable branch / source | Current status and audited .NET evidence | Acceptance obligation |
+| --- | --- | --- |
+| Startup readiness/IFAC/HW-MTU/filter-before-queue (`Transport.py:1753-1813`; IFAC `1689-1750`) | **Partial** Core manager parses at 500 and drops malformed frames; no IFAC or traffic-class preprocessing; source counter/diagnostic equivalence **missing** | Before-ready bounded wait/drop; <=2-byte frames; missing/unexpected IFAC flag, wrong/short MAC, post-auth frame too large, parse/filter rejection. Preserve raw-codec reserved-bit roundtrip while enforcing IFAC only at bearer boundary |
+| Announce prevalidation and ingress hold; tag parsing/dedup/inflight batching (`Transport.py:1815-1896`) | **Partial** AnnounceEngine validates and router parses/truncates tags; class queues, source counters/holds/inflight semantics **missing** | Known/unknown/explicitly requested/blackholed announces; signature/MTU reject; request payload below/at/above 16/32 bytes, tagless/oversized/duplicate tags, simultaneous requesting interfaces, limited traffic versus ordinary batching; queues full must produce deliberate bounded behavior |
+| Closed pending/active links and failure-triggered rediscovery (`Transport.py:695-737,875-964,1242-1264`) | **Partial** LinkManager ticks/removes closed links; router culls link entries, but automated path invalidation/rediscovery/blocked-ingress state machine **missing** | Pending endpoint failure with transport on/off, shared client versus standalone; invalidated/local-client/one-hop-destination/one-hop-initiator branches; boundary mode exception; 20 s minimum rediscovery interval, queue max 32 and 0.5 s dispatch throttle; fail then recover route without restart |
+| Receipt cull/timeout/collection (`Transport.py:739-762`), retransmission limits/held announce restoration (`764-837`) | **Partial** receipt expiry, rebroadcast timers and neighbor cancellation tested; 1024 cull and held restoration incomplete | 1025+ outstanding receipts, oldest CULLED versus timeout, one terminal callback; local rebroadcast/retry limits, elapsed retransmission, lost identity/path during wait, restore held original after targeted path response |
+| Hash/tag generations; detached pending local requests and path states (`Transport.py:840-874,1150-1158`) | **Partial** router two-generation bounded hash/tag sets; full stale local/shared request and health-state cleanup **missing/unverified** | At/exceed half hash capacity and tag capacity, duplicate survives one generation then expires; detach before response, no orphan states and bounded growth across repeated attach/remove |
+| Reverse/link/path/request/discovery cleanup (`Transport.py:875-1022,1077-1148`) | **Partial** `TransportRouter.Cull:743-786` removes ordinary reverse/discovery/path/unproved entries; validated-link missing-interface handling and rediscovery coupling **partial** | Timeout equality/just-after, every absent ingress/egress, validated versus pending links; AP/roaming/full path lifetimes; pending/inflight 45 s gates, discovery timeout; failed round retries later and unrelated tables remain usable |
+| Tunnel cleanup/replacement (`Transport.py:1024-1075,2764-2874`) | **Missing** | Excessively future expiry (>2x timeout), expired tunnel, vanished interface, stale tunnel path and newer active timebase. Reappearance restores only eligible paths; corrupted persisted tunnel cannot poison others |
+| Interface order/ingress/PR/held-announces/PHY keepalive jobs (`Transport.py:1160-1170`; `Interfaces/Interface.py:184-430`) | **Missing** complete control plane; limited announce queue exists | Five-second controlled-clock rounds; gravity priority, held capacity/release cadence, latest queue replacement and hop-prioritized bandwidth cap; one interface failure logged and later round/other traffic continues |
+| Packet/announce/resource caches, known destinations, management announces, blackhole expiry (`Transport.py:1172-1238,2995-3123`) | **Missing** disk cache/proof recovery/management/blackhole; known destination bounded in-memory expiry **partial** | Cache cleanup every 5 min; forced proof cache retained/read/replayed after proof loss; valid/corrupt/truncated cache, retention and clock skew; two-hour management announces (initial scheduling at start), one-minute blackhole expiry; slow/faulting jobs owned/cancelled, not untracked background work |
+| Runtime jobs/persist/resource-cache cleanup and signals (`Reticulum.py:157-206,351-397,1316-1357`); Identity ratchet/known stores (`Identity.py:177-349,395-479`) | **Partial** stable transport/utility identities and graceful app cancellation exist; other stores/job policies **missing** | Reference intervals (5 min jobs, 15 min clean, 12 h persist, 5 min gracious persist, 24 h resource cache) under controlled clocks; atomic replace, failed/corrupt/readonly stores, process restart; concurrent persist and shutdown cannot truncate keys or deadlock |
+| Path/hash/tunnel/blackhole save/reload and stable interface lookup (`Transport.py:397-509,2983-2992,3745-3968,4030-4116`) | **Missing**, separate from identity persistence | Clean and abrupt restart, wrong/absent interface identity, stale/corrupt entry, cached original announce unavailable, bad signed blackhole input and ACL; recover valid independent entries with diagnostics, never silently trust arbitrary serialized objects |
+| Per-bearer transmit accounting, partial writes and egress gating (`Interfaces/util/TransmitBuffer.py:35-173`; `BackboneInterface.py:55-69`; `Interface.py:301-383`) | **Partial** basic async writes; coalescing/accounting/Backbone egress **missing** | Frame order/whole-frame counts under partial/zero/interrupted/would-block writes; byte/frame high-low watermarks, stall/dead-time/hysteresis, bounded backlog, cancellation while blocked. Python zero-copy deque layout itself is **not applicable** |
+
+#### Malformed-input and failure-path acceptance ledger
+
+This ledger is exhaustive by **external ingress/schema/state-machine family**,
+not an assertion that every cross-product of malformed fields was executed.
+For each family, the differential suite must record reference return/exception,
+network reply/drop, state mutation, diagnostic and continued service on the
+next valid input. A reference exception is evidence, not a reason to terminate
+the .NET daemon or copy an unbounded allocation. Any deliberate hardening
+divergence must be explicit.
+
+| Boundary and source anchors | Classification / existing test boundary | Required corpus and recovery evidence |
+| --- | --- | --- |
+| Crypto/key/token (`Cryptography/{Token,HKDF,PKCS7,X25519,Ed25519}.py`; `Identity.py:738-944`) | Valid RFC/reference and tamper/short/low-order slices **implemented**; provider/padding/malformed-key equivalence **partial/unverified** | Key lengths, low-order/noncanonical/invalid Ed25519, no private key, empty/oversized HKDF, token length/alignment, valid-HMAC invalid-padding and bad-HMAC no-decrypt; no secret log; disposed/zeroed key use and concurrent ratchet rotation |
+| Packet/frame/IFAC (`Packet.py:180-283`; `Transport.py:1624-1680,1689-1896`; bearer framing) | `PacketTests` all 128 flags/every truncation/hop/MTU; HDLC fuzz/recovery tests **implemented bounded slices**; IFAC/bearer MTU controls **missing** | Both headers and each context/type, unknown/duplicate/hop filter, wrong transport ID, malformed escape/truncated frame, IFAC above; valid successor on same peer. Explicitly retain/document stricter malformed HDLC rejection |
+| Announces/discovery/blackhole (`Identity.py:511-612`; `Discovery.py:290-469,525-650,905-967`) | `AnnounceTests` tamper/truncation/wrong signed destination and `AnnounceEngineTests` key conflicts **implemented**; discovery/blackhole **missing** | Ratchet flag/key/name/random/signature/hash/app-data permutations, older/replayed announce, disallowed source/stamp/encryption/version/schema, invalid IP/name/port/location, stale/unknown discovery states, failed/partial blackhole update, bad expiry/reason; no poisoning remembered identity/path |
+| Link control/proofs/requests (`Link.py:148-227,391-451,804-918,929-1187`; `Packet.py:449-560`; `Transport.py:2610-2718`) | Valid vectors/basic wrong-proof timeout **implemented**; all mode/hop/context/state/schema/failure combinations **unverified/partial** | Truncated/extra signalling/proofs, disabled mode, bad keys/signature/terminus/interface; repeated/wrong-side identify, keepalive/RTT/close payload/state; malformed request timestamp/path/data/response IDs, unknown/duplicate/late response, invalid policy/oversized small or resource body; only authenticated observations rebalance paths |
+| Resource advertisement (`Resource.py:156-244,1289-1376`) | Valid advertisement vectors **implemented**; hostile schema/limit policy **partial/unverified** | Missing/extra/wrong-typed t/d/n/h/r/o/i/l/q/f/m, negative/zero/overflow/inconsistent sizes and parts, flags request+response/metadata/split/encryption, hash widths, segment bounds/order and duplicate accepted advertisement. Test `t` above `MAX_EFFICIENT_SIZE*3` and policies below/at/above allowed allocations before allocation |
+| Resource parts/request/HMU/proof/assembly (`Resource.py:488-515,576-676,685-839,842-1123`) | Valid vectors and send/reject/cancel/segmentation **implemented bounded slices**; malformed/terminal cleanup **partial** | HMU truncated hash/invalid MessagePack/negative or excessive segment, empty/non-divisible/oversized map, unmatched part hashes/duplicate/out-of-window requests, bad proof/hash, decompression corruption/expansion, metadata length/schema with otherwise valid resource hash, partial multipart file and I/O failure. Reject/cancel releases next queued resource; exactly one terminal outcome and no accumulator/task/file leak |
+| Channel envelope/messages/Buffer (`Channel.py:113-148,253-273,303-397,399-545`; `Buffer.py:64-98,151-191,232-280`) | Vector/order/full-window/reserved/large-message/retry-exhaustion recovery slices **implemented**; malicious wrap/concurrency/slow reader **unverified** | Envelope type/sequence/declared length versus bytes, unknown/reserved/unregistered message/factory failure, duplicate/reorder/window at sequence wrap after >65536 sends, RTT thresholds; stream header/id/EOF/compression expansion <=16 KiB, partial reads/zero-length writes, blocked read then dispose/close, callback throw and concurrent EOF/write |
+| Configuration/local management (`Reticulum.py:460-730,843-1207,1369-1435`; vendor config syntax) | Existing `RnsdTests` subset **implemented**; full parser/auth RPC **missing** | All schema ledger cases plus authenticated connection challenge/framing, invalid key, short/unknown get/manage/drop/identity/destination operations, arbitrary payload/depth limits, stalled local peer and detach/reload race; isolated peer failure and deterministic authorization errors |
+| Git remote/admin/pages/media/signatures (`Utilities/rngit/client.py:335-676`; `server.py:2869-4642`; `pages.py:250-312,366-3007`; `media.py:57-215`; `commitsigs.py:48-331`) | Read-only helper valid/error/process subset **implemented**; remaining families **missing** | Invalid URL/alias/ref/object-format/bundle/status/metadata and partial EOF; path/ref traversal, denied/hidden/blocked/null identities, corrupt .allowed/release/work files, request field/type/size/ID/scope, concurrent ref/doc/release updates; escaped/paginated/binary pages and download paths; absent/crashed/timed-out media/template/Git/editor process; wrong principal/namespace/author/tagger, truncated/legacy/tampered RSG/SSHSIG/RSM and artifact mismatch |
+| Utility/file/process/device boundaries (all CLI parser anchors above; `rncp.py:254-324`; `rnx.py:155-251`; `rnsh/protocol.py:46-148`) | Basic rncp/rnx/identity errors **partial**; remaining utilities/device behavior **missing/unverified** | Wrong argument arity/type/combination, malformed hash, unauthenticated peer, missing/readonly/jail escapes, binary output, failed spawn/timeout/EOF/signal, protocol-version/PTY restore; device unexpected KISS/firmware/EEPROM reply, invalid image/signature/flash backend. Simulated negative cases precede authorized real hardware |
+
+#### Shipped examples as observable acceptance scenarios
+
+All fourteen files in `Examples/` were inventoried, including the ones not
+listed in `docs/source/examples.rst`. Examples require equivalent scenarios,
+not copied Python executables, terminal menus or module layout.
+
+| Example and source anchors | Status / .NET owner and evidence | Scenario required for acceptance |
+| --- | --- | --- |
+| `Minimal.py:18-67` | **Partial**, Applications node/Transport announce | Fresh config/identity, initialize/start, announce and orderly cancellation; verify discovery from a Python peer |
+| `Announce.py:23-138` | **Implemented bounded announce/handler slice**, Core/Transport `AnnounceTests`, `LiveAnnounceTests` | Preserve app-data/aspect-filter/ratchet/path-response and callback-fault regressions; dynamic default app data remains **partial** |
+| `Broadcast.py:17-72` | **Partial**, Core plain codec and router test, not full plain endpoint API | Two real mixed peers exchange plain broadcast, no identity encryption, hop limits and observer-independent receive |
+| `Echo.py:25-109,118-260` | **Partial**, Transport local DATA/receipts | Both-direction encrypted single datagram, APP/ALL/NONE proof policies, RTT and timeout, no subscriber and tampered input |
+| `Ratchets.py:24-117,126-269` | **Partial**, Core ratchets + Transport recall; live ratchet exchange exists | Repeat Echo with enforced ratchet, rotation/restart/signed persistence/old key expiry and rejected identity fallback |
+| `Link.py:27-97,109-234` | **Implemented bounded healthy link slice**, Transport `LinkTests`/`LiveLinkTests` | Both initiators, encrypted data/RTT/keepalive/each-side close; impaired/lost establishment and no-observer flow remain **unverified/partial** |
+| `Identify.py:27-107,122-257` | **Implemented bounded identification slice**, Transport Link/live tests | Correct identity callback and signed link binding both ways; repeated/wrong/malformed identify and callback failure acceptance remains required |
+| `Request.py:26-97,109-230` | **Partial**, Transport `Link.Requests` tests | Registered path and random response, received/progress/fail callbacks; denied/absent handler, timeout, cancel, size/resource policies and live both directions |
+| `Resource.py:28-100,117-238` | **Partial**, Transport resources; normal segmented/metadata/live transfer exists | Sending and receiving callbacks, compression/random bytes, reject/cancel; queue advancement, corrupt metadata, bounded assembly and cleanup |
+| `Filetransfer.py:44-188,214-521` | **Partial**, Applications rncp and Transport file responses | Listing then chosen streamed file, both directions, missing/changed/unreadable file, path containment and final checksum; rncp roundtrip alone is not this example's file-server contract |
+| `Channel.py:60-86,98-190,202-333` | **Implemented bounded message/order/retry slice**, Transport Channel/vector/resilience/live tests | Custom AOT-safe message factories, full window/retries, both directions; unknown type, wrap and slow/malicious peer remain **unverified** |
+| `Buffer.py:35-128,147-266` | **Partial**, Transport streams/live tests | Stream callbacks, interactive bidirectional EOF; cancellation/disposal/slow-reader bounds and lost proof recovery without callback/task leaks |
+| `Speedtest.py:36-151,164-282` | **Unverified** scenario, Transport metrics + Applications harness | Sustained both-direction transfer with independent byte/rate/loss observations, negotiated MTU, proof/timeout and clean close; no invented throughput threshold or Python performance identity requirement |
+| `ExampleInterface.py:62-211,218-293` | **Missing** equivalent configured extension, Interfaces/Core/Applications | Static native factory or owned process adapter exercising lifecycle, framing/config/IFAC/modes/reconnect/error and reload; Python dynamic import/exec is intentionally not reproduced |
+
+#### Ownership and architecture decision matrix
+
+These boundaries are requirements for subsequent implementation, not a claim
+that existing classes already satisfy them. Preserve the existing projects;
+no speculative singleton/module/threading translation or whole-stack rewrite
+is implied.
+
+| Owner / existing implementation | Async lifecycle, cancellation and bounds | Persistence and errors |
+| --- | --- | --- |
+| Crypto (`Ed25519`, `X25519`, `KeyDerivation`, `Token`) | Own secret buffers and zeroing, synchronous bounded primitive operations; disposable identities use safe key snapshots for concurrent ratchet/decrypt work; no background crypto worker per packet | No persistence/logging of secrets; caller-owned files. Stable failure verdict/exception at primitive boundary, authenticate before decrypt; malformed key/padding hardening explicit |
+| Core (`Packet`, `Destination`, `Announce`, `IdentityFile`, `MsgPack`, `PacketInterfaceManager`) | Codec has no routing/encryption side effects; caller-owned input lifetime explicit. Manager owns top-level and spawned bearer start/read/send/dispose, bounded 256 wait-on-full ingress, cancellable enumeration; child fault isolated, top-level fault reported | Raw identity file contract and owner-only/nonoverwrite policy; explicit MessagePack limits. Aggregate disposal failures without abandoning siblings; callback-independent processing. New prioritized queue policy must remain bounded and preserve source/traffic class |
+| Interfaces (UDP/TCP/serial/HDLC; future bearers) | Own sockets/serial/child process/peer, decoder and send/reconnect tasks; cancellation interrupts DNS/connect/read/backpressure/retry. Per-peer/aggregate frame+byte limits and actual negotiated MTU, no child failure kills parent listener | Stable bearer identity needed for restored paths/tunnels. Stats/errors include peer/context, distinguish optional unavailable device from fatal owned interface; no silent unsupported settings or leaked processes/reconnect timers |
+| Transport (`TransportRouter`, AnnounceEngine, KnownDestinations, LinkManager/Link, Resource, Channel/Buffer) | Own protocol registries, timers, requests, callbacks and queues; a single cancellation tree settles pending operations. Existing LinkManager outbound/callback channels are **unbounded**, RawChannelReader memory grows, callbacks can stall, preparation/assembly Task.Run work is not fully owned: these are **partial**, not accepted architecture | Serialize versioned protocol state via Applications storage boundary; preserve original announce wire and stable interface identity. Isolate/report optional observers, exactly-once outcomes; timeouts/cancellation versus protocol rejection distinct; shutdown joins workers and clears secrets/accumulators/receipts |
+| Applications (`ReticulumNode`, RnsdHost/config, ClientLinks, utilities, rngit helper/session) | Own configuration, policies, shared-instance election/RPC, OS signals and host lifetime. Scope Git/editor/template/media/remote-command processes with explicit authorization, bounded stdout/stderr/time and owned cleanup. Read-only RngitSession must not own Git refs; host services need per-repository mutation serialization | Own atomic/versioned stores, permissions/reload, private identity ACLs, caches and stats restart. Errors map to CLI stdout/stderr/exact exits or authenticated RPC status; failure must not expose hidden repositories. `RnsdHost.DisposeAsync` currently disposes manager only and ReticulumNode can miss host disposal on unexpected run failure: terminal/restartable ownership remains required work |
+| LXMF and telemetry (existing supported extensions) | Preserve current cancellable native delivery/telemetry boundaries and existing regression suites; do not fold missing upstream management into telemetry or promise LXMF propagation parity | Existing stores/policy limits and interop disclosures retained; no extension expansion needed to close RNS parity inventory |
+
+Intentional .NET differences: explicit start/dispose/cancellation rather than a
+process singleton; Core packet codec versus upstream packet orchestration;
+static AOT-safe handlers/factories/serialization instead of reflection/dynamic
+imports; .NET `Stream.ReadAsync` waiting rather than Python RawIOBase returning
+None; configurable bounded backpressure and 64 TCP-client default cap; strict
+key/padding/HDLC/identity-file validation and explicit secret zeroing.
+These architectural choices are acceptable only with documented observable
+effects and recovery tests. `.dotreticulum`, rnid `--show`, direct rngit
+clone/fetch and custom telemetry are native additions/differences, not proof of
+the upstream CLI/configuration surface.
+
+Upstream quirks need explicit decisions, not accidental translations:
+`rngit/client.py:173,479-481` permits batch zero but does not advance a nonempty
+fetch queue; `server.py:277-280` routes mirror CLI tasks through fork;
+`server.py:4912-4970` comments place mirror_interval near repositories although
+the reader is `[rngit]`; `pages.py:269-312` permits executable `.mu` templates;
+`media.py:53,118-180` selects backends using RNGIT_MEDIA_BACKEND and controls
+child processes. Bound/no-progress errors and explicitly authorized template/
+editor execution should be intentional safety differences, recorded and tested
+instead of copying hangs, arbitrary Python execution or unbounded output.
+The coordinator additionally confirmed the existing-object push branch
+(`server.py:3078-3106`) requires force for **any changed SHA**, including a
+fast-forward, unlike ordinary bundle-push ancestry handling. Per-ref operations
+are sequential, not atomic/CAS/lease transactions; deletion preserves the
+reference's HEAD behavior. Differential cases must distinguish these branches
+rather than asserting normal Git fast-forward semantics for all requests.
+Any helper SHA-1-only decision must explicitly reject local/remote SHA-256
+without narrowing the existing direct rngit client's separate behavior.
+
+#### Differential/live/Pester/NativeAOT acceptance routing
+
+The earlier feature-table criteria and the schema/failure/example rows above
+are cumulative. Each row below assigns all four verification modes; N/A means
+that particular layer has no CLI/network boundary, not that feature verification
+can be skipped. New fixtures must execute the pinned reference, record actual
+imports/SHA and source hashes, and preserve old `e40191b3...` vector provenance.
+“Native” always means executing the relevant published feature, not only
+successful publish or `--help`.
+
+| Feature families / owner | Differential xUnit (D) | Actual reference/live (L) | Separate-process Pester (P) | Published native feature (N) |
+| --- | --- | --- | --- | --- |
+| Crypto/identity/ratchets/announce/codec/serialization; Core/Crypto | Independent provider/key/token/announce/packet/MessagePack corpus including malformed cases above; byte/verdict/state assertions | Mixed peers accept .NET bytes and .NET accepts Python bytes, both ratchet/plain identity directions | rnid complete CLI, encoding/file/stdin/no-overwrite/ACL/reload plus failure exits; codec-only internals have no separate CLI | Generate/load/export/sign/verify/encrypt/decrypt; announce and exchange from published utility with independently checked result |
+| Config/logging/shared management/stores; Applications/Core/Interfaces | Every schema key/default/alias/invalid case; clocked cleanup and authentication-framing vectors | Real Python shared server/.NET client and reverse where applicable; RPC auth/ACL/manage/retention, discovered/blackhole peer updates | Clean home/start/election, required-shared fallback, attach/reload/detach, signal/restart/corrupt/readonly stores, version/example/monitor outputs | Repeat management/persistence/configured daemon feature and shutdown after live traffic, no leaked listener or child |
+| Transport/routing/control/tunnels/cache; Transport/Interfaces | Mode/gravity/filter/IFAC/PR/receipts/cache/tunnel and every housekeeping branch above with controlled clocks | Python leaf AND transport peers, direct/multi-hop, both initiators, simultaneous requests, loss/latency/proof-loss/reconnect/route change; cached proof avoids full transfer | rnpath/rnstatus/rnprobe with daemon processes, authorized/denied/unknown and persisted state | Native router and management utilities perform representative impaired mixed-mesh flow with asserted paths/proofs/cleanup |
+| Links/requests/resources; Transport | Wire/proof/metadata/limits/compression/segment/state corpus, no-subscriber/faulting observer, bounded queued cancellation and exact terminal outcome | Both link initiators; random/compressible multi-megabyte files each direction direct and Python-transport mixed multi-hop; file larger than memory budget; lost proof/request/close/recovery | rncp/rnx real client/listener/allow/jail/timeout/exit/output matrix; test process resource consumption, not only handlers | Encrypted/compressed multi-megabyte file and request response both directions, cancellation/rejection queue advancement and settled shutdown |
+| Channel/Buffer; Transport | Full-window/retry and >65536-message wrap/RTT/malformed envelope/stream/slow-reader bounds | Both-direction Python Channel/Buffer over impaired direct and mixed transport path, exhaust then recover a new link | rnsh protocol/PTY/pipe/stdin/output/resize/EOF/signal and terminal restoration; internal Channel lacks standalone CLI until used by that feature | Native rnsh/stream flow and retry/close recovery; verify pending readers/writers settle within configured deadline |
+| Existing UDP/TCP/serial + missing Auto/Backbone/Local/Pipe/KISS/AX25/RNode/Multi/I2P/Weave/Android; Interfaces | Every config family, framing/device response, partial write/queue/accounting, retry/disposal/fault isolation; owned simulators where physical device absent | Each implemented bearer with real Python counterpart; actual serial/radio/Weave hardware, I2P SAM and actual mobile permissions separately identified | Config/start/optional error/reload/reconnect/child exit/respawn with owned processes/devices and output/exit evidence | Execute actual bearer on each claimed OS/RID; desktop simulation cannot close Android/iOS/radio claims |
+| Git helper/config/push/hosting/permissions/create/fork/mirror/sync; Applications | Reference-generated request/ref/status/permissions/default/alias/object-format and malformed corpus, concurrent mutation/stores | Actual ordinary Git clone/fetch/push/delete/force and reference node/admin operations both client/server directions; hidden/denied/partial/failing/restarted peers | Git-discoverable installed executable, exact protocol stdout, real repositories/refs/fsck, command/version/config/allow/restart/timeout/failure exits | Native Git operations and hosted-node flow, nonzero missing-object bundle evidence, local ref preservation, SHA-1/SHA-256 advertised support tested per platform |
+| Git releases/work/pages/media/templates/signatures; Applications | Every operation/scope/permission, RSG/RSM/SSHSIG corpus, escaping/routes/pagination/binary/artifact checksums and backend failure cases | Bidirectional authorized reference exchanges, missing/tampered artifacts, current/legacy signatures, principal mismatch and actual NomadNet-style request routes | Real CLI operation output/exit and disk changes/restart/concurrency; owned executable template/media/editor failure/timeout/no-leak | Native create/fetch/verify release + work/page/download/signature operations, not merely fetching unrelated Git objects |
+| rnid/rnsd/rnstatus/rnpath/rnprobe/rncp/rnx/rnsh/rnodeconf; Applications | Parser/domain/protocol fixtures for every CLI ledger row and conflict branch | Corresponding real reference daemon/client/device boundary; explicit authorization for remote exec and device writes | Every option's success/failure/default effect, stdin/EOF/signal/exit/output/persisted results; mock device vs real hardware distinguished | Executable discovery and representative substantive success/failure for each utility on supported platforms, including binary process I/O and OS terminal behavior |
+| Resolver/rnir/rnpkg/disabled crypto/autoconnect placeholders | Assert source-backed no-function/disabled behavior, not invented implementations | No live capability claim for absent functionality; placeholder startup may initialize RNS | Help/version/init/example and failure shell behavior where installed | Shell/version/init only, explicitly labeled; not “native resolver/package manager support” |
+| RNS formatting/profiling/platform and retained LXMF/telemetry regressions | Format/base256 boundaries, statistics optionality and AOT-safe profiling snapshots; existing extension tests | Match actual management observations; existing LXMF/lxmd evidence remains separately scoped | Exact utility text/JSON/monitor output and native extension regressions where promised | OS-specific formatting/device metrics/feature exercised; no Python module/decorator/CRNS loader reproduction required |
+
+Platform evidence remains **unverified** beyond recorded Windows slices:
+Linux/macOS managed/native, ARM/RISC-V, FreeBSD, Android/iOS permissions,
+UNIX sockets/PTYs, serial/radio hardware and additional network backends must
+each supply actual feature evidence before a support claim. Absence of such
+resources does not prevent parser/simulator/Windows implementation. Coverage
+collection must use a fresh directory, serialize instrumentation against other
+builds, merge six production modules without double counting, and report
+passed/skipped plus live enablement; coverage percentage is not an acceptance
+criterion by itself.
+
+**Closure interpretation.** The earlier “unreviewed jobs/preprocessing,
+CLI/config/manual options and examples” inventory limitation is resolved at
+the public-family/reader/branch level by this supplement. Exhaustive public
+classification does **not** mean exhaustive private helper review, every
+malformed combination tested, Python API identity, all manual prose ported,
+or any newly implemented parity feature. Unexecuted differential verdicts,
+platforms, hardware and future features are explicitly classified above and
+tracked by the corresponding unchecked Parity 2-8 work in `plan.md`. No
+unclassified external family is intentionally deferred to implementation;
+future source discoveries or an explicit pin update must extend that tracker.
+The additional concrete gaps (MessagePack application values, metrics/
+formatting/profiling, failed-link rediscovery, transmit accounting and Git
+templates) are now explicit required work, not implicit completions.
+
+#### Coordinator execution evidence for the inventory baseline
+
+The parent session reported the current-main checks below while this audit
+was being completed. The auditor inspected the recorded test/coverage and
+Pester log output, but did not rerun the commands. The reproducible invocation
+sequence uses the supplied reference and output locations:
+
+```powershell
+$referenceFiles = 'C:\Users\dennis\.copilot\session-state\c075724f-f262-4902-9809-a6358920915f\files'
+$sessionFiles = 'C:\Users\dennis\.copilot\session-state\f94e85c1-752c-4ad1-84c9-9df20727787d\files'
+$python = Join-Path $referenceFiles 'refvenv\Scripts\python.exe'
+$reference = Join-Path $referenceFiles 'upstream-reticulum-rns'
+$nativeDirectory = Join-Path $sessionFiles 'native-parity1'
+$nativeExe = Join-Path $nativeDirectory 'DotReticulum.Applications.exe'
+dotnet build DotReticulum.slnx -c Release --nologo -v quiet
+dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet
+$env:PATH = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer;' + $env:PATH
+dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o $nativeDirectory --nologo -v minimal
+& $nativeExe --help
+pwsh -NoProfile -File tests\run-tests.ps1 -Live -Python $python -Upstream $reference -NativeExe $nativeExe -Coverage -ResultsDirectory (Join-Path $sessionFiles 'coverage-parity1')
+pwsh -NoProfile -File tests\run-pester.ps1 -GitRemote -Python $python -Upstream $reference
+pwsh -NoProfile -File tests\run-pester.ps1 -GitRemote -Python $python -Upstream $reference -Application $nativeExe
+```
+
+Coordinator results: build **0 warnings / 0 errors**; default suite **360 passed,
+40 opt-in skipped, 0 failed**; win-x64 NativeAOT publish with both warning-as-error
+flags and native `--help` **passed**. Full live/native coverage **402 passed,
+0 skipped / 0 failed**, including actual native multi-megabyte encrypted/
+compressed resource paths. Native Pester against the actual pinned Python
+server **26 passed, 0 skipped / 0 failed**; the same managed Pester suite also
+**26 passed, 0 skipped / 0 failed** (coordinator-reported separately). Logs retained by the coordinator:
+`files\parity1-validation.log` and `files\parity1-pester.log` under the current
+session directory above. Publishing alone is not the feature evidence.
+
+The full live run merged six managed production reports, counting shared
+sources once. Native/Pester child processes are not additional Coverlet hits:
+
+| Project | Lines | Branches |
+| --- | ---: | ---: |
+| Applications | 913/1395 (65.45%) | 723/1579 (45.79%) |
+| Core | 682/722 (94.46%) | 380/421 (90.26%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 376/412 (91.26%) | 117/126 (92.86%) |
+| LXMF | 388/429 (90.44%) | 193/270 (71.48%) |
+| Transport | 2430/2800 (86.79%) | 1308/1701 (76.90%) |
+| **Overall** | **4899/5874 (83.40%)** | **2768/4147 (66.75%)** |
+
+This execution preserves the tested bounded slices while establishing a
+measured baseline for subsequent phases; it does not change the missing/
+partial/unverified classifications or certify all inventoried failure paths.
+Parity 1 is complete as an inventory/architecture/acceptance baseline.
+Implementation begins with Parity 2 only in the integrating session's scope.
 
 ### Read-only Git helper contract and implementation (2026-10-19)
 
