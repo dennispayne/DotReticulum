@@ -4,9 +4,6 @@
 
 # DotReticulum
 
-Artwork adapted from Reticulum by Mark Qvist under the Reticulum License;
-see [artwork attribution](assets/branding/NOTICE.txt). This modified mark is unofficial.
-
 An **LLM-assisted learning project**: an experimental native C# / .NET 10 implementation of the [Reticulum Network Stack](https://reticulum.network), aiming for wire compatibility with the Python reference implementation. It was produced with AI assistance, is not an official or community-recognized Reticulum implementation, and is not endorsed by the Reticulum project or its maintainer. Do not use it for production or security-critical purposes.
 
 Compatibility claims here are exactly as strong as the recorded evidence; see the status table and [development history](.github/development-history.md). Phase progress is tracked in [plan.md](plan.md).
