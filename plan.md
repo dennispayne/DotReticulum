@@ -1,0 +1,136 @@
+# DotReticulum solution plan
+
+Phase and subphase progress is tracked here. The target is high-fidelity behavioral and wire parity with the pinned Reticulum upstream, implemented as idiomatic, modern native .NET rather than a line-by-line Python translation. Development history, verification evidence and recorded limitations are in [.github/development-history.md](.github/development-history.md). Checked phases reflect their defined scope, not complete upstream feature parity.
+
+- [x] Bootstrap
+  - [x] Solution, projects, SDK pin and build configuration
+  - [x] Governance, licensing, contribution guidance and repository templates
+  - [x] PowerShell development/coverage tooling and Pester CLI end-to-end tests
+- [x] P0 - Basic stack, utilities and telemetry
+  - [x] Crypto primitives, Identity, token and `rnid`
+  - [x] Packet and Destination codec
+  - [x] Interface contract, bounded manager, UDP, TCP client/server and serial HDLC
+  - [x] Announces, ratchets, rate limiting and propagation
+  - [x] Path discovery, routing tables, multi-hop transport and `rnsd`
+  - [x] Links, resources, Channel/Buffer and link-table forwarding
+  - [x] LXMF messaging, `rncp`, `rnx` and telemetry
+  - [x] Native hosted-upstream fetch, Git integrity checks and upstream comparison
+  - [x] Lessons applied: failure isolation, test integrity, reproducibility and native verification
+- [x] Git-first gate - Read-only native git-remote-rns
+  - [x] Audit pinned upstream helper negotiation, commands, configuration and errors; define focused source-backed acceptance criteria
+  - [x] Separate reusable Git transport/object import from direct-client ref ownership without a whole-stack rewrite
+  - [x] Package a Git-discoverable native git-remote-rns executable; support protocol-clean stdout, stderr diagnostics and bounded cancellation
+  - [x] Implement capability negotiation, ref/HEAD advertisement and Git-driven clone/fetch for working-tree and bare repositories
+  - [x] Verify remote-tracking refs, default/non-default branches, tags, incremental/no-change fetches and explicit rejection of unsupported operations
+  - [x] Pester ordinary Git clone/fetch and error paths against a local upstream server using managed and published native implementations
+  - [x] Fetch actual hosted-upstream objects through ordinary Git using our native helper; record object integrity, source provenance and any seeded history
+- [ ] Parity 1 - Repository-wide contract and architecture baseline
+  - [x] Source-review Git, endpoint/transport, runtime/interface and utility contract families against existing code/tests
+  - [x] Expand this checklist with concrete gaps discovered in the bounded source review, referenced in development history
+  - [ ] Close the exhaustive public-behavior/configuration/CLI/example matrix, including unreviewed housekeeping and malformed-input branches
+  - [ ] Classify each contract as implemented, partial, missing, unverified, not applicable or upstream placeholder; require evidence for implemented claims
+  - [ ] Map contracts onto existing .NET projects and define ownership, async lifecycle, cancellation, bounded buffering, persistence and error-reporting boundaries
+  - [ ] Define differential, live-reference, Pester and NativeAOT acceptance criteria for each feature; record intentional API/platform differences
+- [ ] Parity 2 - Remaining Git integration and hosting
+  - [ ] Complete helper client configuration/aliases/ref batch settings and explicitly verify object-format/platform limits
+  - [ ] Git push bundles, existing-object ref operations, force behavior, deletion and per-ref Git status reporting
+  - [ ] Repository node configuration, identity/aliases, announcements, blocked identities, statistics and restart persistence
+  - [ ] Group/repository/document permissions, .allowed files, administration and authorization-failure disclosure
+  - [ ] Repository create, fork, mirror, manual/periodic sync and default-HEAD restoration
+  - [ ] Release list/view/fetch/create/delete/latest, artifacts, manifests and offline/signer verification
+  - [ ] Work document list/view/create/propose/edit/delete/comment/complete/activate, scopes and permissions
+  - [ ] NomadNet repository/tree/blob/commit/ref/statistics/release/work pages and downloads
+  - [ ] Upstream image/WebP media conversion, backend failure/timeout behavior and temporary-resource cleanup
+  - [ ] rngcs SSHSIG/RSG signing, principal discovery, structural checking and author/tagger verification
+  - [ ] Native Git utility executable discovery and full CLI/configuration/error/exit-code compatibility
+  - [ ] Managed/native end-to-end acceptance of remaining Git features against the reference
+- [ ] Parity 3 - Runtime, configuration and operations
+  - [ ] Full applicable upstream configuration/defaults and explicit diagnostics for unsupported settings
+  - [ ] Configuration discovery/default creation, nested/list/quoted settings and precedence; omitted/conflicting enable flags, mode and port aliases
+  - [ ] Shared-instance/local-client operation and management RPC semantics
+  - [ ] Authenticated local/remote management framing, required-shared/fallback behavior, instance election and daemon restart/reconnect
+  - [ ] Destination/identity usage and retain/unretain management operations
+  - [ ] Persistent identities, known destinations, ratchets, paths, tunnels and caches with restart/expiry/corruption behavior
+  - [ ] Interface attach/detach/reload, statistics, logging, housekeeping and graceful shutdown
+  - [ ] Logging levels through PATHING/EXTREME, timestamp controls, file rotation, service/interactive/version modes and signal persistence
+  - [ ] Faulted-router cleanup, link/request/resource/stream settlement and explicit terminal-versus-restartable host ownership
+  - [ ] Interface discovery, advertisements, stamps, autoconnect and bootstrap behavior
+  - [ ] Discovery metadata/encryption/stamps/source policy, persisted stale/unknown/removal states and capacity/duplicate/transport eligibility
+  - [ ] Blackhole identity management, publication and update behavior
+  - [ ] Blackhole expiry/reason/source authorization, failed-source updates, persistence and endpoint/link rejection integration
+  - [ ] AOT-safe interface extension mechanism with explicit differences from Python dynamic loading
+- [ ] Parity 4 - Transport and interface-control fidelity
+  - [ ] Complete interface modes, routing/path selection, requests, proofs, receipt and cache semantics
+  - [ ] Gravity/responsive-path selection, mode-specific replacement expiry and local outbound path-use refresh
+  - [ ] Authenticated LRPROOF rebalance effects on destination paths and expected terminus hops
+  - [ ] Concurrent path-request target delivery, held-announcement restoration, engaged/inflight scheduling and slow-medium limits
+  - [ ] Receipt eligibility, culling/1024 limit, conclusion metadata and upstream timeout calculations
+  - [ ] Forced resource-proof caching/query/replay after proof loss without inventing general cache behavior
+  - [ ] IFAC network identity/key derivation, packet authentication and rejection behavior
+  - [ ] IFAC configuration aliases and legacy HKDF expansion behavior at upgraded frame sizes, without weakening documented crypto hardening
+  - [ ] Tunnel establishment, synthesis, restoration and expiry
+  - [ ] Announce queues, bandwidth caps, rate penalties, ingress/egress controls and path-request limits
+  - [ ] Full ingress/origin/egress mode matrix, internal/roaming/AP boundaries, per-interface rates and newer-announcement queue replacement
+  - [ ] Data/announce/path-request/ingress-limited saturation behavior and bounded priority/rejection policy
+  - [ ] TCP reconnect, disconnect recovery and peer isolation
+  - [ ] Interface bitrate/MTU handling and link MTU discovery
+- [ ] Parity 5 - Endpoint and transfer fidelity
+  - [ ] Complete applicable Identity, Destination and Packet behavior beyond existing vectors
+  - [ ] Process/decrypt local packets and automatic proof strategies without event subscribers; isolate observer errors
+  - [ ] Default link acceptance, direction/type validation, duplicate registration and plain/group endpoint encryption/key lifecycle
+  - [ ] Known-destination local recall, use/retention-aware cleanup and signed ratchet persistence/reload/rotation races
+  - [ ] Dynamic/default announce app data, per-call overrides and path-response tag caching
+  - [ ] Record malformed-key/token-padding/HKDF differences explicitly and verify independent provider/boundary cases
+  - [ ] Link policies, callbacks, timing, identification, request/response limits and failure/recovery semantics
+  - [ ] Install request limits before send; enforce small-packet/resource limits, final progress, receipt coupling and integer compression thresholds
+  - [ ] Owned bounded request/callback/outbound work, cancellation and stalled-observer isolation
+  - [ ] File-backed/streamed resources, multipart/resume behavior where supported upstream, compression, limits and cancellation
+  - [ ] Release queued resources on cancellation/rejection as well as success; exactly-once terminal callbacks
+  - [ ] Dispose multipart accumulators and join/cancel preparation/assembly work on failure, cancellation and link teardown
+  - [ ] Malformed metadata/advertisement/HMU/segment/compression-expansion validation and explicit resource policy limits
+  - [ ] Actual upgraded-MTU link/resource/channel packets beyond 500 bytes and mixed-path bottleneck behavior
+  - [ ] Channel/Buffer flow control, retry/window behavior, exhaustion and teardown under impaired mixed-node links
+  - [ ] Sequence wrap/reorder/duplicate and RTT window boundaries; bounded slow-consumer memory
+  - [ ] Complete pending stream reads on disposal/link closure; observe ready-callback failures and concurrent close/write/EOF
+  - [ ] Upstream-exact malformed-input, boundary, concurrent-operation and long-running behavior
+- [ ] Parity 6 - Upstream interface coverage
+  - [ ] AutoInterface
+  - [ ] BackboneInterface and egress-state recovery
+  - [ ] LocalInterface and PipeInterface
+  - [ ] KISSInterface and AX25KISSInterface
+  - [ ] RNodeInterface and RNodeMultiInterface
+  - [ ] I2PInterface
+  - [ ] WeaveInterface
+  - [ ] Android-specific adapters or documented native platform equivalents
+  - [ ] Complete UDP/TCP/serial configuration and validate real serial/radio hardware
+  - [ ] UDP receive/forward independence, device/hostname/address-family resolution and configured port precedence
+  - [ ] TCP retry limits, KISS framing/IPv6/fixed MTU, optional-peer diagnostics and documented client-cap difference
+  - [ ] Serial parity/data/stop-bit configuration, idle partial-frame reset and reconnect/unplug recovery
+  - [ ] Backbone flap blocking/watermarks/egress-stall recovery and Pipe owned-child exit/respawn/cancellation
+  - [ ] RNodeMulti nested subinterface settings/shared queues and Android USB/Bluetooth permission/adaptor contracts
+- [ ] Parity 7 - Upstream utility coverage
+  - [ ] rnid import/export, encryption/decryption, signing/verification, metadata, announcements and network lookup options
+  - [ ] rnstatus statistics and management options
+  - [ ] rnpath inspection, request and path-management options
+  - [ ] rnprobe request/reply and reporting options
+  - [ ] rnsh interactive sessions, terminal/process handling and recovery
+  - [ ] rnodeconf device configuration/update operations and hardware validation
+  - [ ] Complete rnsd, rncp and rnx CLI/configuration/error/exit-code behavior
+  - [ ] rncp/rnx allow-file precedence, home expansion, version/PHY options, writable-output errors and bounded file/process I/O
+  - [ ] rnx binary stdout/stderr, negative/zero output limits, failed spawn, timeout termination/results and authorized cancellation
+  - [ ] rnsh Channel/PTY/window/stream protocol and platform terminal/process recovery, distinct from rnx interactive mode
+  - [ ] rnodeconf read-only/device-simulator behavior before explicitly authorized owned-device firmware/EEPROM/trust operations
+  - [ ] Track Resolver/rnir/rnpkg placeholders without inventing functionality absent from the pinned upstream
+- [ ] Parity 8 - Compatibility and release acceptance
+  - [ ] Close the source-backed inventory: no unclassified features or unacknowledged parity gaps
+  - [ ] Mixed Python/.NET leaf and transport topologies with loss, latency, reconnects, restarts and constrained resources
+  - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
+  - [ ] Per-interface interoperability and hardware evidence; untested platforms/devices remain unverified
+  - [ ] Native utility packaging, executable discovery, installation and user documentation
+  - [ ] Record behavioral differences, production coverage and reproducible reference provenance without claiming Python API identity
+- [ ] Final phase - CI/CD (last)
+  - [ ] `ci-build-test.yml`
+  - [ ] `interop-test.yml`
+  - [ ] `e2e-mesh-test.yml`
+  - [ ] `codeql.yml`
+  - [ ] `stale.yml`

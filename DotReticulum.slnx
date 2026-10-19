@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DotReticulum.Applications/DotReticulum.Applications.csproj" />
+    <Project Path="src/DotReticulum.Core/DotReticulum.Core.csproj" />
+    <Project Path="src/DotReticulum.Crypto/DotReticulum.Crypto.csproj" />
+    <Project Path="src/DotReticulum.Interfaces/DotReticulum.Interfaces.csproj" />
+    <Project Path="src/DotReticulum.Lxmf/DotReticulum.Lxmf.csproj" />
+    <Project Path="src/DotReticulum.Transport/DotReticulum.Transport.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj" />
+    <Project Path="tests/DotReticulum.Core.Tests/DotReticulum.Core.Tests.csproj" />
+    <Project Path="tests/DotReticulum.Crypto.Tests/DotReticulum.Crypto.Tests.csproj" />
+    <Project Path="tests/DotReticulum.Interfaces.Tests/DotReticulum.Interfaces.Tests.csproj" />
+    <Project Path="tests/DotReticulum.Lxmf.Tests/DotReticulum.Lxmf.Tests.csproj" />
+    <Project Path="tests/DotReticulum.Transport.Tests/DotReticulum.Transport.Tests.csproj" />
+  </Folder>
+</Solution>

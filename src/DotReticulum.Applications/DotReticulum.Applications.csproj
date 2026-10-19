@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\DotReticulum.Core\DotReticulum.Core.csproj" />
+    <ProjectReference Include="..\DotReticulum.Transport\DotReticulum.Transport.csproj" />
+    <ProjectReference Include="..\DotReticulum.Interfaces\DotReticulum.Interfaces.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DotReticulum.Applications.Tests" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+</Project>

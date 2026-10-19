@@ -1,0 +1,309 @@
+{
+ "upstream_sha": "e40191b3d193b46b7f2d8a44424a594cd758839b",
+ "single": [
+  {
+   "app_name": "lxmf",
+   "aspects": [
+    "delivery"
+   ],
+   "identity_private": "853891c5d0f430d150bf32c18094957b36b85c5c91a5f47dd79c149d16a30dcfd764039df743d0c7a12db18447fca6fc31ec5a5d4267e9ad0f4470c8f40dd680",
+   "identity_hash": "78633f47f1f8a78e932918fab6e1ccd8",
+   "full_name": "lxmf.delivery.78633f47f1f8a78e932918fab6e1ccd8",
+   "name_hash": "6ec60bc318e2c0f0d908",
+   "hash": "5a0d5b71e544ffd4284f882f7bec2123",
+   "type": 0,
+   "expand_name_no_identity": "lxmf.delivery",
+   "static_hash_identity_object": "5a0d5b71e544ffd4284f882f7bec2123",
+   "static_hash_identity_bytes": "5a0d5b71e544ffd4284f882f7bec2123",
+   "static_hash_no_identity": "9497d16c52ac5faec04c36db5c301e8e"
+  },
+  {
+   "app_name": "lxmf",
+   "aspects": [
+    "propagation"
+   ],
+   "identity_private": "7b3a123200adafc8ba6ccf1479d8a9a589f474887cc3a449d886a7a2007af3284fc5dfa523d30547c0433758fcae69b74e0bb647138bc7909d80f785e9358395",
+   "identity_hash": "768b18481cc19baf421367df99eab2db",
+   "full_name": "lxmf.propagation.768b18481cc19baf421367df99eab2db",
+   "name_hash": "e03a09b77ac21b22258e",
+   "hash": "c5747ba3ba36aab9dbfdd07295e3c3ce",
+   "type": 0,
+   "expand_name_no_identity": "lxmf.propagation",
+   "static_hash_identity_object": "c5747ba3ba36aab9dbfdd07295e3c3ce",
+   "static_hash_identity_bytes": "c5747ba3ba36aab9dbfdd07295e3c3ce",
+   "static_hash_no_identity": "8801321bf89cce83419e3e80a7df53e8"
+  },
+  {
+   "app_name": "nomadnetwork",
+   "aspects": [
+    "node"
+   ],
+   "identity_private": "fba3779cfc4e5c6ca8f247f95630a82083aaff11fd34db5b9ae6c95281f23f0a0026b633e9c365d601c0c4a4f460699a3ba7391568bd3082b0e37247e1a1c34b",
+   "identity_hash": "46f3cfc6a40d7dcc095c37831d37ab0b",
+   "full_name": "nomadnetwork.node.46f3cfc6a40d7dcc095c37831d37ab0b",
+   "name_hash": "213e6311bcec54ab4fde",
+   "hash": "bbd8e79badd3d310eda0f5ec5e30d42c",
+   "type": 0,
+   "expand_name_no_identity": "nomadnetwork.node",
+   "static_hash_identity_object": "bbd8e79badd3d310eda0f5ec5e30d42c",
+   "static_hash_identity_bytes": "bbd8e79badd3d310eda0f5ec5e30d42c",
+   "static_hash_no_identity": "b11b1094382ebd4a9fe43b061b3da93e"
+  },
+  {
+   "app_name": "example_utilities",
+   "aspects": [
+    "announcesample",
+    "fruits"
+   ],
+   "identity_private": "a463628db47a161fe14c63a93d4f87c2e7d8c7a48baa0a18d34d6f58a4e5b93be82fedf8ebd2fa3c3b90876bd1aec28d3b84d24c08d9c8558c5cf94d7a4b4b16",
+   "identity_hash": "8df7c8d1b8153fb9fb13297c4c6de285",
+   "full_name": "example_utilities.announcesample.fruits.8df7c8d1b8153fb9fb13297c4c6de285",
+   "name_hash": "6f233dfd9aa4cbd4a1e2",
+   "hash": "733209ed650c81e508ec00f14f6387d0",
+   "type": 0,
+   "expand_name_no_identity": "example_utilities.announcesample.fruits",
+   "static_hash_identity_object": "733209ed650c81e508ec00f14f6387d0",
+   "static_hash_identity_bytes": "733209ed650c81e508ec00f14f6387d0",
+   "static_hash_no_identity": "1c1bb1956a206a37932a85d9db76ffc9"
+  },
+  {
+   "app_name": "a",
+   "aspects": [],
+   "identity_private": "125f5ec296c6d01507502833c52d7efd8aecee5cfdda833cb0c83802cf0d9d1c73a3dcc9a9348196b6efc966eaf024ad293a30794a305838639366e41bd3cf7c",
+   "identity_hash": "9a01ab6c681d4eec5d9acc105b617be3",
+   "full_name": "a.9a01ab6c681d4eec5d9acc105b617be3",
+   "name_hash": "ca978112ca1bbdcafac2",
+   "hash": "7b64aa0808d1200fda223712e6baf285",
+   "type": 0,
+   "expand_name_no_identity": "a",
+   "static_hash_identity_object": "7b64aa0808d1200fda223712e6baf285",
+   "static_hash_identity_bytes": "7b64aa0808d1200fda223712e6baf285",
+   "static_hash_no_identity": "ff115c9d538bfd67d932a7892cdbd5f4"
+  },
+  {
+   "app_name": "app",
+   "aspects": [
+    "a",
+    "b",
+    "c",
+    "d"
+   ],
+   "identity_private": "f1b9da707793a246476dcd6a96713f2bfe3aa8881ef116d2fae10192ef4a3e2d22fb630d5ca2860202e912c2d065ea99501c47552b7f78c8339a41a00e034b67",
+   "identity_hash": "e127db0a23d51144e06209ae2881d399",
+   "full_name": "app.a.b.c.d.e127db0a23d51144e06209ae2881d399",
+   "name_hash": "a3f947dc0f2cf083985d",
+   "hash": "1098f093ed1d2db9f7a36d3369d1ec7a",
+   "type": 0,
+   "expand_name_no_identity": "app.a.b.c.d",
+   "static_hash_identity_object": "1098f093ed1d2db9f7a36d3369d1ec7a",
+   "static_hash_identity_bytes": "1098f093ed1d2db9f7a36d3369d1ec7a",
+   "static_hash_no_identity": "90f195f2707cbf961128c2ee2a43b0b2"
+  },
+  {
+   "app_name": "\u00fcn\u00efcode",
+   "aspects": [
+    "\u00e6spect"
+   ],
+   "identity_private": "224ef50355e94ddd8c5802b44047cdf7458f915ca510ae992b9c384ba28fff8dfbc7170b6b7c3d85393ca2cd9ae7dd564e5b7a630c8c6d1586ae6c71fb1ffa15",
+   "identity_hash": "975be06352e19a0af7b3e739080d5fb0",
+   "full_name": "\u00fcn\u00efcode.\u00e6spect.975be06352e19a0af7b3e739080d5fb0",
+   "name_hash": "a5881aad3b33a254192f",
+   "hash": "62d22360423dd5303f0f3e8339a301b8",
+   "type": 0,
+   "expand_name_no_identity": "\u00fcn\u00efcode.\u00e6spect",
+   "static_hash_identity_object": "62d22360423dd5303f0f3e8339a301b8",
+   "static_hash_identity_bytes": "62d22360423dd5303f0f3e8339a301b8",
+   "static_hash_no_identity": "8336a02a8f043abed2544062abefc501"
+  },
+  {
+   "app_name": "",
+   "aspects": [
+    "x"
+   ],
+   "identity_private": "89fa1541b13632d59086d4bdeca9101e461582fba05a705b45454eb8dfc72960a6b647117b6cf9762cc6a44f0fae3855676af4aea42c7dcb22a14b72804742b4",
+   "identity_hash": "1dc17856e94a5452195da110ee3a141f",
+   "full_name": ".x.1dc17856e94a5452195da110ee3a141f",
+   "name_hash": "bb42e4c602551e7cef9f",
+   "hash": "550d982a09c3d0fc917fc6d9a2f03e31",
+   "type": 0,
+   "expand_name_no_identity": ".x",
+   "static_hash_identity_object": "550d982a09c3d0fc917fc6d9a2f03e31",
+   "static_hash_identity_bytes": "550d982a09c3d0fc917fc6d9a2f03e31",
+   "static_hash_no_identity": "bee1685b9981df06cbedf98c1bf804b1"
+  }
+ ],
+ "plain": [
+  {
+   "app_name": "lxmf",
+   "aspects": [
+    "delivery"
+   ],
+   "full_name": "lxmf.delivery",
+   "name_hash": "6ec60bc318e2c0f0d908",
+   "hash": "9497d16c52ac5faec04c36db5c301e8e",
+   "type": 2
+  },
+  {
+   "app_name": "lxmf",
+   "aspects": [
+    "propagation"
+   ],
+   "full_name": "lxmf.propagation",
+   "name_hash": "e03a09b77ac21b22258e",
+   "hash": "8801321bf89cce83419e3e80a7df53e8",
+   "type": 2
+  },
+  {
+   "app_name": "nomadnetwork",
+   "aspects": [
+    "node"
+   ],
+   "full_name": "nomadnetwork.node",
+   "name_hash": "213e6311bcec54ab4fde",
+   "hash": "b11b1094382ebd4a9fe43b061b3da93e",
+   "type": 2
+  },
+  {
+   "app_name": "example_utilities",
+   "aspects": [
+    "announcesample",
+    "fruits"
+   ],
+   "full_name": "example_utilities.announcesample.fruits",
+   "name_hash": "6f233dfd9aa4cbd4a1e2",
+   "hash": "1c1bb1956a206a37932a85d9db76ffc9",
+   "type": 2
+  },
+  {
+   "app_name": "a",
+   "aspects": [],
+   "full_name": "a",
+   "name_hash": "ca978112ca1bbdcafac2",
+   "hash": "ff115c9d538bfd67d932a7892cdbd5f4",
+   "type": 2
+  },
+  {
+   "app_name": "app",
+   "aspects": [
+    "a",
+    "b",
+    "c",
+    "d"
+   ],
+   "full_name": "app.a.b.c.d",
+   "name_hash": "a3f947dc0f2cf083985d",
+   "hash": "90f195f2707cbf961128c2ee2a43b0b2",
+   "type": 2
+  },
+  {
+   "app_name": "\u00fcn\u00efcode",
+   "aspects": [
+    "\u00e6spect"
+   ],
+   "full_name": "\u00fcn\u00efcode.\u00e6spect",
+   "name_hash": "a5881aad3b33a254192f",
+   "hash": "8336a02a8f043abed2544062abefc501",
+   "type": 2
+  },
+  {
+   "app_name": "",
+   "aspects": [
+    "x"
+   ],
+   "full_name": ".x",
+   "name_hash": "bb42e4c602551e7cef9f",
+   "hash": "bee1685b9981df06cbedf98c1bf804b1",
+   "type": 2
+  }
+ ],
+ "group": [
+  {
+   "app_name": "grp",
+   "aspects": [
+    "chat"
+   ],
+   "identity_hash": "3d636b419a9b63c5efa9bb0304ec89ea",
+   "full_name": "grp.chat.3d636b419a9b63c5efa9bb0304ec89ea",
+   "name_hash": "373842b5bddbea552b11",
+   "hash": "6875ea66961fdc8228307ecca0b3a0ed",
+   "type": 1
+  }
+ ],
+ "hash_from_name": [
+  {
+   "full_name": "lxmf.delivery",
+   "identity_hash": "78633f47f1f8a78e932918fab6e1ccd8",
+   "hash": "5a0d5b71e544ffd4284f882f7bec2123",
+   "hash_bytes": "5a0d5b71e544ffd4284f882f7bec2123"
+  },
+  {
+   "full_name": "lxmf.propagation",
+   "identity_hash": "768b18481cc19baf421367df99eab2db",
+   "hash": "c5747ba3ba36aab9dbfdd07295e3c3ce",
+   "hash_bytes": "c5747ba3ba36aab9dbfdd07295e3c3ce"
+  },
+  {
+   "full_name": "nomadnetwork.node",
+   "identity_hash": "46f3cfc6a40d7dcc095c37831d37ab0b",
+   "hash": "bbd8e79badd3d310eda0f5ec5e30d42c",
+   "hash_bytes": "bbd8e79badd3d310eda0f5ec5e30d42c"
+  },
+  {
+   "full_name": "example_utilities.announcesample.fruits",
+   "identity_hash": "8df7c8d1b8153fb9fb13297c4c6de285",
+   "hash": "733209ed650c81e508ec00f14f6387d0",
+   "hash_bytes": "733209ed650c81e508ec00f14f6387d0"
+  },
+  {
+   "full_name": "a",
+   "identity_hash": "9a01ab6c681d4eec5d9acc105b617be3",
+   "hash": "7b64aa0808d1200fda223712e6baf285",
+   "hash_bytes": "7b64aa0808d1200fda223712e6baf285"
+  },
+  {
+   "full_name": "app.a.b.c.d",
+   "identity_hash": "e127db0a23d51144e06209ae2881d399",
+   "hash": "1098f093ed1d2db9f7a36d3369d1ec7a",
+   "hash_bytes": "1098f093ed1d2db9f7a36d3369d1ec7a"
+  },
+  {
+   "full_name": "\u00fcn\u00efcode.\u00e6spect",
+   "identity_hash": "975be06352e19a0af7b3e739080d5fb0",
+   "hash": "62d22360423dd5303f0f3e8339a301b8",
+   "hash_bytes": "62d22360423dd5303f0f3e8339a301b8"
+  },
+  {
+   "full_name": ".x",
+   "identity_hash": "1dc17856e94a5452195da110ee3a141f",
+   "hash": "550d982a09c3d0fc917fc6d9a2f03e31",
+   "hash_bytes": "550d982a09c3d0fc917fc6d9a2f03e31"
+  }
+ ],
+ "invalid": [
+  {
+   "case": "dot_in_app_name",
+   "upstream_rejects": true,
+   "error": "ValueError"
+  },
+  {
+   "case": "dot_in_aspect",
+   "upstream_rejects": true,
+   "error": "ValueError"
+  },
+  {
+   "case": "expand_name_dot_in_aspect",
+   "upstream_rejects": true,
+   "error": "ValueError"
+  },
+  {
+   "case": "plain_with_identity",
+   "upstream_rejects": true,
+   "error": "TypeError"
+  },
+  {
+   "case": "outbound_single_without_identity",
+   "upstream_rejects": true,
+   "error": "ValueError"
+  }
+ ]
+}
