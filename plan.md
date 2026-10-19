@@ -31,20 +31,34 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] Classify each contract as implemented, partial, missing, unverified, not applicable or upstream placeholder; require evidence for implemented claims
   - [x] Map contracts onto existing .NET projects and define ownership, async lifecycle, cancellation, bounded buffering, persistence and error-reporting boundaries
   - [x] Define differential, live-reference, Pester and NativeAOT acceptance criteria for each feature; record intentional API/platform differences
-- [ ] Parity 2 - Remaining Git integration and hosting
+- [x] Parity 2 - Remaining Git integration and hosting
   - [x] Complete helper client configuration/aliases/ref batch settings and explicitly verify object-format/platform limits
   - [x] Git push bundles, existing-object ref operations, force behavior, deletion and per-ref Git status reporting
-  - [ ] Repository node configuration, identity/aliases, announcements, blocked identities, statistics and restart persistence
-  - [ ] Group/repository/document permissions, .allowed files, administration and authorization-failure disclosure
-  - [ ] Repository create, fork, mirror, manual/periodic sync and default-HEAD restoration
-  - [ ] Release list/view/fetch/create/delete/latest, artifacts, manifests and offline/signer verification
-  - [ ] Work document list/view/create/propose/edit/delete/comment/complete/activate, scopes and permissions
-  - [ ] NomadNet repository/tree/blob/commit/ref/statistics/release/work pages and downloads
-  - [ ] Static/executable Micron templates, Unicode-icon/media settings, rendering and explicitly authorized bounded editor/template processes
-  - [ ] Upstream image/WebP media conversion, backend failure/timeout behavior and temporary-resource cleanup
-  - [ ] rngcs SSHSIG/RSG signing, principal discovery, structural checking and author/tagger verification
-  - [ ] Native Git utility executable discovery and full CLI/configuration/error/exit-code compatibility
-  - [ ] Managed/native end-to-end acceptance of remaining Git features against the reference
+  - [x] Repository node configuration, identity/aliases, announcements, blocked identities, statistics and restart persistence
+    - [x] Source-backed node defaults/configuration, raw persistent identity, alias resolution and corrupt/unwritable-storage diagnostics
+    - [x] Owned bounded hosting request workers, announcements, blocked-peer rejection and deterministic shutdown
+    - [x] Reference-format fetch/push/page/download statistics, ignore lists, periodic flush and restart recovery
+  - [x] Group/repository/document permissions, .allowed files, administration and authorization-failure disclosure
+    - [x] Group config/.allowed union, repository/document inheritance and explicit none/all/admin precedence
+    - [x] Get/set administration, protected-state disclosure and static/explicitly authorized executable permission files
+  - [x] Repository create, fork, mirror, manual/periodic sync and default-HEAD restoration
+    - [x] Bare discovery/create and creator permissions; interrupted initialization/clone cleanup and concurrent mutations
+    - [x] Native RNS and applicable external-source fork/mirror, persisted upstream metadata, mirror HEAD restoration and fork HEAD preservation
+  - [x] Release list/view/fetch/create/delete/latest, artifacts, manifests and offline/signer verification
+    - [x] Draft init/artifact/finalize persistence, published/latest selection, protected downloads and failed-step recovery
+    - [x] Local release packaging, independent RSG/RSM verification, artifact integrity and explicit signer-trust distinction
+  - [x] Work document list/view/create/propose/edit/delete/comment/complete/activate, scopes and permissions
+    - [x] Active/completed/proposed scopes, signed content, comments/IDs, document administration and restart/concurrency recovery
+  - [x] NomadNet repository/tree/blob/commit/ref/statistics/release/work pages and downloads
+    - [x] Anonymous authorization without weakening identity validation, protected downloads and pagination/binary/Unicode boundaries
+    - [x] Persisted fork/mirror provenance, known-peer links, HEAD/sync-age annotations and credential-safe disclosure
+  - [x] Static/executable Micron templates, Unicode-icon/media settings, rendering and explicitly authorized bounded editor/template processes
+  - [x] Upstream image/WebP media conversion, backend failure/timeout behavior and temporary-resource cleanup
+  - [x] rngcs SSHSIG/RSG signing, principal discovery, structural checking and author/tagger verification
+  - [x] Native Git utility executable discovery and full CLI/configuration/error/exit-code compatibility
+  - [x] Managed/native end-to-end acceptance of remaining Git features against the reference
+    - [x] Native client/reference server and reference client/native host acceptance, plus native executable discovery and persisted-process flows
+    - [x] Full regression, applicable Pester, fresh merged production coverage and warnings-as-errors NativeAOT feature execution on Windows x64
 - [ ] Parity 3 - Runtime, configuration and operations
   - [ ] Full applicable upstream configuration/defaults and explicit diagnostics for unsupported settings
   - [ ] Configuration discovery/default creation, nested/list/quoted settings and precedence; omitted/conflicting enable flags, mode and port aliases

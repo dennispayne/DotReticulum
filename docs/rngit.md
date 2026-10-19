@@ -14,6 +14,10 @@ Git owns the working tree, HEAD, local branches, tags and remote-tracking refs;
 the helper advertises remote refs, imports fetched objects and sends push
 operations to the server. It never updates the caller's local refs.
 The direct `rngit` commands below retain their bare-repository behavior.
+The application also contains a native repository node, management client,
+release/work stores, NomadNet page service and `rngcs` signer. These are
+separate surfaces from the completed ordinary-Git helper; their evidence and
+remaining acceptance boundaries are recorded in the development history.
 The Reticulum-hosted URL
 `rns://7649a50d84610232d1416b41d2896aff/reticulum/reticulum` is this project's
 authoritative reference upstream; GitHub is only a secondary comparison mirror.
@@ -32,6 +36,153 @@ merely because newer refs appear: compare and verify the snapshot first.
 Stored vectors retain the SHA of the revision that generated them.
 
 ## Usage
+
+### Repository node and management
+
+The repository node uses a separate rngit configuration directory and the
+existing .NET Reticulum interface configuration:
+
+```powershell
+DotReticulum.Applications.exe rngit node --config C:\RNGit\Server --rnsconfig C:\RNS\Server
+DotReticulum.Applications.exe rngit node --config C:\RNGit\Server --print-identity
+DotReticulum.Applications.exe rngit create rns://NODE/team/project.git --config C:\RNGit\Client --rnsconfig C:\RNS\Client
+DotReticulum.Applications.exe rngit work rns://NODE/team/project.git create --title "Design" --content C:\Owned\design.md --config C:\RNGit\Client --rnsconfig C:\RNS\Client
+DotReticulum.Applications.exe rngit release rns://NODE/team/project.git create v1:C:\Owned\artifacts --content C:\Owned\notes.md --config C:\RNGit\Client --rnsconfig C:\RNS\Client
+DotReticulum.Applications.exe rngit release C:\Owned\manifest.rsm verify --offline --signer IDENTITY_HASH
+```
+
+`NODE` denotes the 32-character repositories destination hash, not the
+identity hash. `--config` selects rngit's directory; `--rnsconfig` selects
+our .NET network configuration. The older direct clone/fetch commands retain
+their existing `--config` network meaning. Install copies of the published
+executable as `rngit`, `rngcs` and `git-remote-rns` (with `.exe` on Windows);
+their filenames select the corresponding utility.
+
+The server's `config` follows the source-backed flat/list rngit settings:
+
+```ini
+[rngit]
+node_name = Private development node
+announce_interval = 360
+mirror_interval = 24
+record_stats = yes
+[aliases]
+maintainer = 0123456789abcdef0123456789abcdef
+[repositories]
+team = C:\Owned\Repositories
+[access]
+team = read:all, create:maintainer, write:maintainer, admin:maintainer
+[pages]
+serve_nomadnet = yes
+unicode_icons = yes
+media_conversion = yes
+```
+
+Announce intervals are minutes; mirror intervals are hours. Existing bare
+repositories are discovered under configured group directories. Keys are
+raw 64-byte `repositories_identity` and `client_identity`; `stats` uses the
+reference MessagePack schema. Corrupt identities are never replaced.
+Back up the configuration and keys together with repositories and their
+adjacent `.allowed`, `.work` and `.releases` state. Protect Windows directory
+ACLs; generated Unix private-key files are owner-only.
+
+Group `.allowed` entries are combined with `[access]`; nonempty
+repository permission entries override group entries. Explicit `none` takes
+precedence over `all` and administrators. Identity aliases here identify
+callers, unlike helper aliases which identify destination nodes.
+Management distinguishes readable-but-denied from hidden repositories
+without disclosing protected contents. NomadNet anonymous permissions are
+resolved explicitly; an invalid all-zero cryptographic key is not accepted
+to emulate upstream's anonymous sentinel.
+
+Native mutation commands never invoke an editor implicitly. Supply
+`--content <owned-file>` or explicitly authorize bounded `EDITOR` execution
+with `--allow-exec`. Deletion and latest-release prompts retain the default
+refusal; `--yes` explicitly confirms the requested mutation. Python's interactive runtime
+shell is not provided by the native node. Executable templates and permission
+resolvers require operator authorization; static `.mu` templates do not.
+External media backends are optional executables, not Python client
+dependencies. Backend absence/failure is diagnosed and does not prove image
+conversion support.
+
+`rngcs -Y sign|find-principals|check-novalidate|verify` implements Git's signer
+invocation surface. SSHSIG is a transport envelope around Reticulum RSG:
+structural checking does not verify a signature. Cryptographic validity does
+not establish publisher trust. Release verification with an independently
+specified signer checks that identity; an embedded artifact key alone is
+never described as a trusted publisher. Commit/tag verification separately
+checks author/tagger identity.
+
+### Collaboration, presentation and safety boundaries
+
+`fork` and `mirror` take a source URL followed by a target repository URL.
+Both persist their source next to the bare repository. Manual `sync` updates
+either kind; periodic synchronization selects mirrors whose interval has
+elapsed. Mirror synchronization restores the source's default HEAD, while
+fork synchronization preserves the fork's HEAD. RNS sources always use the
+native stack. HTTP/HTTPS/SSH sources invoke local Git only when the node
+operator passes `--allow-external`; filesystem and other sources are not
+implicitly authorized. A failed or cancelled initialization is diagnosed and
+its owned staging directory is removed; imported objects and interrupted
+multi-step release drafts are not described as a transactional rollback.
+
+Release operations are `list`, `view <tag>`, `create <tag>:<artifacts-directory>`,
+`latest <tag>`, `delete <tag>`, and `fetch <tag>:<artifact-pattern>`. Use
+`latest:all` explicitly to fetch every artifact of the selected latest
+release. Creation writes `manifest.rsm` and artifact `.rsg` sidecars into
+the owned artifacts directory. Fetch validates the selected artifacts and
+saves `<package>_<version>.rsm` beside them. `release <manifest> verify`
+performs offline verification; `--signer` can require a particular identity
+hash or load an explicitly supplied raw private identity file. It does not
+modify a personal trust store. Git's allowed-signers file is not a trust
+database for `rngcs`: the pinned signer ignores that option, while principal,
+author/tagger and cryptographic checks remain distinct.
+
+Work operations are `list`, `view`, `create`, `propose`, `edit`, `delete`,
+`update` (also `comment`), `complete`, `activate` and `perms`. Select
+`active`, `completed`, `proposed`, or `all` for listing; mutations and views
+use an explicit document ID where applicable. Content is trimmed before
+signing, matching server validation. Document permissions inherit from the
+repository unless overridden; mutation authorization and hidden-versus-denied
+responses are enforced before protected content is returned.
+
+NomadNet serves index/group/repository/tree/blob/history/commit/ref/statistics,
+release and work pages, plus blob/artifact/document downloads and `/media`.
+Place static overrides under `templates`; `base.mu` recognizes
+`{NODE_NAME}`, `{VERSION}`, `{NAVIGATION}`, `{PAGE_CONTENT}` and `{GEN_TIME}`.
+Generation timing is measured per request. Native Markdown implements the
+reference's default rendering path, including its code-point width fallback
+when optional `wcwidth` is absent. Optional Python Pygments highlighting and
+wcwidth-enhanced layout are not provided. Byte-differential fixtures cover
+the exercised default rendering, not every conceivable Markdown document or
+terminal font. Unsafe filesystem links/download paths are rejected and
+media refs are encoded rather than preserving unsafe upstream URL behavior.
+Static `.mu` files are not treated as executable merely because Windows
+reports `X_OK`; executable permission/template resolution requires explicit
+`--allow-exec` and bounded process execution.
+
+Media backend discovery follows `magick`, `convert`, `gm`, `ffmpeg`, `avconv`;
+`RNGIT_MEDIA_BACKEND` can select a supported backend. Conversion bounds input,
+output, runtime and owned subprocess lifetime. Missing/failed conversion is
+diagnosed; page delivery may retain the original image as upstream does.
+Real FFmpeg/WebP conversion was exercised on Windows; other backend families
+have argument-selection/failure coverage, not installed-encoder evidence.
+
+CLI syntax failures exit 2, client-operation failures exit 1, and fatal node
+initialization failures exit 255. Errors use stderr rather than upstream's
+console-progress output; help identifies this native experimental utility.
+Non-interactive content files, explicit process/network authorization,
+resource limits and rejection of Python's interactive runtime are intentional
+.NET safety/API differences, not claims of Python runtime compatibility.
+
+The live reference-client adapter uses the actual pinned
+`server.ReticulumGitClient`. On Windows it closes the received resource file
+immediately before that client's original retention callback moves it:
+upstream otherwise attempts to unlink an open file and raises WinError 32.
+The original callback, request handlers and wire/resource implementation
+remain in use; the adapter reads/closes the returned file and emits observations.
+This proves interoperation with that disclosed Windows file-lifetime shim,
+not an unmodified upstream Windows resource-retention path.
 
 ### Ordinary Git (native helper)
 

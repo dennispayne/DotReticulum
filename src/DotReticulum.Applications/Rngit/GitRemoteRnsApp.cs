@@ -180,24 +180,27 @@ public static class GitRemoteRnsApp
         }
     }
 
-    private static Action<int, string> CreateLogger(RngitClientConfiguration config, TextWriter error)
+    private static Action<int, string> CreateLogger(RngitClientConfiguration config, TextWriter error) =>
+        CreateFileLogger(config.LogPath, config.LogLevel, error, "git-remote-rns", "client_log");
+
+    internal static Action<int, string> CreateFileLogger(string path, int logLevel, TextWriter error, string tool, string label)
     {
-        using (new FileStream(config.LogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { }
+        using (new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { }
         var gate = new object();
         return (level, message) =>
         {
-            if (level > config.LogLevel) return;
+            if (level > logLevel) return;
             lock (gate)
             {
                 try
                 {
-                    if (new FileInfo(config.LogPath).Length > 5 * 1024 * 1024)
-                        File.Move(config.LogPath, config.LogPath + ".1", overwrite: true);
-                    File.AppendAllText(config.LogPath, $"[{DateTimeOffset.Now:O}] [{level}] {message}{Environment.NewLine}", new UTF8Encoding(false));
+                    if (new FileInfo(path).Length > 5 * 1024 * 1024)
+                        File.Move(path, path + ".1", overwrite: true);
+                    File.AppendAllText(path, $"[{DateTimeOffset.Now:O}] [{level}] {message}{Environment.NewLine}", new UTF8Encoding(false));
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    error.WriteLine($"git-remote-rns: Could not write client_log: {ex.Message}");
+                    error.WriteLine($"{tool}: Could not write {label}: {ex.Message}");
                 }
             }
         };

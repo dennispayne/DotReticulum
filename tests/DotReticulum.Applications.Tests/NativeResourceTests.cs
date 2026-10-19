@@ -17,13 +17,15 @@ public sealed class NativeFactAttribute : FactAttribute
 
 public sealed class NativeResourceTests
 {
-    private sealed class NativePeer : IDisposable
+    internal sealed class NativePeer : IDisposable
     {
         private readonly Process _process;
         private readonly StringBuilder _log = new();
         public string Output { get { lock (_log) return _log.ToString(); } }
 
-        public NativePeer(params string[] args)
+        public NativePeer(params string[] args) : this(null, args) { }
+
+        public NativePeer(IReadOnlyDictionary<string, string>? environment, params string[] args)
         {
             var info = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTRETICULUM_NATIVE_EXE")!)
             {
@@ -32,11 +34,23 @@ public sealed class NativeResourceTests
                 RedirectStandardError = true,
             };
             foreach (var argument in args) info.ArgumentList.Add(argument);
+            if (environment is not null)
+                foreach (var (key, value) in environment) info.Environment[key] = value;
             _process = Process.Start(info) ?? throw new InvalidOperationException("Could not launch native peer.");
-            _process.OutputDataReceived += (_, e) => { if (e.Data is not null) lock (_log) _log.AppendLine(e.Data); };
-            _process.ErrorDataReceived += (_, e) => { if (e.Data is not null) lock (_log) _log.AppendLine(e.Data); };
+            _process.OutputDataReceived += (_, e) => Append(e.Data);
+            _process.ErrorDataReceived += (_, e) => Append(e.Data);
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
+        }
+
+        private void Append(string? line)
+        {
+            if (line is null) return;
+            lock (_log)
+            {
+                _log.AppendLine(line);
+                if (_log.Length > 65536) _log.Remove(0, _log.Length - 65536);
+            }
         }
 
         public async Task WaitForSuccessAsync(CancellationToken cancellationToken)

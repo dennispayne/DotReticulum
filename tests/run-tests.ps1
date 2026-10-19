@@ -48,7 +48,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Coverage reporting failed.' }
     }
     if ($Pester) {
-        $pesterArguments = @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'run-pester.ps1'))
+        $pesterArguments = @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'run-pester.ps1'), '-GitHosting')
         if ($NativeExe) { $pesterArguments += @('-Application', $env:DOTRETICULUM_NATIVE_EXE) }
         if ($Live) {
             $pesterArguments += @('-GitRemote', '-Python', $env:DOTRETICULUM_PYTHON, '-Upstream', $env:DOTRETICULUM_UPSTREAM)

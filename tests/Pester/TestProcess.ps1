@@ -1,10 +1,16 @@
 function Start-TestProcess {
-    param([string] $Executable, [string[]] $Arguments)
+    param([string] $Executable, [string[]] $Arguments, [string] $WorkingDirectory, [hashtable] $Environment = @{})
     $info = [System.Diagnostics.ProcessStartInfo]::new($Executable)
     $info.UseShellExecute = $false
     $info.RedirectStandardOutput = $true
     $info.RedirectStandardError = $true
+    $info.RedirectStandardInput = $true
+    if ($WorkingDirectory) { $info.WorkingDirectory = $WorkingDirectory }
     foreach ($argument in $Arguments) { $info.ArgumentList.Add($argument) }
+    foreach ($key in $Environment.Keys) {
+        if ($null -eq $Environment[$key]) { $null = $info.Environment.Remove($key) }
+        else { $info.Environment[$key] = $Environment[$key] }
+    }
     $process = [System.Diagnostics.Process]::Start($info)
     return @{
         Process = $process
@@ -40,6 +46,32 @@ function Complete-TestProcess {
 }
 
 function Invoke-TestProcess {
-    param([string] $Executable, [string[]] $Arguments, [int] $TimeoutSeconds = 60)
-    Complete-TestProcess (Start-TestProcess $Executable $Arguments) $TimeoutSeconds
+    param([string] $Executable, [string[]] $Arguments, [int] $TimeoutSeconds = 60,
+        [string] $WorkingDirectory, [hashtable] $Environment = @{}, [string] $InputText = '')
+    $peer = Start-TestProcess $Executable $Arguments $WorkingDirectory $Environment
+    if ($InputText) { $peer.Process.StandardInput.Write($InputText) }
+    $peer.Process.StandardInput.Close()
+    Complete-TestProcess $peer $TimeoutSeconds
+}
+
+function Install-TestGitHelper {
+    param([string] $Application, [string] $Directory)
+    $suffix = if ($IsWindows) { '.exe' } else { '' }
+    $helper = Join-Path $Directory "git-remote-rns$suffix"
+    $source = Split-Path $Application
+    $name = [IO.Path]::GetFileNameWithoutExtension($Application)
+    if ([IO.Path]::GetExtension($Application) -eq '.dll' -or (Test-Path -LiteralPath (Join-Path $source "$name.runtimeconfig.json"))) {
+        Copy-Item -LiteralPath (Join-Path $source "$name$suffix") -Destination $helper
+        foreach ($extension in '.dll', '.deps.json', '.runtimeconfig.json') {
+            Copy-Item -LiteralPath (Join-Path $source "$name$extension") -Destination $Directory
+        }
+        foreach ($item in Get-ChildItem -LiteralPath $source -File) {
+            if ($item.Name -eq "$name.dll" -or $item.Extension -notin @('.dll', '.so', '.dylib')) { continue }
+            Copy-Item -LiteralPath $item.FullName -Destination $Directory
+        }
+        $runtimes = Join-Path $source 'runtimes'
+        if (Test-Path -LiteralPath $runtimes) { Copy-Item -LiteralPath $runtimes -Destination $Directory -Recurse }
+    }
+    else { Copy-Item -LiteralPath $Application -Destination $helper }
+    return $helper
 }

@@ -1,0 +1,229 @@
+{
+  "upstream": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "version": "1.5.7",
+  "imports": {
+    "RNS": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+    "pages": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\Utilities\\rngit\\pages.py",
+    "media": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\Utilities\\rngit\\media.py"
+  },
+  "sha256": {
+    "pages": "d165d8ac8d3cfdd1b42929a2512e9d5d03a1cef726124deca5218d7522a89c04",
+    "media": "55fadeaee76d0a79c30c54d1d79122174cb6a956f2278013e97c4fd015fd8e9c",
+    "server": "6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693",
+    "util": "ac74160c788c62b139866d91113903bc10d18466539a373624737d6d4f4d0ef2"
+  },
+  "disclosed_shims": [
+    "os.access=False solely for static template branches on Windows",
+    "shutil.which returns requested executable solely for encoder argument discovery"
+  ],
+  "template_input": "  π {PAGE_CONTENT} {UNKNOWN}\t \n",
+  "template_loaded": "  π {PAGE_CONTENT} {UNKNOWN}",
+  "rendered": "#!c=0\n> Nœud ♥\n\nNavigation ♥\n> Groups\n\na   `b\n\n<\n-\n`a`F666`[Served by rngit 1.5.7`:/page/index.mu] - Unknown generation time`f",
+  "icons": {
+    "false": {
+      "sep": "•",
+      "folder": "󰉖",
+      "file": "",
+      "branch": "󰘬",
+      "commits": "󰋚",
+      "tag": "󰓼",
+      "stats": "",
+      "heart": "󰋑",
+      "package": "󰏗",
+      "work": "󱌣",
+      "unknown": ""
+    },
+    "true": {
+      "sep": "•",
+      "folder": "🗀",
+      "file": "🗎",
+      "branch": "⑃",
+      "commits": "🖹",
+      "tag": "⌆",
+      "stats": "🗠",
+      "heart": "♥",
+      "package": "◇",
+      "work": "☸",
+      "unknown": ""
+    }
+  },
+  "markup": {
+    "escape": "\\`x\\` [unchanged]",
+    "tabs": "a   b   c",
+    "diff_input": "diff --git a/x b/x\nindex abc..def\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-`old\\path\n+`new\n context",
+    "diff": "\n`F666diff --git a/x b/x`f\n`F666index abc..def`f\n\\--- a/x\n+++ b/x\n`F0aa@@ -1 +1 @@`f\n`F900-\\`old\\\\path`f\n`F0a0+\\`new`f\n context",
+    "link": "`[Nœud`:/page/tree.mu`g=hello+world|r=a%2Bb%2F%CF%80]"
+  },
+  "webp_headers": [
+    {
+      "data": "UklGRgAAAABXRUJQVlA4WAAAAAAAEDRWeJASNFZ4",
+      "dimensions": [
+        1216633,
+        7886389
+      ]
+    },
+    {
+      "data": "UklGRgAAAABXRUJQVlA4IAAAAAAAEDRWeJASNFZ4",
+      "dimensions": [
+        13330,
+        14422
+      ]
+    },
+    {
+      "data": "UklGRgAAAABXRUJQVlA4TAAAAAAAEDRWeJASNFZ4",
+      "dimensions": [
+        13329,
+        8537
+      ]
+    },
+    {
+      "data": "UklGRgAAAABXRUJQQkFEIQAAAAAAEDRWeJASNFZ4",
+      "dimensions": null
+    },
+    {
+      "data": "",
+      "dimensions": null
+    },
+    {
+      "data": "bm90IHdlYnA=",
+      "dimensions": null
+    },
+    {
+      "data": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "dimensions": null
+    }
+  ],
+  "configured": [
+    {
+      "backend": "magick",
+      "arguments": [
+        "-",
+        "-quality",
+        "100",
+        "-resize",
+        "64x64>",
+        "webp:-"
+      ]
+    },
+    {
+      "backend": "convert",
+      "arguments": [
+        "-",
+        "-quality",
+        "100",
+        "-resize",
+        "64x64>",
+        "webp:-"
+      ]
+    },
+    {
+      "backend": "gm",
+      "arguments": [
+        "convert",
+        "-",
+        "-quality",
+        "100",
+        "-resize",
+        "64x64>",
+        "webp:-"
+      ]
+    },
+    {
+      "backend": "ffmpeg",
+      "arguments": [
+        "-y",
+        "-loglevel",
+        "error",
+        "-i",
+        "-",
+        "-quality",
+        "100",
+        "-vf",
+        "scale='min(iw,64)':'min(ih,64)':force_original_aspect_ratio=decrease",
+        "-f",
+        "webp",
+        "pipe:1"
+      ]
+    },
+    {
+      "backend": "avconv",
+      "arguments": [
+        "-y",
+        "-loglevel",
+        "error",
+        "-i",
+        "-",
+        "-quality",
+        "100",
+        "-vf",
+        "scale='min(iw,64)':'min(ih,64)':force_original_aspect_ratio=decrease",
+        "-f",
+        "webp",
+        "pipe:1"
+      ]
+    }
+  ],
+  "unsupported_backend": null,
+  "executable_template": {
+    "success": "owned π {PAGE_CONTENT}",
+    "nonzero_exit_output": "",
+    "owned_fixture": "C:\\Git\\dennispayne\\DotReticulum\\tests\\Fixtures\\RngitPresentationBackend\\bin\\Release\\net10.0\\RngitPresentationBackend.exe"
+  },
+  "editor": {
+    "input": "owned permission input\n",
+    "permissions_result": "owned permission input\n",
+    "command": "C:\\Windows\\System32\\sort.exe",
+    "shell": false
+  },
+  "native": {
+    "encoder": "C:\\Git\\dennispayne\\DotReticulum\\TestResults\\media-backend\\ffmpeg-9.0.2-essentials_build\\bin\\ffmpeg.exe",
+    "encoder_sha256": "3256173f3f8bffd7df12227c68adf68025edb1832273a9530688a7bb1ed8edec",
+    "encoder_version": "ffmpeg version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+    "source_image": "C:\\Git\\dennispayne\\DotReticulum\\assets\\branding\\dotreticulum.png",
+    "source_sha256": "474352118dc848496f47b8f3e757b75b242c29e47f24166b8407eae325031001",
+    "cases": [
+      {
+        "quality": 85,
+        "max_dimension": 64,
+        "dimensions": [
+          64,
+          64
+        ],
+        "output": "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",
+        "sha256": "522e72e16b8c7916ae523d1e53e1fcf110ff3405ad67391fff904e29eb5f7a92"
+      },
+      {
+        "quality": 0,
+        "max_dimension": 32,
+        "dimensions": [
+          32,
+          32
+        ],
+        "output": "UklGRj4BAABXRUJQVlA4WAoAAAAQAAAAHwAAHwAAQUxQSMoAAAABgJtt27Hn+a1SE5hJFrA6lmltO2ltjeB07GxVzgBOSifV07x43v/4B4iICYAYN3V0mpTkXiJe5dFFVpC5FqWxj/4i92/MIacpf0DhxwqtRMYpSp9linjmkXTRw6n7QOKPBtYhkp+wNul24t6msutkjSLEYmUliq5TNYo2galgJ14c0p2wGj6pvppY4J6lWfYDPzxzL3eRA3zf7XtvY8uT2HO1DgSLEPMAnBN/vP9JFwjbBrs1AACJ66yNJCAvuEa8KQSV5u4eC8Q4VlA4IE4AAAAQAwCdASogACAAP83W4GY/tK0/sAgD8DmJYgC7AHbnnyQA/tzuOeZvLl1iHMP9GPxkl2idwqQtuoJATEstOLYaT7FwrnxsMnlIeW6gAAA=",
+        "sha256": "979f8208f4b6b7aa808aecdb2414c6b4787df704d53d443dce5268c4d67ce45b"
+      },
+      {
+        "quality": 120,
+        "max_dimension": 32,
+        "dimensions": [
+          32,
+          32
+        ],
+        "output": "UklGRooEAABXRUJQVlA4WAoAAAAQAAAAHwAAHwAAQUxQSMoAAAABgJtt27Hn+a1SE5hJFrA6lmltO2ltjeB07GxVzgBOSifV07x43v/4B4iICYAYN3V0mpTkXiJe5dFFVpC5FqWxj/4i92/MIacpf0DhxwqtRMYpSp9linjmkXTRw6n7QOKPBtYhkp+wNul24t6msutkjSLEYmUliq5TNYo2galgJ14c0p2wGj6pvppY4J6lWfYDPzxzL3eRA3zf7XtvY8uT2HO1DgSLEPMAnBN/vP9JFwjbBrs1AACJ66yNJCAvuEa8KQSV5u4eC8Q4VlA4IJoDAAAwFACdASogACAAAAAAJagCdMoR1B4x+Gf4Ac+5rR3jyQPmS/XbRn0gPMB/AP5t+1XsAdQB/iOoA9ADpNPJj//90g51rw56x5PB7HnDv7D+TmWTfDP7V+Sv83/ZnYDv8JrCf89/xv2u/CN/XeRf8Z/rn+V9wL+I/yL+9f2P+9f7//A//jwufsd7C/6ZHR5EbShYZmu7jyoSrLm2SCDCHyiigpkvDj47+K1wAAD+//8df3pU0B8U+MWj6srCZX+e8/S2UpXWkfqy/a2pMs6FhmgmijPWRBDp/6HoT5LVmma6LD+rppzpwYmEIYJ/nxEv/yFG34m8n4ayyvBUn7I6eFg9y3LygzTP/g4sSEIA34HrfjI9yrFvzmI+IQy0fhz8ks8Jai1f/KuhrxyoPxw3/er9/mELPML63qPQ+t4+hT4CgtvP4VRfl5pAE/sfdL++oTkMdB3osff3gK7ML9sZaTuTfliqC5zAOT9rbc7AsuMFq4Ywuk1A/r/4cICaWvMwGMJYz/pDwK6e1pc2/43bD1WFWF8j55D1Xik00XZPv5mR2kx9xDc1AQ9pMSglF0IO1dFkIf0GrnS9zlAEK//OpGRcPfjf46C///oQwWqXZBERynKUW54+TJvTmDmFm7MrCSW4yYR2+h/zDqG2Go0l96VLhJviKaiP2Vcihx//9Er6z+/YrcPS+w5Y34gyQRzts/pP8K59wqeptc7SgPAohgLWWaxg8DZOX6U0n/iY+aMFmNX7gtv/ZeLayfqL9tpUst/1PJoqLRT/Ftd29Glks/yYE1CfBKnm1cx4nKUnsJQ/giJ//3tdGnVAiZ8ll4O/ala1n7/I5p07EMZvwKKR/o9+YE7ma35cb//n8SD8Ftjv9BasyLwEnsMK7nz/CrWus8jOnFckeOCs3nTDSeS790/FBHKF1UnyK3+znNk0MCAOApbOFXphiTdJ2s6///SB5/J3IxDj47qtaqCBdGpr0shB1sZGxn71LzwOMPf2pmdO5m9bU8AhIrySH1NuXQraYGtBxIsQEtcIXt/8cmegaLhnxNix9/KWmCK6BFGCJzzgmfUUSSmOFnEP49SUicQb9P60MrVy+OiORWLSDsKYLcphvOvY7m2x/btcbcVdNRZ5tW3er/OyejoKsIIhD+4vRTHd/BDUFpr5e0T74rvNDUE3eQ+XfeIDH3q3fsFHzCIRcJsla8tDZaXjiG99xPyctgFFGAbD+o8FAAAA",
+        "sha256": "bcd2a93f29ea6b4a3e2bbd85cfef0e3eb84b0f371eb01502b8ffb45512b1cec4"
+      },
+      {
+        "quality": null,
+        "max_dimension": 64,
+        "dimensions": [
+          64,
+          64
+        ],
+        "output": "UklGRhwFAABXRUJQVlA4WAoAAAAQAAAAPwAAPwAAQUxQSHgBAAABkAVJsmlbc23btm3f+2zbtm3btm3btm3b1jwuzfNXREwA/O6mptFyHvcJJ7rS0Wt5HxHxYWt9IkWO4Q9PFKMQthyZV0aoZjP4DXK+HWqrkmbdGyjwVn0tZXL2ouD9udXwnYMS5/nLM+3+HKW+6GkmqeJFlH6pioykzajkthRRrhM/oqKfJruJ0G/9EBV+1M6Aq9gJVPxUCQ22ekiwCVtXCr3ZOlLo/t9HJ3L7x1Ylhoi9yD20oPbIklo/IHVoci2g1QmYSXT/v6ALhV5sDSg0Y9MofUa1c+U02QCMOj5W6WlnYxDoOfWlMjO8QPDOm2rsygSxFtqt92qWeyTvWk0NEKo76s7VB/F55l5Y8ULOq/6WILgTIr49taeJPQQulLE4GITvQEScCN/Nd0jUkQIgceI3lb8H2o3uiLjbVAdkuhxCnK/zAwD7Ee943o92BMmGWQnAHrWGbV0MECx5+kdnSgNNw3aPvnnS0QjIuk9BnOYBpLOy4XcXVlA4IH4DAADwEACdASpAAEAAPpE+mUiloyKhKBgNULASCWQAt/HaVv5A0Ykmcab8xb2jnjsgAmwH8VIgdnhj7iX0l8z/x0ag/SkZba5kJ0ZYTz/7++kp8IJRURkOq4qD0HUNMgWUf9WFuSYo87VInq29rvGD1Kv+HWEUtd3RjciBRAtnkSdJNxrWbaLOdE5MDmlBVek97IAA/v9WS+/hMfV1nceLvP4Hia1lGbC7fNRS37PCFZ5CoFiZrjpGNd9ZiFEF964iYDR515WvXIJ8Pmsd8MhdKBnAI4LMa/7FkExXyC6HewY9Ga5cFWLSHwcUzEn85IiGEWX5JV/BnvR6R6EYXB5h8NvZPNH5l1G1tT4qQ3nMXhiCaarFe2ZPgKMSsH8tr6+jT0+3Vd0yOfUv3mzg0pB0jBsvj/regYLHj/hcys37Tr+SMZClvNmu6Eb0TKLCx8zA94AzG/DJmPVcNWOyiKiYy9ICrF9NICit65KaV7hKPQwEc3i0M5OIS7tu5gM6veCoTHjFwwp8f6kXKVABLf30D0cMpw+vFlJQIJJ7EbTt2SInR5oX6D6JtjtXphML5z8VMvKNPJWGQxXY4V1NIvSJpPQXth1BtSLpxemY9tY9cdrKII1QyBhoLn45rd65XihXGNRBDp/VFkv2FdQj0lMzT3XsmPXa7erGv/nGCqAhJ14M0blYXKm8W5COaWYdYKI2+Nr0gnOt/A1YedjEMn4IwIumEpDz2tN2uINyXzU3o3pi81o+f3sCs7ED7SasIi+KxmkeB2yaopw0wSBcCMLgvEucugM0a7Ie4UH9L4T9glQwLLSjghox+dBFGV/+5JA5KkWX4HlYEK2HhWPrUCpZRNtFHINdBMO8cCLqxKXk855ec0x1DaGBsLT6/hGknb/jVGlN3yA/hg4qbn+3c6ZrMq1Wev16Qaqqa9ozThlgRPkd2zbZnvryY9JE+E9KyqLjODEAsugMa0hKeixkSVAOMS1FMtIPQGejFl+z6czgN6L7S0IVlm2gnMqUfxvB41AaP2/cMRvKf18j+JDfMZblFxnXp6r31tfsTs+9pJwQY73wN1iXaSsNYzwcg/rPaAXZEq7fudFXJoA6LGpfpewdat8qzlUCH1WldXt9Pjj29N0fwhxm+vKryFUi14oUQ5qj0xBxCUomy1uuFecpkpAbdFlCzH5o6XErghJ1Y8+pAAA=",
+        "sha256": "9991eaecda9039ed6e598b2f0c7e21b1bbf360dab6d58e16aa04263054864fff"
+      }
+    ],
+    "invalid_image_result": false,
+    "owned_temp_directory": "C:\\Git\\dennispayne\\DotReticulum\\TestResults\\media-template-vectors"
+  }
+}

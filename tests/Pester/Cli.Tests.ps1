@@ -12,6 +12,15 @@ BeforeAll {
 }
 
 Describe 'DotReticulum CLI end-to-end' -Tag E2E {
+    It 'advertises the complete native Git utility surface in root help' {
+        $result = Invoke-Cli @('--help')
+        $result.Code | Should -Be 0 -Because $result.Error
+        $result.Output | Should -Match 'rngit.*Repository node'
+        $result.Output | Should -Match 'git-remote-rns.*read/write'
+        $result.Output | Should -Match 'rngcs.*signing and verification'
+        $result.Output | Should -Not -Match 'Read-only bare Git clone'
+    }
+
     It 'persists identity generation, preserves it on overwrite refusal and reloads the same public identity' {
         $path = Join-Path $TestDrive 'private identity'
         $created = Invoke-Cli @('rnid', '--generate', $path)

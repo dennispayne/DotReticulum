@@ -7,6 +7,7 @@ param(
 # Opt-in local live-reference acceptance, not evidence of hosted-upstream or
 # multi-hop interoperability. The adapter checks actual imports and the pin.
 BeforeAll {
+    . (Join-Path $PSScriptRoot 'TestProcess.ps1')
     $server = $null
     $script:restartServer = $null
     $root = Join-Path $PSScriptRoot "..\..\TestResults\git-remote-$([guid]::NewGuid().ToString('N'))"
@@ -82,28 +83,11 @@ BeforeAll {
     $pathDirectory = Join-Path $root 'helper path'
     $null = New-Item -ItemType Directory -Path $pathDirectory
     $suffix = if ($IsWindows) { '.exe' } else { '' }
-    $helper = Join-Path $pathDirectory "git-remote-rns$suffix"
     $applicationDirectory = Split-Path $cli -Parent
     $applicationBase = [System.IO.Path]::GetFileNameWithoutExtension($cli)
     $managed = [System.IO.Path]::GetExtension($cli) -eq '.dll' -or
         (Test-Path -LiteralPath (Join-Path $applicationDirectory "$applicationBase.runtimeconfig.json"))
-    if ($managed) {
-        $apphost = Join-Path $applicationDirectory "$applicationBase$suffix"
-        Copy-Item -LiteralPath $apphost -Destination $helper
-        # Renaming an apphost does not change its embedded managed DLL name.
-        foreach ($extension in '.dll', '.deps.json', '.runtimeconfig.json') {
-            Copy-Item -LiteralPath (Join-Path $applicationDirectory "$applicationBase$extension") -Destination $pathDirectory
-        }
-        # NuGet runtime assemblies/native libraries are still resolved by the
-        # original deps.json; copy the remaining runtime payload, not a wrapper.
-        foreach ($item in Get-ChildItem -LiteralPath $applicationDirectory -File) {
-            if ($item.Name -eq "$applicationBase.dll" -or $item.Extension -notin @('.dll', '.so', '.dylib')) { continue }
-            Copy-Item -LiteralPath $item.FullName -Destination $pathDirectory
-        }
-        $runtimes = Join-Path $applicationDirectory 'runtimes'
-        if (Test-Path -LiteralPath $runtimes) { Copy-Item -LiteralPath $runtimes -Destination $pathDirectory -Recurse }
-    }
-    else { Copy-Item -LiteralPath $cli -Destination $helper }
+    $helper = Install-TestGitHelper -Application $cli -Directory $pathDirectory
 
     $config = Join-Path $root 'client config'
     $null = New-Item -ItemType Directory -Path $config

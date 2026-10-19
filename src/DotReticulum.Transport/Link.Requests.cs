@@ -149,25 +149,35 @@ public sealed partial class Link
                 return;
             }
 
-            if (response is FileResponse file)
-            {
-                StartResponseResource(file.Data, requestId, handler.AutoCompress, file.Metadata ?? new object?[0]);
-                return;
-            }
-
-            var packedResponse = MsgPack.Pack(new object?[] { requestId, response });
-            if (packedResponse.Length <= Mdu)
-            {
-                SendWithContext(packedResponse, LinkContext.Response, createReceipt: false, encrypt: true);
-            }
-            else
-            {
-                StartResponseResource(packedResponse, requestId, handler.AutoCompress);
-            }
+            Respond(requestId, response, handler.AutoCompress);
         }
         catch (Exception ex)
         {
             _mgr.Log?.Invoke("Error while handling a request: " + ex.Message);
+        }
+    }
+
+    /// <summary>Sends a response prepared by an application's owned asynchronous request worker.</summary>
+    public bool Respond(ReadOnlySpan<byte> requestId, object response, bool autoCompress = true)
+    {
+        if (requestId.Length != Packet.HashLength) throw new ArgumentException("Invalid request ID.", nameof(requestId));
+        ArgumentNullException.ThrowIfNull(response);
+        lock (_gate)
+        {
+            if (Status != LinkStatus.Active) return false;
+            if (response is FileResponse file)
+            {
+                StartResponseResource(file.Data, requestId.ToArray(), autoCompress, file.Metadata ?? Array.Empty<object?>());
+            }
+            else
+            {
+                var packedResponse = MsgPack.Pack(new object?[] { requestId.ToArray(), response });
+                if (packedResponse.Length <= Mdu)
+                    SendWithContext(packedResponse, LinkContext.Response, createReceipt: false, encrypt: true);
+                else
+                    StartResponseResource(packedResponse, requestId.ToArray(), autoCompress);
+            }
+            return true;
         }
     }
 

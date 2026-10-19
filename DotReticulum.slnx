@@ -15,4 +15,7 @@
     <Project Path="tests/DotReticulum.Lxmf.Tests/DotReticulum.Lxmf.Tests.csproj" />
     <Project Path="tests/DotReticulum.Transport.Tests/DotReticulum.Transport.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/Fixtures/">
+    <Project Path="tests/Fixtures/RngitPresentationBackend/RngitPresentationBackend.csproj" />
+  </Folder>
 </Solution>

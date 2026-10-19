@@ -27,10 +27,12 @@ def main():
     parser.add_argument("--rnsd-port", type=int, default=0)
     parser.add_argument("--repositories", required=True)
     parser.add_argument("--writer", help="Identity hash allowed to write the fixtures group")
+    parser.add_argument("--manage", action="store_true", help="Enable identity-scoped owned-fixture administration")
     args = parser.parse_args()
     if args.writer is not None and re.fullmatch(r"[0-9a-fA-F]{32}", args.writer) is None:
         parser.error("--writer must be a 32-character hexadecimal identity hash")
     writer = args.writer.lower() if args.writer else "none"
+    management = f", create:{writer}, release:{writer}, interact:{writer}, propose:{writer}, admin:{writer}, stats:{writer}" if args.manage else ""
     root = os.path.abspath(args.config)
     os.makedirs(root, exist_ok=True)
     # Upstream uses cwd-based Git commands inside bare repositories. Scope this
@@ -77,7 +79,7 @@ def main():
   readonly = {group}
   hidden = {group}
 [access]
-  fixtures = read:all, write:{writer}
+  fixtures = read:all, write:{writer}{management}
   readonly = read:all, write:none
   hidden = read:none, write:none
 """)

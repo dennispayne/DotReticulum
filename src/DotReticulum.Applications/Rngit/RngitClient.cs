@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using DotReticulum.Core;
 
@@ -168,20 +167,13 @@ public sealed class RngitClient(ReticulumNode node, Identity identity, Action<st
 
     internal static async Task<string> GitAsync(string directory, string[] args, CancellationToken stop, string? input = null,
         bool isolated = false)
+        => Encoding.UTF8.GetString(await GitBytesAsync(directory, args, stop,
+            input is null ? null : StrictUtf8.GetBytes(input), isolated).ConfigureAwait(false));
+
+    internal static async Task<byte[]> GitBytesAsync(string directory, string[] args, CancellationToken stop,
+        byte[]? input = null, bool isolated = false)
     {
-        var info = new ProcessStartInfo("git")
-        {
-            UseShellExecute = false,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            WorkingDirectory = directory,
-            StandardInputEncoding = StrictUtf8,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
-        };
-        foreach (var arg in new[] { "--no-pager", "--git-dir=" + directory, "-c", "core.hooksPath=", "-c", "protocol.allow=never" }.Concat(args)) info.ArgumentList.Add(arg);
+        var environment = new Dictionary<string, string?> { ["GIT_TERMINAL_PROMPT"] = "0" };
         if (isolated)
         {
             foreach (var name in new[]
@@ -189,29 +181,13 @@ public sealed class RngitClient(ReticulumNode node, Identity identity, Action<st
                 "GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE", "GIT_IMPLICIT_WORK_TREE", "GIT_INDEX_FILE",
                 "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_GRAFT_FILE", "GIT_SHALLOW_FILE",
                 "GIT_NAMESPACE", "GIT_PREFIX", "GIT_REPLACE_REF_BASE", "GIT_QUARANTINE_PATH",
-            }) info.Environment.Remove(name);
+            }) environment[name] = null;
         }
-        info.Environment["GIT_TERMINAL_PROMPT"] = "0";
-        using var process = Process.Start(info) ?? throw new IOException("Could not start git.");
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
-        try
-        {
-            if (input is not null) await process.StandardInput.WriteAsync(input.AsMemory(), stop).ConfigureAwait(false);
-            process.StandardInput.Close();
-            await process.WaitForExitAsync(stop).ConfigureAwait(false);
-        }
-        catch
-        {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
-            await Task.WhenAll(stdout, stderr).ConfigureAwait(false);
-            throw;
-        }
-
-        var output = await stdout.ConfigureAwait(false);
-        var error = await stderr.ConfigureAwait(false);
-        if (process.ExitCode != 0) throw new IOException($"git {args[0]} failed ({process.ExitCode}): {error.Trim()}");
-        return output;
+        var arguments = new[] { "--no-pager", "--git-dir=" + directory, "-c", "core.hooksPath=", "-c", "protocol.allow=never" }.Concat(args).ToArray();
+        var result = await RngitProcess.RunAsync("git", arguments, directory,
+            stdin: input, timeout: TimeSpan.FromHours(2),
+            maxOutputBytes: 64 * 1024 * 1024, stop: stop, environment: environment).ConfigureAwait(false);
+        if (result.Code != 0) throw new IOException($"git {args[0]} failed ({result.Code}): {result.Error.Trim()}");
+        return result.Output;
     }
 }

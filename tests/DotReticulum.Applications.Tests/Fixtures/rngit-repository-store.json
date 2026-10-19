@@ -1,0 +1,161 @@
+{
+  "upstream": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "server_sha256": "6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693",
+  "reference_shim": "Windows only: classify .allowed files as non-executable for os.access(X_OK); does not verify unmodified upstream Windows hosting.",
+  "fixture_setup": "Clear inherited GIT_CONFIG_*; remove repository .allowed before repo-set to avoid Windows os.rename overwrite failure; .NET overwrite persistence tested separately.",
+  "identity_private": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40",
+  "identity_hash": "0a20f6120d3b7d2a66326f7528199599",
+  "other_public": "64b101b1d0be5a8704bd078f9895001fc03e8e9f9522f188dd128d9846d48466882d0ea3b2864e7a587f3e698cea4459998312e655e05fa5e8b5119d8baac8cd",
+  "cases": [
+    {
+      "name": "unidentified",
+      "response": "014e6f74206964656e746966696564"
+    },
+    {
+      "name": "invalid-map",
+      "response": "02496e76616c69642072657175657374"
+    },
+    {
+      "name": "no-repository",
+      "response": "024e6f207265706f7369746f727920737065636966696564"
+    },
+    {
+      "name": "invalid-path",
+      "response": "02496e76616c69642072657175657374"
+    },
+    {
+      "name": "missing-group",
+      "response": "034e6f7420666f756e64"
+    },
+    {
+      "name": "read-only-create",
+      "response": "014e6f7420616c6c6f776564"
+    },
+    {
+      "name": "hidden-create",
+      "response": "034e6f7420666f756e64"
+    },
+    {
+      "name": "create",
+      "response": "00"
+    },
+    {
+      "name": "existing",
+      "response": "015265706f7369746f727920616c726561647920657869737473"
+    },
+    {
+      "name": "ordinary-sync",
+      "response": "025265706f7369746f7279206973206e65697468657220666f726b206e6f72206d6972726f72"
+    },
+    {
+      "name": "perms-invalid",
+      "response": "02496e76616c69642072657175657374"
+    },
+    {
+      "name": "group-get",
+      "response": "0081a7636f6e74656e74a0"
+    },
+    {
+      "name": "repo-get",
+      "response": "0081a7636f6e74656e74d92461646d3a3061323066363132306433623764326136363332366637353238313939353939"
+    },
+    {
+      "name": "repo-admin-cannot-set",
+      "response": "014e6f7420616c6c6f776564"
+    },
+    {
+      "name": "invalid-permission",
+      "response": "02496e76616c6964207065726d697373696f6e20226261643a616c6c22206f6e206c696e652032"
+    },
+    {
+      "name": "group-set",
+      "response": "00"
+    },
+    {
+      "name": "group-reloaded-get",
+      "response": "0081a7636f6e74656e74a8773a6f776e65720a"
+    },
+    {
+      "name": "repo-set",
+      "response": "00"
+    },
+    {
+      "name": "repo-reloaded-get",
+      "response": "0081a7636f6e74656e74ad723a616c6c0a773a6e6f6e650a"
+    }
+  ],
+  "decisions": [
+    {
+      "name": "inherit",
+      "allowed": "",
+      "document": "",
+      "blocked": false,
+      "repository": true,
+      "group": true,
+      "doc": true
+    },
+    {
+      "name": "repo-none-beats-admin",
+      "allowed": "w:none",
+      "document": "",
+      "blocked": false,
+      "repository": false,
+      "group": true,
+      "doc": false
+    },
+    {
+      "name": "repo-unmatched-overrides",
+      "allowed": "w:ffffffffffffffffffffffffffffffff",
+      "document": "",
+      "blocked": false,
+      "repository": false,
+      "group": true,
+      "doc": false
+    },
+    {
+      "name": "admin-all-not-universal",
+      "allowed": "adm:all",
+      "document": "",
+      "blocked": false,
+      "repository": true,
+      "group": true,
+      "doc": true
+    },
+    {
+      "name": "document-unmatched-falls-back",
+      "allowed": "",
+      "document": "w:ffffffffffffffffffffffffffffffff",
+      "blocked": false,
+      "repository": true,
+      "group": true,
+      "doc": true
+    },
+    {
+      "name": "document-none-denies",
+      "allowed": "",
+      "document": "w:none",
+      "blocked": false,
+      "repository": true,
+      "group": true,
+      "doc": false
+    },
+    {
+      "name": "document-all-beats-repo-none",
+      "allowed": "w:none",
+      "document": "w:all",
+      "blocked": false,
+      "repository": false,
+      "group": true,
+      "doc": true
+    },
+    {
+      "name": "blocked-only-repository",
+      "allowed": "",
+      "document": "",
+      "blocked": true,
+      "repository": false,
+      "group": true,
+      "doc": true
+    }
+  ]
+}

@@ -5,13 +5,14 @@ namespace DotReticulum.Applications.Rngit;
 public static class RngitApp
 {
     public const string Usage = """
-        DotReticulum rngit - experimental read-only Git over Reticulum
+        DotReticulum rngit clone/fetch - experimental bare Git transfers
 
         Usage:
           rngit clone <rns://destination/group/repository> <new-directory> [options]
           rngit fetch <rns://destination/group/repository> <existing-bare-directory> [options]
 
-        Creates a bare repository; requires git on PATH. Never pushes or publishes.
+        These commands transfer bare repositories; git must be on PATH.
+        Use "rngit --help" for hosting/management and git-remote-rns for ordinary Git.
         Options:
           --config <path>        .NET Reticulum config directory or file (default ~/.dotreticulum)
           --timeout <seconds>    Overall deadline including path, link, transfers and local git (default 7200)
@@ -22,6 +23,8 @@ public static class RngitApp
 
     public static async Task<int> RunAsync(string[] args, TextWriter output, TextWriter error, CancellationToken stop)
     {
+        if (args.Length == 0 || args[0] is not ("clone" or "fetch"))
+            return await RngitManagementApp.RunAsync(args, output, error, stop).ConfigureAwait(false);
         string? config = null;
         var seconds = 7200.0;
         var limit = RngitClient.DefaultMaxResponseBytes;

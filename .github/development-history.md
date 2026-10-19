@@ -6,6 +6,235 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
+### Parity 2 repository hosting, collaboration, presentation and signing (2026-10-19)
+
+This milestone supersedes the **missing hosting, administration, lifecycle,
+release, work-document, page/media/template and signing** classifications in
+the historical Parity 1 inventory below. The completed read-only gate,
+Parity 1 inventory and `7c81563` read/write helper milestone remain intact.
+Implementation is confined to Parity 2: no reference-pin update, public
+repository mutation, personal key/trust-store modification, policy change,
+Parity 3 work or GitHub Actions workflow was performed.
+
+#### Source, acceptance and ownership
+
+The authoritative, previously .NET-fetched checkout remains
+`a29bfb51c468945c96a1ee22cae0114e993e2391`, tree
+`24d4c393de9fd57b933836cea68891fd953ab060`. Its tracked worktree is clean.
+`reference_environment.verify_reference(require_lxmf=True)` confirmed RNS
+1.5.7 imported from that checkout's `RNS\__init__.py` and LXMF 1.2.1 from the
+isolated `refvenv\Lib\site-packages\LXMF\__init__.py`. The checkout and venv are
+the session-owned paths recorded in the preceding milestone, not installed
+system substitutes. Original `e40191b3...` fixtures retain their provenance.
+
+| Source file under `RNS\Utilities` | SHA-256 |
+| --- | --- |
+| `rngit\server.py` | `6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693` |
+| `rngit\client.py` | `78358331ddac087860fb8a1f350632d3875917782dc000681d48597affd8936b` |
+| `rngit\pages.py` | `d165d8ac8d3cfdd1b42929a2512e9d5d03a1cef726124deca5218d7522a89c04` |
+| `rngit\media.py` | `55fadeaee76d0a79c30c54d1d79122174cb6a956f2278013e97c4fd015fd8e9c` |
+| `rngit\commitsigs.py` | `f4a05c0db1099d60a032f57e40b457edfdd60e30248ae5c4c25f0542bbbaa0fc` |
+| `rnid.py` | `faee0d8acb4263f10812fa378085f2653b2453f584b4a33f2018c7797885f8c8` |
+
+Seven bounded fleet deliverables owned configuration/statistics,
+repository storage/permissions/lifecycle, releases, work documents, pages,
+process/templates/media and signing. The coordinator retained host
+composition, CLI dispatch, authorization integration, native RNS transfers,
+lifecycle ownership, shared-output validation and commits. Agents did not
+launch nested fleets or commit independent changes.
+
+| Pinned contract | Observable acceptance and implementation boundary |
+| --- | --- |
+| `server.py:1990-2260,4641-5081`: defaults, identity, configuration, statistics | `RngitHostConfiguration` and `RngitHostStatistics`: raw stable identity, aliases, blocked sets, malformed/unwritable/corrupt state, detached counters, ignore rules, persisted byte-format statistics, periodic flush/restart. Reference summary vectors do not substitute for live authorization tests |
+| `server.py:2262-2371,2869-3140`: permission inheritance, discovery and Git handlers | `RngitRepositoryStore` plus owned `RngitHost`: static/authorized executable `.allowed`, admin/get/set, hidden-versus-denied responses, ordinary Git clone/new-object push/Unicode refs, shared repository leases and bounds. Authorization precedes protected state disclosure |
+| Repository lifecycle handlers and inventory source anchors | Create/fork/mirror/manual and periodic sync, persisted source metadata, failed/cancelled clone cleanup, mirror default-HEAD restoration versus fork HEAD preservation. Actual native RNS transfers against the pinned Python node and owned dumb-HTTP Git synchronization; no Python fetching on the product's behalf |
+| `server.py:878-1148,3367-3790`; `rnid.py:413-510,588-601` | Draft/artifact/finalize/latest/delete, persisted partial steps, permissions, local packaging, independent manifests/signatures, fetch/offline verification, signer mismatch and tampering. Imported Git object consistency, signature validity and trusted publisher identity remain separate |
+| `server.py:1346-1841,3789-4440`: work clients/handlers | All scopes, signed create/propose/edit/comment/update, complete/activate/delete/perms, comments/IDs, inheritance, corruption/concurrency/restart. Client trims content before signing, matching `_edit_work_content` at 1843-1881 |
+| `pages.py:250-314,366-3007`, `util.py:130-818`, `highlight.py` | Page/download byte differentials, trees/blobs/refs/history/commits/stats/releases/work, pagination, binary/Unicode/escaping, anonymous/identified/denied access, templates and request-local generation timing. Native process acceptance separately exercises real page/download resources |
+| `media.py:53-215`; templates/editors at `pages.py:269-314`, `server.py:1888+` | Backend discovery/arguments/absence/failure/timeout, actual FFmpeg/WebP conversion, bounded output/input/process lifetimes, explicit execution authorization and owned temporary cleanup |
+| `commitsigs.py:48-331`; `rnid.py:413-488` | `rngcs`: binary stdin/file signing, SSHSIG/RSG parsing, principal discovery, structure versus crypto, author/tagger identity, wrong principal/tamper/malformed inputs. Real Git commit/tag signing and actual upstream verification in both directions |
+| `server.py:139-285`; helper executable integration | Actual utility filename discovery, applicable option dispatch/arity, version, source CLI exit differential, service logging, confirmation, explicit editor execution. Syntax exit 2, client failure 1, fatal node initialization 255; errors deliberately use stderr |
+
+`RngitHost` owns a bounded request queue, workers, active links, destinations,
+services and shutdown. Deferred `Link.Respond` permits async bounded processing
+without blocking the transport dispatcher. A deterministic test fills the
+running/queued slots, verifies explicit busy rejection and settles both
+pending requests on disposal without leaked clone state. Optional diagnostics
+cannot disable processing. Blocked peers are disconnected without disabling
+unrelated service; a closed-link client error explicitly warns that an
+in-flight mutation's remote outcome can be uncertain.
+
+#### Independent reference generation and disclosed adaptations
+
+All new generators execute the actual pinned Python implementation and retain
+source provenance. C#/PowerShell prepare owned inputs and assert outputs.
+Handler snapshots, loopback tests and live mixed-node evidence are distinct.
+
+Reproduction uses `$python`/`$reference` from the preceding record, with
+`DOTRETICULUM_UPSTREAM` and `PYTHONPATH` set to `$reference` (and
+`PYTHONUTF8=1` for Unicode vectors). Each work directory must be fresh/owned:
+
+```powershell
+& $python tests\DotReticulum.Applications.Tests\GenerateRngitHostVectors.py --work-directory .rngit-host-vector-work --output tests\DotReticulum.Applications.Tests\Fixtures\rngit-host.json
+& $python tests\DotReticulum.Applications.Tests\GenerateRngitRepositoryStoreVectors.py --directory TestResults\store-vectors --output tests\DotReticulum.Applications.Tests\Fixtures\rngit-repository-store.json
+& $python tests\DotReticulum.Applications.Tests\GenerateRngitWorkVectors.py --work-directory TestResults\rngit-work-vectors --output tests\DotReticulum.Applications.Tests\Fixtures\rngit-work.json
+& $python tests\DotReticulum.Applications.Tests\GenerateRngitPageVectors.py --work-directory tests\.page-reference-timing --output tests\DotReticulum.Applications.Tests\Fixtures\rngit-pages.json
+& $python tests\DotReticulum.Applications.Tests\GenerateRngcsVectors.py --output tests\DotReticulum.Applications.Tests\Fixtures\rngcs.json
+dotnet build tests\Fixtures\RngitPresentationBackend\RngitPresentationBackend.csproj -c Release -v quiet
+& $python tests\DotReticulum.Applications.Tests\GenerateRngitMediaTemplatesVectors.py --output tests\DotReticulum.Applications.Tests\Fixtures\rngit-media-templates.json --work-directory TestResults\media-template-vectors --encoder TestResults\media-backend\ffmpeg-9.0.2-essentials_build\bin\ffmpeg.exe --source-image assets\branding\dotreticulum.png --template-executable tests\Fixtures\RngitPresentationBackend\bin\Release\net10.0\RngitPresentationBackend.exe --editor C:\Windows\System32\sort.exe
+```
+
+Store generation uses the owned public/readonly/hidden bare fixture directories.
+Release generation is driven by the C# test that creates requests/repositories:
+set `DOTRETICULUM_GENERATE_RELEASE=1`, `DOTRETICULUM_PYTHON=$python`, then run
+`dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --filter FullyQualifiedName~RngitReleaseTests.PinnedHandlerVectors`.
+Unset that opt-in and rebuild afterward to copy the retained generated fixture.
+
+Reference adaptations are explicit, not claims of unmodified Windows behavior:
+
+- Host vectors supply constructor state without listeners/discovery, force
+  summary authorization true, fix day/clock and join recording threads.
+  They remove the initial stats file before upstream's Windows-failing
+  replacement rename and use one repository to avoid upstream shared defaults.
+- Store vectors use original handlers on explicitly initialized nodes.
+  Windows static `.allowed` vectors override only `X_OK`; replacement vectors
+  remove an existing file before upstream `os.rename`. Native overwrite and
+  actual authorization are covered separately.
+- Work vectors fix `server.time.time` to `1700000000.25`, restoring it afterward.
+  Forty-nine responses and five binary snapshots use original permission and
+  signature logic. Textual allowed-file newline identity is not claimed.
+- Page vectors initialize handlers without listeners, fix the stats clock,
+  disable ambient Git overrides and use `core.quotePath=false`.
+  Nondeterministic timing footers are normalized only after native timing-shape
+  assertions. Optional Pygments and wcwidth are absent in the verified venv.
+- Media static-template vectors override Windows `X_OK`; argument/discovery
+  vectors mock executable discovery only. Actual FFmpeg conversion uses the
+  owned encoder and temp directory. Executable templates invoke the owned C#
+  fixture; the upstream editor vector uses native `sort.exe`.
+- Signing has no crypto/source shim. Generation fixes CLI argv[0] and
+  normalizes owned-root paths; signature-text comparison alone normalizes
+  Windows stdout CRLF. Git subprocess configuration is process-local,
+  with empty owned global/system configuration and explicit autocrlf policy.
+- The actual `server.ReticulumGitClient` live adapter closes the received file
+  immediately before its original retention/move callback on Windows.
+  Unmodified upstream otherwise attempts to unlink an open file (WinError 32).
+  Requests, handlers, signatures and network/resource code remain actual
+  upstream; unmodified Windows file retention is **not** established.
+
+#### Integration evidence and bounded differences
+
+Actual native clients exercise work/releases and RNS fork/mirror/sync against
+the pinned Python server. The actual pinned Python management client exercises
+listing/fetch, create, permissions and signed work/releases against managed and
+published native hosts. Ordinary Git exercises the helper against both server
+implementations, including genuinely new pushed objects. Native-host
+acceptance additionally requests thirteen page routes, three downloads,
+media conversion, templates/timing, concurrent mutations and blocked peers.
+Pester uses separate real CLI/Git/editor/backend processes, stable persisted
+identity and restart state; no public upstream is mutated.
+
+The first integrated gate (before the final provenance/credential/Windows
+resolver refinements) ran `tests\run-tests.ps1 -Live -Python $python -Upstream
+$reference -NativeExe $native -Coverage -Pester` into the fresh
+`coverage-parity2-closure-1` directory: **654 xUnit passed / 5 Windows-specific
+skips**, **95 native Pester passed**, merged production coverage
+**83.57% lines / 67.13% branches**. This is intermediate evidence, not the
+final acceptance of subsequent refinements.
+
+The final source gate includes credential-safe lifecycle diagnostics,
+credential-safe fork/mirror provenance, native known-destination wiring,
+populated work-page whitespace correction, actual Windows PE `.allowed`
+execution, root/direct help and explicit subprocess-fixture build dependency.
+An invalid PE header never selects executable permission resolution; a valid
+PE requires explicit authorization. Diagnostics retain operation, repository,
+exception type and Git exit code without emitting raw credential-bearing
+arguments/stderr. Persisted source URLs are unchanged; displayed userinfo,
+query and fragment are omitted, and malformed sources are redacted.
+
+Final commands (all successful), with `$sessionFiles` naming this session's
+`files` directory and `$native` its `native-parity2\DotReticulum.Applications.exe`:
+
+```powershell
+dotnet build DotReticulum.slnx -c Release --nologo -v quiet
+$env:PATH = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer;' + $env:PATH
+dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o (Join-Path $sessionFiles 'native-parity2') --nologo -v minimal
+& $native --help
+$env:DOTRETICULUM_MEDIA_BACKEND = (Resolve-Path TestResults\media-backend\ffmpeg-9.0.2-essentials_build\bin\ffmpeg.exe).Path
+pwsh -NoProfile -File tests\run-tests.ps1 -Live -Python $python -Upstream $reference -NativeExe $native -Coverage -Pester -ResultsDirectory (Join-Path $sessionFiles 'coverage-parity2-closure-2')
+pwsh -NoProfile -File tests\run-pester.ps1 -GitHosting -GitRemote -Python $python -Upstream $reference
+```
+
+Release build and win-x64 NativeAOT publish: **zero warnings/errors**;
+published executable SHA-256
+`f42daa105e39a886771f2c9f551a63f0b4a2a48a74dfcd10ff74e4566427c689`.
+Full live/native xUnit: **660 passed / 5 skipped / 0 failed**
+(Applications 328, Core 77, Crypto 47, Interfaces 62, LXMF 35, Transport 111).
+Published-native Pester: **98 passed / 0 skipped / 0 failed**.
+The independent complete managed Pester invocation also passed **98 / 98**.
+Native acceptance ran actual hosted feature flows and multi-megabyte transfer,
+not just publish/help; the native-host test included the actual pinned Python
+client with the disclosed retention shim and real FFmpeg.
+
+Fresh merged production coverage, six reports, source line/branch identities
+deduplicated across suites (no overlapping builds/collection):
+
+| Project | Lines | Branches |
+| --- | ---: | ---: |
+| Applications | 4860/6113 (79.50%) | 4561/7229 (63.09%) |
+| Core | 686/722 (95.01%) | 383/421 (90.97%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 376/412 (91.26%) | 117/126 (92.86%) |
+| LXMF | 388/429 (90.44%) | 193/270 (71.48%) |
+| Transport | 2451/2806 (87.35%) | 1319/1705 (77.36%) |
+| **Overall** | **8871/10598 (83.70%)** | **6620/9801 (67.54%)** |
+
+Retained fixture SHA-256, all from actual pinned-reference execution:
+
+| Fixture under Applications.Tests `Fixtures` | SHA-256 |
+| --- | --- |
+| `rngit-host.json` | `d428392dc1be2cd979920fd192af460e2371e0ae0efdade6a5625bb50f7ca79a` |
+| `rngit-repository-store.json` | `6f6df2795db1437357948d34e4f570f4f374bee7e2d4017ad704609e230422e0` |
+| `rngit-release-vectors.json` | `5c60638fd617bf33b6fbca83f9f4265e57f0a1711d586f4cf1fe8e6da295422d` |
+| `rngit-work.json` | `6de59dcc435b90561d9b5ecfb15d199c1d547dc8db201271fb0fdd4f6c99adae` |
+| `rngit-pages.json` | `9d84961c8f782d94d676221dfb3946ebbd15fe3d46835530d364de5b60b659f1` |
+| `rngit-media-templates.json` | `df4f6e91e8ba3232d71dbc227fc1683fbfcf7021abdcce6babe49b77309f2bd5` |
+| `rngcs.json` | `d68867a8e17ae71faf6f85a298a75f6fb5664530257e0353c1f18122a7696f84` |
+
+The page corpus now contains **122 response/download cases**, 24 Markdown
+cases, 23 generation-time cases and 12 sync-age cases. It includes source
+annotations (`pages.py:474-500`, `server.py:2733-2782`) and explicitly unsupported
+global/group work requests (`pages.py:1471-1475` requires a repository).
+The release corpus contains 31 handler cases; work has 49 responses/five binary
+snapshots; store has 19 responses/eight decisions; rngcs has 136 CLI,
+54 validation and ten exact signing vectors.
+
+Native safety/API differences include explicit executable/external-source
+authorization; no Python interactive runtime; bounded parsers, queues, links,
+responses, signatures and processes; diagnosed corrupt state without identity
+replacement/ID reset; atomic cross-platform file overwrite; independent
+statistics counters; filesystem-link/path restrictions and encoded media refs.
+No cross-process statistics merge, transaction/rollback/remote lease, durable
+resume or streaming-resource guarantee is invented.
+
+Windows x64 is the exercised managed/native platform. Unix permission/symlink
+cases explicitly skip on Windows; Linux/macOS/hardware support is not inferred.
+Actual encoder execution covers FFmpeg 9.0.2 (SHA-256
+`3256173f3f8bffd7df12227c68adf68025edb1832273a9530688a7bb1ed8edec`),
+not the other backend families' installations. Windows jobs own exited-root
+descendants; equivalent Unix orphan ownership remains unverified.
+Rare DST equivalence and cross-process statistics merging are not established.
+Native rendering deliberately uses deterministic literal code blocks and
+code-point widths rather than discovering optional Python packages on the
+operator's machine. Default reference rendering, native diff/commit coloring
+and Micron formatting are implemented. Pygments language-token coloring and
+wcwidth-enhanced layout are **not implemented equivalents**; this is the
+documented dependency-free native rendering boundary, not evidence of those
+optional integrations. Neither the milestone nor its checked phase claims
+every optional Python-package enhancement or complete repository-wide parity.
+An embedded signer key is not a trusted publisher, and rngcs intentionally
+retains upstream's ignored allowed-signers/namespace options rather than
+claiming a trust policy it does not enforce.
+
 ### Parity 2 native read/write Git client milestone (2026-10-19)
 
 This record supersedes the **missing helper push/client configuration** entries

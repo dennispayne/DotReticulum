@@ -1,0 +1,92 @@
+{
+  "upstream": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "server_sha256": "6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693",
+  "configurations": [
+    {
+      "name": "default",
+      "config": "# This is the default rngit config file.\n# You will need to edit it to specify repository locations and\n# access permissions.\n\n[rngit]\n\n# Automatic announce interval in minutes.\n# 6 hours by default.\n\nannounce_interval = 360\n\n# An optional name for this node, included\n# in announces.\n\n# node_name = Anonymous Git Node\n\n# You can enable collecting view, fetch and push statistics\n# which can be displayed on the stats pages of repositories.\n# Remember to set the \"s\" (stats) permission appropriately\n# for statistics to actually be viewable by anyone.\n\n# record_stats = no\n# stats_ignore_identities = 9710b86ba12c42d1d8f30f74fe509286\n# stats_push_ignore_identities = 5bffebe038654304dafcbe12cbcd0412\n\n# You can block specific identities from any interaction\n# with this node.\n\n# blocked_identities = d31aeea49873006f13b3415520666a4e\n\n# To make it easier to handle scrapers, crawlers, slopware\n# and other annoyances, you can block unidentified peers by\n# adding the null_ident hash to to blocked identities.\n\n# blocked_identities = d7db22f63b453c23bb0688dde565b7c1\n\n[repositories]\n\n# You can define multiple repository groups, each with a path\n# to the directory containing \"repo_name.git\" directories.\n\ninternal = /path/to/directory/with/git/repositories\npublic = /another/path/to/directory/with/git/repositories\nshowcase = /another/path/to/directory/with/git/repositories\n\n# To add a short description to your repositories, you can\n# either place a \"repo_name.description\" file in the same\n# directory as the repository folder, or set it in the bare\n# repository with `git config repository.description`.\n\n# If you have mirrored repositories with the \"rngit mirror\"\n# command, you can configure the global mirroring interval\n# in hours.\n\n# mirror_interval = 24\n\n\n[aliases]\n\n# You can define aliases for commonly used identity hashes\n# in this section. Each line must be in the format\n# aliased_name = IDENTITY_HASH\n#\n# These hashes are used for the permissions system and\n# identity resolution. For rngit CLI client operations,\n# aliases must be defined in ~/.rngit/client_config.\n\n# alice = d09285e660cfe27cee6d9a0beb58b7e0\n# bob = ffcffb4e255e156e77f79b82c13086a6\n\n[access]\n\n# You can apply permissions for all repositories within\n# different repository collections like this:\n\npublic = r:all, w:9710b86ba12c42d1d8f30f74fe509286\ninternal = rw:9710b86ba12c42d1d8f30f74fe509286\n\n# By default, all repositories sourced from the con-\n# figured repository collection paths have no permissions\n# enabled, and will be neither readable nor writable.\n#\n# The following permissions are supported:\n#   r   = read       (clone, fetch, view)\n#   w   = write      (push, create and manage work documents)\n#   rw  = read/write\n#   c   = create     (create new repositories in group)\n#   s   = stats      (view repository statistics)\n#   rel = release    (create and manage releases)\n#   i   = interact   (comment on work documents)\n#   p   = propose    (propose new work documents)\n#   adm = admin      (full administrative access)\n#\n# To configure permissions per repository, you must create\n# an \".allowed\" file matching the repository name. If the\n# repository is in a folder called \"my_project.git\", create\n# a \"my_project.allowed\" file next to it. This file must\n# contain a permission statement on each line in the form of\n# \"r:IDENTITY_HASH\", \"w:IDENTITY_HASH\" or \"r:IDENTITY_HASH\".\n# Instead of IDENTITY_HASH, you can also use \"all\" or \"none\".\n#\n# You can also make the allow-files executable, and have them\n# evaluate or source the permissions from somewhere else,\n# and then output the results to stdout.\n#\n# Additionally, you can create a \"group.allowed\" file in the\n# root of a repository group directory, which will apply to\n# all repositories within this group. The same syntax and\n# functionality applies here.\n\n\n[pages]\n# You can run a nomadnet-compatible page node to serve\n# repository information if required. Access permissions\n# will follow those configured per group and repository.\n#\n# The page server supports automatic markdown to micron\n# conversion for repository readmes and other files. If\n# you have the pygments Python module installed, syntax\n# highlighting will also be automatically applied.\n#\n# The page server is highly customizable, and you can\n# provide custom templates for each page type by placing\n# a corresponding \"template_name.mu\" file in the\n# ~/.rngit/templates directory. The supported template\n# names are \"base\", \"front\", \"group\", \"repo\", \"tree\",\n# \"blob\", \"commits\", \"commit\", \"refs\", \"stats\", \"releases\",\n# \"release\", \"work\" and \"work_doc\". You should include a\n# {PAGE_CONTENT} variable somewhere in your templates,\n# the rendered page content will be injected into this\n# variable.\n\n# serve_nomadnet = no\n\n# It is possible to disable Nerd Font icons and instead\n# use simpler (but more compatible) unicode icons.\n\n# unicode_icons = yes\n\n# You can configure whether the page server should try\n# to convert media files to WebP on the fly, for serving\n# to nomadnet clients. Enabled by default, but will\n# require an available encoding backend installed on\n# your system. Supported backends utilities are \"magick\",\n# \"convert\", \"gm\", \"ffmpeg\" and \"avconv\". If any one is\n# installed, rngit will auto-detect and use it, but you\n# can force a specific backend with the environment\n# variable RNGIT_MEDIA_BACKEND.\n\n# media_conversion = yes\n\n\n[logging]\n# Valid log levels are 0 through 8:\n#   0: Log only critical information\n#   1: Log errors and lower log levels\n#   2: Log warnings and lower log levels\n#   3: Log notices and lower log levels\n#   4: Log info and lower (this is the default)\n#   5: Verbose logging\n#   6: Debug logging\n#   7: Pathing logging\n#   8: Extreme logging\n\nloglevel = 4\n",
+      "node_name": "Anonymous Git Node",
+      "announce_seconds": 21600,
+      "mirror_seconds": 86400,
+      "record_stats": false,
+      "serve_nomadnet": false,
+      "loglevel": 4,
+      "aliases": {},
+      "ignored": [],
+      "push_ignored": [],
+      "blocked": []
+    },
+    {
+      "name": "empty",
+      "config": "",
+      "node_name": "Anonymous Git Node",
+      "announce_seconds": 0,
+      "mirror_seconds": 86400,
+      "record_stats": false,
+      "serve_nomadnet": false,
+      "loglevel": 4,
+      "aliases": {},
+      "ignored": [],
+      "push_ignored": [],
+      "blocked": []
+    },
+    {
+      "name": "configured",
+      "config": "[rngit]\nnode_name = 'A # node'\nannounce_interval = -2\nmirror_interval = -5\nrecord_stats = yes\nstats_ignore_identities = alice, invalid\nstats_push_ignore_identities = 0123456789abcdef0123456789abcdef\nblocked_identities = alice,\n[aliases]\nalice = 0123456789ABCDEF0123456789ABCDEF\nall = 0123456789abcdef0123456789abcdef\nbroken = invalid\n[access]\npublic = r:all, w:alice\n[pages]\nserve_nomadnet = true\nunicode_icons = yes\nmedia_conversion = off\n[logging]\nloglevel = 99\n",
+      "node_name": "A # node",
+      "announce_seconds": -120,
+      "mirror_seconds": 0,
+      "record_stats": true,
+      "serve_nomadnet": true,
+      "loglevel": 8,
+      "aliases": {
+        "alice": "0123456789abcdef0123456789abcdef"
+      },
+      "ignored": [
+        "0123456789abcdef0123456789abcdef"
+      ],
+      "push_ignored": [
+        "0123456789abcdef0123456789abcdef"
+      ],
+      "blocked": [
+        "0123456789abcdef0123456789abcdef"
+      ]
+    }
+  ],
+  "statistics": {
+    "pages": {
+      "front": {
+        "2026-10-19": 1
+      }
+    },
+    "groups": {
+      "group": {
+        "view": {
+          "2026-10-19": 1
+        },
+        "repositories": {
+          "repo": {
+            "view": {
+              "2026-10-19": 1
+            },
+            "fetch": {
+              "2026-10-19": 1
+            },
+            "push": {
+              "2026-10-19": 2
+            },
+            "download": {
+              "2026-10-19": 1
+            },
+            "release_download": {
+              "2026-10-19": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "statistics_msgpack": "82a5706167657381a566726f6e7481aa323032362d31302d313901a667726f75707381a567726f757082a47669657781aa323032362d31302d313901ac7265706f7369746f7269657381a47265706f85a47669657781aa323032362d31302d313901a5666574636881aa323032362d31302d313901a47075736881aa323032362d31302d313902a8646f776e6c6f616481aa323032362d31302d313901b072656c656173655f646f776e6c6f616481aa323032362d31302d313901",
+  "summary_msgpack": "de0010a567726f7570a567726f7570aa7265706f7369746f7279a47265706fad6c6f6f6b6261636b5f6461797303aa646174655f72616e6765af4f6374203137202d204f6374203139a46461797393aa323032362d31302d3137aa323032362d31302d3138aa323032362d31302d3139aa6461795f6c6162656c7393a64f6374203137a64f6374203138a64f6374203139af74696d656c696e655f6c6162656c7392aa3320646179732061676fa5546f646179a5766965777384a56461696c7993000001a5746f74616c01a47065616b01a87065616b5f646179aa323032362d31302d3139a76665746368657384a56461696c7993000001a5746f74616c01a47065616b01a87065616b5f646179aa323032362d31302d3139a670757368657384a56461696c7993000002a5746f74616c02a47065616b02a87065616b5f646179aa323032362d31302d3139a9646f776e6c6f61647384a56461696c7993000001a5746f74616c01a47065616b01a87065616b5f646179aa323032362d31302d3139b172656c656173655f646f776e6c6f61647384a56461696c7993000001a5746f74616c01a47065616b01a87065616b5f646179aa323032362d31302d3139b2646f776e6c6f6164735f636f6d62696e656484a56461696c7993000002a5746f74616c02a47065616b02a87065616b5f646179aa323032362d31302d3139ae61637469766974795f73636f72650cab61637475616c5f6461797301ae61637469766974795f6c6576656ca468696768",
+  "empty_summary_msgpack": "de0010a567726f7570a7756e6b6e6f776eaa7265706f7369746f7279a7756e6b6e6f776ead6c6f6f6b6261636b5f6461797303aa646174655f72616e6765af4f6374203137202d204f6374203139a46461797393aa323032362d31302d3137aa323032362d31302d3138aa323032362d31302d3139aa6461795f6c6162656c7393a64f6374203137a64f6374203138a64f6374203139af74696d656c696e655f6c6162656c7392aa3320646179732061676fa5546f646179a5766965777384a56461696c7993000000a5746f74616c00a47065616b00a87065616b5f646179c0a76665746368657384a56461696c7993000000a5746f74616c00a47065616b00a87065616b5f646179c0a670757368657384a56461696c7993000000a5746f74616c00a47065616b00a87065616b5f646179c0a9646f776e6c6f61647384a56461696c7993000000a5746f74616c00a47065616b00a87065616b5f646179c0b172656c656173655f646f776e6c6f61647384a56461696c7993000000a5746f74616c00a47065616b00a87065616b5f646179c0b2646f776e6c6f6164735f636f6d62696e656484a56461696c7993000000a5746f74616c00a47065616b00a87065616b5f646179c0ae61637469766974795f73636f726500ab61637475616c5f6461797303ae61637469766974795f6c6576656ca8696e616374697665"
+}

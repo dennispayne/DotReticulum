@@ -47,9 +47,17 @@ public sealed class PyLinkNode : IAsyncDisposable
         node._process = Process.Start(psi) ?? throw new InvalidOperationException("Could not start python.");
         node._pumps.Add(Task.Run(node.PumpStdout));
         node._pumps.Add(Task.Run(node.PumpStderr));
-        var ready = await node._ready.Task.WaitAsync(TimeSpan.FromSeconds(60));
-        node.Hash = Convert.FromHexString(ready.GetProperty("dest").GetString()!);
-        return node;
+        try
+        {
+            var ready = await node._ready.Task.WaitAsync(TimeSpan.FromSeconds(60));
+            node.Hash = Convert.FromHexString(ready.GetProperty("dest").GetString()!);
+            return node;
+        }
+        catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or FormatException)
+        {
+            await node.DisposeAsync();
+            throw new InvalidOperationException($"Python node {name} startup failed:\n{node.Log}", ex);
+        }
     }
 
     public int Count(string eventName) => _events.Count(e => e.GetProperty("event").GetString() == eventName);
