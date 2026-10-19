@@ -6,6 +6,17 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
+### Artwork lettering correction (2026-10-19)
+
+Removed square-cap protrusions from the R/S strokes and replaced the N's
+mitered stroke with a filled outline with flat top/bottom edges. The SVG and
+Windows exporter now agree on flat polyline caps and bevel joins. Regenerated
+the PNG and all ICO frames with
+`pwsh -NoProfile -File assets\branding\Export-Icons.ps1`; visually inspected
+the enlarged lettering crop. Native win-x64 publish with ILLink/ILC warnings
+as errors passed; the extracted icon matched the source ICO pixel-for-pixel.
+No protocol or runtime behavior changed.
+
 ### Revised Reticulum-derived artwork (2026-10-19)
 
 Supersedes the original mesh D artwork below at user request. The SVG now

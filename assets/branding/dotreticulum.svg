@@ -38,10 +38,10 @@
     <circle cx="339" cy="359" r="13"/>
     <circle cx="467" cy="256" r="20"/>
   </g>
-  <g fill="none" stroke="#000000" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
+  <polygon points="305,219 305,161 311,161 343,207 343,161 349,161 349,219 343,219 311,173 311,219" fill="#000000"/>
+  <g fill="none" stroke="#000000" stroke-width="6" stroke-linecap="butt" stroke-linejoin="bevel">
     <polyline points="250,216 250,164 282,164 289,171 289,183 282,190 250,190"/>
     <polyline points="265,190 289,216"/>
-    <polyline points="308,216 308,164 346,216 346,164"/>
     <polyline points="403,171 396,164 372,164 365,171 365,181 403,200 403,209 396,216 372,216 365,209"/>
   </g>
 </svg>

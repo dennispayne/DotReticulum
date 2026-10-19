@@ -51,7 +51,8 @@ function Export-Png([int]$Size) {
                         [System.Drawing.ColorTranslator]::FromHtml((Get-Style $element 'stroke')),
                         [single](Get-Style $element 'stroke-width'))
                     try {
-                        $pen.StartCap = $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Square
+                        $pen.StartCap = $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Flat
+                        $pen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Bevel
                         $graphics.DrawLines($pen, $points)
                     } finally { $pen.Dispose() }
                 }
