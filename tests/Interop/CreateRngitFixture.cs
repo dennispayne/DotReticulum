@@ -1,5 +1,5 @@
 // dotnet run --file tests\Interop\CreateRngitFixture.cs -- <owned-root>
-// Add "incremental <clone>" to create diverging commits and publish the next tip.
+// Add "incremental <clone>" or "push <clone>" to prepare independently owned histories.
 #:property LangVersion=13.0
 #:property Nullable=enable
 #:property ImplicitUsings=enable
@@ -12,9 +12,9 @@ const string UnicodeBranch = "branch-caf\u00e9";
 const string UnicodeTag = "v-\u00e9";
 Console.OutputEncoding = new UTF8Encoding(false, true);
 
-if (args.Length != 1 && (args.Length != 3 || args[1] != "incremental"))
+if (args.Length != 1 && (args.Length != 3 || args[1] is not ("incremental" or "push")))
 {
-    Console.Error.WriteLine("Usage: CreateRngitFixture.cs <owned-root> [incremental <clone>]");
+    Console.Error.WriteLine("Usage: CreateRngitFixture.cs <owned-root> [incremental|push <clone>]");
     return 2;
 }
 
@@ -50,12 +50,26 @@ try
         await Git("-C", source, "tag", "feature-tip");
         await Git("-C", source, "switch", "main");
         await Git("clone", "--bare", source, bare);
+        var pushBare = Path.Combine(repositories, "push.git");
+        await Git("clone", "--bare", source, pushBare);
+        await Git("-C", pushBare, "tag", "locked", initialCommit);
+        var emptyBare = Path.Combine(repositories, "empty.git");
+        await Git("init", "--bare", "--initial-branch=main", "--object-format=sha1", emptyBare);
+        var sha256Source = Path.Combine(root, "sha256-source");
+        var sha256Bare = Path.Combine(repositories, "sha256.git");
+        await Git("init", "--initial-branch=main", "--object-format=sha256", sha256Source);
+        await Write(Path.Combine(sha256Source, "readme.txt"), "actual SHA256 fixture\n");
+        await Git("-C", sha256Source, "add", "readme.txt");
+        await Git("-C", sha256Source, "commit", "-m", "SHA256 initial");
+        await Git("clone", "--bare", sha256Source, sha256Bare);
         Print(("Source", source), ("Repositories", repositories), ("BareSource", bare),
             ("InitialCommit", initialCommit), ("InitialTree", initialTree),
             ("AnnotatedTag", annotatedTag), ("FeatureCommit", featureCommit),
-            ("UnicodeBranch", UnicodeBranch), ("UnicodeTag", UnicodeTag));
+            ("UnicodeBranch", UnicodeBranch), ("UnicodeTag", UnicodeTag),
+            ("PushBare", pushBare), ("EmptyBare", emptyBare),
+            ("Sha256Source", sha256Source), ("Sha256Bare", sha256Bare));
     }
-    else
+    else if (args[1] == "incremental")
     {
         var clone = Path.GetFullPath(args[2]);
         var relative = Path.GetRelativePath(root, clone);
@@ -76,6 +90,36 @@ try
         await Git("-C", source, "branch", "-f", UnicodeBranch, nextCommit);
         await Git("-C", source, "push", bare, "main", $"refs/heads/{UnicodeBranch}", "refs/tags/v2");
         Print(("LocalCommit", localCommit), ("NextCommit", nextCommit), ("NextTree", nextTree));
+    }
+    else
+    {
+        var clone = Path.GetFullPath(args[2]);
+        var relative = Path.GetRelativePath(root, clone);
+        if (Path.IsPathRooted(relative) || relative == ".." ||
+            relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal) ||
+            Directory.Exists(clone))
+            throw new IOException("Push mode requires a new working clone inside the owned fixture root.");
+        await Git("clone", source, clone);
+        var baseCommit = await Git("-C", clone, "rev-parse", "HEAD");
+        await Write(Path.Combine(clone, "push.txt"), "new independently generated push object\n");
+        await Git("-C", clone, "add", "push.txt");
+        await Git("-C", clone, "commit", "-m", "push first");
+        var first = await Git("-C", clone, "rev-parse", "HEAD");
+        await Git("-C", clone, "tag", "push-light");
+        await Git("-C", clone, "tag", "-a", "push-annotated", "-m", "push annotated tag");
+        await Git("-C", clone, "tag", "push-\u00e9");
+        var pushAnnotated = await Git("-C", clone, "rev-parse", "refs/tags/push-annotated");
+        await Write(Path.Combine(clone, "push.txt"), "second independently generated push object\n");
+        await Git("-C", clone, "commit", "-am", "push second");
+        var second = await Git("-C", clone, "rev-parse", "HEAD");
+        await Git("-C", clone, "switch", "-c", "divergent", baseCommit);
+        await Write(Path.Combine(clone, "divergent.txt"), "divergent push history\n");
+        await Git("-C", clone, "add", "divergent.txt");
+        await Git("-C", clone, "commit", "-m", "push divergence");
+        var divergent = await Git("-C", clone, "rev-parse", "HEAD");
+        await Git("-C", clone, "switch", "main");
+        Print(("Clone", clone), ("FirstCommit", first), ("SecondCommit", second),
+            ("DivergentCommit", divergent), ("AnnotatedTag", pushAnnotated));
     }
     return 0;
 

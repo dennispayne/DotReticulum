@@ -5,53 +5,63 @@ using DotReticulum.Transport;
 
 namespace DotReticulum.Applications.Rngit;
 
-// Owns one identified link and imports objects only. Ref ownership belongs to the caller.
-internal sealed class RngitSession : IDisposable
+// Owns one identified link. Fetch imports objects only; Git owns the caller's refs.
+internal sealed partial class RngitSession : IDisposable
 {
     private readonly Link link;
     private readonly RngitAddress address;
     private readonly TimeSpan timeout;
     private readonly long limit;
     private readonly Action<string>? progress;
+    private readonly int refBatchSize;
     internal Dictionary<string, string> Refs { get; private set; } = new(StringComparer.Ordinal);
     internal string Head { get; private set; } = "";
 
-    private RngitSession(Link link, RngitAddress address, TimeSpan timeout, long limit, Action<string>? progress)
+    private RngitSession(Link link, RngitAddress address, TimeSpan timeout, long limit, Action<string>? progress, int refBatchSize)
     {
         this.link = link;
         this.address = address;
         this.timeout = timeout;
         this.limit = limit;
         this.progress = progress;
+        this.refBatchSize = refBatchSize;
     }
 
     internal static async Task<RngitSession> OpenAsync(ReticulumNode node, Identity identity, string url,
-        TimeSpan timeout, long limit, Action<string>? progress, CancellationToken stop)
+        TimeSpan timeout, long limit, Action<string>? progress, CancellationToken stop, bool forPush = false, int refBatchSize = 25)
     {
+        if (refBatchSize is < 1 or > 1024) throw new ArgumentOutOfRangeException(nameof(refBatchSize));
         var address = RngitAddress.Parse(url);
         progress?.Invoke("Resolving path and establishing link...");
         var connection = await ClientLinks.ConnectAsync(node, address.DestinationHash, timeout, stop).ConfigureAwait(false);
         var link = connection.Link ?? throw new IOException(connection.Error);
-        var session = new RngitSession(link, address, timeout, limit, progress);
+        var session = new RngitSession(link, address, timeout, limit, progress, refBatchSize);
         try
         {
             link.Identify(identity);
-            var listing = await session.RequestAsync("/git/list", new Dictionary<object, object?>
-            {
-                [0] = address.Repository, ["for_push"] = false,
-            }, Math.Min(limit, 4 * 1024 * 1024), stop).ConfigureAwait(false);
-            if (listing.Metadata is not null) throw new InvalidDataException("Unexpected metadata on list response.");
-            CheckStatus(listing.Data, "list");
-            (session.Refs, session.Head) = RngitClient.ParseRefs(new UTF8Encoding(false, true).GetString(listing.Data.AsSpan(1)));
-            // Validate before a remote string can enter Git's line-oriented protocol or ref transactions.
-            foreach (var name in session.Refs.Keys.Append(session.Head).Distinct())
-            {
-                if (!ValidRef(name)) throw new InvalidDataException("Invalid remote ref name.");
-            }
-            progress?.Invoke($"Remote HEAD {session.Head} {session.Refs.GetValueOrDefault(session.Head, "(unborn)")} ({session.Refs.Count} advertised refs)");
+            await session.ListAsync(forPush, stop).ConfigureAwait(false);
             return session;
         }
         catch { session.Dispose(); throw; }
+    }
+
+    internal async Task ListAsync(bool forPush, CancellationToken stop)
+    {
+        var listing = await RequestAsync("/git/list", new Dictionary<object, object?>
+        {
+            [0] = address.Repository, ["for_push"] = forPush,
+        }, Math.Min(limit, 4 * 1024 * 1024), stop).ConfigureAwait(false);
+        if (listing.Metadata is not null) throw new InvalidDataException("Unexpected metadata on list response.");
+        CheckStatus(listing.Data, "list");
+        var (refs, head) = RngitClient.ParseRefs(new UTF8Encoding(false, true).GetString(listing.Data.AsSpan(1)));
+        // Validate before a remote string can enter Git's line-oriented protocol or ref transactions.
+        foreach (var name in refs.Keys.Append(head).Distinct())
+        {
+            if (!ValidRef(name)) throw new InvalidDataException("Invalid remote ref name.");
+        }
+        Refs = refs;
+        Head = head;
+        progress?.Invoke($"Remote HEAD {Head} {Refs.GetValueOrDefault(Head, "(unborn)")} ({Refs.Count} advertised refs)");
     }
 
     internal static bool ValidRef(string name) =>
@@ -74,7 +84,7 @@ internal sealed class RngitSession : IDisposable
         var objects = await RngitClient.GitAsync(directory, ["rev-list", "--objects", "--all", "--no-object-names"], stop).ConfigureAwait(false);
         var known = objects.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);
         long bytes = 0;
-        foreach (var batch in requested.Chunk(25))
+        foreach (var batch in requested.Chunk(refBatchSize))
         {
             var request = new Dictionary<object, object?>
             {

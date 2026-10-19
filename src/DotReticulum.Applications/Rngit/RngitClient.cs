@@ -33,8 +33,9 @@ public sealed class RngitClient(ReticulumNode node, Identity identity, Action<st
     public const long DefaultMaxResponseBytes = 256L * 1024 * 1024;
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
-    internal Task<RngitSession> OpenSessionAsync(string url, TimeSpan timeout, long limit, CancellationToken stop) =>
-        RngitSession.OpenAsync(node, identity, url, timeout, limit, progress, stop);
+    internal Task<RngitSession> OpenSessionAsync(string url, TimeSpan timeout, long limit, CancellationToken stop,
+        bool forPush = false, int refBatchSize = 25) =>
+        RngitSession.OpenAsync(node, identity, url, timeout, limit, progress, stop, forPush, refBatchSize);
 
     public Task<RngitCloneResult> CloneAsync(string url, string directory, TimeSpan timeout,
         long maxResponseBytes = DefaultMaxResponseBytes, CancellationToken cancellationToken = default, bool singleBranch = false) =>
@@ -165,7 +166,8 @@ public sealed class RngitClient(ReticulumNode node, Identity identity, Action<st
         return (refs, head);
     }
 
-    internal static async Task<string> GitAsync(string directory, string[] args, CancellationToken stop, string? input = null)
+    internal static async Task<string> GitAsync(string directory, string[] args, CancellationToken stop, string? input = null,
+        bool isolated = false)
     {
         var info = new ProcessStartInfo("git")
         {
@@ -180,6 +182,15 @@ public sealed class RngitClient(ReticulumNode node, Identity identity, Action<st
             StandardErrorEncoding = Encoding.UTF8,
         };
         foreach (var arg in new[] { "--no-pager", "--git-dir=" + directory, "-c", "core.hooksPath=", "-c", "protocol.allow=never" }.Concat(args)) info.ArgumentList.Add(arg);
+        if (isolated)
+        {
+            foreach (var name in new[]
+            {
+                "GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE", "GIT_IMPLICIT_WORK_TREE", "GIT_INDEX_FILE",
+                "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_GRAFT_FILE", "GIT_SHALLOW_FILE",
+                "GIT_NAMESPACE", "GIT_PREFIX", "GIT_REPLACE_REF_BASE", "GIT_QUARANTINE_PATH",
+            }) info.Environment.Remove(name);
+        }
         info.Environment["GIT_TERMINAL_PROMPT"] = "0";
         using var process = Process.Start(info) ?? throw new IOException("Could not start git.");
         var stdout = process.StandardOutput.ReadToEndAsync();

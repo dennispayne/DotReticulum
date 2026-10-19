@@ -7,19 +7,18 @@ public sealed class GitRemoteRnsTests
     private const string Url = "rns://0123456789abcdef0123456789abcdef/group/repo";
 
     [Fact]
-    public async Task Negotiation_IsOfflineReadOnlyAndProtocolClean()
+    public async Task Negotiation_IsOfflineAndProtocolClean()
     {
         using var input = new StringReader("capabilities\noption progress true\noption progress false\noption depth 1\noption progress nonsense\n\n");
         using var output = new StringWriter();
         using var error = new StringWriter();
         Assert.Equal(0, await GitRemoteRnsApp.RunAsync(["origin", Url], input, output, error, CancellationToken.None));
-        Assert.Equal("fetch\noption\n\nok\nok\nunsupported\nerror invalid progress value\n", output.ToString());
+        Assert.Equal("fetch\npush\noption\n\nok\nok\nunsupported\nerror invalid progress value\n", output.ToString());
         Assert.Equal("", error.ToString());
     }
 
     [Theory]
-    [InlineData("push refs/heads/main:refs/heads/main\n", "Unsupported")]
-    [InlineData("list for-push\n", "Push is not supported")]
+    [InlineData("push refs/heads/main:refs/heads/main\n", "preceding list for-push")]
     [InlineData("connect git-upload-pack\n", "Unsupported")]
     [InlineData("option progress\n", "Malformed")]
     [InlineData("fetch broken\n", "preceding list")]

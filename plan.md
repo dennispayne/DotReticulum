@@ -32,8 +32,8 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] Map contracts onto existing .NET projects and define ownership, async lifecycle, cancellation, bounded buffering, persistence and error-reporting boundaries
   - [x] Define differential, live-reference, Pester and NativeAOT acceptance criteria for each feature; record intentional API/platform differences
 - [ ] Parity 2 - Remaining Git integration and hosting
-  - [ ] Complete helper client configuration/aliases/ref batch settings and explicitly verify object-format/platform limits
-  - [ ] Git push bundles, existing-object ref operations, force behavior, deletion and per-ref Git status reporting
+  - [x] Complete helper client configuration/aliases/ref batch settings and explicitly verify object-format/platform limits
+  - [x] Git push bundles, existing-object ref operations, force behavior, deletion and per-ref Git status reporting
   - [ ] Repository node configuration, identity/aliases, announcements, blocked identities, statistics and restart persistence
   - [ ] Group/repository/document permissions, .allowed files, administration and authorization-failure disclosure
   - [ ] Repository create, fork, mirror, manual/periodic sync and default-HEAD restoration

@@ -8,6 +8,7 @@ Its Git subprocesses allow bare-repository discovery, which upstream requires.
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -25,7 +26,11 @@ def main():
     parser.add_argument("--tcp-server-port", type=int, default=0)
     parser.add_argument("--rnsd-port", type=int, default=0)
     parser.add_argument("--repositories", required=True)
+    parser.add_argument("--writer", help="Identity hash allowed to write the fixtures group")
     args = parser.parse_args()
+    if args.writer is not None and re.fullmatch(r"[0-9a-fA-F]{32}", args.writer) is None:
+        parser.error("--writer must be a 32-character hexadecimal identity hash")
+    writer = args.writer.lower() if args.writer else "none"
     root = os.path.abspath(args.config)
     os.makedirs(root, exist_ok=True)
     # Upstream uses cwd-based Git commands inside bare repositories. Scope this
@@ -37,11 +42,11 @@ def main():
     verify_reference()
 
     tempfile.tempdir = os.path.join(root, "scratch")
-    os.makedirs(tempfile.tempdir)
+    os.makedirs(tempfile.tempdir, exist_ok=True)
     group = os.path.abspath(args.repositories)
 
     rnsdir = os.path.join(root, "rns")
-    os.makedirs(rnsdir)
+    os.makedirs(rnsdir, exist_ok=True)
     with open(os.path.join(rnsdir, "config"), "w", encoding="utf-8") as file:
         file.write(f"""[reticulum]
   enable_transport = No
@@ -57,7 +62,7 @@ def main():
     listen_port = {args.tcp_server_port}
 """)
     serverdir = os.path.join(root, "rngit")
-    os.makedirs(serverdir)
+    os.makedirs(serverdir, exist_ok=True)
     with open(os.path.join(serverdir, "config"), "w", encoding="utf-8") as file:
         file.write(f"""[rngit]
   node_name = DotReticulum loopback fixture
@@ -69,10 +74,12 @@ def main():
   serve_nomadnet = No
 [repositories]
   fixtures = {group}
+  readonly = {group}
   hidden = {group}
 [access]
-  fixtures = read:all
-  hidden = read:none
+  fixtures = read:all, write:{writer}
+  readonly = read:all, write:none
+  hidden = read:none, write:none
 """)
     RNS.Reticulum(configdir=rnsdir)
     server = ReticulumGitNode(configdir=serverdir)

@@ -1,0 +1,87 @@
+{
+  "upstream": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "client_sha256": "78358331ddac087860fb8a1f350632d3875917782dc000681d48597affd8936b",
+  "server_sha256": "6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693",
+  "cases": [
+    {
+      "name": "unidentified",
+      "response": "014e6f74206964656e746966696564",
+      "success": false
+    },
+    {
+      "name": "non-map",
+      "response": "02496e76616c69642072657175657374",
+      "success": false
+    },
+    {
+      "name": "no-repository",
+      "response": "024e6f207265706f7369746f727920737065636966696564",
+      "success": false
+    },
+    {
+      "name": "no-data",
+      "response": "02496e76616c696420726571756573742064617461",
+      "success": false
+    },
+    {
+      "name": "operations-type",
+      "response": "02496e76616c6964206461746120666f72206f7065726174696f6e73",
+      "success": false
+    },
+    {
+      "name": "unknown-operation",
+      "response": "02556e6b6e6f776e206f7065726174696f6e3a20626164",
+      "success": false
+    },
+    {
+      "name": "invalid-ref",
+      "response": "02496e76616c69642072657175657374",
+      "success": false
+    },
+    {
+      "name": "invalid-sha",
+      "response": "02496e76616c696420534841",
+      "success": false
+    },
+    {
+      "name": "missing-object",
+      "response": "ff4f626a656374206666666666666666666666666666666666666666666666666666666666666666666666666666666620646f6573206e6f7420657869737420696e207265706f7369746f7279",
+      "success": false
+    },
+    {
+      "name": "invalid-bundle",
+      "response": "ff436f756c64206e6f74207665726966792062756e646c65",
+      "success": false
+    },
+    {
+      "name": "read-only",
+      "response": "014e6f7420616c6c6f776564",
+      "success": false
+    },
+    {
+      "name": "hidden",
+      "response": "034e6f7420666f756e64",
+      "success": false
+    },
+    {
+      "name": "create-existing-object",
+      "response": "00",
+      "success": true
+    },
+    {
+      "name": "delete",
+      "response": "00",
+      "success": true
+    },
+    {
+      "name": "delete-absent",
+      "response": "00",
+      "success": true
+    },
+    {
+      "name": "delete-invalid-ref",
+      "response": "02496e76616c69642072657175657374",
+      "success": false
+    }
+  ]
+}

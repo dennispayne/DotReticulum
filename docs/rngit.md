@@ -1,4 +1,4 @@
-# Read-only Git over Reticulum
+# Git over Reticulum
 
 `rngit clone` creates a **bare** local Git repository from an upstream
 `rngit` server. `rngit fetch` updates an existing bare repository using
@@ -9,9 +9,10 @@ implementation is not an official Reticulum utility. Its network path is entirel
 Git on `PATH` performs local bundle validation/import and object checking;
 the client never invokes Git's network transports.
 
-The same application also implements a read-only **`git-remote-rns` helper**.
+The same application also implements a read/write **`git-remote-rns` helper**.
 Git owns the working tree, HEAD, local branches, tags and remote-tracking refs;
-the helper advertises remote refs and imports objects, never updates Git's refs.
+the helper advertises remote refs, imports fetched objects and sends push
+operations to the server. It never updates the caller's local refs.
 The direct `rngit` commands below retain their bare-repository behavior.
 The Reticulum-hosted URL
 `rns://7649a50d84610232d1416b41d2896aff/reticulum/reticulum` is this project's
@@ -44,9 +45,13 @@ New-Item -ItemType Directory -Force C:\Tools\DotReticulum
 Copy-Item artifacts\git-native\DotReticulum.Applications.exe C:\Tools\DotReticulum\git-remote-rns.exe
 $env:PATH = 'C:\Tools\DotReticulum;' + $env:PATH
 $env:DOTRETICULUM_RNS_CONFIG = 'C:\RNS\Client'
+$env:RNGIT_CONFIG = 'C:\RNGit\Client'
 $env:DOTRETICULUM_RNGIT_TIMEOUT = '900'
 git clone rns://DESTINATION/GROUP/REPOSITORY C:\Repos\repository
 git -C C:\Repos\repository fetch origin
+git -C C:\Repos\repository push origin main
+git -C C:\Repos\repository push origin refs/tags/v1
+git -C C:\Repos\repository push origin --delete old-branch
 git clone --bare rns://DESTINATION/GROUP/REPOSITORY C:\Repos\bare.git
 ```
 
@@ -60,11 +65,48 @@ helpers with that name earlier on `PATH`/Git's exec path.
 is the fallback environment alias. The default is `~/.dotreticulum`.
 `DOTRETICULUM_RNGIT_TIMEOUT` sets a positive overall deadline in seconds
 (default 7200, including Git protocol input). `DOTRETICULUM_RNGIT_MAX_RESPONSE`
-sets the positive response byte cap (default 268435456). The identity remains
-`storage\rngit` under that configuration. Python's `RNGIT_CONFIG`, aliases,
-`client_config`, log file and shared-instance settings are not consumed:
-this is an explicit .NET configuration/platform difference, not full
-configuration parity.
+sets the positive response byte cap (default 268435456).
+`DOTRETICULUM_RNGIT_MAX_PUSH` limits each outgoing bundle before it is loaded
+into memory (default 268435456 bytes). Local Git prepares bundles on disk;
+that temporary disk use can exceed the transfer cap before Git finishes.
+Transfers still use buffered RNS resources, not a streaming large-repository
+implementation.
+
+`RNGIT_CONFIG` independently selects the helper client directory. It contains
+`client_config`, `client_identity` (64 raw private-key bytes) and `client_log`.
+Without it, the pinned upstream default is preserved: `~/.rngit`, or
+`~/.rngit/reticulum` when `~/.config/rngit/config` exists. This surprising
+default is taken from the actual reference, not its comments. Missing client
+configuration/identity files are created; identity publication is atomic and
+concurrent creators load the same winner. Corrupt keys are not replaced.
+Unix keys are owner-only; Windows users must protect the directory ACL.
+
+```ini
+[client]
+ref_batch_size = 25
+[aliases]
+my_node = 0123456789abcdef0123456789abcdef
+[logging]
+loglevel = 4
+```
+
+Aliases are case-sensitive: `rns://my_node/group/repository`. Literal destination
+hashes take precedence. Fetch batches default to 25 and clamp to 1024. Unlike
+upstream's non-progressing zero-batch loop, nonpositive values fail explicitly.
+Logging clamps to the actual upstream constants -1 (off) through 8; filtered
+node/session diagnostics go to `client_log`, rotated at 5 MiB. Protocol errors
+always reach stderr. Flat sections, quoted scalar values and comments are
+supported; malformed aliases, duplicate entries, nested/list/multiline/
+interpolated values and oversized input fail with a diagnostic instead of
+being ignored or misparsed. Unknown scalar settings retain upstream's
+ignore behavior. This bounded parser is not full ConfigObj.
+
+**Identity migration:** the helper now uses upstream's `client_identity`, not
+the older .NET `<RNS config>\storage\rngit`. To preserve an existing authorized
+identity, explicitly copy that file into the selected client directory as
+`client_identity` **before first use**, without overwriting another identity.
+The direct `rngit clone/fetch` CLI keeps its existing RNS storage identity.
+Python shared-instance attachment is still not implemented.
 
 Git discovers the executable by name. For managed development only, copy the
 Release **apphost** (`DotReticulum.Applications.exe` on Windows) under the helper
@@ -74,18 +116,21 @@ selects helper mode. Alternatively invoke
 `dotnet DotReticulum.Applications.dll git-remote-rns <remote> <url>` to inspect
 the protocol manually; that command alone does not install a Git helper.
 
-Supported Git commands are `capabilities`, `list`, `option progress true|false`
-and batched `fetch <object-id> <ref>` terminated by a blank line. Capabilities
-are **`fetch` and `option` only**; `list` is implicit in Git's protocol.
+Supported Git commands are `capabilities`, `list`, `list for-push`,
+`option progress true|false`, batched `fetch <object-id> <ref>` and
+`push [+]<source>:<destination-ref>`, each batch terminated by a blank line.
+Capabilities are **`fetch`, `push` and `option`**; `list` is implicit.
 Unknown options return `unsupported`; malformed commands and unsupported
-operations fail nonzero with diagnostics on stderr. Push, `list for-push`,
-connect, shallow/depth and filter capabilities are not advertised.
+operations fail nonzero with diagnostics on stderr. Connect, shallow/depth,
+filter and atomic-push capabilities are not advertised. Unsupported dry-run
+requests must fail before any remote mutation.
 Git can create working-tree/bare clones, choose branches (`clone -b feature`),
 follow annotated tags, fetch incrementally, and retain local work while updating
 remote-tracking refs through its normal refspecs. An unchanged fetch may require
 only a ref listing because Git knows the objects already.
 
-The helper lazily starts one owned .NET node/identified link per invocation
+The helper lazily reads client configuration and starts one owned .NET
+node/identified link per invocation
 when Git requests refs, and tears it down on exit/error/cancellation.
 Protocol stdout contains only Git responses. Diagnostics, progress and received
 bundle-byte counts go to stderr. Helper input/output is explicitly UTF-8
@@ -97,6 +142,43 @@ bundles and checks the object database before acknowledging success.
 Failure may leave imported unreferenced objects; Git decides whether to update
 refs. The helper requires Git's `GIT_DIR` when importing; it does not initialize
 repositories, set HEAD, write FETCH_HEAD, or rewrite configuration.
+
+### Push behavior and limits
+
+Push listing uses upstream's write-permission check. New branches, lightweight
+and annotated tags, updates, forced updates and deletion use the pinned
+`/git/push` and `/git/delete` contracts. Arbitrary locally resolvable sources
+(including raw object IDs) are named in an isolated temporary bare repository
+with a read-only object alternate; the caller's refs and HEAD are not changed.
+Remote tips present locally are excluded from bundles. If all required objects
+already exist remotely, the helper sends an `update_ref` operation without a
+bundle. This is a real zero-byte operation, not a failed-bundle fallback.
+
+**Important upstream difference:** existing-object operations require explicit
+force whenever an existing target changes SHA, **even for fast-forward
+changes**. Bundle pushes instead use Git fetch's ancestry/tag decisions.
+The helper preserves both behaviors; it does not silently upgrade a push to
+force. Delete uses upstream's behavior, including leaving symbolic HEAD alone.
+Every ref gets `ok <ref>` or a correctly quoted `error <ref> <reason>`; one
+rejected ref does not hide success or prevent later independent refs.
+
+Pushes are sequential, **not atomic**. Upstream has no compare-and-swap or
+remote lease protocol: concurrent writes to the same ref are not transactionally
+protected. Git may apply local advertisement checks, but this is not a remote
+lease guarantee. Separate sessions pushing distinct refs are supported.
+Cancellation/deadline or loss after transmission cannot prove whether the
+server applied the in-flight operation; the helper fails explicitly and the
+caller should fetch/inspect before retrying. Cleanup removes owned temporary
+repositories on normal error/cancellation; forcibly killing a process can leave
+an unreferenced `rngit-push-*` directory in its Git directory.
+
+The ordinary-Git helper explicitly supports **SHA-1 only**. Nonempty remote
+SHA-256 listings and local SHA-256 transfers fail with a diagnostic; no Git
+object-format negotiation is advertised. An empty remote does not expose its
+object format in the upstream protocol: it is assumed SHA-1 and an incompatible
+server must reject the bundle. The separate direct bare client retains its
+SHA-1/SHA-256 behavior. Native feature evidence is Windows x64 only; other
+platforms remain unverified.
 
 ### Direct bare-repository client
 
@@ -201,7 +283,7 @@ cancellation or local Git/filesystem failure; **2** invalid arguments.
 
 ## Exact upstream protocol
 
-The read-only implementation follows these files at
+The original read-only implementation follows these files at
 `e40191b3d193b46b7f2d8a44424a594cd758839b`; their rngit protocol is unchanged
 at the current hosted live-reference pin `a29bfb51c468945c96a1ee22cae0114e993e2391`:
 
@@ -219,11 +301,12 @@ stdout flushing), `handle_git_list` (symbolic HEAD and refs), and
 verification/unbundle without ref updates). Upstream advertises `list`, `fetch`,
 `push`, `option`, recognizes progress, reports unsupported options, and aborts
 unknown commands with a stderr diagnostic and code 255 (invalid startup uses 1).
-Our read-only helper deliberately omits push and uses 1 consistently for
-failures. Upstream eagerly connects before negotiation; ours connects lazily
+The historical read-only gate omitted push; the current helper adds it and
+uses 1 for protocol/transport failures, with per-ref rejections returned through
+Git's status protocol. Upstream eagerly connects before negotiation; ours connects lazily
 so offline capability discovery does not require a network.
 
-Focused acceptance is ordinary Git discovery/clone/fetch on working and bare
+The historical Git-first gate acceptance is ordinary Git discovery/clone/fetch on working and bare
 repositories; default/non-default branches, tags, HEAD, remote-tracking refs;
 actual missing-object and no-change fetches; clean protocol, denied reads,
 malformed input, deadlines/cancellation and explicit unsupported-operation
@@ -242,7 +325,8 @@ keys, other keys and ref/SHA values are strings.
    carrying MessagePack `[request-id, response-bytes]`, not a file response.
 2. `/git/fetch`: `{0: "group/repository", "refs":
    [{"sha": "<object-id>", "ref": "refs/..."}]}`.
-   Requests are batched at 25 refs, matching upstream's default. The full
+   Requests default to batches of 25 refs, matching upstream; the helper's
+   client_config can override this, while the direct CLI keeps 25. The full
    history is requested for clone. Fetch additionally sends `"have": "<old-id>"`
    inside each ref entry when that local ref exists in the Python helper.
    Our shared importer sends a top-level
@@ -260,12 +344,35 @@ keys, other keys and ref/SHA values are strings.
 4. Error responses are a status byte plus diagnostic text:
    `1` disallowed, `2` invalid request, `3` not found/not allowed, `255` remote
    failure. Unknown/malformed metadata is an error.
+5. Push listing is `/git/list` with `"for_push": true`. A bundle push is
+   `/git/push` with `{0: "group/repository", "local_ref": "refs/rngit/push",
+   "remote_ref": "refs/...", "force": false, "bundle": <binary Git bundle>}`.
+   The local bundle ref is implementation-owned, not an on-wire branch naming
+   convention. Existing-object push instead sends
+   `{0: "group/repository", "operations": [{"action": "update_ref",
+   "ref": "refs/...", "sha": "<object-id>", "force": false}]}`.
+   Delete is `/git/delete` with `{0: "group/repository", "ref": "refs/..."}`.
+   Each response must be ordinary binary status bytes with no file metadata;
+   successful status is exactly `b"\x00"`. Requests that exceed the link MDU
+   use ordinary request Resources, including the binary bundle inside the map.
 
 Resources may be compressed, encrypted, and segmented by RNS. Requests larger
 than the link MDU also use Resources. **Channel is not part of rngit's
 list/fetch protocol**, so the client does not invent Channel messages.
 
 ## Verification and limits
+
+The Parity 2 read/write milestone additionally exercises ordinary Git push
+against a disposable, actual pinned Python server with an identity-scoped
+writer: new/updated/forced/deleted branches and tags, annotated/Unicode refs,
+existing-object-only operations, per-ref partial rejection, concurrent distinct
+refs, read-only/hidden/unapproved identities, restart persistence and explicit
+SHA-256 rejection. Managed xUnit tests cover live wire decisions and a separate
+reference-generated status corpus (`GenerateRngitPushVectors.py`); Pester owns
+actual Git processes. The generator executes real upstream handlers on owned
+fixtures, not a replacement server. Those handler vectors alone are not
+live-network evidence. Exact final commands/results and remaining failure/
+platform gaps are recorded in the development history.
 
 The opt-in `RngitTests.LiveRngit_*` C# test creates a local two-commit Git fixture with
 random binary content, multiple branches and an annotated tag, then runs the
@@ -319,14 +426,15 @@ upstream's request worker from completing. No subprocess or wire-protocol
 shim is installed.
 
 The direct client creates bare repositories; ordinary Git uses the helper for
-working-tree or bare repositories. No push,
-repository creation, release download/publishing, shallow clone,
+working-tree or bare repositories. Push is available through the helper only;
+the direct CLI remains read-only. No repository creation/hosting, release
+download/publishing, shallow clone,
 submodule/LFS download or signature verification is implemented by the client.
 Git itself owns working-tree checkout. Upstream's fetch handler has no depth option. Detached remote HEAD
 is unsupported by upstream's list format and rejected when not represented as
 a valid symbolic branch. The direct client recognizes SHA-1/SHA-256 formats.
-The helper does not advertise Git's object-format negotiation; its ordinary-Git
-acceptance uses SHA-1, and a local/remote format mismatch fails explicitly.
+The helper does not advertise Git's object-format negotiation and explicitly
+rejects SHA-256; ordinary-Git acceptance uses SHA-1.
 Arbitrary remote refs are checked by
 equivalent ref-name validation before protocol output/import. The direct client
 uses one local ref transaction; it no longer launches a redundant Git process

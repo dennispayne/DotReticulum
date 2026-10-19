@@ -6,6 +6,187 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
+### Parity 2 native read/write Git client milestone (2026-10-19)
+
+This record supersedes the **missing helper push/client configuration** entries
+in the earlier inventory snapshots, not the remaining hosting/signing gaps.
+Parity 1 was first integrated as `2d5fcff`; subsequent work is confined to
+Parity 2's client milestone. The branding and introductory README edits were
+preserved. No public repository was written, no reference pin advanced, and
+no GitHub workflow, origin push, merge or repository-protection change was made.
+
+#### Source-backed contracts and implemented boundary
+
+Authoritative source remains the previously .NET-fetched hosted checkout
+`a29bfb51c468945c96a1ee22cae0114e993e2391`, tree
+`24d4c393de9fd57b933836cea68891fd953ab060`, RNS 1.5.7.
+`reference_environment.verify_reference(require_lxmf=True)` confirmed actual
+RNS import under that checkout, a clean tracked RNS tree and LXMF 1.2.1 from
+the isolated venv. Source SHA-256:
+`client.py` = `78358331ddac087860fb8a1f350632d3875917782dc000681d48597affd8936b`;
+`server.py` = `6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693`.
+Existing `e40191b3...` vectors were not regenerated or relabeled.
+
+| Pinned source contract | Implementation and measurable acceptance |
+| --- | --- |
+| `Utilities/rngit/client.py:55-76,130-213,679-718`: client directory/defaults, client_config, client_identity, aliases, logging, ref_batch_size | Applications `RngitClientConfiguration` reads the upstream flat settings and persists raw identities atomically without overwrite. Default/custom/batch-one configuration, quoted/comments, case/literal precedence, invalid/bounded input, concurrent creators, corrupt-key preservation and restart identity checks; Unix permissions explicitly skipped on Windows. Native/helper network configuration remains the documented .NET subset |
+| `client.py:335-447`; `server.py:2869-2935`: capabilities, for-push listing and batch dispatch | Offline protocol-clean negotiation advertises fetch/push/option; list is implicit. Write listing uses for_push=true. Bounded lines/ref queues, no mixed/duplicate-target batch, explicit malformed/EOF/timeout diagnostics and no fabricated success; real Git process acceptance |
+| `client.py:545-655`; `server.py:3005-3069`: bundle push | Resolve source to its exact object ID, enumerate genuinely new reachable objects, exclude locally available advertised tips, prepare a bundle under an owned isolated bare repository using read-only alternates, send the reference binary-map request, require a valid status. Named refs/raw OIDs, initial unborn repository, branches/annotated/lightweight/Unicode tags, updates and bundle rejection/force; positive bytes and previously absent objects are mandatory checks |
+| `client.py:630-675`; `server.py:3070-3111`: existing-object operations | Zero new objects uses action=update_ref with ref/sha/force, not an error-string-based fallback from failed bundle creation. Existing target changes require force even for fast-forward, matching the actual reference. Zero-byte success, unchanged success, changed-SHA rejection and explicit force are exercised independently |
+| `client.py:551-577`; `server.py:3115-3140`: deletion | Reference /git/delete request and individual status, including absent-ref deletion and deletion of the advertised default branch without rewriting symbolic HEAD; persisted object/ref integrity asserted |
+| `client.py:445-462,545-676`: per-ref stdout/error escaping | Git-compatible C-style UTF-8 byte quoting prevents diagnostic line injection. Local source failure and remote rejection each produce error for that ref while later independent refs can succeed. Git porcelain exit/output and direct helper exact statuses checked separately |
+| `server.py:2262-2371,2869-2890,3005-3019`: authorization/disclosure | Disposable identity-scoped writer, different identity, readable read-only and hidden groups; rejected writes preserve refs and hidden listings expose none. Python adapter supplies configuration only; actual upstream permission/handler logic is unchanged |
+| Git object format and local ownership | Helper explicitly supports SHA-1 only and rejects genuine SHA-256 remote/local transfers; direct rngit SHA-256 behavior remains unchanged. Push preparation never creates even temporary refs in the caller's repository. Revision/exclusion input uses stdin to avoid Windows command-line limits. Existing clone/fetch/Unicode/HEAD/remote-tracking and diverged-local-branch regressions retained |
+
+One owner kept request/bundle/status/helper behavior together. Independent fleet
+deliverables were the configuration/identity implementation and the disposable
+C#/PowerShell/reference-adapter acceptance fixtures. The coordinator integrated
+them and owns final full-suite/native/coverage evidence and commits.
+
+#### Reference-generated corpus and live fixtures
+
+`tests\DotReticulum.Applications.Tests\GenerateRngitPushVectors.py` executes
+the actual pinned `ReticulumGitNode.handle_push/handle_delete` methods, using
+C#/PowerShell-prepared disposable repositories and node configuration, not a
+simulated server or fabricated success replies. Sixteen captured cases cover
+unidentified/malformed requests, missing repository/data, operation/ref/SHA
+validation, nonexistent object, corrupt bundle, readable denied/hidden access,
+existing-object creation and present/absent/invalid deletion.
+`Fixtures\rngit-push.json` records the exact pin/source hashes and response
+bytes. Repeating generation produced identical SHA-256
+`941ae1dc34ea3425a428c03cb096738db84145c9999a2b5f1e7382697927752c`.
+Handler vectors alone are **not live-network evidence**.
+
+The generator's fixture was created by
+`dotnet run --file tests\Interop\CreateRngitFixture.cs --verbosity quiet -- $fixtureRoot`.
+Its owned RNS config sets share_instance/enable_transport=no; server config
+maps fixtures/readonly/hidden to the generated repositories with respectively
+read:all+write:all, read:all+write:none, and read:none+write:none, disables
+NomadNet/stats and periodic mirrors. With the verified source on PYTHONPATH,
+PYTHONUTF8=1 and a process-only safe.bareRepository=all Git override:
+
+```powershell
+$fixtureRoot = Join-Path $sessionFiles 'push-research'
+$sha = git -C (Join-Path $fixtureRoot 'source') rev-parse refs/heads/main
+& $python tests\DotReticulum.Applications.Tests\GenerateRngitPushVectors.py --rns-config (Join-Path $fixtureRoot 'rns') --server-config (Join-Path $fixtureRoot 'server') --object $sha --output tests\DotReticulum.Applications.Tests\Fixtures\rngit-push.json
+```
+
+Live xUnit sends real .NET requests over an identified encrypted RNS link to
+the unchanged reference handlers, including bundle/operations force decisions,
+annotated tags, actual denied identities, outbound cap, cancellation and
+staging cleanup. Pester uses separate actual Git/helper processes, C#-generated
+histories and a Python host with identity-scoped --writer. It additionally
+exercises partial per-ref Git exits, simultaneous distinct-ref writers,
+configured one-ref fetch batches, isolated log rotation, unsupported dry-run/
+atomic no-mutation, queued-batch deadlines and actual server restart with
+stable identities, persisted refs and fresh clone/push afterward.
+
+The Python host retains the disclosed UTF-8 runtime, process-only bare-repo
+discovery override, owned temporary directory and nonblocking stdin allowances.
+The added --writer and read-only/hidden groups are test configuration, not a
+permission shim. No public Reticulum upstream is a push test target.
+
+#### Coordinator validation and production coverage
+
+Using `$python`, `$reference` and `$sessionFiles` from the Parity 1 record:
+
+```powershell
+$env:DOTRETICULUM_LIVE = '1'
+$env:DOTRETICULUM_PYTHON = $python
+$env:DOTRETICULUM_UPSTREAM = $reference
+dotnet build DotReticulum.slnx -c Release --nologo -v quiet
+dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --filter 'FullyQualifiedName~GitRemoteRnsTests|FullyQualifiedName~RngitClientConfigurationTests|FullyQualifiedName~RngitPushTests' --nologo -v quiet
+$env:PATH = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer;' + $env:PATH
+$nativeDirectory = Join-Path $sessionFiles 'native-git-write'
+dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o $nativeDirectory --nologo -v minimal
+$nativeExe = Join-Path $nativeDirectory 'DotReticulum.Applications.exe'
+& $nativeExe --help
+pwsh -NoProfile -File tests\run-tests.ps1 -Live -Python $python -Upstream $reference -NativeExe $nativeExe -Coverage -ResultsDirectory (Join-Path $sessionFiles 'coverage-git-write')
+pwsh -NoProfile -File tests\run-pester.ps1 -GitRemote -Python $python -Upstream $reference
+pwsh -NoProfile -File tests\run-pester.ps1 -GitRemote -Python $python -Upstream $reference -Application $nativeExe
+```
+
+Build passed with **zero warnings/errors**. Focused live configuration/helper/
+push tests **87 passed, 1 skipped, zero failed**. NativeAOT publish with both
+warning-as-error gates and published `--help` passed. Full live/native coverage
+**464 passed, 1 skipped, zero failed**: Applications 132+1, Core 77, Crypto 47,
+Interfaces 62, LXMF 35, Transport 111. The only skip is Unix file permissions on
+Windows, with an explicit reason; all opt-in live cases were enabled.
+The full suite includes the published native encrypted/compressed
+multi-megabyte resource flow, not only native helper negotiation.
+Managed and published-native Pester each **59 passed, zero skipped/failed**.
+These include the existing eight tooling/CLI cases and 51 live Git cases.
+Native acceptance executes actual pushes, clone/fetch, denial, force, deletion,
+restart and cleanup through the installed git-remote-rns executable, not
+merely its help/capability output.
+
+An initial focused live fixture clone failed because the production local-Git
+wrapper correctly denies network/file transports. Only the disposable test
+clone opts into protocol.file.allow=always; production restrictions were not
+weakened. Final commands above passed after that test setup correction.
+The prior 49-case delegated Git run predated the additional unborn-remote and
+missing-local-source cases and is not substituted for the final runner result.
+
+Fresh coverage merged six production reports by source/line/branch identity;
+Pester and native external child processes do not count as managed hits:
+
+| Project | Lines | Branches |
+| --- | ---: | ---: |
+| Applications | 1136/1664 (68.27%) | 924/1829 (50.52%) |
+| Core | 682/722 (94.46%) | 380/421 (90.26%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 376/412 (91.26%) | 117/126 (92.86%) |
+| LXMF | 388/429 (90.44%) | 193/270 (71.48%) |
+| Transport | 2433/2800 (86.89%) | 1312/1701 (77.13%) |
+| **Overall** | **5125/6143 (83.43%)** | **2973/4397 (67.61%)** |
+
+Logs/reports remain outside source control under `$sessionFiles`:
+`git-write-validation.log`, `git-write-pester-managed.log`,
+`git-write-pester-native.log` and `coverage-git-write`.
+Environment remains Windows x64, .NET SDK 10.0.402, Git 2.52.0.windows.1,
+PowerShell 7.6.6 and Pester 5.7.1.
+
+#### Intentional differences and remaining boundary
+
+Nonpositive batch sizes fail rather than copy upstream's non-progress loop;
+invalid aliases/unsupported ConfigObj structures, duplicate entries and
+oversized input fail explicitly. Config integers are signed 32-bit. Unknown
+scalar settings retain upstream's ignore behavior. Actual logging constants
+are -1..8, not the default sample's stale comment; .NET timestamp/diagnostic
+formatting and lazy offline startup are intentional differences.
+The client directory default preserves upstream's surprising
+~/.config/rngit/config detection selecting ~/.rngit/reticulum.
+Helper identity now uses client_identity: preserving an older .NET
+storage/rngit identity requires explicit operator copying before first use;
+there is no silent migration or key replacement. Direct CLI storage is unchanged.
+
+Each request/resource is buffered. Outgoing bundles default to a 256 MiB cap
+before reading into memory; local Git can consume more temporary disk before
+the resulting bundle is size-checked. Source object directories containing
+newlines are unsupported. Ordinary-Git helper SHA-256 negotiation is not
+implemented; an empty remote does not disclose its format and is assumed
+SHA-1 until the server accepts/rejects the push. Native installation/execution
+is verified only on Windows x64, not Linux/macOS/mobile or hardware.
+
+Ref operations are sequential, not atomic/CAS: no remote lease guarantee can
+be claimed. Same-ref races remain the reference's behavior; concurrent
+distinct refs are tested. Atomic and dry-run pushes are explicitly rejected
+without mutation. Cancellation/loss after transmission leaves the in-flight
+remote outcome uncertain, reported as failure, never invented rollback or
+success. Normal failure/cancellation cleans owned local staging; a forced OS
+kill can leave an unreferenced owned staging directory. Impaired network/
+mid-upload disconnect and same-ref race stress are not newly verified here.
+Object hashes/fsck establish consistency, **not authenticated publisher or
+release-signature verification**.
+
+This is the user's preferred coherent fallback milestone, **not complete
+Parity 2**. Remaining hosting/configuration/permissions/persistence, create/
+fork/mirror/sync, releases/work documents, pages/templates/media, signing and
+full native utility CLI integration remain unchecked. The exact next item is
+**Repository node configuration, identity/aliases, announcements, blocked
+identities, statistics and restart persistence**. No Parity 3 implementation
+has begun.
+
 ### Artwork lettering correction (2026-10-19)
 
 Removed square-cap protrusions from the R/S strokes and replaced the N's
