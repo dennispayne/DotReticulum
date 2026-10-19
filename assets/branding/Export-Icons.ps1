@@ -28,20 +28,32 @@ function Export-Png([int]$Size) {
         $graphics.ScaleTransform($Size * 4 / 512, $Size * 4 / 512)
         foreach ($element in $source.SelectNodes('//*')) {
             switch ($element.LocalName) {
-                'rect' {
-                    $path = [System.Drawing.Drawing2D.GraphicsPath]::new()
-                    $brush = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml($element.fill))
+                'polygon' {
+                    [System.Drawing.PointF[]]$points = @(
+                        foreach ($pair in $element.points.Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)) {
+                            $coordinates = $pair.Split(',')
+                            [System.Drawing.PointF]::new([single]$coordinates[0], [single]$coordinates[1])
+                        }
+                    )
+                    $brush = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml((Get-Style $element 'fill')))
                     try {
-                        $x = [single]$element.x; $y = [single]$element.y
-                        $w = [single]$element.width; $h = [single]$element.height
-                        $d = [single]$element.rx * 2
-                        $path.AddArc($x, $y, $d, $d, 180, 90)
-                        $path.AddArc($x + $w - $d, $y, $d, $d, 270, 90)
-                        $path.AddArc($x + $w - $d, $y + $h - $d, $d, $d, 0, 90)
-                        $path.AddArc($x, $y + $h - $d, $d, $d, 90, 90)
-                        $path.CloseFigure()
-                        $graphics.FillPath($brush, $path)
-                    } finally { $brush.Dispose(); $path.Dispose() }
+                        $graphics.FillPolygon($brush, $points)
+                    } finally { $brush.Dispose() }
+                }
+                'polyline' {
+                    [System.Drawing.PointF[]]$points = @(
+                        foreach ($pair in $element.points.Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)) {
+                            $coordinates = $pair.Split(',')
+                            [System.Drawing.PointF]::new([single]$coordinates[0], [single]$coordinates[1])
+                        }
+                    )
+                    $pen = [System.Drawing.Pen]::new(
+                        [System.Drawing.ColorTranslator]::FromHtml((Get-Style $element 'stroke')),
+                        [single](Get-Style $element 'stroke-width'))
+                    try {
+                        $pen.StartCap = $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Square
+                        $graphics.DrawLines($pen, $points)
+                    } finally { $pen.Dispose() }
                 }
                 'line' {
                     $color = [System.Drawing.ColorTranslator]::FromHtml((Get-Style $element 'stroke'))
@@ -56,9 +68,15 @@ function Export-Png([int]$Size) {
                     try {
                         $r = [single]$element.r
                         $graphics.FillEllipse($brush, [single]$element.cx - $r, [single]$element.cy - $r, $r * 2, $r * 2)
+                        $pen = [System.Drawing.Pen]::new(
+                            [System.Drawing.ColorTranslator]::FromHtml((Get-Style $element 'stroke')),
+                            [single](Get-Style $element 'stroke-width'))
+                        try {
+                            $graphics.DrawEllipse($pen, [single]$element.cx - $r, [single]$element.cy - $r, $r * 2, $r * 2)
+                        } finally { $pen.Dispose() }
                     } finally { $brush.Dispose() }
                 }
-                { $_ -in 'svg', 'title', 'desc', 'g' } {}
+                { $_ -in 'svg', 'title', 'desc', 'metadata', 'g' } {}
                 default { throw "Unsupported SVG element: $($element.LocalName)" }
             }
         }

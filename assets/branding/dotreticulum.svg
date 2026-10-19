@@ -1,42 +1,47 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">DotReticulum</title>
-  <desc id="desc">Violet and blue connected nodes form a D on a dark indigo tile.</desc>
-  <rect x="24" y="24" width="464" height="464" rx="104" fill="#11152d"/>
-  <g stroke="#47538c" stroke-width="5" stroke-linecap="round">
-    <line x1="144" y1="144" x2="260" y2="256"/>
-    <line x1="144" y1="256" x2="272" y2="144"/>
-    <line x1="144" y1="256" x2="272" y2="368"/>
-    <line x1="144" y1="368" x2="260" y2="256"/>
-    <line x1="272" y1="144" x2="260" y2="256"/>
-    <line x1="352" y1="200" x2="260" y2="256"/>
-    <line x1="376" y1="256" x2="260" y2="256"/>
-    <line x1="352" y1="312" x2="260" y2="256"/>
-    <line x1="272" y1="368" x2="260" y2="256"/>
-    <line x1="144" y1="256" x2="260" y2="256"/>
+  <desc id="desc">An unofficial adaptation of the Reticulum network mark, with its circular backdrop replaced by a two-tone C#-purple hexagon.</desc>
+  <metadata>Adapted from Reticulum artwork, Copyright (c) 2016-2026 Mark Qvist, under the Reticulum License. See ../../LICENSE and NOTICE.txt.</metadata>
+  <polygon points="256,20 460,138 460,374 256,492 52,374 52,138" fill="#9b4f96"/>
+  <polygon points="52,374 460,138 460,374 256,492" fill="#68217a"/>
+  <g stroke="#ffffff" stroke-width="8" stroke-linecap="round">
+    <line x1="187" y1="94" x2="211" y2="143"/>
+    <line x1="211" y1="143" x2="146" y2="193"/>
+    <line x1="211" y1="143" x2="211" y2="258"/>
+    <line x1="211" y1="258" x2="79" y2="437"/>
+    <line x1="235" y1="258" x2="467" y2="256"/>
+    <line x1="79" y1="437" x2="238" y2="376"/>
+    <line x1="238" y1="376" x2="302" y2="403"/>
+    <line x1="302" y1="403" x2="339" y2="359"/>
+    <line x1="339" y1="359" x2="467" y2="256"/>
   </g>
-  <g stroke="#9b85ff" stroke-width="12" stroke-linecap="round">
-    <line x1="144" y1="144" x2="144" y2="256"/>
-    <line x1="144" y1="256" x2="144" y2="368"/>
-    <line x1="144" y1="144" x2="272" y2="144"/>
-    <line x1="144" y1="368" x2="272" y2="368"/>
+  <g stroke="#000000" stroke-width="3" stroke-linecap="round">
+    <line x1="187" y1="94" x2="211" y2="143"/>
+    <line x1="211" y1="143" x2="146" y2="193"/>
+    <line x1="211" y1="143" x2="211" y2="258"/>
+    <line x1="211" y1="258" x2="79" y2="437"/>
+    <line x1="235" y1="258" x2="467" y2="256"/>
+    <line x1="79" y1="437" x2="238" y2="376"/>
+    <line x1="238" y1="376" x2="302" y2="403"/>
+    <line x1="302" y1="403" x2="339" y2="359"/>
+    <line x1="339" y1="359" x2="467" y2="256"/>
   </g>
-  <g stroke="#68a6ff" stroke-width="12" stroke-linecap="round">
-    <line x1="272" y1="144" x2="352" y2="200"/>
-    <line x1="352" y1="200" x2="376" y2="256"/>
-    <line x1="376" y1="256" x2="352" y2="312"/>
-    <line x1="352" y1="312" x2="272" y2="368"/>
+  <g fill="#000000" stroke="#ffffff" stroke-width="2.5">
+    <circle cx="187" cy="94" r="11"/>
+    <circle cx="211" cy="143" r="11"/>
+    <circle cx="146" cy="193" r="13"/>
+    <circle cx="211" cy="258" r="27"/>
+    <circle cx="235" cy="258" r="16"/>
+    <circle cx="79" cy="437" r="20"/>
+    <circle cx="238" cy="376" r="21"/>
+    <circle cx="302" cy="403" r="21"/>
+    <circle cx="339" cy="359" r="13"/>
+    <circle cx="467" cy="256" r="20"/>
   </g>
-  <g fill="#b5a2ff">
-    <circle cx="144" cy="144" r="20"/>
-    <circle cx="144" cy="256" r="20"/>
-    <circle cx="144" cy="368" r="20"/>
-    <circle cx="272" cy="144" r="18"/>
-    <circle cx="272" cy="368" r="18"/>
+  <g fill="none" stroke="#000000" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter">
+    <polyline points="250,216 250,164 282,164 289,171 289,183 282,190 250,190"/>
+    <polyline points="265,190 289,216"/>
+    <polyline points="308,216 308,164 346,216 346,164"/>
+    <polyline points="403,171 396,164 372,164 365,171 365,181 403,200 403,209 396,216 372,216 365,209"/>
   </g>
-  <g fill="#80bdff">
-    <circle cx="352" cy="200" r="17"/>
-    <circle cx="376" cy="256" r="20"/>
-    <circle cx="352" cy="312" r="17"/>
-  </g>
-  <circle cx="260" cy="256" r="19" fill="#e2e6ff"/>
 </svg>
