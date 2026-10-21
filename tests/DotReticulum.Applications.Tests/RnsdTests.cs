@@ -103,6 +103,19 @@ public class RnsdAppTests : IDisposable
         }
     }
 
+    private static async Task<Packet> ReceiveAnnounceAsync(TcpClientPacketInterface client, byte[]? destinationHash, CancellationToken cancellationToken)
+    {
+        await foreach (var raw in client.ReceiveAsync(cancellationToken))
+        {
+            if (Packet.TryParse(raw, out var packet)
+                && packet.PacketType == PacketType.Announce
+                && (destinationHash is null || packet.DestinationHash.Span.SequenceEqual(destinationHash)))
+                return packet;
+        }
+
+        throw new EndOfStreamException("TCP client disconnected before receiving the announce.");
+    }
+
     [Fact]
     public async Task Help_PrintsUsageAndExitsZero()
     {
@@ -143,20 +156,24 @@ public class RnsdAppTests : IDisposable
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
         await using var a = await ConnectAsync(port, deadline);
         await using var b = await ConnectAsync(port, deadline);
-        await Task.Delay(300);
+
+        using var receiveCts = new CancellationTokenSource(deadline - DateTime.UtcNow);
+        using var readinessIdentity = Identity.Generate();
+        var readiness = ReceiveAnnounceAsync(a, null, receiveCts.Token);
+        for (var attempt = 0; !readiness.IsCompleted; attempt++)
+        {
+            var probe = Destination.Create(DestinationType.Single, "dotreticulum", ["tests", "rnsd", $"ready-{attempt}"], readinessIdentity);
+            await b.SendAsync(Announce.Create(readinessIdentity, probe).ToArray(), receiveCts.Token);
+            await Task.WhenAny(readiness, Task.Delay(TimeSpan.FromMilliseconds(100), receiveCts.Token));
+        }
+        _ = await readiness;
 
         var identity = Identity.Generate();
         var destination = Destination.Create(DestinationType.Single, "dotreticulum", ["tests", "rnsd"], identity);
-        await a.SendAsync(Announce.Create(identity, destination).ToArray(), CancellationToken.None);
+        var receive = ReceiveAnnounceAsync(b, destination.Hash, receiveCts.Token);
+        await a.SendAsync(Announce.Create(identity, destination).ToArray(), receiveCts.Token);
 
-        using var receiveCts = new CancellationTokenSource(deadline - DateTime.UtcNow);
-        Packet? relayed = null;
-        await foreach (var raw in b.ReceiveAsync(receiveCts.Token))
-        {
-            if (Packet.TryParse(raw, out var packet) && packet.PacketType == PacketType.Announce) { relayed = packet; break; }
-        }
-
-        Assert.NotNull(relayed);
+        var relayed = await receive;
         Assert.Equal(destination.Hash, relayed.DestinationHash.ToArray());
         Assert.Equal(HeaderType.Header2, relayed.HeaderType);
 

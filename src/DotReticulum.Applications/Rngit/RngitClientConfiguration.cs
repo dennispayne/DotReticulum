@@ -71,25 +71,7 @@ public sealed class RngitClientConfiguration
     }
 
     /// <summary>Uses raw upstream identity files; Unix creation is owner-only, Windows inherits directory ACLs.</summary>
-    public Identity LoadOrCreateIdentity()
-    {
-        if (!File.Exists(IdentityPath))
-        {
-            using var generated = Identity.Generate();
-            PublishNew(IdentityPath, path => IdentityFile.SaveNew(generated, path));
-        }
-        using var stream = File.OpenRead(IdentityPath);
-        if (stream.Length != Identity.KeySize)
-            throw new InvalidDataException($"Identity file must be exactly {Identity.KeySize} bytes.");
-        var key = new byte[Identity.KeySize];
-        try
-        {
-            stream.ReadExactly(key);
-            if (stream.ReadByte() != -1) throw new InvalidDataException("Identity file changed while being read.");
-            return Identity.FromPrivateKey(key);
-        }
-        finally { CryptographicOperations.ZeroMemory(key); }
-    }
+    public Identity LoadOrCreateIdentity() => RngitIdentityFile.LoadOrCreate(IdentityPath);
 
     private static void PublishNew(string destination, Action<string> write)
     {

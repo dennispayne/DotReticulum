@@ -1,7 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Security.Cryptography;
 using System.Text;
 using DotReticulum.Core;
 
@@ -196,21 +195,7 @@ public sealed class RngitHostConfiguration
     {
         if (OperatingSystem.IsWindows())
             diagnostic?.Invoke($"Identity '{IdentityPath}' inherits directory ACLs on Windows; protect the configuration directory.");
-        if (!File.Exists(IdentityPath))
-        {
-            using var generated = Identity.Generate();
-            PublishNew(IdentityPath, staging => IdentityFile.SaveNew(generated, staging));
-        }
-        using var stream = File.OpenRead(IdentityPath);
-        if (stream.Length != Identity.KeySize) throw new InvalidDataException("Identity file must be exactly 64 bytes.");
-        var key = new byte[Identity.KeySize];
-        try
-        {
-            stream.ReadExactly(key);
-            if (stream.ReadByte() != -1) throw new InvalidDataException("Identity file changed while reading.");
-            return Identity.FromPrivateKey(key);
-        }
-        finally { CryptographicOperations.ZeroMemory(key); }
+        return RngitIdentityFile.LoadOrCreate(IdentityPath);
     }
 
     private static void PublishNew(string destination, Action<string> write)

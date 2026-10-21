@@ -6,6 +6,48 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
+### Parity 2 push-readiness regression fixes (2026-10-20)
+
+Resolved two nondeterministic Windows test failures found during push-readiness
+verification. Concurrent `RngitClientConfiguration.LoadOrCreateIdentity`
+callers could contend while opening the newly atomically published identity;
+the `File.OpenRead` sharing violation occurred at that read, not while writing.
+Client and host identity loading now share one process-wide gate around
+first-publication and validation, while retaining unique staging files and
+no-overwrite atomic publication. Existing corrupt-file rejection and Unix
+owner-only creation behavior are unchanged.
+
+The `rnsd` relay test no longer assumes a fixed 300 ms is enough for both
+accepted TCP children to be adopted by the router. It waits for an actual
+announce to cross from the second client to the first, using fresh probe
+destinations until that round-trip readiness evidence exists, then verifies
+the original announce relay and graceful shutdown.
+
+Verification after the fixes:
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: passed, zero
+  warnings/errors.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet`:
+  **613 passed, 50 skipped, 0 failed** (Applications 310/23 skipped;
+  Core 77; Crypto 47; Interfaces 55/7 skipped; LXMF 27/8 skipped;
+  Transport 97/12 skipped).
+- `ConcurrentCreatorsConvergeOnOneCompleteIdentity`: **70/70** repeated
+  passes, including 20 concurrent repetitions alongside the relay regression.
+- `Run_RelaysAnnouncesBetweenClients_ShutsDownGracefully_AndPersistsIdentity`:
+  **50/50** repeated passes, including 20 concurrent repetitions alongside
+  the identity regression.
+- `dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj
+  -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true
+  -p:IlcTreatWarningsAsErrors=true`: NativeAOT succeeded with zero
+  warnings/errors; the published executable's `--help` smoke test passed.
+- `pwsh -NoProfile -File tests\run-pester.ps1 -Application <published exe>
+  -GitHosting`: **29 passed, 18 skipped, 0 failed**. Skips require the
+  separately provisioned pinned Python reference or optional FFmpeg backend.
+
+The recorded Parity 2 live Python/native interop, full hosting Pester,
+coverage and feature-flow evidence above remains unchanged; no new live
+reference run was needed for these synchronization and test-readiness changes.
+
 ### Parity 2 repository hosting, collaboration, presentation and signing (2026-10-19)
 
 This milestone supersedes the **missing hosting, administration, lifecycle,
