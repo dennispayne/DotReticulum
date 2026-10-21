@@ -19,6 +19,12 @@ $containers = @(New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Cover
 if (!$ToolingOnly) {
     $resolved = (Resolve-Path -LiteralPath $Application).Path
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Cli.Tests.ps1') -Data @{ Application = $resolved }
+    $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity3Configuration.Tests.ps1') -Data @{ Application = $resolved }
+    $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\SharedRuntime.Tests.ps1') -Data @{
+        Application = $resolved
+        Python = $Python
+        Upstream = $Upstream
+    }
     if ($GitHosting) {
         $presentationProject = Join-Path $PSScriptRoot 'Fixtures\RngitPresentationBackend\RngitPresentationBackend.csproj'
         & dotnet build $presentationProject -c Release --nologo -v quiet

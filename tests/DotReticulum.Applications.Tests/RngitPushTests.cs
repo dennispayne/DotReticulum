@@ -108,10 +108,12 @@ public sealed class RngitPushTests
             var config = Directory.CreateDirectory(Path.Combine(root, "client")).FullName;
             await File.WriteAllTextAsync(Path.Combine(config, "config"), $"""
                 [reticulum]
+                  share_instance = no
                   enable_transport = no
                 [interfaces]
                   [[Python]]
                     type = TCPClientInterface
+                    enabled = yes
                     target_host = 127.0.0.1
                     target_port = {port}
                 """, stop);

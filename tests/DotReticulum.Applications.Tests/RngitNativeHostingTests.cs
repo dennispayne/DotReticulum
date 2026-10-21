@@ -54,10 +54,12 @@ public sealed class RngitNativeHostingTests
         var serverNetwork = Directory.CreateDirectory(Path.Combine(fixture.Root, "server-network")).FullName;
         await File.WriteAllTextAsync(Path.Combine(serverNetwork, "config"), $"""
             [reticulum]
+              share_instance = no
             enable_transport = no
             [interfaces]
             [[Owned native server]]
             type = TCPServerInterface
+            enabled = yes
             listen_ip = 127.0.0.1
             listen_port = {port}
             """);
@@ -86,10 +88,12 @@ public sealed class RngitNativeHostingTests
         }
         await using var node = ReticulumNode.Create(RnsdConfigParser.Parse($"""
             [reticulum]
+              share_instance = no
             enable_transport = no
             [interfaces]
             [[Owned native host]]
             type = TCPClientInterface
+            enabled = yes
             target_host = 127.0.0.1
             target_port = {port}
             """), Path.Combine(fixture.Root, "managed-client"));

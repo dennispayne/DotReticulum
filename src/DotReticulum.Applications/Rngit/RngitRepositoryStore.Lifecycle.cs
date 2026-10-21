@@ -91,7 +91,7 @@ public sealed partial class RngitRepositoryStore
             token.ThrowIfCancellationRequested();
             PublishAllowed(target + ".allowed", "adm:" + caller.HexHash);
             allowedPublished = true;
-            Directory.Move(staging, target);
+            await Runtime.FileSystemSharingRetry.ExecuteAsync(() => Directory.Move(staging, target), token).ConfigureAwait(false);
             published = true;
             lock (gate) repositories.Add(repository, new(group, name, target));
             return Status(0);

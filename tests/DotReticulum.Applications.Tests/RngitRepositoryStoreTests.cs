@@ -42,7 +42,13 @@ public sealed partial class RngitRepositoryStoreTests : IDisposable
     private static Dictionary<object, object?> Perms(string scope, bool group, string step, object? content = null) =>
         new() { [group ? 2 : 0] = scope, ["operation"] = group ? "gperms" : "rperms", ["step"] = step, ["content"] = content };
     private static byte[] Bytes(object? value) => Assert.IsType<byte[]>(value);
-    private static void Success(object? value) => Assert.Equal(new byte[] { 0 }, Bytes(value));
+    private void Success(object? value)
+    {
+        var bytes = Bytes(value);
+        Assert.True(bytes.AsSpan().SequenceEqual(new byte[] { 0 }),
+            (bytes.Length > 1 ? System.Text.Encoding.UTF8.GetString(bytes.AsSpan(1)) : Convert.ToHexString(bytes))
+            + Environment.NewLine + string.Join(Environment.NewLine, diagnostics));
+    }
 
     [Fact]
     public async Task ActualUpstreamHandlerResponsesMatchExactly()

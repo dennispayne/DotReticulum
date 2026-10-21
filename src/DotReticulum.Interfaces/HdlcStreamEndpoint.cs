@@ -14,14 +14,25 @@ internal sealed class HdlcStreamEndpoint : IAsyncDisposable
     private readonly CancellationTokenSource _disposeCts = new();
     private int _disposed;
     private int _receiving;
+    private long _receivedBytes;
+    private long _sentBytes;
+    private int _receiveEnded;
+    private readonly Action<int>? _received;
+    private readonly Action<int>? _sent;
 
-    public HdlcStreamEndpoint(Stream stream, IDisposable? owner = null)
+    public long ReceivedBytes => Interlocked.Read(ref _receivedBytes);
+    public long SentBytes => Interlocked.Read(ref _sentBytes);
+
+    public HdlcStreamEndpoint(Stream stream, IDisposable? owner = null, Action<int>? received = null, Action<int>? sent = null)
     {
         _stream = stream;
         _owner = owner;
+        _received = received;
+        _sent = sent;
     }
 
     public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+    public bool IsConnected => !IsDisposed && Volatile.Read(ref _receiveEnded) == 0;
 
     public CancellationToken DisposedToken => _disposeCts.Token;
 
@@ -36,7 +47,16 @@ internal sealed class HdlcStreamEndpoint : IAsyncDisposable
             throw new InvalidOperationException("ReceiveAsync supports a single enumerator.");
         }
 
-        return ReceiveCoreAsync(cancellationToken);
+        return ReceiveTrackedAsync(cancellationToken);
+    }
+
+    private async IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveTrackedAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (var packet in ReceiveCoreAsync(cancellationToken).ConfigureAwait(false)) yield return packet;
+        }
+        finally { Volatile.Write(ref _receiveEnded, 1); }
     }
 
     private async IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveCoreAsync([EnumeratorCancellation] CancellationToken cancellationToken)
@@ -65,6 +85,8 @@ internal sealed class HdlcStreamEndpoint : IAsyncDisposable
             _decoder.Feed(buffer.AsSpan(0, read), frames);
             foreach (var frame in frames)
             {
+                Interlocked.Add(ref _receivedBytes, frame.Length);
+                _received?.Invoke(frame.Length);
                 yield return frame;
             }
         }
@@ -80,6 +102,8 @@ internal sealed class HdlcStreamEndpoint : IAsyncDisposable
         {
             await _stream.WriteAsync(framed, linked.Token).ConfigureAwait(false);
             await _stream.FlushAsync(linked.Token).ConfigureAwait(false);
+            Interlocked.Add(ref _sentBytes, framed.Length);
+            _sent?.Invoke(framed.Length);
         }
         catch (OperationCanceledException) when (IsDisposed && !cancellationToken.IsCancellationRequested)
         {

@@ -1,0 +1,102 @@
+{
+  "upstreamRevision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "sourceSha256": {
+    "RNS/Reticulum.py": "c655675a799413d9bb11d44ab90d56bc1f4fe339fee1ee5d108754dc8bf812d7",
+    "RNS/__init__.py": "217d8cd060844475acb692f869c9eb1e051ce5b800d3f23479d562e37f048f33",
+    "RNS/Utilities/rnsd.py": "e8920d1acde17e09b0aad57651348e86aabc84fbb29a531c340b7365d220e748",
+    "RNS/vendor/configobj.py": "fb7036cfe845a256889752ac5839d7e8dce3356eef9c7b440a92a646be4bec8e",
+    "RNS/Interfaces/TCPInterface.py": "d9a4fcaf6e76a9dcb810d335850ab0398d21054848fd84766a62f687a9ec942d",
+    "RNS/Interfaces/UDPInterface.py": "575d1137716139b238649ae5b35a0f66a6a25a8661bc919f5226942df79f4fa5"
+  },
+  "importedRns": "RNS\\__init__.py",
+  "rnsVersion": "1.5.7",
+  "method": "ConfigObj + Reticulum._synthesize_interface (absent FixtureOnlyInterface, no interface I/O) + RNS.log",
+  "quotedText": "name = \"a # b, c\" # trailing\nsources = \"aa\", 'bb,cc', dd,\n",
+  "quoted": {
+    "name": "a # b, c",
+    "sources": [
+      "aa",
+      "bb,cc",
+      "dd"
+    ]
+  },
+  "cases": [
+    {
+      "settings": "",
+      "enabled": false,
+      "mode": null
+    },
+    {
+      "settings": "enabled=no",
+      "enabled": false,
+      "mode": null
+    },
+    {
+      "settings": "enabled=yes",
+      "enabled": true,
+      "mode": 1
+    },
+    {
+      "settings": "interface_enabled=yes",
+      "enabled": true,
+      "mode": 1
+    },
+    {
+      "settings": "enabled=no\ninterface_enabled=yes",
+      "enabled": true,
+      "mode": 1
+    },
+    {
+      "settings": "enabled=yes\ninterface_enabled=no",
+      "enabled": true,
+      "mode": 1
+    },
+    {
+      "settings": "enabled=yes\nmode=ptp",
+      "enabled": true,
+      "mode": 2
+    },
+    {
+      "settings": "enabled=yes\nmode=pointtopoint",
+      "enabled": true,
+      "mode": 2
+    },
+    {
+      "settings": "enabled=yes\ninterface_mode=accesspoint\nmode=roaming",
+      "enabled": true,
+      "mode": 3
+    },
+    {
+      "settings": "enabled=yes\nmode=gateway",
+      "enabled": true,
+      "mode": 6
+    },
+    {
+      "settings": "enabled=yes\nmode=internal",
+      "enabled": true,
+      "mode": 7
+    },
+    {
+      "settings": "enabled=yes\nmode=roaming",
+      "enabled": true,
+      "mode": 4
+    },
+    {
+      "settings": "enabled=yes\nmode=boundary",
+      "enabled": true,
+      "mode": 5
+    }
+  ],
+  "logLines": [
+    "[Critical] fixture",
+    "[Error]    fixture",
+    "[Warning]  fixture",
+    "[Notice]   fixture",
+    "[Info]     fixture",
+    "[Verbose]  fixture",
+    "[Debug]    fixture",
+    "[Pathing]  fixture",
+    "[Extra]    fixture"
+  ],
+  "logMaximumFileSize": 5242880
+}

@@ -31,10 +31,12 @@ public sealed class LiveMixedTransportTests(ITestOutputHelper output)
         var pythonPort = Port();
         var config = RnsdConfigParser.Parse($"""
             [reticulum]
+              share_instance = no
               enable_transport = yes
             [interfaces]
               [[Server]]
                 type = TCPServerInterface
+                enabled = yes
                 mode = gateway
                 listen_ip = 127.0.0.1
                 listen_port = {port}

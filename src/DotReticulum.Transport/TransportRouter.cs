@@ -51,6 +51,9 @@ public sealed class TransportRouterOptions
     public TimeSpan CullInterval { get; init; } = TimeSpan.FromSeconds(5);
 
     public TimeProvider? TimeProvider { get; init; }
+
+    /// <summary>Runtime blackhole policy, evaluated using the authenticated identity hash.</summary>
+    public Func<byte[], bool>? IsIdentityBlocked { get; init; }
 }
 
 /// <summary>A destination hosted by this node. Delivery of packets addressed to it goes to <see cref="PacketReceived"/>.</summary>
@@ -120,7 +123,7 @@ public sealed class LocalDestination(Identity identity, Destination destination)
 /// the link table (link requests forwarded as transport, link proofs validated and relayed, link-addressed packets relayed) and delivery of link
 /// traffic to the <see cref="LinkManager"/> (<see cref="Links"/>).
 /// </summary>
-public sealed partial class TransportRouter
+public sealed partial class TransportRouter : IAsyncDisposable
 {
     public static readonly byte[] PathRequestHash = Destination.Create(DestinationType.Plain, "rnstransport", ["path", "request"]).Hash;
 
@@ -137,12 +140,17 @@ public sealed partial class TransportRouter
     private HashSet<string> _hashesPrev = [];
     private HashSet<string> _tags = [];
     private HashSet<string> _tagsPrev = [];
+    private CancellationTokenSource? _runCancellation;
+    private TaskCompletionSource? _runCompletion;
+    private volatile bool _disposed;
+    private readonly bool _ownsTransportIdentity;
 
     public TransportRouter(PacketInterfaceManager manager, TransportRouterOptions? options = null)
     {
         _manager = manager ?? throw new ArgumentNullException(nameof(manager));
         _options = options ?? new TransportRouterOptions();
         _time = _options.TimeProvider ?? TimeProvider.System;
+        _ownsTransportIdentity = _options.TransportIdentity is null;
         TransportIdentity = _options.TransportIdentity ?? Identity.Generate();
         Engine = new AnnounceEngine(new AnnounceEngineOptions
         {
@@ -168,6 +176,27 @@ public sealed partial class TransportRouter
     }
 
     public bool TransportEnabled => _options.TransportEnabled;
+
+    public bool IsIdentityBlocked(byte[] identityHash) => _options.IsIdentityBlocked?.Invoke(identityHash) == true;
+
+    /// <summary>Releases routing state and local links that depended on a detached interface or child peer.</summary>
+    public void DetachInterface(IPacketInterface iface)
+    {
+        ArgumentNullException.ThrowIfNull(iface);
+        if (IsSharedClient) SharedConnectionDisappeared();
+        var affectedLinks = Links.Links.Where(link => ReferenceEquals(link.AttachedInterface, iface)
+            || (link.AttachedInterface is null && ReferenceEquals(Engine.GetPath(link.DestinationHash)?.Interface, iface))).ToArray();
+        Engine.CullPaths(source => ReferenceEquals(source, iface) ? null : TimeSpan.MaxValue);
+        lock (_gate)
+        {
+            _modes.Remove(iface);
+            _localClientInterfaces.Remove(iface);
+            foreach (var key in _reverse.Where(kv => ReferenceEquals(kv.Value.Received, iface) || ReferenceEquals(kv.Value.Outbound, iface)).Select(kv => kv.Key).ToArray()) _reverse.Remove(key);
+            foreach (var key in _linkTable.Where(kv => ReferenceEquals(kv.Value.ReceivedInterface, iface) || ReferenceEquals(kv.Value.NextHopInterface, iface)).Select(kv => kv.Key).ToArray()) _linkTable.Remove(key);
+            foreach (var entry in _discovery.Values) entry.Interfaces.Remove(iface);
+        }
+        foreach (var link in affectedLinks) link.Teardown();
+    }
 
     /// <summary>Optional diagnostic sink (one line per event).</summary>
     public Action<string>? Log
@@ -214,43 +243,102 @@ public sealed partial class TransportRouter
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var timers = Task.WhenAll(AnnounceLoopAsync(linked.Token), CullLoopAsync(linked.Token));
+        TaskCompletionSource completion;
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_runCancellation is not null) throw new InvalidOperationException("The router is already running.");
+            _runCancellation = linked;
+            _runCompletion = completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+        Task[] workers = [];
         try
         {
-            await foreach (var received in _manager.ReceiveWithSourceAsync(linked.Token).ConfigureAwait(false))
-            {
-                try { await HandleAsync(received, linked.Token).ConfigureAwait(false); }
-                catch (OperationCanceledException) when (linked.IsCancellationRequested) { throw; }
-                catch (Exception ex) { Log?.Invoke($"Error while processing a packet: {ex.Message}"); }
-            }
+            workers = [AnnounceLoopAsync(linked.Token), CullLoopAsync(linked.Token), ReceiveLoopAsync(linked.Token)];
+            await await Task.WhenAny(workers).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (linked.IsCancellationRequested)
         {
         }
         finally
         {
-            await linked.CancelAsync().ConfigureAwait(false);
-            try { await timers.ConfigureAwait(false); }
-            catch (OperationCanceledException) { }
-            await Links.StopAsync().ConfigureAwait(false);
+            try
+            {
+                await linked.CancelAsync().ConfigureAwait(false);
+                try { await Task.WhenAll(workers).ConfigureAwait(false); }
+                catch (OperationCanceledException) { }
+            }
+            finally
+            {
+                try { await Links.StopAsync().ConfigureAwait(false); }
+                finally
+                {
+                    FailReceipts();
+                    lock (_gate)
+                    {
+                        _runCancellation = null;
+                        completion.TrySetResult();
+                    }
+                }
+            }
+        }
+    }
+
+    private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
+    {
+        await foreach (var received in _manager.ReceiveWithSourceAsync(cancellationToken).ConfigureAwait(false))
+        {
+            try { await HandleAsync(received, cancellationToken).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+            catch (Exception ex) { Log?.Invoke($"Error while processing a packet: {ex.Message}"); }
+        }
+    }
+
+    /// <summary>Stops the current dispatcher and links. The externally owned interface manager is not disposed; RunAsync can be called again.</summary>
+    public async Task StopAsync()
+    {
+        Task? completion;
+        lock (_gate)
+        {
+            _runCancellation?.Cancel();
+            completion = _runCompletion?.Task;
+        }
+        if (completion is not null) await completion.ConfigureAwait(false);
+        await Links.StopAsync().ConfigureAwait(false);
+        FailReceipts();
+    }
+
+    /// <summary>Terminal router cleanup. The constructor-supplied interface manager remains owned by the caller.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        lock (_gate) _disposed = true;
+        try { await StopAsync().ConfigureAwait(false); }
+        finally
+        {
+            try { await Links.DisposeAsync().ConfigureAwait(false); }
+            finally { if (_ownsTransportIdentity) TransportIdentity.Dispose(); }
         }
     }
 
     /// <summary>Processes one received packet (the receive loop calls this; exposed for deterministic tests).</summary>
     public async ValueTask HandleAsync(ReceivedPacket received, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         var packet = received.Packet;
         if (!Filter(packet)) return;
-        var linkAddressed = _options.TransportEnabled && IsLinkTableTraffic(packet);
+        var fromLocalClient = IsLocalClientInterface(received.Source);
+        var canRelayLinks = _options.TransportEnabled || HasLocalClients;
+        var linkAddressed = canRelayLinks && IsLinkTableTraffic(packet);
         if (!linkAddressed && (packet.Context != 0xFF || packet.PacketType != PacketType.Proof)) RememberHash(packet);
 
         if (packet.PacketType == PacketType.Announce)
         {
-            HandleAnnounce(received);
+            if (HandleAnnounce(received))
+                await RelaySharedAnnounceAsync(received, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        var hops = packet.Hops + 1;
+        var hops = packet.Hops + InboundHopIncrement(received.Source);
         if (hops >= Packet.HopLimit) return;
 
         if (linkAddressed)
@@ -261,7 +349,7 @@ public sealed partial class TransportRouter
 
         if (packet.PacketType == PacketType.Proof && packet.Context == LinkContext.LrProof)
         {
-            if (_options.TransportEnabled && HasLinkEntry(packet.DestinationHash.Span))
+            if (canRelayLinks && HasLinkEntry(packet.DestinationHash.Span))
             {
                 await RelayLinkProofAsync(received, (byte)hops, cancellationToken).ConfigureAwait(false);
             }
@@ -273,9 +361,19 @@ public sealed partial class TransportRouter
             return;
         }
 
-        if (_options.TransportEnabled && packet.HeaderType == HeaderType.Header2)
+        var forLocalClient = Engine.GetPath(packet.DestinationHash.Span)?.Interface is { } destinationInterface && IsLocalClientInterface(destinationInterface);
+        if ((!IsSharedClient && _options.TransportEnabled && packet.HeaderType == HeaderType.Header2)
+            || (packet.DestinationType == DestinationType.Single && (fromLocalClient || forLocalClient)
+                && Engine.GetPath(packet.DestinationHash.Span) is not null))
         {
-            await ForwardAsync(received, (byte)hops, cancellationToken).ConfigureAwait(false);
+            var routed = received;
+            if (packet.HeaderType == HeaderType.Header1)
+            {
+                var transported = Packet.Create(packet.PacketType, packet.DestinationType, packet.DestinationHash, packet.Payload,
+                    packet.Context, HeaderType.Header2, TransportId, TransportType.Transport, packet.ContextFlag, packet.Hops, packet.ReservedBit);
+                routed = new ReceivedPacket(transported.ToArray(), transported, received.Source);
+            }
+            await ForwardAsync(routed, (byte)hops, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -296,6 +394,10 @@ public sealed partial class TransportRouter
                     return;
                 }
 
+                if (packet.DestinationType == DestinationType.Plain)
+                    await RelaySharedPlainAsync(received, cancellationToken).ConfigureAwait(false);
+                else if (fromLocalClient && packet.DestinationType == DestinationType.Single)
+                    await RelayUnknownLocalPacketAsync(received, cancellationToken).ConfigureAwait(false);
                 await DeliverLocalAsync(received).ConfigureAwait(false);
                 break;
             case PacketType.Proof when packet.Context != 0xFF:
@@ -313,6 +415,7 @@ public sealed partial class TransportRouter
     /// </summary>
     public async ValueTask SendAsync(Packet packet, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(packet);
         if (packet.PacketType != PacketType.Announce && packet.DestinationType is DestinationType.Single or DestinationType.Link
             && packet.HeaderType == HeaderType.Header1 && Engine.GetPath(packet.DestinationHash.Span) is { Interface: { } iface } path && _manager.Contains(iface))
@@ -334,6 +437,7 @@ public sealed partial class TransportRouter
     /// <summary>Announces a local destination on every interface (or only <paramref name="onlyOn"/>), optionally as a path response.</summary>
     public async ValueTask AnnounceAsync(LocalDestination destination, IPacketInterface? onlyOn = null, bool pathResponse = false, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(destination);
         var packet = Announce.Create(destination.Identity, destination.Destination, destination.AppData, destination.Ratchets, pathResponse);
         if (onlyOn is null) await _manager.SendAsync(packet, cancellationToken).ConfigureAwait(false);
@@ -352,7 +456,7 @@ public sealed partial class TransportRouter
 
     private bool Filter(Packet packet)
     {
-        if (packet.HeaderType == HeaderType.Header2 && packet.PacketType != PacketType.Announce
+        if (!IsSharedClient && packet.HeaderType == HeaderType.Header2 && packet.PacketType != PacketType.Announce
             && !packet.TransportId.Span.SequenceEqual(TransportId)) return false;
 
         if (packet.Context is 0xFA or 0x03 or 0x05 or 0x01 or 0x08 or 0x0E) return true;
@@ -403,17 +507,20 @@ public sealed partial class TransportRouter
         }
     }
 
-    private void HandleAnnounce(ReceivedPacket received)
+    private bool HandleAnnounce(ReceivedPacket received)
     {
-        var result = Engine.Process(received.Packet, received.Source);
+        if (Announce.TryParse(received.Packet, out var announce) && IsIdentityBlocked(Identity.TruncatedHash(announce.PublicKey))) return false;
+        var fromLocalClient = IsLocalClientInterface(received.Source);
+        var result = Engine.Process(received.Packet, received.Source, InboundHopIncrement(received.Source),
+            queueRebroadcast: !fromLocalClient && !IsSharedClient);
         if (result.Outcome is not (AnnounceOutcome.Accepted or AnnounceOutcome.AcceptedRateLimited))
         {
             if (result.Outcome == AnnounceOutcome.Invalid) Log?.Invoke($"Dropped invalid announce from {Describe(received.Source)}");
-            return;
+            return false;
         }
 
         Log?.Invoke($"Destination {Convert.ToHexStringLower(received.Packet.DestinationHash.Span)} is now {result.Hops} hops away on {Describe(received.Source)}");
-        if (!_options.TransportEnabled) return;
+        if (!_options.TransportEnabled && !fromLocalClient) return true;
 
         DiscoveryEntry? waiting;
         var key = Convert.ToHexStringLower(received.Packet.DestinationHash.Span);
@@ -422,11 +529,12 @@ public sealed partial class TransportRouter
             _discovery.Remove(key, out waiting);
         }
 
-        if (waiting is null) return;
+        if (waiting is null) return true;
         foreach (var target in waiting.Interfaces)
         {
             if (_manager.Contains(target)) Engine.QueuePathResponse(received.Packet.DestinationHash.Span, target, TimeSpan.Zero);
         }
+        return true;
     }
 
     private async ValueTask ForwardAsync(ReceivedPacket received, byte hops, CancellationToken cancellationToken)
@@ -600,7 +708,7 @@ public sealed partial class TransportRouter
 
     private async ValueTask<bool> RouteProofAsync(ReceivedPacket received, byte hops, CancellationToken cancellationToken)
     {
-        if (!_options.TransportEnabled) return false;
+        if (!_options.TransportEnabled && !HasLocalClients) return false;
         var key = Convert.ToHexStringLower(received.Packet.DestinationHash.Span);
         ReverseEntry? entry;
         lock (_gate)
@@ -666,11 +774,13 @@ public sealed partial class TransportRouter
             return;
         }
 
-        if (!_options.TransportEnabled) return;
-
         var path = Engine.GetPath(destination);
+        var fromLocalClient = IsLocalClientInterface(attached);
+        var forLocalClient = path?.Interface is { } pathInterface && IsLocalClientInterface(pathInterface);
+        if (!_options.TransportEnabled && !fromLocalClient && !forLocalClient && !HasLocalClients) return;
         if (path is not null)
         {
+            if (!_options.TransportEnabled && !fromLocalClient && !forLocalClient) return;
             if (mode == InterfaceMode.Roaming && ReferenceEquals(path.Interface, attached)) return;
             if (requestor is not null && Engine.GetNextHop(destination) is { } nextHop && nextHop.AsSpan().SequenceEqual(requestor)) return;
             var delay = _options.PathRequestGrace + (mode == InterfaceMode.Roaming ? _options.RoamingGrace : TimeSpan.Zero);
@@ -678,7 +788,7 @@ public sealed partial class TransportRouter
             return;
         }
 
-        var searchModes = mode is InterfaceMode.AccessPoint or InterfaceMode.Gateway or InterfaceMode.Roaming or InterfaceMode.Internal or InterfaceMode.Boundary;
+        var searchModes = fromLocalClient || HasLocalClients || mode is InterfaceMode.AccessPoint or InterfaceMode.Gateway or InterfaceMode.Roaming or InterfaceMode.Internal or InterfaceMode.Boundary;
         if (!searchModes) return;
 
         lock (_gate)
@@ -695,6 +805,7 @@ public sealed partial class TransportRouter
         foreach (var other in _manager.Interfaces)
         {
             if (ReferenceEquals(other, attached)) continue;
+            if (!_options.TransportEnabled && !fromLocalClient && !IsLocalClientInterface(other)) continue;
             if (mode == InterfaceMode.Boundary && GetInterfaceMode(other) is not (InterfaceMode.Boundary or InterfaceMode.Gateway)) continue;
             try { await RequestPathAsync(destination, other, tag, cancellationToken).ConfigureAwait(false); }
             catch (Exception ex) when (ex is not OperationCanceledException) { Log?.Invoke($"Could not forward path request on {Describe(other)}: {ex.Message}"); }
@@ -767,14 +878,15 @@ public sealed partial class TransportRouter
             foreach (var key in _discovery.Where(kv => now > kv.Value.Timeout).Select(kv => kv.Key).ToArray()) _discovery.Remove(key);
 
             // Validated links expire after 1.25 * the stale time without traffic; unvalidated ones when the proof is overdue.
-            foreach (var key in _linkTable.Where(kv => kv.Value.Validated
+            foreach (var key in _linkTable.Where(kv => (kv.Value.Validated
                 ? now - kv.Value.Timestamp > TimeSpan.FromSeconds(Link.StaleFactor * Link.KeepaliveMax * 1.25)
-                : now > kv.Value.ProofTimeout
+                : now > kv.Value.ProofTimeout)
                     || !_manager.Contains(kv.Value.ReceivedInterface) || !_manager.Contains(kv.Value.NextHopInterface)).Select(kv => kv.Key).ToArray())
             {
                 _linkTable.Remove(key);
             }
             foreach (var iface in _modes.Keys.Where(i => !_manager.Contains(i)).ToArray()) _modes.Remove(iface);
+            _localClientInterfaces.RemoveWhere(iface => !_manager.Contains(iface));
         }
 
         ExpireReceipts();

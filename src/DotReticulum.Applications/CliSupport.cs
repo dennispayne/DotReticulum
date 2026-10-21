@@ -6,7 +6,7 @@ namespace DotReticulum.Applications;
 /// <summary>Helpers shared by the command line front ends (rncp, rnx, telemetry, lxmf).</summary>
 internal static class CliSupport
 {
-    private static readonly string[] LevelNames = ["CRITICAL", "ERROR", "WARNING", "NOTICE", "INFO", "VERBOSE", "DEBUG", "EXTREME"];
+    private static readonly string[] LevelNames = ["CRITICAL", "ERROR", "WARNING", "NOTICE", "INFO", "VERBOSE", "DEBUG", "PATHING", "EXTREME"];
 
     public const int HashHexLength = Identity.HashSize * 2;
 
@@ -43,11 +43,7 @@ internal static class CliSupport
     {
         if (path is null) return node.LoadOrCreateIdentity(Path.Combine("identities", name));
         path = Path.GetFullPath(path);
-        if (File.Exists(path)) return IdentityFile.Load(path);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var identity = Identity.Generate();
-        IdentityFile.SaveNew(identity, path);
-        return identity;
+        return Runtime.RuntimeStateStore.LoadOrCreateIdentity(path);
     }
 
     /// <summary>Returns a thread-safe logger writing "[time] [LEVEL] message" lines for messages up to <paramref name="level"/>.</summary>
@@ -57,7 +53,7 @@ internal static class CliSupport
         return (messageLevel, message) =>
         {
             if (messageLevel > level) return;
-            lock (gate) writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{LevelNames[Math.Clamp(messageLevel, 0, 7)]}] {message}");
+            lock (gate) writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{LevelNames[Math.Clamp(messageLevel, 0, 8)]}] {message}");
         };
     }
 

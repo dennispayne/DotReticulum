@@ -65,10 +65,12 @@ public sealed class RngitHostTests
             ["--repositories", Path.GetDirectoryName(fixture.Repository)!, "--writer", caller.HexHash, "--manage"]);
         var config = RnsdConfigParser.Parse($"""
             [reticulum]
+              share_instance = no
               enable_transport = no
             [interfaces]
               [[Pinned repository server]]
                 type = TCPClientInterface
+                enabled = yes
                 target_host = 127.0.0.1
                 target_port = {port}
             """);
@@ -140,10 +142,12 @@ public sealed class RngitHostTests
         using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         var config = RnsdConfigParser.Parse($"""
             [reticulum]
+              share_instance = no
               enable_transport = no
             [interfaces]
               [[Reference client]]
                 type = TCPServerInterface
+                enabled = yes
                 listen_ip = 127.0.0.1
                 listen_port = {port}
             """);
@@ -324,19 +328,23 @@ public sealed class RngitHostTests
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(45));
         var serverConfig = RnsdConfigParser.Parse($"""
             [reticulum]
+              share_instance = no
               enable_transport = no
             [interfaces]
               [[Loopback]]
                 type = TCPServerInterface
+                enabled = yes
                 listen_ip = 127.0.0.1
                 listen_port = {port}
             """);
         var clientConfig = RnsdConfigParser.Parse($"""
             [reticulum]
+              share_instance = no
               enable_transport = no
             [interfaces]
               [[Loopback]]
                 type = TCPClientInterface
+                enabled = yes
                 target_host = 127.0.0.1
                 target_port = {port}
             """);

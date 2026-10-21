@@ -55,19 +55,23 @@ fixtures = read:all, write:all, create:all, release:all, interact:all, propose:a
     $portProbe.Stop()
     @"
 [reticulum]
+share_instance = no
 enable_transport = no
 [interfaces]
 [[Loopback]]
 type = TCPServerInterface
+enabled = yes
 listen_ip = 127.0.0.1
 listen_port = $port
 "@ | Set-Content -LiteralPath (Join-Path $nodeConfig.FullName 'config')
     @"
 [reticulum]
+share_instance = no
 enable_transport = no
 [interfaces]
 [[Loopback]]
 type = TCPClientInterface
+enabled = yes
 target_host = 127.0.0.1
 target_port = $port
 "@ | Set-Content -LiteralPath (Join-Path $client.FullName 'config')

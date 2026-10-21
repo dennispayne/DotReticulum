@@ -13,7 +13,7 @@ namespace DotReticulum.Interfaces;
 /// spawned sub-interfaces) through <see cref="ChildConnected"/>; the server itself then neither receives nor sends, so a
 /// router can answer a client on that client only and never echo a packet back to its source.
 /// </summary>
-public sealed class TcpServerPacketInterface : ISpawningPacketInterface
+public sealed class TcpServerPacketInterface : ISpawningPacketInterface, IPacketInterfaceDiagnostics
 {
     public const int DefaultMaxClients = 64;
     private const int ReceiveQueueCapacity = 256;
@@ -30,6 +30,9 @@ public sealed class TcpServerPacketInterface : ISpawningPacketInterface
     private bool _started;
     private Task? _disposeTask;
     private int _receiving;
+    private long _rxBytes;
+    private long _txBytes;
+    private long _rejectedClients;
 
     private readonly bool _perClient;
 
@@ -51,6 +54,8 @@ public sealed class TcpServerPacketInterface : ISpawningPacketInterface
     /// <summary>Raised in per-client mode for each accepted connection; the child arrives connected and started.</summary>
     public event Action<IPacketInterface>? ChildConnected;
 
+    public bool SendsThroughChildren => _perClient;
+
     /// <summary>The bound listening endpoint (resolves an ephemeral port 0); null before start.</summary>
     public IPEndPoint? LocalEndpoint { get; private set; }
 
@@ -63,6 +68,21 @@ public sealed class TcpServerPacketInterface : ISpawningPacketInterface
                 return _clients.Count;
             }
         }
+    }
+
+    public IReadOnlyDictionary<string, object?> GetDiagnostics()
+    {
+        lock (_gate) return new Dictionary<string, object?>
+        {
+            ["rxb"] = Interlocked.Read(ref _rxBytes),
+            ["txb"] = Interlocked.Read(ref _txBytes),
+            ["clients"] = _clients.Count,
+            ["bitrate"] = 10_000_000L,
+            ["dotreticulum_bitrate_kind"] = "configured_estimate",
+            ["rejected_clients"] = _rejectedClients,
+            ["listen_address"] = LocalEndpoint?.ToString(),
+            ["status"] = _started && _disposeTask is null,
+        };
     }
 
     private sealed class Client(HdlcStreamEndpoint endpoint)
@@ -204,6 +224,7 @@ public sealed class TcpServerPacketInterface : ISpawningPacketInterface
         {
             if (_disposeTask is not null || _clients.Count >= _maxClients)
             {
+                _rejectedClients++;
                 socket.Dispose();
                 return;
             }
@@ -211,7 +232,9 @@ public sealed class TcpServerPacketInterface : ISpawningPacketInterface
             try
             {
                 socket.NoDelay = true;
-                client = new Client(new HdlcStreamEndpoint(new NetworkStream(socket, ownsSocket: true)));
+                client = new Client(new HdlcStreamEndpoint(new NetworkStream(socket, ownsSocket: true),
+                    received: length => Interlocked.Add(ref _rxBytes, length),
+                    sent: length => Interlocked.Add(ref _txBytes, length)));
             }
             catch (SocketException)
             {
@@ -229,7 +252,7 @@ public sealed class TcpServerPacketInterface : ISpawningPacketInterface
                     return;
                 }
 
-                handler(new TcpServerClientInterface(client.Endpoint, () => RemoveClientAsync(client)));
+                handler(new TcpServerClientInterface(client.Endpoint, () => RemoveClientAsync(client), socket.RemoteEndPoint!.ToString()!));
                 return;
             }
 

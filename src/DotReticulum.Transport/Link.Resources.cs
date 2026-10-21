@@ -67,7 +67,10 @@ public sealed partial class Link
         return acc;
     }
 
-    internal void ForgetSegments(byte[] originalHash) => _segments.Remove(Convert.ToHexStringLower(originalHash));
+    internal void ForgetSegments(byte[] originalHash)
+    {
+        if (_segments.Remove(Convert.ToHexStringLower(originalHash), out var accumulator)) accumulator.Data.Dispose();
+    }
 
     internal void NotifyResourceStarted(Resource resource)
     {
@@ -135,7 +138,7 @@ public sealed partial class Link
         {
             lock (_gate)
             {
-                if (r.Status == ResourceStatus.Complete)
+                if (r.Status == ResourceStatus.Complete && receipt.Status is not (RequestStatus.Ready or RequestStatus.Failed))
                 {
                     receipt.Status = RequestStatus.Delivered;
                     receipt.Deadline = Now + timeout;
@@ -168,7 +171,9 @@ public sealed partial class Link
             r.CancelLocked();
         }
 
-        _queuedResources.Clear();
+        while (_queuedResources.TryDequeue(out var queued)) queued.CancelLocked();
+        foreach (var accumulator in _segments.Values) accumulator.Data.Dispose();
+        _segments.Clear();
     }
 
     private void TickResources(double now, List<Action> after)
@@ -431,7 +436,7 @@ public sealed partial class Link
             }
             else if (MsgPack.TryUnpack(resource.Data, out var unpacked) && unpacked is object?[] { Length: >= 2 } arr && arr[0] is byte[] requestId)
             {
-                HandleResponse(requestId, arr[1]);
+                HandleResponse(requestId, arr[1], rawResponse: resource.Data);
             }
 
             return;
@@ -450,5 +455,3 @@ public sealed partial class Link
         pending?.Fail();
     }
 }
-
-

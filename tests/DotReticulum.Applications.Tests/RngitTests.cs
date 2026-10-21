@@ -77,10 +77,12 @@ public sealed class RngitTests
             var config = Path.Combine(root, "config");
             File.WriteAllText(config, $"""
                 [reticulum]
+                  share_instance = no
                   enable_transport = no
                 [interfaces]
                   [[Python rngit]]
                     type = TCPClientInterface
+                    enabled = yes
                     target_host = 127.0.0.1
                     target_port = {port}
                 """);

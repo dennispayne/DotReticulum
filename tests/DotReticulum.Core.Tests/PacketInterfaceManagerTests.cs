@@ -70,6 +70,26 @@ public class PacketInterfaceManagerTests
     private static Packet MakePacket(byte tag) =>
         Packet.Create(PacketType.Data, DestinationType.Plain, new byte[16], new byte[] { tag, 1, 2, 3 });
 
+    private sealed class BlockingStartInterface : IPacketInterface
+    {
+        public TaskCompletionSource Starting { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int Disposals;
+        public async ValueTask StartAsync(CancellationToken cancellationToken)
+        {
+            Starting.TrySetResult();
+            await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+        public IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync(CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("The cancelled interface must never receive.");
+        public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("The cancelled interface must never send.");
+        public ValueTask DisposeAsync()
+        {
+            Interlocked.Increment(ref Disposals);
+            return ValueTask.CompletedTask;
+        }
+    }
+
     private static async Task<T> Next<T>(IAsyncEnumerator<T> e)
     {
         using var cts = new CancellationTokenSource(Timeout);
@@ -441,6 +461,140 @@ public class PacketInterfaceManagerTests
         await Assert.ThrowsAsync<ArgumentException>(async () => await manager.SendToAsync(MakePacket(1), new FakeInterface()));
         await manager.SendToAsync(MakePacket(1), a);
         Assert.Single(a.Sent);
+    }
+
+    [Fact]
+    public async Task RuntimeAttachDetachKeepsOtherTrafficAndSupportsEmptyHost()
+    {
+        await using var manager = new PacketInterfaceManager([], keepAlive: true);
+        await manager.StartAsync();
+        await using var received = manager.ReceiveWithSourceAsync().GetAsyncEnumerator();
+        var a = new FakeInterface();
+        var b = new FakeInterface();
+        await manager.AttachAsync(a);
+        await manager.AttachAsync(b);
+        Assert.Equal(1, a.StartCalls);
+        Assert.True(await manager.DetachAsync(a));
+        Assert.False(await manager.DetachAsync(a));
+        Assert.Equal(1, a.DisposeCalls);
+        b.Inject(MakePacket(1).ToArray());
+        Assert.Same(b, (await Next(received)).Source);
+        await manager.DetachAsync(b);
+        var c = new FakeInterface();
+        await manager.AttachAsync(c);
+        c.Inject(MakePacket(2).ToArray());
+        Assert.Same(c, (await Next(received)).Source);
+    }
+
+    [Fact]
+    public async Task FailedRuntimeAttachCleansOnlyNewInterface()
+    {
+        var good = new FakeInterface();
+        await using var manager = new PacketInterfaceManager([good], keepAlive: true);
+        await manager.StartAsync();
+        var bad = new FakeInterface { StartFailure = new IOException("bind failed") };
+        await Assert.ThrowsAsync<IOException>(async () => await manager.AttachAsync(bad));
+        Assert.Equal(1, bad.DisposeCalls);
+        Assert.False(manager.Contains(bad));
+        Assert.True(manager.Contains(good));
+        await manager.SendAsync(MakePacket(3));
+        Assert.Single(good.Sent);
+        await Assert.ThrowsAsync<ArgumentException>(async () => await manager.AttachAsync(good));
+        Assert.Equal(0, good.DisposeCalls);
+    }
+
+    [Fact]
+    public async Task DisposalCancelsAnInFlightAttachmentAndJoinsItsCleanup()
+    {
+        var manager = new PacketInterfaceManager([], keepAlive: true);
+        await manager.StartAsync();
+        var iface = new BlockingStartInterface();
+        var attachment = manager.AttachAsync(iface).AsTask();
+        await iface.Starting.Task.WaitAsync(Timeout);
+        await manager.DisposeAsync().AsTask().WaitAsync(Timeout);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => attachment);
+        Assert.Equal(1, iface.Disposals);
+        Assert.Empty(manager.Interfaces);
+    }
+
+    [Fact]
+    public async Task DetachParentCancelsBlockedChildAndDisposesAllPeers()
+    {
+        var spawner = new FakeSpawner();
+        await using var manager = new PacketInterfaceManager([spawner], channelCapacity: 1, keepAlive: true);
+        await manager.StartAsync();
+        var child = new FakeInterface();
+        spawner.Spawn(child);
+        for (var i = 0; i < 4; i++) child.Inject(MakePacket((byte)i).ToArray());
+        await WaitUntil(() => manager.GetStatistics().Single(s => ReferenceEquals(s.Interface, child)).BackpressureWaits > 0);
+        await manager.DetachAsync(spawner).AsTask().WaitAsync(Timeout);
+        Assert.Empty(manager.Interfaces);
+        Assert.Equal(1, child.DisposeCalls);
+        var replacement = new FakeInterface();
+        await manager.AttachAsync(replacement);
+        replacement.Inject(MakePacket(9).ToArray());
+        await using var reader = manager.ReceiveWithSourceAsync().GetAsyncEnumerator();
+        Assert.Same(replacement, (await Next(reader)).Source);
+    }
+
+    [Fact]
+    public async Task StatisticsMeasurePacketsFailuresPressureAndPersistParentTotalsAfterPeerCloses()
+    {
+        var spawner = new FakeSpawner();
+        await using var manager = new PacketInterfaceManager([spawner], channelCapacity: 1, keepAlive: true);
+        await manager.StartAsync();
+        var child = new FakeInterface();
+        spawner.Spawn(child);
+        var packet = MakePacket(1);
+        var announce = Packet.Create(PacketType.Announce, DestinationType.Single, new byte[16], new byte[] { 4 });
+        child.Inject([0]);
+        child.Inject(announce.ToArray());
+        child.Inject(packet.ToArray());
+        await WaitUntil(() => manager.GetStatistics().Single(s => ReferenceEquals(s.Interface, child)).BackpressureWaits == 1);
+        Assert.Equal(1, manager.QueuedPackets);
+        Assert.Equal(1, manager.QueuePressure);
+        await using var reader = manager.ReceiveAsync().GetAsyncEnumerator();
+        Assert.Equal(PacketType.Announce, (await Next(reader)).PacketType);
+        await Next(reader);
+        await manager.SendAsync(announce);
+        child.SendFailure = new IOException("peer failed");
+        var diagnostics = new List<Exception>();
+        manager.Diagnostic += (_, error) => diagnostics.Add(error);
+        await Assert.ThrowsAsync<IOException>(async () => await manager.SendToAsync(packet, child));
+        var stats = manager.GetStatistics().Single(s => ReferenceEquals(s.Interface, child));
+        Assert.Equal(1 + announce.ToArray().Length + packet.ToArray().Length, stats.ReceivedBytes);
+        Assert.Equal(3, stats.ReceivedPackets);
+        Assert.Equal(1, stats.MalformedPackets);
+        Assert.Equal(announce.ToArray().Length, stats.ReceivedAnnounceBytes);
+        Assert.Equal(announce.ToArray().Length, stats.SentBytes);
+        Assert.Equal(1, stats.SentAnnounces);
+        Assert.Equal(1, stats.FailedSends);
+        Assert.Equal(packet.ToArray().Length, stats.FailedSendBytes);
+        Assert.Single(diagnostics);
+        child.EndStream();
+        await WaitUntil(() => !manager.Contains(child));
+        var parent = Assert.Single(manager.GetStatistics());
+        Assert.Equal(stats.ReceivedBytes, parent.ReceivedBytes);
+        Assert.Equal(stats.SentBytes, parent.SentBytes);
+        Assert.Equal(stats.FailedSends, parent.FailedSends);
+    }
+
+    [Fact]
+    public async Task ChildFailureDiagnosticsCannotBreakUnrelatedProcessing()
+    {
+        var spawner = new FakeSpawner();
+        await using var manager = new PacketInterfaceManager([spawner]);
+        await manager.StartAsync();
+        manager.Diagnostic += (_, _) => throw new InvalidOperationException("observer");
+        var good = new FakeInterface();
+        var bad = new FakeInterface();
+        spawner.Spawn(good);
+        spawner.Spawn(bad);
+        bad.Fault(new IOException("reset"));
+        await WaitUntil(() => !manager.Contains(bad));
+        good.Inject(MakePacket(5).ToArray());
+        await using var reader = manager.ReceiveAsync().GetAsyncEnumerator();
+        Assert.Equal(5, (await Next(reader)).Payload.Span[0]);
     }
 
     private static async Task WaitUntil(Func<bool> condition)

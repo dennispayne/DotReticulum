@@ -275,6 +275,14 @@ public sealed class Resource
         bool isResponse = false, int sentMetadataSize = 0, long autoCompressLimit = AutoCompressMaxSize)
     {
         ArgumentNullException.ThrowIfNull(source);
+        if (segmentIndex == 1 && callback is { } concluded)
+        {
+            var completionPosted = 0;
+            callback = resource =>
+            {
+                if (Interlocked.Exchange(ref completionPosted, 1) == 0) concluded(resource);
+            };
+        }
         var r = new Resource(link)
         {
             IsInitiator = true,
@@ -599,15 +607,15 @@ public sealed class Resource
     /// <summary>Upstream <c>validate_proof</c>.</summary>
     internal void ValidateProof(ReadOnlySpan<byte> proof)
     {
-        if (Status == ResourceStatus.Failed || proof.Length != 64 || !proof[32..].SequenceEqual(_expectedProof))
+        if (Status >= ResourceStatus.Complete || proof.Length != 64 || !proof[32..].SequenceEqual(_expectedProof))
         {
             return;
         }
 
         Status = ResourceStatus.Complete;
-        _link.ResourceConcluded(this);
         if (SegmentIndex == TotalSegments)
         {
+            _link.ResourceConcluded(this);
             var callback = Concluded;
             if (callback is not null)
             {
@@ -623,16 +631,19 @@ public sealed class Resource
         {
             if (t.IsFaulted)
             {
+                lock (_link.Gate) CancelLocked();
                 _link.Log("Preparing the next resource segment failed: " + t.Exception?.GetBaseException().Message);
                 return;
             }
 
             lock (_link.Gate)
             {
-                if (_link.Status == LinkStatus.Active)
+                _link.ResourceConcluded(this);
+                if (_link.Status == LinkStatus.Active && Status == ResourceStatus.Complete)
                 {
                     t.Result.Advertise();
                 }
+                else t.Result.CancelLocked();
             }
         }, TaskScheduler.Default);
     }
@@ -1111,7 +1122,16 @@ public sealed class Resource
 
     internal void CancelLocked()
     {
-        _nextSegment = null;
+        if (_nextSegment is { } next)
+        {
+            _nextSegment = null;
+            if (next.IsCompletedSuccessfully) next.Result.CancelLocked();
+            else _ = next.ContinueWith(t =>
+            {
+                if (t.IsCompletedSuccessfully) t.Result.Cancel();
+                else if (t.IsFaulted) _ = t.Exception;
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
         if (Status == ResourceStatus.Corrupt)
         {
             _link.CancelIncoming(this);
@@ -1122,9 +1142,14 @@ public sealed class Resource
 
             _link.Teardown();
         }
-        else if (Status < ResourceStatus.Complete)
+        else if (Status < ResourceStatus.Complete || (IsInitiator && Status == ResourceStatus.Complete && SegmentIndex < TotalSegments))
         {
             Status = ResourceStatus.Failed;
+            if (_accumulator is not null)
+            {
+                _link.ForgetSegments(OriginalHash);
+                _accumulator = null;
+            }
             if (_link.Status == LinkStatus.Active)
             {
                 _link.SendWithContext(Hash, IsInitiator ? LinkContext.ResourceIcl : LinkContext.ResourceRcl, createReceipt: false, encrypt: true);
@@ -1275,5 +1300,3 @@ public sealed class Resource
 
     public override string ToString() => $"<{Convert.ToHexStringLower(Hash)}/{_link.LinkIdHex}>";
 }
-
-

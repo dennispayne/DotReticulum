@@ -179,7 +179,8 @@ public sealed class RngitHostStatisticsTests : IDisposable
     [Fact]
     public async Task ConcurrentRecordsSnapshotsAndFlushesSurviveRestart()
     {
-        var stats = Create();
+        var errors = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        var stats = Create(errors.Enqueue);
         await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
         {
             for (var i = 0; i < 100; i++)
@@ -188,7 +189,7 @@ public sealed class RngitHostStatisticsTests : IDisposable
                 if (i % 25 == 0)
                 {
                     Assert.NotEmpty(stats.Snapshot());
-                    Assert.True(stats.Flush());
+                    Assert.True(stats.Flush(), string.Join(Environment.NewLine, errors));
                 }
             }
         })));

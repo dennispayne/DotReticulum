@@ -59,22 +59,22 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] Managed/native end-to-end acceptance of remaining Git features against the reference
     - [x] Native client/reference server and reference client/native host acceptance, plus native executable discovery and persisted-process flows
     - [x] Full regression, applicable Pester, fresh merged production coverage and warnings-as-errors NativeAOT feature execution on Windows x64
-- [ ] Parity 3 - Runtime, configuration and operations
-  - [ ] Full applicable upstream configuration/defaults and explicit diagnostics for unsupported settings
-  - [ ] Configuration discovery/default creation, nested/list/quoted settings and precedence; omitted/conflicting enable flags, mode and port aliases
-  - [ ] Shared-instance/local-client operation and management RPC semantics
-  - [ ] Authenticated local/remote management framing, required-shared/fallback behavior, instance election and daemon restart/reconnect
-  - [ ] Destination/identity usage and retain/unretain management operations
-  - [ ] Persistent identities, known destinations, ratchets, paths, tunnels and caches with restart/expiry/corruption behavior
-  - [ ] Interface attach/detach/reload, statistics, logging, housekeeping and graceful shutdown
-  - [ ] Complete per-interface/peer traffic, queue/drop/pressure/violation, PHY/device and optional profiling snapshots without synthesizing unsupported metrics
-  - [ ] Logging levels through PATHING/EXTREME, timestamp controls, file rotation, service/interactive/version modes and signal persistence
-  - [ ] Faulted-router cleanup, link/request/resource/stream settlement and explicit terminal-versus-restartable host ownership
-  - [ ] Interface discovery, advertisements, stamps, autoconnect and bootstrap behavior
-  - [ ] Discovery metadata/encryption/stamps/source policy, persisted stale/unknown/removal states and capacity/duplicate/transport eligibility
-  - [ ] Blackhole identity management, publication and update behavior
-  - [ ] Blackhole expiry/reason/source authorization, failed-source updates, persistence and endpoint/link rejection integration
-  - [ ] AOT-safe interface extension mechanism with explicit differences from Python dynamic loading
+- [x] Parity 3 - Runtime, configuration and operations
+  - [x] Full applicable upstream configuration/defaults and explicit diagnostics for unsupported settings
+  - [x] Configuration discovery/default creation, nested/list/quoted settings and precedence; omitted/conflicting enable flags, mode and port aliases
+  - [x] Shared-instance/local-client operation and management RPC semantics
+  - [x] Authenticated local/remote management framing, required-shared/fallback behavior, instance election and daemon restart/reconnect
+  - [x] Destination/identity usage and retain/unretain management operations
+  - [x] Persistent identities, known destinations, ratchets, paths and caches with restart/expiry/corruption behavior; tunnel serialization/expiry, with protocol restoration explicitly remaining in Parity 4
+  - [x] Interface attach/detach/reload, statistics, logging, housekeeping and graceful shutdown
+  - [x] Per-interface/peer traffic, queue/drop/pressure/violation, PHY/device and optional profiling snapshots, with unavailable measurements explicitly null/absent
+  - [x] Logging levels through PATHING/EXTREME, timestamp controls, file rotation, service/interactive/version modes and graceful persistence; POSIX signal execution explicitly unverified on Windows
+  - [x] Faulted-router cleanup, link/request/resource/stream settlement and explicit terminal-versus-restartable host ownership
+  - [x] Interface discovery, advertisements, stamps, bounded Backbone HDLC autoconnect and bootstrap behavior; full bearer/platform coverage remains in Parity 6
+  - [x] Discovery metadata/encryption/stamps/source policy, persisted stale/unknown/removal states and capacity/duplicate/transport eligibility
+  - [x] Blackhole identity management, publication and update behavior
+  - [x] Blackhole expiry/reason/source authorization, failed-source updates, persistence and identified endpoint/link rejection integration
+  - [x] AOT-safe interface extension mechanism with explicit differences from Python dynamic loading
 - [ ] Parity 4 - Transport and interface-control fidelity
   - [ ] Complete interface modes, routing/path selection, requests, proofs, receipt and cache semantics
   - [ ] Gravity/responsive-path selection, mode-specific replacement expiry and local outbound path-use refresh

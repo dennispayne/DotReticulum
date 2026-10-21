@@ -8,22 +8,25 @@ namespace DotReticulum.Interfaces;
 /// Connects to a Reticulum <c>TCPServerInterface</c> and exchanges HDLC-framed packets. There is no reconnect policy:
 /// when the connection ends the receive stream completes (clean close) or faults (I/O error).
 /// </summary>
-public sealed class TcpClientPacketInterface : IPacketInterface
+public sealed class TcpClientPacketInterface : IPacketInterface, IPacketInterfaceDiagnostics
 {
     private readonly string _host;
     private readonly int _port;
+    private readonly long _bitrate;
     private readonly object _gate = new();
     private HdlcStreamEndpoint? _endpoint;
     private bool _started;
     private bool _disposed;
 
-    public TcpClientPacketInterface(string host, int port)
+    public TcpClientPacketInterface(string host, int port, long nominalBitrate = 10_000_000)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
         ArgumentOutOfRangeException.ThrowIfLessThan(port, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(port, 65535);
+        ArgumentOutOfRangeException.ThrowIfLessThan(nominalBitrate, 1);
         _host = host;
         _port = port;
+        _bitrate = nominalBitrate;
     }
 
     public async ValueTask StartAsync(CancellationToken cancellationToken)
@@ -70,6 +73,20 @@ public sealed class TcpClientPacketInterface : IPacketInterface
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken) =>
         GetEndpoint().SendAsync(packet, cancellationToken);
+
+    public IReadOnlyDictionary<string, object?> GetDiagnostics()
+    {
+        lock (_gate) return new Dictionary<string, object?>
+        {
+            ["rxb"] = _endpoint?.ReceivedBytes ?? 0,
+            ["txb"] = _endpoint?.SentBytes ?? 0,
+            ["target_host"] = _host,
+            ["target_port"] = _port,
+            ["bitrate"] = _bitrate,
+            ["dotreticulum_bitrate_kind"] = "configured_estimate",
+            ["status"] = _endpoint is not null && !_disposed && _endpoint.IsConnected,
+        };
+    }
 
     public async ValueTask DisposeAsync()
     {

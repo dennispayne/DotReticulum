@@ -25,17 +25,22 @@ public class ReticulumNodeTests
         var dir = TempDir();
         var server = ReticulumNode.Create(RnsdConfigParser.Parse($"""
             [reticulum]
+              share_instance = no
               enable_transport = no
             [interfaces]
               [[S]]
                 type = TCPServerInterface
+                enabled = yes
                 listen_ip = 127.0.0.1
                 listen_port = {port}
             """), Path.Combine(dir, "server"));
         var client = ReticulumNode.Create(RnsdConfigParser.Parse($"""
+            [reticulum]
+              share_instance = no
             [interfaces]
               [[C]]
                 type = TCPClientInterface
+                enabled = yes
                 target_host = 127.0.0.1
                 target_port = {port}
             """), Path.Combine(dir, "client"));
@@ -72,6 +77,72 @@ public class ReticulumNodeTests
     }
 
     [Fact]
-    public void Open_MissingConfig_Throws() =>
-        Assert.Throws<FileNotFoundException>(() => ReticulumNode.Open(Path.Combine(TempDir(), "nope")));
+    public async Task Open_MissingConfig_CreatesDefaultConfiguration()
+    {
+        var directory = TempDir();
+        try
+        {
+            await using var node = ReticulumNode.Open(directory);
+            Assert.True(File.Exists(Path.Combine(directory, "config")));
+            Assert.True(node.Config.SharedInstance.Enabled);
+            Assert.False(node.Config.EnableTransport);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public async Task IdentityPathsPreserveToolSubdirectoriesWithoutAllowingTraversal()
+    {
+        var directory = TempDir();
+        try
+        {
+            await using var node = ReticulumNode.Create(RnsdConfigParser.Parse("[reticulum]\nshare_instance=no"), directory);
+            using var first = node.LoadOrCreateIdentity(Path.Combine("identities", "rncp"));
+            using var second = node.LoadOrCreateIdentity(Path.Combine("identities", "rncp"));
+            Assert.Equal(first.Hash, second.Hash);
+            Assert.True(File.Exists(Path.Combine(directory, "storage", "identities", "rncp")));
+            foreach (var invalid in new[] { "..", "../escape", "identities/../escape", "identities\\..\\escape", "/absolute", "C:\\absolute", "a//b" })
+                Assert.Throws<ArgumentException>(() => node.LoadOrCreateIdentity(invalid));
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public async Task RestartRestoresValidatedPathOnStableConfiguredBearerWithoutNewAnnounce()
+    {
+        var (server, client, directory) = Pair();
+        try
+        {
+            using var identity = Identity.Generate();
+            var local = new LocalDestination(identity, Destination.Create(DestinationType.Single, "restart-tests", ["echo"], identity))
+            { AcceptLinks = true };
+            local.RegisterRequestHandler("/echo", request => request.Data, RequestPolicy.All);
+            server.Router.RegisterLocalDestination(local);
+            await server.StartAsync();
+            await client.StartAsync();
+            await server.Router.AnnounceAsync(local);
+            Assert.True(await client.WaitForPathAsync(local.Destination.Hash, TimeSpan.FromSeconds(10)));
+            Assert.True(await client.RetainDestinationAsync(local.Destination.Hash));
+            await client.PersistAsync();
+            await client.DisposeAsync();
+            await using var restarted = ReticulumNode.Create(client.Config, client.ConfigDir);
+            await restarted.StartAsync();
+            Assert.True(restarted.Router.HasPath(local.Destination.Hash));
+            using var recalled = restarted.Router.Engine.Known.Recall(local.Destination.Hash);
+            Assert.NotNull(recalled);
+            Assert.Equal(identity.Hash, recalled.Hash);
+            var connected = await ClientLinks.ConnectAsync(restarted, local.Destination.Hash, TimeSpan.FromSeconds(10), CancellationToken.None);
+            Assert.True(connected.Ok, connected.Error);
+            var request = connected.Link!.Request("/echo", new byte[] { 7, 8, 9 });
+            Assert.NotNull(request);
+            Assert.Equal(new byte[] { 7, 8, 9 }, Assert.IsType<byte[]>(await request.ResponseTask.WaitAsync(TimeSpan.FromSeconds(10))));
+            connected.Link.Teardown();
+        }
+        finally
+        {
+            await client.DisposeAsync();
+            await server.DisposeAsync();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
 }

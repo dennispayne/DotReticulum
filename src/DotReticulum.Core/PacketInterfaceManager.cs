@@ -13,20 +13,27 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
 
     private readonly List<IPacketInterface> _interfaces;
     private readonly HashSet<IPacketInterface> _children = [];
+    private readonly Dictionary<IPacketInterface, InterfaceState> _states = [];
+    private readonly Dictionary<ISpawningPacketInterface, Action<IPacketInterface>> _subscriptions = [];
+    private readonly SemaphoreSlim _management = new(1, 1);
+    private readonly bool _keepAlive;
+    private bool _completed;
     private bool _receiversLaunched;
     private readonly Channel<ReceivedPacket> _channel;
     private readonly CancellationTokenSource _receiversCts = new();
     private readonly object _gate = new();
-    private readonly List<Task> _receiverTasks = [];
+    private readonly HashSet<Task> _receiverTasks = [];
     private bool _started;
     private Task? _disposeTask;
     private int _activeReceivers;
 
-    public PacketInterfaceManager(IEnumerable<IPacketInterface> interfaces, int channelCapacity = DefaultChannelCapacity)
+    public PacketInterfaceManager(IEnumerable<IPacketInterface> interfaces, int channelCapacity = DefaultChannelCapacity, bool keepAlive = false)
     {
         ArgumentNullException.ThrowIfNull(interfaces);
         ArgumentOutOfRangeException.ThrowIfLessThan(channelCapacity, 1);
         _interfaces = [.. interfaces];
+        _keepAlive = keepAlive;
+        ChannelCapacity = channelCapacity;
         foreach (var iface in _interfaces)
         {
             ArgumentNullException.ThrowIfNull(iface);
@@ -37,9 +44,9 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
             throw new ArgumentException("The same interface was supplied more than once.", nameof(interfaces));
         }
 
-        foreach (var spawner in _interfaces.OfType<ISpawningPacketInterface>())
+        foreach (var iface in _interfaces)
         {
-            spawner.ChildConnected += AdoptChild;
+            Register(iface, null);
         }
 
         _channel = Channel.CreateBounded<ReceivedPacket>(new BoundedChannelOptions(channelCapacity)
@@ -48,6 +55,190 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
             SingleReader = false,
             SingleWriter = false,
         });
+    }
+
+    public int ChannelCapacity { get; }
+    public int QueuedPackets => _channel.Reader.Count;
+    public double QueuePressure => (double)QueuedPackets / ChannelCapacity;
+    public event Action<IPacketInterface, Exception>? Diagnostic;
+    public event Action<IPacketInterface>? InterfaceRemoved;
+
+    public IReadOnlyList<PacketInterfaceStatistics> GetStatistics()
+    {
+        lock (_gate) return _states.Values.Select(s => s.Snapshot()).ToArray();
+    }
+
+    private sealed class InterfaceState(IPacketInterface iface, InterfaceState? parent, CancellationToken lifetime, bool isolateFailure = false)
+    {
+        public IPacketInterface Interface { get; } = iface;
+        public InterfaceState? Parent { get; } = parent;
+        public bool Isolated { get; } = isolateFailure;
+        public CancellationTokenSource Cancellation { get; } = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
+        public Task Receiver { get; set; } = Task.CompletedTask;
+        public long Rxb, Txb, RxPackets, TxPackets, Arxb, Atxb, Arxc, Atxc, Malformed, SendFailures, FailedBytes, Waits;
+        public int Pending;
+        public PacketInterfaceStatistics Snapshot() => new(Interface, Parent?.Interface,
+            Interlocked.Read(ref Rxb), Interlocked.Read(ref Txb), Interlocked.Read(ref RxPackets), Interlocked.Read(ref TxPackets),
+            Interlocked.Read(ref Arxb), Interlocked.Read(ref Atxb), Interlocked.Read(ref Arxc), Interlocked.Read(ref Atxc),
+            Interlocked.Read(ref Malformed), Interlocked.Read(ref SendFailures), Interlocked.Read(ref FailedBytes),
+            Interlocked.Read(ref Waits), Volatile.Read(ref Pending));
+
+        public void Received(int length, Packet? packet)
+        {
+            Interlocked.Add(ref Rxb, length);
+            Interlocked.Increment(ref RxPackets);
+            if (packet is null) Interlocked.Increment(ref Malformed);
+            else if (packet.PacketType == PacketType.Announce)
+            {
+                Interlocked.Add(ref Arxb, length);
+                Interlocked.Increment(ref Arxc);
+            }
+            Parent?.Received(length, packet);
+        }
+
+        public void Sent(int length, bool announce, bool failed)
+        {
+            if (failed)
+            {
+                Interlocked.Increment(ref SendFailures);
+                Interlocked.Add(ref FailedBytes, length);
+            }
+            else
+            {
+                Interlocked.Add(ref Txb, length);
+                Interlocked.Increment(ref TxPackets);
+                if (announce)
+                {
+                    Interlocked.Add(ref Atxb, length);
+                    Interlocked.Increment(ref Atxc);
+                }
+            }
+            Parent?.Sent(length, announce, failed);
+        }
+    }
+
+    private void Report(IPacketInterface iface, Exception error)
+    {
+        System.Diagnostics.Trace.TraceError("Packet interface {0}: {1}", iface, error);
+        if (Diagnostic is not { } handlers) return;
+        foreach (Action<IPacketInterface, Exception> handler in handlers.GetInvocationList())
+        {
+            try { handler(iface, error); }
+            catch (Exception ex) { System.Diagnostics.Trace.TraceError("Interface diagnostic observer failed: {0}", ex); }
+        }
+    }
+
+    private void NotifyRemoved(IPacketInterface iface)
+    {
+        if (InterfaceRemoved is not { } handlers) return;
+        foreach (Action<IPacketInterface> handler in handlers.GetInvocationList())
+        {
+            try { handler(iface); }
+            catch (Exception error) { Report(iface, error); }
+        }
+    }
+
+    private void Register(IPacketInterface iface, InterfaceState? parent, bool isolateFailure = false)
+    {
+        _states.Add(iface, new InterfaceState(iface, parent, _receiversCts.Token, isolateFailure));
+        if (iface is ISpawningPacketInterface spawner)
+        {
+            Action<IPacketInterface> handler = child => AdoptChild(spawner, child);
+            _subscriptions.Add(spawner, handler);
+            spawner.ChildConnected += handler;
+        }
+    }
+
+    private void LaunchReceiver(IPacketInterface iface)
+    {
+        var state = _states[iface];
+        Interlocked.Increment(ref _activeReceivers);
+        state.Receiver = Task.Run(() => ReceiveLoopAsync(state), CancellationToken.None);
+        _receiverTasks.Add(state.Receiver);
+        _ = state.Receiver.ContinueWith(t =>
+        {
+            lock (_gate) _receiverTasks.Remove(t);
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+    }
+
+    /// <summary>Starts and transfers ownership of a new top-level interface without interrupting other receivers.</summary>
+    public async ValueTask AttachAsync(IPacketInterface iface, CancellationToken cancellationToken = default, bool isolateFailure = false)
+    {
+        ArgumentNullException.ThrowIfNull(iface);
+        await _management.WaitAsync(cancellationToken).ConfigureAwait(false);
+        var registered = false;
+        try
+        {
+            lock (_gate)
+            {
+                ObjectDisposedException.ThrowIf(_disposeTask is not null, this);
+                if (!_started || !_receiversLaunched || _completed) throw new InvalidOperationException("The manager is not running.");
+                if (_interfaces.Contains(iface)) throw new ArgumentException("The interface is already attached.", nameof(iface));
+                Register(iface, null, isolateFailure);
+                _interfaces.Add(iface);
+                registered = true;
+            }
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _receiversCts.Token);
+            await iface.StartAsync(linked.Token).ConfigureAwait(false);
+            lock (_gate)
+            {
+                ObjectDisposedException.ThrowIf(_disposeTask is not null, this);
+                LaunchReceiver(iface);
+            }
+        }
+        catch (Exception error)
+        {
+            if (registered)
+            {
+                try { await DetachCoreAsync(iface).ConfigureAwait(false); }
+                catch (Exception cleanup) { throw new AggregateException(error, cleanup); }
+            }
+            throw;
+        }
+        finally { _management.Release(); }
+    }
+
+    /// <summary>Removes an interface and its accepted peers, cancelling blocked receives before joining them.</summary>
+    public async ValueTask<bool> DetachAsync(IPacketInterface iface, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(iface);
+        await _management.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            lock (_gate) ObjectDisposedException.ThrowIf(_disposeTask is not null, this);
+            return await DetachCoreAsync(iface).ConfigureAwait(false);
+        }
+        finally { _management.Release(); }
+    }
+
+    private async Task<bool> DetachCoreAsync(IPacketInterface iface)
+    {
+        InterfaceState[] removed;
+        lock (_gate)
+        {
+            if (!_states.TryGetValue(iface, out var root)) return false;
+            removed = _states.Values.Where(s => ReferenceEquals(s, root) || ReferenceEquals(s.Parent, root)).ToArray();
+            foreach (var state in removed)
+            {
+                _interfaces.Remove(state.Interface);
+                _states.Remove(state.Interface);
+                _children.Remove(state.Interface);
+                if (state.Interface is ISpawningPacketInterface spawner && _subscriptions.Remove(spawner, out var handler))
+                    spawner.ChildConnected -= handler;
+            }
+        }
+        var errors = new List<Exception>();
+        foreach (var state in removed)
+        {
+            NotifyRemoved(state.Interface);
+            await state.Cancellation.CancelAsync().ConfigureAwait(false);
+            try { await state.Interface.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception ex) { Report(state.Interface, ex); errors.Add(ex); }
+        }
+        await Task.WhenAll(removed.Select(s => s.Receiver)).ConfigureAwait(false);
+        foreach (var state in removed) state.Cancellation.Dispose();
+        if (errors.Count > 0) throw new AggregateException("Interface detach failed.", errors);
+        return true;
     }
 
     /// <summary>A snapshot of the current interfaces, including children spawned by <see cref="ISpawningPacketInterface"/>s.</summary>
@@ -71,27 +262,32 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         }
     }
 
-    private void AdoptChild(IPacketInterface child)
+    private void AdoptChild(ISpawningPacketInterface parent, IPacketInterface child)
     {
         lock (_gate)
         {
-            if (_disposeTask is null && !_interfaces.Contains(child))
+            if (_disposeTask is null && _states.TryGetValue(parent, out var parentState) && !_interfaces.Contains(child))
             {
                 _interfaces.Add(child);
                 _children.Add(child);
+                Register(child, parentState);
                 if (_receiversLaunched)
                 {
-                    Interlocked.Increment(ref _activeReceivers);
-                    _receiverTasks.Add(Task.Run(() => ReceiveLoopAsync(child), CancellationToken.None));
+                    LaunchReceiver(child);
                 }
 
                 return;
             }
         }
 
-        _ = child.DisposeAsync().AsTask();
+        _ = DisposeRejectedChildAsync(child);
     }
 
+    private async Task DisposeRejectedChildAsync(IPacketInterface child)
+    {
+        try { await child.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception ex) { Report(child, ex); }
+    }
     /// <summary>
     /// Starts every interface in order, then begins receiving. If any start fails (or is cancelled) the manager disposes
     /// all interfaces, becomes unusable, and the original exception is rethrown. May be called only once.
@@ -111,28 +307,29 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
 
         try
         {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _receiversCts.Token);
             foreach (var iface in Interfaces)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 ObjectDisposedException.ThrowIf(IsDisposing, this);
                 if (Contains(iface) && !IsChild(iface))
                 {
-                    await iface.StartAsync(cancellationToken).ConfigureAwait(false);
+                    await iface.StartAsync(linked.Token).ConfigureAwait(false);
                 }
             }
 
             lock (_gate)
             {
                 ObjectDisposedException.ThrowIf(_disposeTask is not null, this);
-                _activeReceivers = _interfaces.Count;
                 _receiversLaunched = true;
                 foreach (var iface in _interfaces)
                 {
-                    _receiverTasks.Add(Task.Run(() => ReceiveLoopAsync(iface), CancellationToken.None));
+                    LaunchReceiver(iface);
                 }
 
-                if (_interfaces.Count == 0)
+                if (_interfaces.Count == 0 && !_keepAlive)
                 {
+                    _completed = true;
                     _channel.Writer.TryComplete();
                 }
             }
@@ -164,8 +361,14 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
     }
 
     /// <summary>Like <see cref="ReceiveAsync"/> but includes the arrival interface.</summary>
-    public IAsyncEnumerable<ReceivedPacket> ReceiveWithSourceAsync(CancellationToken cancellationToken = default) =>
-        _channel.Reader.ReadAllAsync(cancellationToken);
+    public async IAsyncEnumerable<ReceivedPacket> ReceiveWithSourceAsync(
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var received in _channel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (Contains(received.Source)) yield return received;
+        }
+    }
 
     /// <summary>Sends to every interface. Failures on one interface do not prevent delivery to the others.</summary>
     public ValueTask SendAsync(Packet packet, CancellationToken cancellationToken = default) =>
@@ -206,7 +409,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        await target.SendAsync(raw, cancellationToken).ConfigureAwait(false);
+        await SendOneAsync(target, raw, cancellationToken).ConfigureAwait(false);
     }
 
     private bool IsChild(IPacketInterface iface)
@@ -251,6 +454,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
                 continue;
             }
 
+            if (iface is ISpawningPacketInterface { SendsThroughChildren: true }) continue;
             pending.Add(SendOneAsync(iface, bytes, cancellationToken));
         }
 
@@ -270,21 +474,49 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         }
     }
 
-    private static async Task SendOneAsync(IPacketInterface iface, byte[] bytes, CancellationToken cancellationToken) =>
-        await iface.SendAsync(bytes, cancellationToken).ConfigureAwait(false);
-    private async Task ReceiveLoopAsync(IPacketInterface iface)
+    private async Task SendOneAsync(IPacketInterface iface, ReadOnlyMemory<byte> bytes, CancellationToken cancellationToken)
     {
-        var token = _receiversCts.Token;
+        InterfaceState state;
+        lock (_gate)
+        {
+            if (!_states.TryGetValue(iface, out state!)) throw new ArgumentException("The interface is no longer attached.", nameof(iface));
+        }
+        Interlocked.Increment(ref state.Pending);
+        try
+        {
+            await iface.SendAsync(bytes, cancellationToken).ConfigureAwait(false);
+            state.Sent(bytes.Length, bytes.Length > 0 && (bytes.Span[0] & 3) == (byte)PacketType.Announce, false);
+        }
+        catch (Exception ex)
+        {
+            state.Sent(bytes.Length, false, true);
+            if (ex is not OperationCanceledException) Report(iface, ex);
+            throw;
+        }
+        finally { Interlocked.Decrement(ref state.Pending); }
+    }
+
+    private async Task ReceiveLoopAsync(InterfaceState state)
+    {
+        var iface = state.Interface;
+        var token = state.Cancellation.Token;
         try
         {
             await foreach (var raw in iface.ReceiveAsync(token).ConfigureAwait(false))
             {
                 if (!Packet.TryParse(raw, out var packet))
                 {
+                    state.Received(raw.Length, null);
                     continue;
                 }
 
-                await _channel.Writer.WriteAsync(new ReceivedPacket(raw, packet, iface), token).ConfigureAwait(false);
+                state.Received(raw.Length, packet);
+                var received = new ReceivedPacket(raw, packet, iface);
+                if (!_channel.Writer.TryWrite(received))
+                {
+                    Interlocked.Increment(ref state.Waits);
+                    await _channel.Writer.WriteAsync(received, token).ConfigureAwait(false);
+                }
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -293,12 +525,14 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         catch (ChannelClosedException)
         {
         }
-        catch (Exception) when (IsChild(iface))
+        catch (Exception ex) when (state.Parent is not null || state.Isolated)
         {
-            // A dynamically spawned connection failing (e.g. a client reset) only removes that connection.
+            Report(iface, ex);
         }
         catch (Exception ex)
         {
+            Report(iface, ex);
+            lock (_gate) _completed = true;
             _channel.Writer.TryComplete(ex);
             try
             {
@@ -310,26 +544,31 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         }
         finally
         {
-            if (IsChild(iface))
+            var ownsCleanup = false;
+            if (state.Parent is not null)
             {
                 lock (_gate)
                 {
                     _interfaces.Remove(iface);
                     _children.Remove(iface);
+                    ownsCleanup = _states.Remove(iface);
                 }
 
-                try
-                {
-                    await iface.DisposeAsync().ConfigureAwait(false);
-                }
-                catch (Exception)
-                {
-                    // The child's connection is already gone.
-                }
+                if (ownsCleanup) try
+                    {
+                        NotifyRemoved(iface);
+                        await iface.DisposeAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        Report(iface, ex);
+                    }
+                if (ownsCleanup) state.Cancellation.Dispose();
             }
 
-            if (Interlocked.Decrement(ref _activeReceivers) == 0)
+            if (Interlocked.Decrement(ref _activeReceivers) == 0 && !_keepAlive)
             {
+                lock (_gate) _completed = true;
                 _channel.Writer.TryComplete();
             }
         }
@@ -361,47 +600,60 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
 
         _channel.Writer.TryComplete();
 
-        var errors = new List<Exception>();
-        IPacketInterface[] toDispose;
-        lock (_gate)
+        await _management.WaitAsync().ConfigureAwait(false);
+        try
         {
-            toDispose = [.. _interfaces];
-        }
-
-        foreach (var spawner in toDispose.OfType<ISpawningPacketInterface>())
-        {
-            spawner.ChildConnected -= AdoptChild;
-        }
-
-        foreach (var iface in toDispose)
-        {
-            try
+            var errors = new List<Exception>();
+            IPacketInterface[] toDispose;
+            lock (_gate)
             {
-                await iface.DisposeAsync().ConfigureAwait(false);
+                toDispose = [.. _interfaces];
             }
-            catch (Exception ex)
+
+            lock (_gate)
             {
-                errors.Add(ex);
+                foreach (var (spawner, handler) in _subscriptions) spawner.ChildConnected -= handler;
+                _subscriptions.Clear();
+            }
+
+            foreach (var iface in toDispose)
+            {
+                try
+                {
+                    await iface.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(ex);
+                }
+            }
+
+            Task[] receivers;
+            lock (_gate)
+            {
+                receivers = [.. _receiverTasks];
+            }
+
+            // Receiver loops never throw (they convert faults to channel completion).
+            await Task.WhenAll(receivers).ConfigureAwait(false);
+            lock (_gate)
+            {
+                foreach (var state in _states.Values) state.Cancellation.Dispose();
+                _states.Clear();
+                _interfaces.Clear();
+                _children.Clear();
+            }
+            _receiversCts.Dispose();
+
+            if (errors.Count == 1)
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
+            }
+            else if (errors.Count > 1)
+            {
+                throw new AggregateException(errors);
             }
         }
-
-        Task[] receivers;
-        lock (_gate)
-        {
-            receivers = [.. _receiverTasks];
-        }
-
-        // Receiver loops never throw (they convert faults to channel completion).
-        await Task.WhenAll(receivers).ConfigureAwait(false);
-        _receiversCts.Dispose();
-
-        if (errors.Count == 1)
-        {
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(errors[0]).Throw();
-        }
-        else if (errors.Count > 1)
-        {
-            throw new AggregateException(errors);
-        }
+        finally { _management.Release(); }
     }
 }

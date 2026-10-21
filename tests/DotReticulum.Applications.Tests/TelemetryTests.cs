@@ -59,17 +59,22 @@ public class TelemetryTests
         var cts = new CancellationTokenSource();
         var hub = RnsdHost.Create(RnsdConfigParser.Parse($"""
             [reticulum]
+              share_instance = no
               enable_transport = yes
             [interfaces]
               [[Hub]]
                 type = TCPServerInterface
+                enabled = yes
                 listen_ip = 127.0.0.1
                 listen_port = {port}
             """), Path.Combine(dir, "hub", "transport_identity"), (_, _) => { });
         ReticulumNode Edge(string name) => ReticulumNode.Create(RnsdConfigParser.Parse($"""
+            [reticulum]
+              share_instance = no
             [interfaces]
               [[Hub]]
                 type = TCPClientInterface
+                enabled = yes
                 target_host = 127.0.0.1
                 target_port = {port}
             """), Path.Combine(dir, name));

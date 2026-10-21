@@ -10,7 +10,7 @@ namespace DotReticulum.Interfaces;
 /// packet to <c>peerEndpoint</c> (a unicast peer or a broadcast address; SO_BROADCAST is enabled like upstream).
 /// Datagrams from any source are accepted.
 /// </summary>
-public sealed class UdpPacketInterface : IPacketInterface
+public sealed class UdpPacketInterface : IPacketInterface, IPacketInterfaceDiagnostics
 {
     // Upstream UDPInterface HW_MTU; larger datagrams are still handed over and then dropped by the manager's parser.
     private const int ReceiveBufferSize = 1064;
@@ -23,6 +23,22 @@ public sealed class UdpPacketInterface : IPacketInterface
     private bool _started;
     private bool _disposed;
     private int _receiving;
+    private long _receivedBytes;
+    private long _sentBytes;
+
+    public IReadOnlyDictionary<string, object?> GetDiagnostics()
+    {
+        lock (_gate) return new Dictionary<string, object?>
+        {
+            ["rxb"] = Interlocked.Read(ref _receivedBytes),
+            ["txb"] = Interlocked.Read(ref _sentBytes),
+            ["bitrate"] = 10_000_000L,
+            ["dotreticulum_bitrate_kind"] = "configured_estimate",
+            ["listen_address"] = LocalEndpoint?.ToString(),
+            ["forward_address"] = _peer.ToString(),
+            ["status"] = _started && !_disposed,
+        };
+    }
 
     public UdpPacketInterface(IPEndPoint localEndpoint, IPEndPoint peerEndpoint)
     {
@@ -106,6 +122,7 @@ public sealed class UdpPacketInterface : IPacketInterface
 
             if (length > 0)
             {
+                Interlocked.Add(ref _receivedBytes, length);
                 yield return buffer.AsMemory(0, length).ToArray();
             }
         }
@@ -119,7 +136,9 @@ public sealed class UdpPacketInterface : IPacketInterface
             throw new ArgumentException("A packet must be 1 to 500 bytes.", nameof(packet));
         }
 
-        await socket.SendToAsync(packet, SocketFlags.None, _peer, cancellationToken).ConfigureAwait(false);
+        var sent = await socket.SendToAsync(packet, SocketFlags.None, _peer, cancellationToken).ConfigureAwait(false);
+        Interlocked.Add(ref _sentBytes, sent);
+        if (sent != packet.Length) throw new IOException($"Incomplete UDP datagram send: {sent} of {packet.Length} bytes.");
     }
 
     public ValueTask DisposeAsync()

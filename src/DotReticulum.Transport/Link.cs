@@ -48,6 +48,7 @@ public sealed partial class Link
     {
         lock (_gate)
         {
+            if (Status == LinkStatus.Closed) throw new InvalidOperationException("The link is closed.");
             return _channel ??= new Channel(this);
         }
     }
@@ -231,7 +232,7 @@ public sealed partial class Link
             _peerSigPub = data[32..64].ToArray(),
             Mtu = mtu,
             Mdu = ComputeMdu(mtu),
-            Hops = packet.Hops + 1,
+            Hops = packet.Hops + mgr.Router.InboundHopIncrement(received.Source),
             AttachedInterface = received.Source,
         };
         link.EstablishmentTimeout = (EstablishmentTimeoutPerHop * Math.Max(1, link.Hops)) + KeepaliveMax;
@@ -534,8 +535,15 @@ public sealed partial class Link
                         {
                         }
 
-                        if (identity is not null && identity.Verify(plaintext.AsSpan(Identity.KeySize, 64), signed) && RemoteIdentity is null)
+                        if (identity is not null && identity.Verify(plaintext.AsSpan(Identity.KeySize, 64), signed))
                         {
+                            if (_mgr.Router.IsIdentityBlocked(identity.Hash))
+                            {
+                                SendTeardownPacket();
+                                CloseLocked(LinkTeardownReason.DestinationClosed, after);
+                                break;
+                            }
+                            if (RemoteIdentity is not null) break;
                             RemoteIdentity = identity;
                             var cb = RemoteIdentified;
                             if (cb is not null)
@@ -568,7 +576,7 @@ public sealed partial class Link
                     var plaintext = Decrypt(packet.Payload.Span);
                     if (plaintext is not null && MsgPack.TryUnpack(plaintext, out var unpacked) && unpacked is object?[] { Length: >= 2 } arr && arr[0] is byte[] requestId)
                     {
-                        _ = Task.Run(() => HandleResponse(requestId, arr[1]));
+                        _ = Task.Run(() => HandleResponse(requestId, arr[1], rawResponse: plaintext));
                     }
 
                     break;
@@ -763,17 +771,19 @@ public sealed partial class Link
         foreach (var r in _receipts.ToArray())
         {
             r.Status = PacketReceiptStatus.Failed;
-            after.Add(() => r.Complete(false));
+            r.Complete(false);
+            if (r.TimedOut is { } timedOut) after.Add(() => timedOut(r));
         }
 
         _receipts.Clear();
         if (_channel is { } closingChannel)
         {
-            after.Add(closingChannel.Shutdown);
+            closingChannel.Shutdown();
         }
         foreach (var req in _pendingRequests.ToArray())
         {
-            after.Add(() => req.Fail());
+            req.Fail(notify: false);
+            if (req.Failed is { } failed) after.Add(() => failed(req));
         }
 
         _pendingRequests.Clear();
@@ -879,7 +889,7 @@ public sealed partial class Link
                     if (now >= req.Deadline && req.Status != RequestStatus.Receiving)
                     {
                         _pendingRequests.RemoveAt(i);
-                        after.Add(req.Fail);
+                        after.Add(() => req.Fail());
                     }
                 }
 
@@ -895,5 +905,3 @@ public sealed partial class Link
 
 
 }
-
-

@@ -8,11 +8,12 @@ namespace DotReticulum.Interfaces;
 /// Framing is the simplified HDLC used by upstream's SerialInterface. Unlike upstream there is no idle-timeout that
 /// resets a partial frame; a corrupt or truncated frame is dropped when the next flag arrives.
 /// </summary>
-public sealed class SerialPacketInterface : IPacketInterface
+public sealed class SerialPacketInterface : IPacketInterface, IPacketInterfaceDiagnostics
 {
     private readonly Func<(Stream Stream, IDisposable? Owner)> _open;
     private readonly object _gate = new();
     private readonly Stream? _providedStream;
+    private readonly int? _baudRate;
     private HdlcStreamEndpoint? _endpoint;
     private bool _started;
     private bool _disposed;
@@ -22,6 +23,7 @@ public sealed class SerialPacketInterface : IPacketInterface
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(portName);
         ArgumentOutOfRangeException.ThrowIfLessThan(baudRate, 1);
+        _baudRate = baudRate;
         _open = () =>
         {
             var port = new SerialPort(portName, baudRate, parity, dataBits, stopBits);
@@ -84,6 +86,18 @@ public sealed class SerialPacketInterface : IPacketInterface
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken) =>
         GetEndpoint().SendAsync(packet, cancellationToken);
+
+    public IReadOnlyDictionary<string, object?> GetDiagnostics()
+    {
+        lock (_gate) return new Dictionary<string, object?>
+        {
+            ["rxb"] = _endpoint?.ReceivedBytes ?? 0,
+            ["txb"] = _endpoint?.SentBytes ?? 0,
+            ["bitrate"] = _baudRate,
+            ["dotreticulum_bitrate_kind"] = _baudRate is null ? null : "configured_baud",
+            ["status"] = _endpoint is not null && !_disposed && _endpoint.IsConnected,
+        };
+    }
 
     public async ValueTask DisposeAsync()
     {

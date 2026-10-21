@@ -7,7 +7,7 @@ namespace DotReticulum.Transport;
 /// Owns every link of a <see cref="TransportRouter"/>: pending/active registries, the outbound packet queue, an ordered callback dispatcher and the
 /// watchdog tick. Background loops start lazily with the first link and stop with <see cref="StopAsync"/> (the router's run loop does this on exit).
 /// </summary>
-public sealed class LinkManager
+public sealed class LinkManager : IAsyncDisposable
 {
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(100);
 
@@ -21,6 +21,10 @@ public sealed class LinkManager
     private readonly Channel<Action> _callbacks = System.Threading.Channels.Channel.CreateUnbounded<Action>(new UnboundedChannelOptions { SingleReader = true });
     private CancellationTokenSource? _cts;
     private Task[] _loops = [];
+    private bool _stopping;
+    private bool _disposed;
+    private bool _suspended;
+    private Task? _stopTask;
 
     internal LinkManager(TransportRouter router, PacketInterfaceManager manager, TimeProvider time)
     {
@@ -52,16 +56,21 @@ public sealed class LinkManager
     {
         ArgumentNullException.ThrowIfNull(destinationIdentity);
         ArgumentNullException.ThrowIfNull(destinationHash);
-        EnsureStarted();
         var hops = _router.HopsTo(destinationHash) ?? 1;
         var timeout = establishmentTimeout ?? ((Link.EstablishmentTimeoutPerHop * Math.Max(1, hops)) + 1);
-        var link = Link.CreateInitiator(this, destinationIdentity, destinationHash, hops, timeout);
-        link.Established = established;
-        link.Closed = closed;
-        link.RequestTime = Now;
-        lock (_gate) _pending[link.LinkIdHex] = link;
-        Enqueue(link.RequestPacket!, null);
-        return link;
+        lock (_gate)
+        {
+            if (_router.IsIdentityBlocked(destinationIdentity.Hash)) throw new InvalidOperationException("The destination identity is blocked.");
+            EnsureStarted();
+            _suspended = false;
+            var link = Link.CreateInitiator(this, destinationIdentity, destinationHash, hops, timeout);
+            link.Established = established;
+            link.Closed = closed;
+            link.RequestTime = Now;
+            _pending[link.LinkIdHex] = link;
+            _outbound.Writer.TryWrite((link.RequestPacket!, null));
+            return link;
+        }
     }
 
     public Link? Find(ReadOnlySpan<byte> linkId)
@@ -72,20 +81,38 @@ public sealed class LinkManager
 
     internal void Enqueue(Packet packet, IPacketInterface? iface)
     {
-        EnsureStarted();
-        _outbound.Writer.TryWrite((packet, iface));
+        lock (_gate)
+        {
+            if (_stopping || _disposed || _suspended) return;
+            EnsureStarted();
+            _outbound.Writer.TryWrite((packet, iface));
+        }
     }
 
     internal void Dispatch(Action action)
     {
-        EnsureStarted();
-        _callbacks.Writer.TryWrite(action);
+        lock (_gate)
+        {
+            if (_stopping)
+            {
+                _callbacks.Writer.TryWrite(action);
+                return;
+            }
+            if (!_disposed && !_suspended)
+            {
+                EnsureStarted();
+                _callbacks.Writer.TryWrite(action);
+                return;
+            }
+        }
+        InvokeCallback(action);
     }
 
     internal void Activate(Link link)
     {
         lock (_gate)
         {
+            if (_stopping || _disposed) return;
             _pending.Remove(link.LinkIdHex);
             _active[link.LinkIdHex] = link;
         }
@@ -108,14 +135,16 @@ public sealed class LinkManager
             return;
         }
 
-        EnsureStarted();
-        var link = Link.ValidateRequest(this, destination, received);
-        if (link is null)
+        Link? link;
+        lock (_gate)
         {
-            return;
+            if (_stopping || _disposed) return;
+            EnsureStarted();
+            _suspended = false;
+            link = Link.ValidateRequest(this, destination, received);
+            if (link is null) return;
+            _active[link.LinkIdHex] = link;
         }
-
-        lock (_gate) _active[link.LinkIdHex] = link;
         Log?.Invoke($"Incoming link request {link.LinkIdHex} accepted");
     }
 
@@ -165,13 +194,10 @@ public sealed class LinkManager
 
     private void EnsureStarted()
     {
-        if (_cts is not null)
-        {
-            return;
-        }
-
         lock (_gate)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_stopping) throw new InvalidOperationException("The link manager is stopping.");
             if (_cts is not null)
             {
                 return;
@@ -183,7 +209,19 @@ public sealed class LinkManager
         }
     }
 
-    public async Task StopAsync()
+    /// <summary>Closes all links and settles their work. New links may be opened after this task completes.</summary>
+    public Task StopAsync()
+    {
+        lock (_gate)
+        {
+            if (_stopping) return _stopTask!;
+            _stopping = true;
+            _suspended = true;
+            return _stopTask = Task.Run(StopCoreAsync);
+        }
+    }
+
+    private async Task StopCoreAsync()
     {
         CancellationTokenSource? cts;
         Task[] loops;
@@ -191,25 +229,51 @@ public sealed class LinkManager
         {
             cts = _cts;
             loops = _loops;
-            _cts = null;
-            _loops = [];
         }
-
-        if (cts is null)
-        {
-            return;
-        }
-
-        await cts.CancelAsync().ConfigureAwait(false);
         try
         {
-            await Task.WhenAll(loops).ConfigureAwait(false);
+            if (cts is not null) await cts.CancelAsync().ConfigureAwait(false);
+            try { await Task.WhenAll(loops).ConfigureAwait(false); }
+            catch (OperationCanceledException) { }
         }
-        catch (OperationCanceledException)
+        finally
         {
+            foreach (var link in Links) link.Teardown();
+            while (_outbound.Reader.TryRead(out _)) { }
+            while (true)
+            {
+                Action? callback;
+                lock (_gate)
+                {
+                    if (!_callbacks.Reader.TryRead(out callback))
+                    {
+                        _cts = null;
+                        _loops = [];
+                        _stopping = false;
+                        break;
+                    }
+                }
+                InvokeCallback(callback);
+            }
+            cts?.Dispose();
         }
+    }
 
-        cts.Dispose();
+    /// <summary>Terminal cleanup; unlike StopAsync, subsequent Connect calls are rejected.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        lock (_gate) _disposed = true;
+        await StopAsync().ConfigureAwait(false);
+    }
+
+    private void InvokeCallback(Action action)
+    {
+        try { action(); }
+        catch (Exception ex)
+        {
+            try { Log?.Invoke("Link callback failed: " + ex.Message); }
+            catch { /* A diagnostic observer must not prevent settlement. */ }
+        }
     }
 
     private async Task PumpAsync(CancellationToken ct)
@@ -246,14 +310,7 @@ public sealed class LinkManager
         {
             await foreach (var action in _callbacks.Reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
-                try
-                {
-                    action();
-                }
-                catch (Exception ex)
-                {
-                    Log?.Invoke("Link callback failed: " + ex.Message);
-                }
+                InvokeCallback(action);
             }
         }
         catch (OperationCanceledException)

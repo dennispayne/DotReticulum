@@ -102,6 +102,11 @@ public sealed class Channel
     private int _nextRxSequence;
     private int _fastRateRounds;
     private int _mediumRateRounds;
+    private bool _shutdown;
+    private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>Completes when the owning link closes and channel work has been released.</summary>
+    public Task Completion => _completion.Task;
 
     internal Channel(Link link)
     {
@@ -195,6 +200,7 @@ public sealed class Channel
 
     private bool IsReadyLocked()
     {
+        if (_shutdown || _link.Status == LinkStatus.Closed) return false;
         var outstanding = 0;
         foreach (var e in _txRing)
         {
@@ -411,6 +417,8 @@ public sealed class Channel
     {
         lock (_lock)
         {
+            if (_shutdown) return;
+            _shutdown = true;
             _handlers.Clear();
             foreach (var e in _txRing)
             {
@@ -423,6 +431,7 @@ public sealed class Channel
 
             _txRing.Clear();
             _rxRing.Clear();
+            _completion.TrySetResult();
         }
     }
 

@@ -70,6 +70,7 @@ public sealed class RawChannelReader : Stream
     private readonly List<Action<int>> _listeners = [];
     private byte[] _buffer = [];
     private bool _eof;
+    private bool _disposed;
     private TaskCompletionSource _signal = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public RawChannelReader(int streamId, Channel channel)
@@ -133,6 +134,7 @@ public sealed class RawChannelReader : Stream
         TaskCompletionSource signal;
         lock (_lock)
         {
+            if (_disposed || _eof) return true;
             _buffer = [.. _buffer, .. data.Data];
             if (data.Eof)
             {
@@ -162,6 +164,7 @@ public sealed class RawChannelReader : Stream
             Task wait;
             lock (_lock)
             {
+                ObjectDisposedException.ThrowIf(_disposed, this);
                 if (_buffer.Length > 0)
                 {
                     var n = Math.Min(buffer.Length, _buffer.Length);
@@ -178,7 +181,12 @@ public sealed class RawChannelReader : Stream
                 wait = _signal.Task;
             }
 
-            await wait.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await Task.WhenAny(wait, _channel.Completion).WaitAsync(cancellationToken).ConfigureAwait(false);
+            lock (_lock)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                if (_channel.Completion.IsCompleted) _eof = true;
+            }
         }
     }
 
@@ -199,14 +207,18 @@ public sealed class RawChannelReader : Stream
             _channel.RemoveMessageHandler(_handler);
             lock (_lock)
             {
+                _disposed = true;
+                _eof = true;
+                _buffer = [];
                 _listeners.Clear();
+                _signal.TrySetResult();
             }
         }
 
         base.Dispose(disposing);
     }
 
-    public override bool CanRead => true;
+    public override bool CanRead => !_disposed;
 
     public override bool CanSeek => false;
 
@@ -253,6 +265,7 @@ public sealed class RawChannelWriter : Stream
     /// <summary>Sends at most one chunk of <paramref name="data"/>; returns the number of bytes consumed (0 when the channel is not ready).</summary>
     public int WriteChunk(ReadOnlySpan<byte> data)
     {
+        ObjectDisposedException.ThrowIf(_closed, this);
         try
         {
             var chunkLength = Math.Min(data.Length, MaxChunkLength);
@@ -298,6 +311,8 @@ public sealed class RawChannelWriter : Stream
 
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_closed, this);
+        cancellationToken.ThrowIfCancellationRequested();
         while (!buffer.IsEmpty)
         {
             var written = WriteChunk(buffer.Span);
@@ -332,6 +347,7 @@ public sealed class RawChannelWriter : Stream
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (DateTime.UtcNow < deadline && !_channel.IsReadyToSend)
         {
+            if (_channel.Completion.IsCompleted || _channel.Link.Status == LinkStatus.Closed) return;
             await Task.Delay(50, cancellationToken).ConfigureAwait(false);
         }
 
@@ -364,7 +380,7 @@ public sealed class RawChannelWriter : Stream
 
     public override bool CanSeek => false;
 
-    public override bool CanWrite => true;
+    public override bool CanWrite => !_closed;
 
     public override long Length => throw new NotSupportedException();
 

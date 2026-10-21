@@ -31,14 +31,29 @@ public sealed partial class TransportRouter
         var seconds = timeout?.TotalSeconds ?? 6 + (6 * (HopsTo(packet.DestinationHash.Span) ?? 0));
         var now = Links.UnixNow;
         var receipt = new PacketReceipt(hash, now, seconds);
-        lock (_gate) _receipts[Convert.ToHexStringLower(hash.AsSpan(0, Destination.HashLength))] = new PendingReceipt(receipt, destinationIdentity, now + seconds);
+        var key = Convert.ToHexStringLower(hash.AsSpan(0, Destination.HashLength));
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_receipts.Remove(key, out var replaced))
+            {
+                replaced.Receipt.Status = PacketReceiptStatus.Failed;
+                replaced.Receipt.Complete(false);
+            }
+            _receipts[key] = new PendingReceipt(receipt, destinationIdentity, now + seconds);
+        }
         try
         {
             await SendAsync(packet, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
-            lock (_gate) _receipts.Remove(Convert.ToHexStringLower(hash.AsSpan(0, Destination.HashLength)));
+            lock (_gate)
+            {
+                if (_receipts.TryGetValue(key, out var current) && ReferenceEquals(current.Receipt, receipt)) _receipts.Remove(key);
+                receipt.Status = PacketReceiptStatus.Failed;
+                receipt.Complete(false);
+            }
             throw;
         }
 
@@ -90,11 +105,16 @@ public sealed partial class TransportRouter
         if (data.Length == ExplicitProofLength && !data[..32].SequenceEqual(hash)) return false;
         if (!pending.Destination.Verify(data[^64..], hash)) return false;
 
-        lock (_gate) _receipts.Remove(Convert.ToHexStringLower(packet.DestinationHash.Span));
         var receipt = pending.Receipt;
-        receipt.Status = PacketReceiptStatus.Delivered;
-        receipt.Rtt = Links.UnixNow - receipt.SentAt;
-        receipt.Complete(true);
+        lock (_gate)
+        {
+            var key = Convert.ToHexStringLower(packet.DestinationHash.Span);
+            if (!_receipts.TryGetValue(key, out var current) || !ReferenceEquals(current, pending)) return false;
+            _receipts.Remove(key);
+            receipt.Status = PacketReceiptStatus.Delivered;
+            receipt.Rtt = Links.UnixNow - receipt.SentAt;
+            receipt.Complete(true);
+        }
         try { receipt.Delivered?.Invoke(receipt); }
         catch (Exception ex) { Log?.Invoke("Delivery callback failed: " + ex.Message); }
         return true;
@@ -109,6 +129,8 @@ public sealed partial class TransportRouter
             foreach (var kv in _receipts.Where(kv => now > kv.Value.Deadline).ToArray())
             {
                 _receipts.Remove(kv.Key);
+                kv.Value.Receipt.Status = PacketReceiptStatus.Failed;
+                kv.Value.Receipt.Complete(false);
                 expired.Add(kv.Value);
             }
         }
@@ -116,10 +138,32 @@ public sealed partial class TransportRouter
         foreach (var pending in expired)
         {
             var receipt = pending.Receipt;
-            receipt.Status = PacketReceiptStatus.Failed;
-            receipt.Complete(false);
             try { receipt.TimedOut?.Invoke(receipt); }
             catch (Exception ex) { Log?.Invoke("Receipt timeout callback failed: " + ex.Message); }
+        }
+    }
+
+    private void FailReceipts()
+    {
+        PendingReceipt[] pending;
+        lock (_gate)
+        {
+            pending = [.. _receipts.Values];
+            _receipts.Clear();
+            foreach (var item in pending)
+            {
+                item.Receipt.Status = PacketReceiptStatus.Failed;
+                item.Receipt.Complete(false);
+            }
+        }
+        foreach (var item in pending)
+        {
+            try { item.Receipt.TimedOut?.Invoke(item.Receipt); }
+            catch (Exception ex)
+            {
+                try { Log?.Invoke("Receipt cleanup callback failed: " + ex.Message); }
+                catch { }
+            }
         }
     }
 }

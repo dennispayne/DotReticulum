@@ -2,9 +2,189 @@
 
 Development chronology, verification evidence, upstream comparisons and recorded limitations. Phase and subphase completion is tracked only in [plan.md](../plan.md); this document is not a second progress checklist.
 
-Current live interoperability uses the authoritative Reticulum-hosted upstream at `a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7). Stored reference vectors and their reproduction generators retain their original `e40191b3d193b46b7f2d8a44424a594cd758839b` provenance. Earlier records describe the pins and tooling used at that time, including Python coverage scripts since replaced by PowerShell.
+Current live interoperability uses the authoritative Reticulum-hosted upstream at `a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7). Earlier protocol vectors and their reproduction generators retain their original `e40191b3d193b46b7f2d8a44424a594cd758839b` provenance; the new Parity 3 runtime fixtures explicitly record the hosted `a29bfb51...` revision and source hashes. Earlier records describe the pins and tooling used at that time, including Python coverage scripts since replaced by PowerShell.
 
 ## Verification records
+
+### Parity 3 runtime, configuration and operations (2026-10-21)
+
+Started on clean `main` at `c5ac441`. The initial Release build was warning-free;
+the initial full suite passed **613 tests, 50 skipped, zero failed**. Six bounded,
+nonoverlapping implementation workstreams supplied configuration/logging,
+shared-instance/RPC, persistence/ratchets, discovery, blackholes and lifecycle
+settlement; the coordinator integrated host ownership, real router state,
+interface mutation/statistics/extensions and all acceptance gates. No workflow,
+Parity 4 implementation, reference-pin change or push was performed.
+
+#### Reference and measurable contracts
+
+The reference remains the previously .NET-fetched authoritative checkout
+`a29bfb51c468945c96a1ee22cae0114e993e2391`, RNS 1.5.7, with LXMF 1.2.1 in
+the isolated Python environment. Live adapters validate the imported module
+paths and versions using `tests\Interop\reference_environment.py`. New
+`GenerateRnsdConfiguration.py`, `GenerateSharedRuntimeVectors.py`,
+`GenerateRuntimeStateVectors.py`, `GenerateDiscoveryVectors.py` and
+`GenerateBlackholeVectors.py` execute that reference; they are not C#-derived
+expected values. Their fixtures retain actual source-file provenance.
+
+| Pinned source under `RNS` | SHA-256 |
+| --- | --- |
+| `Reticulum.py` | `c655675a799413d9bb11d44ab90d56bc1f4fe339fee1ee5d108754dc8bf812d7` |
+| `Transport.py` | `333b34eeab020946eefdd8a7e75d3fa74d2ffc5adfef7c0080752980f455bf2c` |
+| `Identity.py` | `ac336bb2b7217278d3a962b6945212313fed0ee9cc10d666e8ac17faca17ea2f` |
+| `Destination.py` | `e1117e5ff9c4baeda53f9117ae52c4cd0e1e2a4f4167de628e4afb8b4506b8ae` |
+| `Discovery.py` | `ae26445adf6325ed3e47f2b7c4b412060994d75ae583a58162849507ed7a9950` |
+| `Link.py` | `4267ab1c5b11d9c415693298376f2a984aa9bca13a6245e9bc3dce3236365a7c` |
+| `Interfaces\LocalInterface.py` | `b241095c0a528f0c9a88817429a9ce54c7adb5aa850ae08e29c9b84dd8fa4371` |
+| `Interfaces\BackboneInterface.py` | `c3445132d89af04998c35b12e5101c8975d73599f62fe71b501b3d734c150438` |
+| `Interfaces\TCPInterface.py` | `d9a4fcaf6e76a9dcb810d335850ab0398d21054848fd84766a62f687a9ec942d` |
+| `Utilities\rnsd.py` | `e8920d1acde17e09b0aad57651348e86aabc84fbb29a531c340b7365d220e748` |
+
+Acceptance was based on externally observable contracts, not module names:
+
+| Area and source | Implemented and exercised contract |
+| --- | --- |
+| Configuration: `Reticulum.py`, vendored ConfigObj, `Utilities\rnsd.py`, TCP/UDP constructors | Discovery/default creation, explicit directory precedence, nested/list/quoted settings, omitted enable=false and alias OR, source mode/port precedence, static/network identities, all logging levels/timestamps/rotation, version/service and bounded interactive operations. Unsupported settings fail explicitly. |
+| Shared owner/client: `LocalInterface.py`, Reticulum RPC handlers, Python multiprocessing connection framing | Election occurs before physical factories; required-shared fails rather than silently becoming standalone. Reference HDLC and bounded mutual-HMAC MessagePack RPC interoperate in both roles. Wrong keys, malformed framing, competing owners, remote identity allowlisting, owner restart/reconnect, automatic path-response reannouncements and encrypted requests are exercised. |
+| Use/retention and persistence: `Identity.py:101-335,410-513`, `Destination.py:211-241,437-500`, `Transport.py:3788-3950` | Exact binary interchange schemas and fractional timestamps; retained use returns false, unretain records current use. Atomic identities/public-state generations, signed opt-in private ratchets, expiry/corruption/cancellation/concurrency and actual configured-path restart are tested. Nonempty unsupported runtime tunnels are rejected rather than fabricated. |
+| Ownership/operations: Reticulum attach/detach/reload, cleanup/persistence loops, Transport and Link teardown | Serialized interface mutation, child isolation, bounded queue/backpressure, peer/global counters, observer diagnostics, scoped cache cleanup and supervised maintenance. Startup failures release reserved listeners without overwriting corruption. Terminal nodes automatically clean up faulted routers and settle links, requests, resources, channels and blocked streams; directly owned routers remain explicitly restartable. |
+| Discovery: `Discovery.py` and Backbone source | Integer-key metadata/encryption/stamps, allowed sources, transport/implementation eligibility, duplicate/capacity rules, persisted available/unknown/stale/removal policy and bounded background work. Actual TCP advertisements retain their TCP type; only eligible Backbone advertisements autoconnect. Native HDLC bootstrap detach/restore and encrypted request recovery are exercised. |
+| Blackholes: Reticulum/Transport publication, update and rejection handlers | Local precedence, expiry/reason/claimed source/authenticated provenance, source authorization, failed-source preservation, identified `/list` publication with binary map keys and persistence. Updates remove paths and reject/close identified blocked endpoints/links. Actual Python publication/update works in both roles. |
+| Extensions/statistics: Reticulum external-interface loader and source bearer counters | Statically registered AOT-safe factories declare their accepted settings. Actual peer/parent totals avoid double-counting and retain departed-peer traffic; HDLC RX is decoded and TX is framed. Unknown PHY/device/IFAC/priority metrics are null/absent. Nominal bitrates are labeled estimates; opt-in .NET process profiling is not represented as Python profiling. |
+
+`docs\runtime-operations.md`, `docs\runtime-state.md` and `docs\rnsd.md`
+describe ownership, formats, defaults and intentional native differences.
+The default-generated AutoInterface remains disabled with a diagnostic until
+Parity 6 supplies that bearer. IFAC, gravity/internal-announcement controls,
+full Backbone behavior and tunnel synthesis/restoration remain explicitly
+unsupported later-phase work, not hidden runtime functionality. Tunnel
+**serialization, validation and expiry** are covered here; actual tunnel
+protocol integration remains Parity 4.
+
+Private ratchet persistence is destination opt-in, like upstream's
+`enable_ratchets(path)`, and saves signed candidate state before committing
+rotation or policy changes. A failed save preserves the old ring and zeros
+the candidate. Its stronger signed metadata and the single checksummed public
+state generation are documented .NET formats, not claims of direct upstream
+file compatibility. Windows ACLs remain operator-owned; Unix owner-only modes
+are implemented but not newly exercised on this Windows host.
+
+#### Integration failure investigations
+
+Earlier broad concurrent runs exposed intermittent existing Git initialization/
+publication and statistics-flush failures. Exact response assertions were kept
+and enhanced with credential-safe diagnostic context. A temporary first-chance
+I/O observer then reproduced the HTTP-mirror failure under coverage:
+`System.IO.FileSystem.MoveDirectory`, HRESULT **0x80070005**, after successful
+Git work. This was not evidence of the hypothesized process/job-assignment
+failure; the process runner was not changed. The temporary observer was removed.
+
+The runtime store's existing bounded Win32 sharing/access/lock retry policy was
+extracted into `FileSystemSharingRetry` and reused for owned Git-directory
+publication. Only Windows errors 5/32/33 are retried, at most eight times with
+cancellable delays capped at 200 ms; persistent failures retain the original
+exception, cancellation does not publish and destination overwrite is not
+introduced. Regression tests exercise a real exclusive Windows file lease,
+finite attempts, unchanged nonsharing failures and pre-cancellation. The
+instrumented affected state/Git/statistics selector then passed **81 tests,
+2 platform skips**. Statistics diagnostics remain explicit; no speculative
+statistics or process-runner behavior was changed.
+
+#### Final acceptance commands and results
+
+All commands below ran locally; generated reports remain ignored artifacts.
+The reference variables used the same checkout and isolated venv as the preceding
+milestone: `DOTRETICULUM_UPSTREAM=<verified hosted checkout>`,
+`DOTRETICULUM_PYTHON=<refvenv>\Scripts\python.exe`,
+`PYTHONPATH=$env:DOTRETICULUM_UPSTREAM` and `PYTHONUTF8=1`.
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+  **passed, zero warnings/errors**.
+- `dotnet test DotReticulum.slnx -c Release --no-build -m:1 --nologo -v quiet
+  --logger trx --results-directory TestResults\parity3-release-verified`:
+  **863 passed, 60 skipped, zero failed**. One MSBuild project worker avoids
+  overlapping project hosts; normal xUnit collection concurrency remains enabled.
+  Applications 507/33 skipped, Core 91, Crypto 47, Interfaces 56/7 skipped,
+  LXMF 27/8 skipped and Transport 135/12 skipped.
+- `pwsh -NoProfile -File tests\run-tests.ps1 -Coverage -ResultsDirectory
+  TestResults\coverage-parity3-release-20261021`: **863 passed, 60 skipped,
+  zero failed**; live/native opt-in tests disabled in this collection. The
+  runner invoked the production-only Coverlet settings and
+  `tests\coverage_summary.ps1`, merging all six reports by source-line/branch
+  identity without double-counting or averaging. No overlapping build/test
+  wrote these outputs.
+- With `DOTRETICULUM_LIVE=1`,
+  `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
+  -c Release --filter "FullyQualifiedName~SharedLiveTests|FullyQualifiedName~BlackholeLiveTests|FullyQualifiedName~DiscoveryLiveTests|FullyQualifiedName~LiveTransportTests|FullyQualifiedName~LiveMixedTransportTests|FullyQualifiedName~LiveLinkTransportTests|FullyQualifiedName~LiveRncpRnxTests"`:
+  **19 passed, one explicit Windows Backbone skip**. This includes actual
+  Python shared clients/owners and authentication, remote management in both
+  roles, plain/encrypted discovery, blackhole publication/update and existing
+  mixed Python transport, link, rncp and authorized rnx regression flows.
+- With the same reference/live environment,
+  `dotnet test tests\DotReticulum.Transport.Tests\DotReticulum.Transport.Tests.csproj
+  -c Release --filter "FullyQualifiedName~LiveLinkTests|FullyQualifiedName~LiveAnnounceTests"`:
+  **14 passed, zero skipped/failed**, including direct live announces,
+  links/resources and request/response. These live runs preceded only the
+  bounded filesystem-publication extraction, not any further network change.
+- `pwsh -NoProfile -File tests\run-pester.ps1` with the reference environment:
+  **18 passed, one Windows SIGTERM skip, zero failed**, separate managed CLI
+  processes. Election, RPC authentication, ownership, daemon restart, interactive
+  EOF, configuration, identity/state persistence and multi-megabyte rncp ran.
+- `dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj
+  -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true
+  -p:IlcTreatWarningsAsErrors=true -o artifacts\native-parity3 --no-restore
+  --nologo -v quiet`: **passed, zero warnings/errors**, after the final
+  publication fix. MSVC `vcvars64.bat` and publish ran in the same `cmd` process,
+  with `vswhere` discoverable.
+- `artifacts\native-parity3\DotReticulum.Applications.exe --help` and
+  `artifacts\native-parity3\DotReticulum.Applications.exe rnsd --version`:
+  **both exited zero**. Version identifies the experimental native build
+  separately from reference RNS 1.5.7. An initial root `--version` invocation
+  exited 2 because the root dispatches to `rnid`; the applicable `rnsd` option,
+  not a changed root-utility contract, is the verified version command.
+- With `DOTRETICULUM_NATIVE_EXE` pointing to that final binary,
+  `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
+  -c Release --no-build --filter "FullyQualifiedName~NativeResourceTests"
+  --nologo -v quiet`: **one passed**, a **2,200,017-byte** encrypted resource
+  roundtrip with compression asserted in both directions.
+- `pwsh -NoProfile -File tests\run-pester.ps1 -Application
+  artifacts\native-parity3\DotReticulum.Applications.exe -GitHosting` with
+  the reference environment: **55 passed, two explicit skips, zero failed**.
+  In addition to the complete runtime process suite, this exercises native
+  repository creation/publication, restart, ordinary Git clone/push/fetch,
+  work/releases, signing and bounded presentation helpers. Skips are POSIX
+  SIGTERM and the separately provisioned optional FFmpeg backend.
+
+The earlier coverage runs named `coverage-parity3-acceptance-20261021` and
+`coverage-parity3-verified-20261021` failed on the diagnosed directory rename
+and are **not** acceptance passes. The final fresh all-green generation above
+supersedes them and the earlier 857-test coverage generation.
+
+| Production project | Covered lines | Covered branches |
+| --- | ---: | ---: |
+| Applications | 7384/9147 (80.73%) | 6406/9865 (64.94%) |
+| Core | 968/1011 (95.75%) | 488/529 (92.25%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 653/747 (87.42%) | 220/284 (77.46%) |
+| LXMF | 387/429 (90.21%) | 192/270 (71.11%) |
+| Transport | 2888/3281 (88.02%) | 1711/2205 (77.60%) |
+| **Overall** | **12390/14731 (84.11%)** | **9064/13203 (68.65%)** |
+
+#### Platform and evidence boundaries
+
+All new platform execution here is **Windows x64**. Actual Python Backbone
+construction is explicitly skipped because the pinned source supports only
+Linux/Android; native HDLC-adapter integration does not substitute for that
+live claim. Unix abstract sockets, POSIX SIGTERM persistence, Linux/macOS,
+serial/radio hardware and other upstream platforms remain unverified here.
+Anonymous datagrams cannot reveal a sender identity and are not claimed to
+support identity-based blackhole sender rejection.
+
+Discovery fixtures/live adapters disclose a deterministic stamp-selection
+shim that uses actual LXMF workblocks and validation instead of the upstream
+CPU-count-sized multiprocessing scheduler. This verifies payload/stamp
+acceptance, not that scheduler. The existing rncp Windows reference-side move
+shim remains disclosed; no new pin or old-vector relabeling was performed.
 
 ### Parity 2 push-readiness regression fixes (2026-10-20)
 

@@ -15,6 +15,7 @@ public enum RequestStatus : byte
 public sealed class RequestReceipt
 {
     private readonly TaskCompletionSource<object?> _done = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly object _settlementGate = new();
 
     internal RequestReceipt(byte[] requestId, double sentAt, double timeout)
     {
@@ -25,7 +26,19 @@ public sealed class RequestReceipt
 
     public byte[] RequestId { get; internal set; }
 
-    public RequestStatus Status { get; internal set; } = RequestStatus.Sent;
+    private RequestStatus _status = RequestStatus.Sent;
+
+    public RequestStatus Status
+    {
+        get { lock (_settlementGate) return _status; }
+        internal set
+        {
+            lock (_settlementGate)
+            {
+                if (_status is not (RequestStatus.Ready or RequestStatus.Failed)) _status = value;
+            }
+        }
+    }
 
     public double SentAt { get; }
 
@@ -44,6 +57,9 @@ public sealed class RequestReceipt
 
     public object? Response { get; private set; }
 
+    /// <summary>The original MessagePack [request ID, response] envelope, preserving binary map key types; null for a metadata/file response.</summary>
+    public byte[]? RawResponse { get; private set; }
+
     /// <summary>Response resource progress 0..1 while <see cref="Status"/> is Receiving.</summary>
     public double Progress { get; internal set; }
 
@@ -56,30 +72,37 @@ public sealed class RequestReceipt
     /// <summary>Completes with the response, or faults with <see cref="TimeoutException"/> when the request fails.</summary>
     public Task<object?> ResponseTask => _done.Task;
 
-    internal void Complete(object? response)
+    internal void Complete(object? response, byte[]? rawResponse = null)
     {
-        if (Status is RequestStatus.Ready or RequestStatus.Failed)
+        lock (_settlementGate)
         {
-            return;
-        }
+            if (Status is RequestStatus.Ready or RequestStatus.Failed)
+            {
+                return;
+            }
 
-        Response = response;
-        Status = RequestStatus.Ready;
-        Progress = 1;
-        _done.TrySetResult(response);
+            Response = response;
+            RawResponse = rawResponse;
+            Status = RequestStatus.Ready;
+            Progress = 1;
+            _done.TrySetResult(response);
+        }
         ResponseReceived?.Invoke(this);
     }
 
-    internal void Fail()
+    internal void Fail(bool notify = true)
     {
-        if (Status is RequestStatus.Ready or RequestStatus.Failed)
+        lock (_settlementGate)
         {
-            return;
-        }
+            if (Status is RequestStatus.Ready or RequestStatus.Failed)
+            {
+                return;
+            }
 
-        Status = RequestStatus.Failed;
-        _done.TrySetException(new TimeoutException("The request failed or timed out."));
-        Failed?.Invoke(this);
+            Status = RequestStatus.Failed;
+            _done.TrySetException(new TimeoutException("The request failed or timed out."));
+        }
+        if (notify) Failed?.Invoke(this);
     }
 }
 
@@ -181,7 +204,7 @@ public sealed partial class Link
         }
     }
 
-    internal void HandleResponse(byte[] requestId, object? response, object? metadata = null)
+    internal void HandleResponse(byte[] requestId, object? response, object? metadata = null, byte[]? rawResponse = null)
     {
         RequestReceipt? match = null;
         lock (_gate)
@@ -201,7 +224,8 @@ public sealed partial class Link
         if (match is not null)
         {
             match.Metadata = metadata;
-            match.Complete(response);
+            try { match.Complete(response, rawResponse); }
+            catch (Exception ex) { _mgr.Log?.Invoke("Request response callback failed: " + ex.Message); }
         }
     }
 }

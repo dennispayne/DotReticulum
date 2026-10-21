@@ -197,10 +197,12 @@ public sealed class LiveTransportFixture : IAsyncLifetime
 
         var config = RnsdConfigParser.Parse($"""
             [reticulum]
+              share_instance = no
               enable_transport = yes
             [interfaces]
               [[Server]]
                 type = TCPServerInterface
+                enabled = yes
                 listen_ip = 127.0.0.1
                 listen_port = {Port}
             """);
@@ -208,7 +210,7 @@ public sealed class LiveTransportFixture : IAsyncLifetime
         {
             // Run the real (e.g. NativeAOT) rnsd binary instead of the in-process host.
             Directory.CreateDirectory(_dir);
-            File.WriteAllText(Path.Combine(_dir, "config"), $"[reticulum]\n  enable_transport = yes\n[logging]\n  loglevel = 6\n[interfaces]\n  [[Server]]\n    type = TCPServerInterface\n    listen_ip = 127.0.0.1\n    listen_port = {Port}\n");
+            File.WriteAllText(Path.Combine(_dir, "config"), $"[reticulum]\n  share_instance = no\n  enable_transport = yes\n[logging]\n  loglevel = 6\n[interfaces]\n  [[Server]]\n    type = TCPServerInterface\n    enabled = yes\n    listen_ip = 127.0.0.1\n    listen_port = {Port}\n");
             var psi = new System.Diagnostics.ProcessStartInfo(exe, ["rnsd", "--config", _dir]) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
             _external = System.Diagnostics.Process.Start(psi)!;
             _external.OutputDataReceived += (_, e) => { lock (_rnsdLog) _rnsdLog.AppendLine(e.Data); };

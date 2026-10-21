@@ -50,19 +50,19 @@ public class RnsdConfigTests
     }
 
     [Fact]
-    public void Parse_DefaultsToNoTransportAndLogLevel4()
+    public void Parse_DefaultsToNoTransportAndNoticeWithoutLoggingSection()
     {
         var config = RnsdConfigParser.Parse("[reticulum]\n[interfaces]\n");
         Assert.False(config.EnableTransport);
-        Assert.Equal(4, config.LogLevel);
+        Assert.Equal(3, config.LogLevel);
         Assert.Empty(config.Interfaces);
     }
 
     [Theory]
-    [InlineData("[interfaces]\n[[X]]\ntype = AutoInterface\n")]
+    [InlineData("[interfaces]\n[[X]]\ntype = AutoInterface\nenabled=yes\n")]
     [InlineData("[interfaces]\n[[X]]\nenabled = yes\n")]
     [InlineData("[reticulum]\nenable_transport = maybe\n")]
-    [InlineData("[logging]\nloglevel = 9\n")]
+    [InlineData("[logging]\nloglevel = bad\n")]
     [InlineData("key = value\n")]
     [InlineData("[reticulum\n")]
     public void Parse_RejectsInvalidConfigurations(string text) => Assert.Throws<FormatException>(() => RnsdConfigParser.Parse(text));
@@ -80,7 +80,7 @@ public class RnsdConfigTests
 
 public class RnsdAppTests : IDisposable
 {
-    private readonly string _dir = Path.Combine(Path.GetTempPath(), "rnsd-test-" + Guid.NewGuid().ToString("N"));
+    private readonly string _dir = Path.Combine(Environment.CurrentDirectory, "TestResults", "rnsd-test-" + Guid.NewGuid().ToString("N"));
 
     public RnsdAppTests() => Directory.CreateDirectory(_dir);
 
@@ -125,11 +125,13 @@ public class RnsdAppTests : IDisposable
     }
 
     [Fact]
-    public async Task UnknownArgumentAndMissingConfig_Fail()
+    public async Task UnknownArgumentAndMissingConfigPath_FailWithoutCreatingConfiguration()
     {
         var error = new StringWriter();
         Assert.Equal(1, await RnsdApp.RunAsync(["--bogus"], new StringWriter(), error, CancellationToken.None));
-        Assert.Equal(1, await RnsdApp.RunAsync(["--config", Path.Combine(_dir, "missing")], new StringWriter(), error, CancellationToken.None));
+        var missing = Path.Combine(_dir, "missing");
+        Assert.Equal(1, await RnsdApp.RunAsync(["--config"], new StringWriter(), error, CancellationToken.None));
+        Assert.False(Directory.Exists(missing));
         Assert.NotEqual("", error.ToString());
     }
 
@@ -140,11 +142,13 @@ public class RnsdAppTests : IDisposable
         File.WriteAllText(Path.Combine(_dir, "config"), $"""
             [reticulum]
               enable_transport = yes
+              share_instance = no
             [logging]
               loglevel = 5
             [interfaces]
               [[Server]]
                 type = TCPServerInterface
+                enabled = yes
                 listen_ip = 127.0.0.1
                 listen_port = {port}
             """);

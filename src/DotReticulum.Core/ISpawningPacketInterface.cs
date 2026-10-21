@@ -12,6 +12,9 @@ namespace DotReticulum.Core;
 /// </remarks>
 public interface ISpawningPacketInterface : IPacketInterface
 {
+    /// <summary>Whether sends are performed on accepted peers instead of on the parent.</summary>
+    bool SendsThroughChildren => true;
+
     /// <summary>Raised for every newly connected child. Handlers must not block.</summary>
     event Action<IPacketInterface>? ChildConnected;
 }

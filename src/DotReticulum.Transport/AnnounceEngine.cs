@@ -71,7 +71,7 @@ public sealed class AnnounceEngineOptions
 /// by random hash, rate limiting, the announce (rebroadcast) table with hop/retry rules, and announce handler dispatch.
 /// Pure state machine: no I/O; <see cref="AnnounceProcessor"/> connects it to interfaces.
 /// </summary>
-public sealed class AnnounceEngine
+public sealed partial class AnnounceEngine
 {
     /// <summary>Upstream <c>PATHFINDER_M</c>.</summary>
     public const int MaxHops = 128;
@@ -147,7 +147,7 @@ public sealed class AnnounceEngine
     }
 
     /// <summary>Processes one received packet. <paramref name="packet"/> has the hop count as received on the wire; this adds the hop for this node.</summary>
-    public AnnounceResult Process(Packet packet, IPacketInterface? source)
+    public AnnounceResult Process(Packet packet, IPacketInterface? source, int hopIncrement = 1, bool queueRebroadcast = true)
     {
         ArgumentNullException.ThrowIfNull(packet);
         if (packet.PacketType != PacketType.Announce) return new(AnnounceOutcome.NotAnnounce);
@@ -156,7 +156,9 @@ public sealed class AnnounceEngine
         var validation = Announce.Validate(packet);
         if (!validation.IsValid) return new(AnnounceOutcome.Invalid, validation.Status);
         var data = validation.Data!;
-        var hops = packet.Hops + 1;
+        ArgumentOutOfRangeException.ThrowIfNegative(hopIncrement);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(hopIncrement, 1);
+        var hops = packet.Hops + hopIncrement;
         var destinationHash = packet.DestinationHash.ToArray();
         var key = Key(destinationHash);
         var packetHash = packet.CalculateHash();
@@ -234,7 +236,7 @@ public sealed class AnnounceEngine
                 if (blobs.Count > MaxRandomBlobs) blobs.RemoveRange(0, blobs.Count - MaxRandomBlobs);
             }
 
-            if (_options.TransportEnabled && !isPathResponse && !rateBlocked)
+            if (_options.TransportEnabled && queueRebroadcast && !isPathResponse && !rateBlocked)
             {
                 _table[key] = new TableEntry(now, now + Random.Shared.NextDouble() * RandomWindowSeconds, receivedFrom, hops, packet, source);
                 Trim(_table, e => e.Timestamp, key);
@@ -339,7 +341,13 @@ public sealed class AnnounceEngine
 
     public bool RemovePath(ReadOnlySpan<byte> destinationHash)
     {
-        lock (_gate) return _paths.Remove(Key(destinationHash));
+        lock (_gate)
+        {
+            var key = Key(destinationHash);
+            _table.Remove(key);
+            _responses.Remove(key);
+            return _paths.Remove(key);
+        }
     }
 
     /// <summary>

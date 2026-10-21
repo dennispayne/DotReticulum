@@ -33,10 +33,12 @@ public sealed class LiveLinkTransportFixture : IAsyncLifetime
 
         var config = RnsdConfigParser.Parse($"""
             [reticulum]
+              share_instance = no
               enable_transport = yes
             [interfaces]
               [[Server]]
                 type = TCPServerInterface
+                enabled = yes
                 listen_ip = 127.0.0.1
                 listen_port = {port}
             """);

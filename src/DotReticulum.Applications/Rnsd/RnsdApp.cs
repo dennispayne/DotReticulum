@@ -1,113 +1,4 @@
-using System.Net;
-using DotReticulum.Core;
-using DotReticulum.Interfaces;
-using DotReticulum.Transport;
-
 namespace DotReticulum.Applications.Rnsd;
-
-/// <summary>Builds the interface set, the manager and the <see cref="TransportRouter"/> for one <c>rnsd</c> instance.</summary>
-public sealed class RnsdHost : IAsyncDisposable
-{
-    private readonly PacketInterfaceManager _manager;
-
-    private RnsdHost(PacketInterfaceManager manager, TransportRouter router, IReadOnlyList<(string Name, IPacketInterface Interface)> interfaces)
-    {
-        _manager = manager;
-        Router = router;
-        Interfaces = interfaces;
-    }
-
-    public TransportRouter Router { get; }
-
-    public IReadOnlyList<(string Name, IPacketInterface Interface)> Interfaces { get; }
-
-    /// <summary>Creates (but does not start) the host. The transport identity is loaded from, or created at, <paramref name="transportIdentityPath"/>.</summary>
-    public static RnsdHost Create(RnsdConfig config, string transportIdentityPath, Action<int, string> log)
-    {
-        Identity identity;
-        if (File.Exists(transportIdentityPath))
-        {
-            identity = IdentityFile.Load(transportIdentityPath);
-        }
-        else
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(transportIdentityPath))!);
-            identity = Identity.Generate();
-            IdentityFile.SaveNew(identity, transportIdentityPath);
-            log(4, $"Created transport identity {identity.HexHash}");
-        }
-
-        var interfaces = new List<(string Name, IPacketInterface Interface)>();
-        var modes = new Dictionary<IPacketInterface, InterfaceMode>();
-        foreach (var cfg in config.Interfaces.Where(i => i.Enabled))
-        {
-            var iface = CreateInterface(cfg);
-            interfaces.Add((cfg.Name, iface));
-            modes[iface] = cfg.Mode;
-        }
-
-        var manager = new PacketInterfaceManager(interfaces.Select(i => i.Interface));
-        var router = new TransportRouter(manager, new TransportRouterOptions { TransportEnabled = config.EnableTransport, TransportIdentity = identity })
-        {
-            Log = message => log(5, message),
-        };
-
-        foreach (var (iface, mode) in modes)
-        {
-            router.SetInterfaceMode(iface, mode);
-            if (iface is ISpawningPacketInterface spawner)
-            {
-                var spawnedMode = mode;
-                spawner.ChildConnected += child =>
-                {
-                    router.SetInterfaceMode(child, spawnedMode);
-                    log(5, $"Client connected to a {spawner.GetType().Name}");
-                };
-            }
-        }
-
-        return new RnsdHost(manager, router, interfaces);
-    }
-
-    /// <summary>Starts every interface; throws (after disposing everything) if one cannot be started.</summary>
-    public ValueTask StartAsync(CancellationToken cancellationToken) => _manager.StartAsync(cancellationToken);
-
-    /// <summary>Routes packets until cancelled.</summary>
-    public Task RunAsync(CancellationToken cancellationToken) => Router.RunAsync(cancellationToken);
-
-    public ValueTask DisposeAsync() => _manager.DisposeAsync();
-
-    public static IPacketInterface CreateInterface(RnsdInterfaceConfig cfg)
-    {
-        switch (cfg.Type)
-        {
-            case RnsdInterfaceType.TcpServer:
-                return new TcpServerPacketInterface(new IPEndPoint(Address(cfg, "listen_ip", "0.0.0.0"), cfg.GetInt("listen_port", cfg.GetInt("port", 4242), 0, 65535)),
-                    perClientInterfaces: true);
-            case RnsdInterfaceType.TcpClient:
-                return new TcpClientPacketInterface(cfg.Get("target_host") ?? throw new FormatException($"Interface '{cfg.Name}': target_host is required."),
-                    cfg.GetInt("target_port", cfg.GetInt("port", 4242), 1, 65535));
-            case RnsdInterfaceType.Udp:
-            {
-                var port = cfg.GetInt("port", 4242, 0, 65535);
-                return new UdpPacketInterface(
-                    new IPEndPoint(Address(cfg, "listen_ip", "0.0.0.0"), cfg.GetInt("listen_port", port, 0, 65535)),
-                    new IPEndPoint(Address(cfg, "forward_ip", "255.255.255.255"), cfg.GetInt("forward_port", port, 1, 65535)));
-            }
-            case RnsdInterfaceType.Serial:
-                return new SerialPacketInterface(cfg.Get("port") ?? throw new FormatException($"Interface '{cfg.Name}': port is required."),
-                    cfg.GetInt("speed", 9600, 1));
-            default:
-                throw new FormatException($"Interface '{cfg.Name}': unsupported type.");
-        }
-    }
-
-    private static IPAddress Address(RnsdInterfaceConfig cfg, string key, string fallback)
-    {
-        var text = cfg.Get(key) ?? fallback;
-        return IPAddress.TryParse(text, out var address) ? address : throw new FormatException($"Interface '{cfg.Name}': '{key}' must be an IP address, got '{text}'.");
-    }
-}
 
 /// <summary>Command line front end of <c>rnsd</c>.</summary>
 public static class RnsdApp
@@ -116,20 +7,28 @@ public static class RnsdApp
         DotReticulum rnsd - Reticulum transport daemon (experimental)
 
         Usage:
-          rnsd [--config <dir|file>] [-v|-vv] [-q]
+          rnsd [--config <dir|file>] [-v|-vv] [-q] [--service] [--interactive]
           rnsd --exampleconfig       Print an example configuration
           rnsd --help
 
         Options:
           -c, --config <path>   Configuration directory (containing 'config') or a config file.
-                                Default: ~/.dotreticulum. State (transport identity) is kept in
+                                Search: system /etc/reticulum, ~/.config/reticulum, ~/.reticulum.
+                                Missing configs are created. State (transport identity) is kept in
                                 <dir>/storage/transport_identity.
           -v, --verbose         Raise the log level (repeatable); -q lowers it. The default level
-                                comes from [logging] loglevel (0 critical .. 7 extreme; default 4).
+                                comes from [logging] loglevel (0 critical .. 8 extreme).
+          -s, --service         Log to <config dir>/logfile; ignore verbosity adjustments.
+          -i, --interactive     Native management shell: help, status, interfaces, persist, quit.
+                                A deliberate replacement for the upstream Python REPL; no code execution.
+          --allow-discovery-commands
+                                Explicitly authorize configured discovery metadata executables.
+                                No shell or arguments; bounded execution. Disabled by default.
+          --version             Show DotReticulum and pinned reference versions.
           --exampleconfig       Print an example configuration to stdout and exit.
           -h, --help            Show this help.
 
-        The config file is a subset of Reticulum's ini format; see docs/rnsd.md.
+        Unsupported configuration controls are errors; see docs/rnsd.md.
         Stop with Ctrl+C or SIGTERM.
         """;
 
@@ -171,62 +70,110 @@ public static class RnsdApp
           #   speed = 115200
         """;
 
-    private static readonly string[] LevelNames = ["CRITICAL", "ERROR", "WARNING", "NOTICE", "INFO", "VERBOSE", "DEBUG", "EXTREME"];
-
     /// <summary>Runs the daemon. Returns the process exit code; completes after <paramref name="stop"/> is cancelled and everything is disposed.</summary>
-    public static async Task<int> RunAsync(string[] args, TextWriter output, TextWriter error, CancellationToken stop)
+    public static async Task<int> RunAsync(string[] args, TextWriter output, TextWriter error, CancellationToken stop, TextReader? input = null)
+    {
+        try { return await RunCoreAsync(args, output, error, stop, input).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested) { return 0; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException
+            or ArgumentException or NotSupportedException or AggregateException)
+        { return Fail(error, ex.Message); }
+    }
+
+    private static async Task<int> RunCoreAsync(string[] args, TextWriter output, TextWriter error, CancellationToken stop, TextReader? input)
     {
         string? configArg = null;
         var verbosity = 0;
+        var service = false;
+        var interactive = false;
+        var example = false;
+        var help = false;
+        var version = false;
+        var allowDiscoveryCommands = false;
         for (var i = 0; i < args.Length; i++)
         {
             switch (args[i])
             {
                 case "-h" or "--help" or "-?":
-                    output.WriteLine(Usage);
-                    return 0;
+                    help = true;
+                    break;
                 case "--exampleconfig":
-                    output.WriteLine(ExampleConfig);
-                    return 0;
+                    example = true;
+                    break;
+                case "--version":
+                    version = true;
+                    break;
+                case "-s" or "--service":
+                    service = true;
+                    break;
+                case "-i" or "--interactive":
+                    interactive = true;
+                    break;
+                case "--allow-discovery-commands":
+                    allowDiscoveryCommands = true;
+                    break;
                 case "-c" or "--config":
                     if (i + 1 >= args.Length) return Fail(error, $"{args[i]} requires a path.");
+                    if (args[i + 1].StartsWith('-')) return Fail(error, $"{args[i]} requires a path.");
                     configArg = args[++i];
                     break;
                 case "-v" or "--verbose":
                     verbosity++;
                     break;
-                case "-vv":
-                    verbosity += 2;
-                    break;
                 case "-q" or "--quiet":
                     verbosity--;
                     break;
                 default:
+                    if (args[i].StartsWith("--config=", StringComparison.Ordinal))
+                    {
+                        configArg = args[i]["--config=".Length..];
+                        if (configArg.Length == 0) return Fail(error, "--config requires a path.");
+                        break;
+                    }
+                    if (args[i].Length > 2 && args[i][0] == '-' && args[i][1..].All(c => c is 'v' or 'q'))
+                    {
+                        verbosity += args[i][1..].Sum(c => c == 'v' ? 1 : -1);
+                        break;
+                    }
                     error.WriteLine(Usage);
                     return Fail(error, $"unknown argument '{args[i]}'.");
             }
         }
 
-        var (configDir, configFile) = ResolveConfig(configArg);
-        if (!File.Exists(configFile))
+        if (help) { output.WriteLine(Usage); return 0; }
+        if (version)
         {
-            return Fail(error, $"configuration file '{configFile}' does not exist. Create it (see --exampleconfig).");
+            output.WriteLine($"rnsd DotReticulum {typeof(RnsdApp).Assembly.GetName().Version} (experimental; reference RNS 1.5.7)");
+            return 0;
         }
+        if (example) { output.WriteLine(ExampleConfig); return 0; }
 
         RnsdConfig config;
-        try { config = RnsdConfigParser.Parse(await File.ReadAllTextAsync(configFile, CancellationToken.None).ConfigureAwait(false)); }
-        catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException) { return Fail(error, $"{configFile}: {ex.Message}"); }
-
-        var level = Math.Clamp(config.LogLevel + verbosity, 0, 7);
-        var gate = new object();
-        void Log(int messageLevel, string message)
+        string configDir, configFile;
+        bool created;
+        try
         {
-            if (messageLevel > level) return;
-            lock (gate) output.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{LevelNames[messageLevel]}] {message}");
+            (configDir, configFile) = ResolveConfig(configArg);
+            created = RnsdConfigurationFiles.EnsureCreated(configDir, configFile);
+            config = RnsdConfigParser.Parse(await File.ReadAllTextAsync(configFile, stop).ConfigureAwait(false)) with { SourcePath = configFile };
         }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested) { return 0; }
+        catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException or ArgumentException)
+        { return Fail(error, ex.Message); }
+
+        var level = RnsdLogger.LevelFor(config, verbosity, service);
+        var logger = new RnsdLogger(level, config.LogTimestamps, output, error, service ? Path.Combine(configDir, "logfile") : null);
+        void Log(int messageLevel, string message) => logger.Log(messageLevel, message);
+        if (created)
+            Log(2, $"Default config file created at '{configFile}'. AutoInterface is unsupported; no external interface is enabled. Configure a supported interface and restart.");
 
         RnsdHost host;
-        try { host = RnsdHost.Create(config, Path.Combine(configDir, "storage", "transport_identity"), Log); }
+        try
+        {
+            host = await RnsdHost.CreateAsync(config, Path.Combine(configDir, "storage", "transport_identity"), Log,
+                executionPolicy: new Runtime.RuntimeExecutionPolicy { AllowDiscoveryCommands = allowDiscoveryCommands },
+                cancellationToken: stop).ConfigureAwait(false);
+        }
         catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException)
         {
             return Fail(error, ex.Message);
@@ -235,31 +182,53 @@ public static class RnsdApp
         await using (host.ConfigureAwait(false))
         {
             try { await host.StartAsync(stop).ConfigureAwait(false); }
-            catch (OperationCanceledException) { return 0; }
-            catch (Exception ex) { return Fail(error, $"could not start interfaces: {ex.Message}"); }
+            catch (OperationCanceledException) when (stop.IsCancellationRequested) { return 0; }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Net.Sockets.SocketException or InvalidOperationException or ArgumentException)
+            { return Fail(error, $"could not start interfaces: {ex.Message}"); }
 
             Log(4, $"Transport instance {Convert.ToHexStringLower(host.Router.TransportId)} started; transport {(config.EnableTransport ? "enabled" : "disabled")}");
             foreach (var (name, iface) in host.Interfaces) Log(4, $"Interface '{name}' ({iface.GetType().Name}) is up");
             Log(4, "rnsd ready");
 
-            try { await host.RunAsync(stop).ConfigureAwait(false); }
-            catch (Exception ex) when (ex is not OperationCanceledException) { return Fail(error, $"router failed: {ex.Message}"); }
+            try
+            {
+                if (interactive)
+                {
+                    using var interactiveStop = CancellationTokenSource.CreateLinkedTokenSource(stop);
+                    var run = host.RunAsync(interactiveStop.Token);
+                    var shell = RnsdInteractiveShell.RunAsync(host, input ?? Console.In, output, error, interactiveStop.Token);
+                    try { await Task.WhenAny(run, shell).ConfigureAwait(false); }
+                    finally { await interactiveStop.CancelAsync().ConfigureAwait(false); }
+                    try { await run.ConfigureAwait(false); }
+                    catch (OperationCanceledException) when (interactiveStop.IsCancellationRequested) { }
+                    try { await shell.ConfigureAwait(false); }
+                    catch (OperationCanceledException) when (interactiveStop.IsCancellationRequested) { }
+                }
+                else await host.RunAsync(stop).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
+            catch (Exception ex) when (ex is IOException or System.Net.Sockets.SocketException or InvalidOperationException)
+            { return Fail(error, $"daemon failed: {ex.Message}"); }
             Log(4, "Shutting down");
+            try
+            {
+                using var persistTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await host.PersistAsync(persistTimeout.Token).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or OperationCanceledException)
+            { return Fail(error, $"shutdown persistence failed: {ex.Message}"); }
         }
 
         return 0;
     }
 
-    public static (string Dir, string File) ResolveConfig(string? configArg)
-    {
-        if (configArg is null)
-        {
-            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dotreticulum");
-            return (dir, Path.Combine(dir, "config"));
-        }
+    public static (string Dir, string File) ResolveConfig(string? configArg) => RnsdConfigurationFiles.Resolve(configArg);
 
-        var full = Path.GetFullPath(configArg);
-        return Directory.Exists(full) ? (full, Path.Combine(full, "config")) : (Path.GetDirectoryName(full)!, full);
+    public static (string Directory, string File, RnsdConfig Config) LoadConfiguration(string? configArg, Runtime.InterfaceFactoryRegistry? extensions = null)
+    {
+        var (directory, file) = ResolveConfig(configArg);
+        RnsdConfigurationFiles.EnsureCreated(directory, file);
+        return (directory, file, RnsdConfigParser.Parse(System.IO.File.ReadAllText(file), extensions) with { SourcePath = file });
     }
 
     private static int Fail(TextWriter error, string message)

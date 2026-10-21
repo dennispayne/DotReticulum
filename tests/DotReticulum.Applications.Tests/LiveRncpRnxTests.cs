@@ -37,7 +37,6 @@ internal sealed class PyTool : IDisposable
             [reticulum]
               enable_transport = False
               share_instance = No
-              panic_on_interface_error = No
             [logging]
               loglevel = 4
             [interfaces]
