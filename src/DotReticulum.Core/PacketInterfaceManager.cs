@@ -502,6 +502,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         var token = state.Cancellation.Token;
         try
         {
+            token.ThrowIfCancellationRequested();
             await foreach (var raw in iface.ReceiveAsync(token).ConfigureAwait(false))
             {
                 if (!Packet.TryParse(raw, out var packet))
@@ -520,6 +521,9 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+        }
+        catch (ObjectDisposedException) when (token.IsCancellationRequested)
         {
         }
         catch (ChannelClosedException)

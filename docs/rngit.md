@@ -213,7 +213,10 @@ does not establish support on other systems. Do not install two different
 helpers with that name earlier on `PATH`/Git's exec path.
 
 `DOTRETICULUM_RNS_CONFIG` selects our Reticulum configuration; `RNS_CONFIG`
-is the fallback environment alias. The default is `~/.dotreticulum`.
+is the fallback environment alias. With neither set, use the same configuration
+discovery as `rnsd`: an existing system `/etc/reticulum/config`, then
+`~/.config/reticulum/config`, otherwise `~/.reticulum` (with the Windows
+system-directory mapping described in [rnsd.md](rnsd.md)).
 `DOTRETICULUM_RNGIT_TIMEOUT` sets a positive overall deadline in seconds
 (default 7200, including Git protocol input). `DOTRETICULUM_RNGIT_MAX_RESPONSE`
 sets the positive response byte cap (default 268435456).
@@ -257,7 +260,9 @@ the older .NET `<RNS config>\storage\rngit`. To preserve an existing authorized
 identity, explicitly copy that file into the selected client directory as
 `client_identity` **before first use**, without overwriting another identity.
 The direct `rngit clone/fetch` CLI keeps its existing RNS storage identity.
-Python shared-instance attachment is still not implemented.
+The helper uses the same shared-instance election as the other native applications,
+including attachment to a native or pinned Python owner. Endpoint and RPC
+authentication settings must match; see [runtime operations](runtime-operations.md).
 
 Git discovers the executable by name. For managed development only, copy the
 Release **apphost** (`DotReticulum.Applications.exe` on Windows) under the helper
@@ -364,8 +369,11 @@ Reticulum transport gateway:
 
 The server must be reachable through that interface and permit reads from the
 client identity (persisted as `<config directory>\storage\rngit`).
-There is no Python shared-instance attachment. See [rnsd.md](rnsd.md) for
-the supported configuration subset.
+Shared-instance election can attach to a native or pinned Python owner rather than
+opening physical interfaces; a separate configuration directory requires a common
+explicit RPC key. Set `share_instance=no` for independent interface ownership.
+See [rnsd.md](rnsd.md) and [runtime operations](runtime-operations.md) for configuration
+and ownership boundaries.
 
 `--timeout <seconds>` is an overall deadline covering startup, path discovery,
 link establishment, all requests/transfers, and local Git commands (default

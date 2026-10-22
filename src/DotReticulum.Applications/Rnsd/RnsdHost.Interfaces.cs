@@ -46,6 +46,8 @@ public sealed partial class RnsdHost
         try
         {
             if (!internalForced) ThrowIfDisposed();
+            var replacement = (configuration ?? _configuration).Interfaces.SingleOrDefault(i => i.Name == name);
+            if (replacement is not null) ValidateAdvertisement(replacement);
             var detached = await DetachCoreAsync(name, cancellationToken).ConfigureAwait(false);
             return detached == true ? await AttachCoreAsync(name, configuration ?? _configuration, cancellationToken).ConfigureAwait(false) : detached;
         }
@@ -65,16 +67,27 @@ public sealed partial class RnsdHost
             _log(1, $"Cannot attach interface '{name}': no configuration entry exists.");
             return null;
         }
+        ValidateAdvertisement(settings);
         var iface = CreateInterface(settings, _extensions);
-        ConfigureMode(iface, settings.Mode);
-        try { await _manager.AttachAsync(iface, cancellationToken).ConfigureAwait(false); }
-        catch
+        try
+        {
+            ConfigureMode(iface, settings.Mode);
+            await _manager.AttachAsync(iface, cancellationToken).ConfigureAwait(false);
+            lock (_gate) _interfaces.Add((name, iface));
+            RegisterAdvertisement(settings);
+        }
+        catch (Exception original)
         {
             RemoveModeHandler(iface);
-            await iface.DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                if (_manager.Contains(iface)) await _manager.DetachAsync(iface).ConfigureAwait(false);
+                else await iface.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception cleanup) { throw new AggregateException("Interface attach and cleanup failed.", original, cleanup); }
+            finally { lock (_gate) _interfaces.RemoveAll(i => ReferenceEquals(i.Interface, iface)); }
             throw;
         }
-        lock (_gate) _interfaces.Add((name, iface));
         _log(4, $"Interface '{name}' was attached.");
         return true;
     }
@@ -94,9 +107,15 @@ public sealed partial class RnsdHost
             _log(2, "The shared-instance interface cannot be detached through interface management.");
             return false;
         }
-        await _manager.DetachAsync(iface, cancellationToken).ConfigureAwait(false);
-        RemoveModeHandler(iface);
-        lock (_gate) _interfaces.RemoveAll(i => ReferenceEquals(i.Interface, iface));
+        // Tick holds the announcer gate while reading host metadata; never wait for it under _gate.
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_announcer is not null) await _announcer.UnregisterAsync(name, cancellationToken).ConfigureAwait(false);
+        try { await _manager.DetachAsync(iface).ConfigureAwait(false); }
+        finally
+        {
+            RemoveModeHandler(iface);
+            lock (_gate) _interfaces.RemoveAll(i => ReferenceEquals(i.Interface, iface));
+        }
         _log(4, $"Interface '{name}' was detached.");
         return true;
     }

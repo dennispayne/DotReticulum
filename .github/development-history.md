@@ -6,6 +6,74 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
+### Discovery advertisement lifecycle regression follow-up (2026-10-22)
+
+Follow-up to Parity 3 commit `c4b0ba2`: reconcile named interface
+attach/detach/reload with discovery advertisement registration, including the
+current listener port, replacement metadata/name/endpoint, interval, location
+provider, enablement and publication validation. Runtime documentation now
+distinguishes per-interface mutation from global reconfiguration, replacement
+validation from later initialization failure, and registration from scheduled
+publication. The original milestone evidence below remains historical; it does
+not verify this follow-up.
+
+Removed stale shared-instance limitations from the rncp/rnx and Git utility
+guides: these tools now use the common native runtime's election/attachment
+contract, including its explicit cross-directory RPC-key requirement. Corrected
+the Git helper's stale default network-config directory to the runtime's
+`rnsd` configuration discovery order.
+
+Four deterministic discovery regression cases decode signed outgoing
+advertisements, verify replacement metadata and the actual bound port, and
+exercise replacement intervals, disabled discovery/interfaces, the first dynamic
+publisher and detach/reattach. An injected discovery clock avoids scheduler sleeps.
+Publication requirements are validated before a reload removes the old interface.
+
+Full-suite integration exposed a closely related detach race: a queued receiver
+could enter an already-disposed TCP interface and incorrectly terminate the
+manager. Receivers now check cancellation before entering the bearer and treat
+disposal after owned cancellation as normal shutdown. A fifth new regression
+case deterministically overlaps receive/disposal and verifies unrelated traffic
+and later attachments. An investigation run also reproduced the previously
+observed intermittent Windows statistics-file access-denied failure; no unrelated
+statistics implementation was changed. The final full run below passed.
+
+Validation on Windows x64:
+
+- Baseline `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`
+  and `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet`:
+  **zero build warnings/errors; 863 passed, 60 skipped, zero failed**.
+- `dotnet test DotReticulum.slnx -c Release --filter
+  "FullyQualifiedName~PacketInterfaceManagerTests|FullyQualifiedName~RuntimeDiscoveryHostTests"
+  --nologo -v quiet`: **34 passed, zero skipped/failed** after the detach fix.
+- Final `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`
+  and `dotnet test DotReticulum.slnx -c Release --no-build -m:1 --nologo
+  -v quiet --logger trx --results-directory TestResults\discovery-reload-verified`:
+  **zero build warnings/errors; 868 passed, 60 skipped, zero failed**.
+- `dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj
+  -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true
+  -p:IlcTreatWarningsAsErrors=true -o artifacts\native-discovery-reload
+  --no-restore --nologo -v quiet`: **passed**, with MSVC setup and publish in
+  the same process. Published `--help` and `rnsd --version` both exited zero.
+- With `DOTRETICULUM_NATIVE_EXE` set to that binary,
+  `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
+  -c Release --no-build --filter "FullyQualifiedName~NativeResourceTests"
+  --nologo -v quiet`: **one passed**, a **2,200,017-byte** encrypted,
+  compressed resource roundtrip.
+- `pwsh -NoProfile -File tests\run-pester.ps1 -Application
+  artifacts\native-discovery-reload\DotReticulum.Applications.exe`:
+  **16 passed, three skipped, zero failed**. This executes native daemon,
+  configuration, persistence, shared-instance election and multi-megabyte rncp
+  processes. Skips are POSIX SIGTERM and two Python-environment-dependent flows;
+  the reference environment was not enabled for this follow-up.
+
+No new wire/live interoperability, native discovery-reload process observation,
+platform coverage or upstream-pin change is claimed. Discovery mutation is
+verified through the managed host and real signed packet output; native feature
+execution is limited to the flows listed above. The Parity 3 evidence remains
+Windows x64-only, with later-phase interface/transport/platform limitations
+unchanged. No phase checkbox or interop claim changed.
+
 ### Parity 3 runtime, configuration and operations (2026-10-21)
 
 Started on clean `main` at `c5ac441`. The initial Release build was warning-free;

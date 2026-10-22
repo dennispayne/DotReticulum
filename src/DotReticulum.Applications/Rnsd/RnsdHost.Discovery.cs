@@ -11,15 +11,35 @@ public sealed partial class RnsdHost
     {
         var publishable = _configuration.Interfaces.Where(i => i.Enabled && i.Discovery.Enabled).ToArray();
         if (publishable.Length == 0) return;
+        foreach (var settings in publishable) ValidateAdvertisement(settings);
         foreach (var settings in publishable)
-        {
-            if (settings.Type != RnsdInterfaceType.TcpServer)
-                throw new NotSupportedException($"Interface '{settings.Name}': discovery publication is only supported for the native TCP server bearer.");
-            if (settings.Discovery.Encrypt && _networkIdentity is null)
-                throw new InvalidOperationException($"Interface '{settings.Name}': encrypted discovery requires network_identity.");
-            if (settings.Discovery.LocationCommand is not null && !_executionPolicy.AllowDiscoveryCommands)
-                throw new UnauthorizedAccessException($"Interface '{settings.Name}': location_cmd requires explicit --allow-discovery-commands authorization.");
-        }
+            RegisterAdvertisement(settings);
+    }
+
+    private void ValidateAdvertisement(RnsdInterfaceConfig settings)
+    {
+        if (!settings.Enabled || !settings.Discovery.Enabled) return;
+        if (settings.Type != RnsdInterfaceType.TcpServer)
+            throw new NotSupportedException($"Interface '{settings.Name}': discovery publication is only supported for the native TCP server bearer.");
+        if (settings.Discovery.Encrypt && _networkIdentity is null)
+            throw new InvalidOperationException($"Interface '{settings.Name}': encrypted discovery requires network_identity.");
+        if (settings.Discovery.LocationCommand is not null && !_executionPolicy.AllowDiscoveryCommands)
+            throw new UnauthorizedAccessException($"Interface '{settings.Name}': location_cmd requires explicit --allow-discovery-commands authorization.");
+        if (settings.Discovery.AnnounceInterval <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(settings), "Discovery advertisement interval must be positive.");
+    }
+
+    private void RegisterAdvertisement(RnsdInterfaceConfig settings)
+    {
+        if (!settings.Enabled || !settings.Discovery.Enabled) return;
+        EnsureAnnouncer();
+        _announcer!.Register(settings.Name, settings.Discovery.AnnounceInterval, token => ReadAdvertisementAsync(settings, token),
+            settings.Discovery.LocationCommand);
+    }
+
+    private void EnsureAnnouncer()
+    {
+        if (_announcer is not null) return;
         var identity = _networkIdentity ?? Router.TransportIdentity;
         var destination = Destination.Create(DestinationType.Single, "rnstransport", ["discovery", "interface"], identity);
         Router.RegisterLocalDestination(new LocalDestination(identity, destination));
@@ -28,13 +48,13 @@ public sealed partial class RnsdHost
             var local = new LocalDestination(identity, destination) { AppData = payload.ToArray() };
             Router.RegisterLocalDestination(local);
             await Router.AnnounceAsync(local, cancellationToken: token).ConfigureAwait(false);
-        }, _networkIdentity, diagnostic: message => _log(1, message),
+        }, _networkIdentity, timeProvider: _timeProvider, diagnostic: message => _log(1, message),
             metadataResolver: (advertisement, location, token) => DiscoveryMetadata.ResolveAsync(advertisement, location,
                 token, _executionPolicy.DiscoveryCommandTimeout, _ => _executionPolicy.AllowDiscoveryCommands));
-        foreach (var settings in publishable)
-            _announcer.Register(settings.Name, settings.Discovery.AnnounceInterval, token => ReadAdvertisementAsync(settings, token),
-                settings.Discovery.LocationCommand);
     }
+
+    internal ValueTask TickDiscoveryAdvertisementsAsync(CancellationToken cancellationToken = default) =>
+        _announcer?.TickAsync(cancellationToken) ?? ValueTask.CompletedTask;
 
     private ValueTask<DiscoveryAdvertisement> ReadAdvertisementAsync(RnsdInterfaceConfig settings, CancellationToken token)
     {

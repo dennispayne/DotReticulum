@@ -161,7 +161,7 @@ public sealed partial class RnsdHost
         do
         {
             if (_discovery is not null) await _discovery.TickAsync(token).ConfigureAwait(false);
-            if (_announcer is not null) await _announcer.TickAsync(token).ConfigureAwait(false);
+            await TickDiscoveryAdvertisementsAsync(token).ConfigureAwait(false);
             if (_blackholeService is not null) await _blackholeService.TickAsync(token).ConfigureAwait(false);
             var now = DateTimeOffset.UtcNow;
             if (now - lastClean >= TimeSpan.FromMinutes(15))
@@ -209,10 +209,10 @@ public sealed partial class RnsdHost
         if (_rpcServer is not null) await Release(() => _rpcServer.DisposeAsync().AsTask()).ConfigureAwait(false);
         _rpcClient?.Dispose();
         if (_discovery is not null) await Release(() => _discovery.DisposeAsync().AsTask()).ConfigureAwait(false);
-        if (_announcer is not null) await Release(() => _announcer.DisposeAsync().AsTask()).ConfigureAwait(false);
         await _mutation.WaitAsync().ConfigureAwait(false);
         try
         {
+            if (_announcer is not null) await Release(() => _announcer.DisposeAsync().AsTask()).ConfigureAwait(false);
             await Release(() => Router.DisposeAsync().AsTask()).ConfigureAwait(false);
             await Release(() => _manager.DisposeAsync().AsTask()).ConfigureAwait(false);
         }

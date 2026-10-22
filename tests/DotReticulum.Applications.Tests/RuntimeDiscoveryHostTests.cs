@@ -1,12 +1,202 @@
+using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 using DotReticulum.Applications.Rnsd;
 using DotReticulum.Applications.Runtime;
 using DotReticulum.Core;
+using DotReticulum.Interfaces;
 using DotReticulum.Transport;
 
 namespace DotReticulum.Applications.Tests;
 
 public sealed class RuntimeDiscoveryHostTests
 {
+    [Fact]
+    public async Task ReloadedPublisherUsesReplacementMetadataBoundEndpointAndInterval()
+    {
+        var root = DiscoveryTestDirectory();
+        var clock = new DiscoveryClock();
+        var feed = new AdvertisementFeed();
+        var registry = DiscoveryRegistry(feed);
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try
+        {
+            await using var host = RnsdHost.Create(PublicationConfiguration(registry), Path.Combine(root, "transport_identity"),
+                (_, _) => { }, registry, timeProvider: clock);
+            await host.StartAsync(stop.Token);
+            await host.TickDiscoveryAdvertisementsAsync(stop.Token);
+            var original = ReadAdvertisement(feed, host);
+            Assert.Equal("Original publisher", original.Name);
+            Assert.Equal("localhost", original.ReachableOn);
+            var originalServer = Assert.IsType<TcpServerPacketInterface>(host.Interfaces.Single(i => i.Name == "Published").Interface);
+            Assert.Equal(originalServer.LocalEndpoint!.Port, original.Port);
+            feed.Sent.Clear();
+
+            var replacement = PublicationConfiguration(registry, replacement: true);
+            Assert.True(await host.ReloadInterfaceAsync("Published", replacement, cancellationToken: stop.Token));
+            clock.Advance(TimeSpan.FromSeconds(61));
+            await host.TickDiscoveryAdvertisementsAsync(stop.Token);
+            var updated = ReadAdvertisement(feed, host);
+            var server = Assert.IsType<TcpServerPacketInterface>(host.Interfaces.Single(i => i.Name == "Published").Interface);
+            Assert.NotSame(originalServer, server);
+            Assert.Equal("Replacement publisher", updated.Name);
+            Assert.Equal("127.0.0.1", updated.ReachableOn);
+            Assert.Equal(53.2, updated.Latitude);
+            Assert.Equal(-2.6, updated.Longitude);
+            Assert.Equal(456d, updated.Height);
+            Assert.Equal(server.LocalEndpoint!.Port, updated.Port);
+            Assert.True(updated.Port > 0);
+            feed.Sent.Clear();
+
+            clock.Advance(TimeSpan.FromMinutes(6));
+            await host.TickDiscoveryAdvertisementsAsync(stop.Token);
+            Assert.Empty(feed.Sent);
+            clock.Advance(TimeSpan.FromMinutes(5));
+            await host.TickDiscoveryAdvertisementsAsync(stop.Token);
+            Assert.Equal("Replacement publisher", ReadAdvertisement(feed, host).Name);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task PublisherRegistrationTracksDisableEnableDetachAndAttach(bool initiallyDiscoverable, bool disableInterface)
+    {
+        var root = DiscoveryTestDirectory();
+        var clock = new DiscoveryClock();
+        var feed = new AdvertisementFeed();
+        var registry = DiscoveryRegistry(feed);
+        var logs = new List<string>();
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try
+        {
+            await using var host = RnsdHost.Create(PublicationConfiguration(registry, initiallyDiscoverable),
+                Path.Combine(root, "transport_identity"), (_, message) => logs.Add(message), registry, timeProvider: clock);
+            await host.StartAsync(stop.Token);
+            await host.TickDiscoveryAdvertisementsAsync(stop.Token);
+            if (initiallyDiscoverable) Assert.Equal("Original publisher", ReadAdvertisement(feed, host).Name);
+            else Assert.Empty(feed.Sent);
+            feed.Sent.Clear();
+
+            if (initiallyDiscoverable)
+                Assert.True(await host.ReloadInterfaceAsync("Published",
+                    PublicationConfiguration(registry, discoverable: disableInterface, enabled: !disableInterface),
+                    cancellationToken: stop.Token));
+            else
+                Assert.True(await host.DetachInterfaceAsync("Published", cancellationToken: stop.Token));
+            clock.Advance(TimeSpan.FromHours(1));
+            await host.TickDiscoveryAdvertisementsAsync(stop.Token);
+            Assert.Empty(feed.Sent);
+
+            var enabled = PublicationConfiguration(registry, replacement: true);
+            if (initiallyDiscoverable)
+                Assert.True(await host.ReloadInterfaceAsync("Published", enabled, cancellationToken: stop.Token));
+            else
+                Assert.True(await host.AttachInterfaceAsync("Published", enabled, cancellationToken: stop.Token));
+            clock.Advance(TimeSpan.FromSeconds(61));
+            await host.TickDiscoveryAdvertisementsAsync(stop.Token);
+            Assert.Equal("Replacement publisher", ReadAdvertisement(feed, host).Name);
+            feed.Sent.Clear();
+
+            Assert.True(await host.DetachInterfaceAsync("Published", cancellationToken: stop.Token));
+            clock.Advance(TimeSpan.FromHours(1));
+            await host.TickDiscoveryAdvertisementsAsync(stop.Token);
+            Assert.Empty(feed.Sent);
+            Assert.DoesNotContain(logs, message => message.Contains("Discovery advertisement for", StringComparison.Ordinal));
+
+            Assert.True(await host.AttachInterfaceAsync("Published", enabled, cancellationToken: stop.Token));
+            clock.Advance(TimeSpan.FromSeconds(61));
+            await host.TickDiscoveryAdvertisementsAsync(stop.Token);
+            var attached = ReadAdvertisement(feed, host);
+            var server = Assert.IsType<TcpServerPacketInterface>(host.Interfaces.Single(i => i.Name == "Published").Interface);
+            Assert.Equal("Replacement publisher", attached.Name);
+            Assert.Equal(server.LocalEndpoint!.Port, attached.Port);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
+    }
+
+    private static string DiscoveryTestDirectory() => Path.Combine(Directory.GetCurrentDirectory(), "TestResults",
+        "discovery-reload-" + Guid.NewGuid().ToString("N"));
+
+    private static InterfaceFactoryRegistry DiscoveryRegistry(AdvertisementFeed feed)
+    {
+        var registry = new InterfaceFactoryRegistry();
+        registry.Register("AdvertisementFeed", [], _ => feed);
+        return registry;
+    }
+
+    private static RnsdConfig PublicationConfiguration(InterfaceFactoryRegistry registry, bool discoverable = true,
+        bool replacement = false, bool enabled = true) => RnsdConfigParser.Parse($"""
+            [reticulum]
+            share_instance=no
+            enable_transport=yes
+            [interfaces]
+            [[Feed]]
+            type=AdvertisementFeed
+            enabled=yes
+            [[Published]]
+            type=TCPServerInterface
+            enabled={(enabled ? "yes" : "no")}
+            listen_ip=127.0.0.1
+            listen_port=0
+            discoverable={(discoverable ? "yes" : "no")}
+            reachable_on={(replacement ? "127.0.0.1" : "localhost")}
+            discovery_name={(replacement ? "Replacement publisher" : "Original publisher")}
+            discovery_stamp_value=1
+            announce_interval={(replacement ? 10 : 5)}
+            latitude={(replacement ? "53.2" : "52.1")}
+            longitude={(replacement ? "-2.6" : "-1.5")}
+            height={(replacement ? 456 : 123)}
+            """, registry);
+
+    private static DiscoveryRecord ReadAdvertisement(AdvertisementFeed feed, RnsdHost host)
+    {
+        var packet = Packet.Parse(Assert.Single(feed.Sent));
+        var validation = Announce.Validate(packet);
+        using var identity = validation.Identity;
+        Assert.True(validation.IsValid);
+        Assert.NotNull(identity);
+        Assert.Equal(host.Router.TransportIdentity.Hash, identity.Hash);
+        Assert.Equal(Destination.Create(DestinationType.Single, "rnstransport", ["discovery", "interface"], identity).Hash,
+            packet.DestinationHash.ToArray());
+        Assert.NotNull(validation.Data!.AppData);
+        return DiscoveryCodec.Decode(validation.Data.AppData, identity, packet.Hops, requiredValue: 1);
+    }
+
+    private sealed class DiscoveryClock : TimeProvider
+    {
+        private DateTimeOffset _now = DateTimeOffset.FromUnixTimeSeconds(1_700_000_000);
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(TimeSpan elapsed) => _now += elapsed;
+    }
+
+    private sealed class AdvertisementFeed : IPacketInterface
+    {
+        private readonly Channel<ReadOnlyMemory<byte>> _received = System.Threading.Channels.Channel.CreateUnbounded<ReadOnlyMemory<byte>>();
+        public List<byte[]> Sent { get; } = [];
+        public ValueTask StartAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.CompletedTask;
+        }
+        public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await foreach (var packet in _received.Reader.ReadAllAsync(cancellationToken)) yield return packet;
+        }
+        public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Sent.Add(packet.ToArray());
+            return ValueTask.CompletedTask;
+        }
+        public ValueTask DisposeAsync()
+        {
+            _received.Writer.TryComplete();
+            return ValueTask.CompletedTask;
+        }
+    }
+
     [Fact]
     public async Task SignedDiscoveryPreservesTcpPolicyAndBackboneMetadataAttachesNativeHdlcAdapter()
     {

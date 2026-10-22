@@ -32,17 +32,18 @@ public sealed partial class RnsdHost : IAsyncDisposable
     private ManagementRpcServer? _rpcServer;
     private ManagementRpcClient? _rpcClient;
     private DiscoveryService? _discovery;
-    private DiscoveryAnnouncer? _announcer;
+    private volatile DiscoveryAnnouncer? _announcer;
     private IAnnounceHandler? _discoveryHandler;
     private BlackholeService? _blackholeService;
     private DateTimeOffset _startedAt;
     private byte[] _rpcKey = [];
     private readonly RuntimeExecutionPolicy _executionPolicy;
+    private readonly TimeProvider _timeProvider;
 
     private RnsdHost(PacketInterfaceManager manager, TransportRouter router, List<(string Name, IPacketInterface Interface)> interfaces,
         RnsdConfig configuration, InterfaceFactoryRegistry? extensions, Action<int, string> log,
         Identity internalIdentity, Identity? networkIdentity, SharedInstanceSession shared, BlackholeStore blackholes, string storageDirectory,
-        RuntimeExecutionPolicy executionPolicy)
+        RuntimeExecutionPolicy executionPolicy, TimeProvider timeProvider)
     {
         _manager = manager;
         Router = router;
@@ -57,6 +58,7 @@ public sealed partial class RnsdHost : IAsyncDisposable
         _storageDirectory = storageDirectory;
         _stateStore = new RuntimeStateStore(storageDirectory);
         _executionPolicy = executionPolicy;
+        _timeProvider = timeProvider;
         manager.Diagnostic += (iface, error) => log(1, $"{InterfaceName(iface)}: {error.Message}");
         manager.InterfaceRemoved += router.DetachInterface;
     }
@@ -87,11 +89,12 @@ public sealed partial class RnsdHost : IAsyncDisposable
 
     /// <summary>Creates (but does not start) the host. The transport identity is loaded from, or created at, <paramref name="transportIdentityPath"/>.</summary>
     public static RnsdHost Create(RnsdConfig config, string transportIdentityPath, Action<int, string> log,
-        InterfaceFactoryRegistry? extensions = null, RuntimeExecutionPolicy? executionPolicy = null)
-        => CreateAsync(config, transportIdentityPath, log, extensions, executionPolicy).GetAwaiter().GetResult();
+        InterfaceFactoryRegistry? extensions = null, RuntimeExecutionPolicy? executionPolicy = null, TimeProvider? timeProvider = null)
+        => CreateAsync(config, transportIdentityPath, log, extensions, executionPolicy, timeProvider: timeProvider).GetAwaiter().GetResult();
 
     public static async Task<RnsdHost> CreateAsync(RnsdConfig config, string transportIdentityPath, Action<int, string> log,
-        InterfaceFactoryRegistry? extensions = null, RuntimeExecutionPolicy? executionPolicy = null, CancellationToken cancellationToken = default)
+        InterfaceFactoryRegistry? extensions = null, RuntimeExecutionPolicy? executionPolicy = null, CancellationToken cancellationToken = default,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(log);
@@ -137,7 +140,7 @@ public sealed partial class RnsdHost : IAsyncDisposable
                 Log = message => log(5, message),
             };
             var host = new RnsdHost(manager, router, interfaces, config, extensions, log,
-                internalIdentity, networkIdentity, session, blackholes, storageDirectory, executionPolicy ?? new());
+                internalIdentity, networkIdentity, session, blackholes, storageDirectory, executionPolicy ?? new(), timeProvider ?? TimeProvider.System);
             constructed = host;
             foreach (var (iface, mode) in modes) host.ConfigureMode(iface, mode);
             host.ConfigureSharedRouting();

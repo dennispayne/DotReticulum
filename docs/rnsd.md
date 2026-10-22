@@ -81,8 +81,10 @@ Supported-interface configuration accepts the pinned source's discovery metadata
 `discovery_encrypt`, `reachable_on`, `publish_ifac`, `location_cmd`, `latitude`,
 `longitude`, `height`, `discovery_frequency`, `discovery_bandwidth`,
 `discovery_modulation`, `discovery_lxmf_address`, and `ignore_config_warnings`.
-These populate `RnsdInterfaceConfig.Discovery`; runtime publication still requires a supported
-discoverable bearer and host registration.
+These populate `RnsdInterfaceConfig.Discovery`; native publication is supported only for
+an enabled, discoverable `TCPServerInterface`. It advertises the actual TCP type and current
+bound listening port, not a Backbone type. Parsed radio frequency/bandwidth/modulation
+settings do not turn a TCP bearer into a radio interface or fabricated radio measurements.
 
 Defaults are non-discoverable, six-hour announces (minimum five minutes), stamp value 16,
 no encryption, no IFAC publication, and no optional location/operator/radio fields.
@@ -91,6 +93,15 @@ the native maximum 256 fail. Coordinates must be finite; LXMF addresses must be 
 Discovery normally promotes a mode other than gateway/AP/internal to gateway; setting
 `ignore_config_warnings=yes` retains the explicit mode. Discoverability also implies a static
 active transport identity, matching the pinned source.
+
+Named attach/reload updates advertisement registration from that interface's current
+configuration, including its discovery name, endpoint, interval and location provider.
+Detach removes the registration and waits for any in-flight publication. Turning off
+`discoverable` or interface enablement removes publication eligibility on reload; explicit
+named attach/reload can still open a disabled configuration entry. These operations do not
+reload global identities or discovery policy. Replacement discovery requirements are checked
+before reload detaches the old bearer; a later bearer initialization failure does not restore
+it. See [runtime operations](runtime-operations.md) for ownership and scheduling details.
 
 `location_cmd` and executable `reachable_on` values are **not execution permission**. Dynamic
 metadata resolution requires an explicit runtime executable authorizer, bounded output/time,

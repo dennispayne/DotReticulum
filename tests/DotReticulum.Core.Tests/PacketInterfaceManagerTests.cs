@@ -98,6 +98,48 @@ public class PacketInterfaceManagerTests
         return e.Current;
     }
 
+    private sealed class DisposalRaceInterface : IPacketInterface
+    {
+        private readonly TaskCompletionSource _disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Receiving { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public ValueTask StartAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            Receiving.TrySetResult();
+            await _disposed.Task;
+            ObjectDisposedException.ThrowIf(_disposed.Task.IsCompleted, this);
+            yield break;
+        }
+        public ValueTask DisposeAsync()
+        {
+            _disposed.TrySetResult();
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    [Fact]
+    public async Task DetachDisposalRaceDoesNotFaultOtherReceiversOrFutureAttachments()
+    {
+        var closing = new DisposalRaceInterface();
+        var survivor = new FakeInterface();
+        var diagnostics = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+        await using var manager = new PacketInterfaceManager([closing, survivor], keepAlive: true);
+        manager.Diagnostic += (_, error) => diagnostics.Enqueue(error);
+        await manager.StartAsync();
+        await closing.Receiving.Task.WaitAsync(Timeout);
+        Assert.True(await manager.DetachAsync(closing).AsTask().WaitAsync(Timeout));
+
+        var replacement = new FakeInterface();
+        await manager.AttachAsync(replacement);
+        await using var packets = manager.ReceiveWithSourceAsync().GetAsyncEnumerator();
+        survivor.Inject(MakePacket(1).ToArray());
+        Assert.Same(survivor, (await Next(packets)).Source);
+        replacement.Inject(MakePacket(2).ToArray());
+        Assert.Same(replacement, (await Next(packets)).Source);
+        Assert.Empty(diagnostics);
+    }
+
     [Fact]
     public async Task ReceivesParsedPacketsWithSource()
     {

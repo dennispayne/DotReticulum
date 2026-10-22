@@ -10,10 +10,20 @@ the exact exercised platforms and reference flows.
 
 `RnsdHost` owns its interfaces. `AttachInterfaceAsync`, `DetachInterfaceAsync`
 and `ReloadInterfaceAsync` serialize configuration mutations without stopping
-unrelated receivers. A reload detaches before attaching the replacement, like
-the reference; if replacement initialization fails, the old interface is not
-silently restored. Missing configuration/attachment returns `null`; an already
-attached interface returns `false`. Initialization and disposal errors are
+unrelated receivers. Management attach/reload reparses the host's source config
+file; direct API calls use the supplied `RnsdConfig`, or the host's original
+configuration when omitted. These are named interface operations, not a reload
+of global runtime settings, identities or discovery source policy.
+
+A reload validates the replacement's supported discovery bearer, encryption
+identity requirement, location-command authorization and positive interval before
+removing the old bearer. Endpoint/provider output validation still occurs at
+publication time; this prevalidation does not execute providers.
+Reload then detaches before initializing the replacement;
+if replacement initialization fails, the old interface is not silently restored.
+Missing configuration/attachment returns `null`; an already attached interface
+returns `false`. Disabled interface management and attempts to detach the
+shared-instance bearer return `false`. Initialization and disposal errors are
 explicit exceptions with diagnostic logging.
 
 `PacketInterfaceManager.AttachAsync` transfers ownership of a newly registered
@@ -135,8 +145,28 @@ capacity. Source/transport policy, duplicate endpoints, configured interfaces
 and connection limits are applied before attachment.
 
 Native TCP servers advertise their actual bearer type and bound port; they
-are never mislabeled Backbone servers to bypass eligibility. Upstream
-autoconnect eligibility is Backbone-only, including its implementation/version
+are never mislabeled Backbone servers to bypass eligibility. Publication requires
+both interface enablement and `discoverable=yes`. A successful named attach/reload
+registers the replacement's metadata, discovery name, `reachable_on`, location
+provider, encryption/stamp policy and interval, using the current listener's bound
+port (including an ephemeral port). The first dynamically attached discoverable
+bearer can initialize publication even if none was configured at startup.
+Explicit named attach retains its existing ability to open a disabled
+configuration entry, but that entry is not advertised. Likewise, clearing
+`discoverable` on reload leaves the replacement bearer unadvertised.
+
+Detach unregisters and waits for any in-flight advertisement before returning;
+reload does not leave a callback to the removed listener or its old metadata.
+Cancellation is honored while waiting to unregister; once unregistered, bearer
+removal finishes without caller cancellation so it cannot leave an active bearer
+with its publication ownership already removed.
+Each new registration is eligible at the next discovery scheduler job, not
+published synchronously by attach/reload. The scheduler considers at most one due
+interface per 60-second job; subsequent publications use the registered interval.
+Metadata providers run at publication time; provider failures are diagnosed and
+abort that publication, not silently replaced with stale metadata.
+
+Upstream autoconnect eligibility is Backbone-only, including its implementation/version
 policy. The bounded native client adapter speaks that HDLC stream with a
 five-second initial connection deadline; this is not a claim of full Backbone
 configuration/server/platform parity. Unverified implementations require the
