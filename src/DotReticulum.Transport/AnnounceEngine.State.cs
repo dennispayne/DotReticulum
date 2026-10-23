@@ -21,7 +21,7 @@ public sealed partial class AnnounceEngine
     {
         lock (_gate)
         {
-            var count = _table.Count + _responses.Count;
+            var count = _table.Count + _responses.Values.Sum(entries => entries.Count);
             _table.Clear();
             _responses.Clear();
             return count;

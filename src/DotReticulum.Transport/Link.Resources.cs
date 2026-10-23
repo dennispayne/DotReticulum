@@ -41,6 +41,27 @@ public sealed partial class Link
 
     internal void SendPrebuilt(Packet packet) => SendProofPacket(packet);
 
+    internal void SendResourceProof(Packet packet)
+    {
+        _mgr.Router.CacheResourceProof(packet);
+        SendProofPacket(packet);
+    }
+
+    internal void RequestResourceProof(byte[] resourceHash, byte[] expectedProof)
+    {
+        var expected = Packet.Create(PacketType.Proof, DestinationType.Link, LinkId,
+            (byte[])[.. resourceHash, .. expectedProof], LinkContext.ResourcePrf);
+        var hash = expected.CalculateHash();
+        if (_mgr.Router.GetResourceProof(hash, LinkId) is { } cached)
+        {
+            ReceiveExtendedProof(new ReceivedPacket(cached.ToArray(), cached, AttachedInterface!), []);
+        }
+        else
+        {
+            SendWithContext(hash, LinkContext.CacheRequest, createReceipt: false, encrypt: false);
+        }
+    }
+
     /// <summary>Wire size of a link-encrypted control packet carrying <paramref name="plaintextLength"/> bytes (used for rate estimates).</summary>
     internal static int OverheadOfEncrypted(int plaintextLength) => Packet.Header1Size + Token.Overhead + (((plaintextLength / 16) + 1) * 16);
 

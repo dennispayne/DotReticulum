@@ -22,20 +22,24 @@ public sealed partial class RnsdHost
             var state = host.Router.ExportState(host.InterfaceHash);
             return new RuntimeStateSnapshot(host.Router.Engine.Known.ExportSnapshot(),
                 state.Paths.Select(p => new PersistedPath(p.DestinationHash, p.Timestamp, p.ReceivedFrom, p.Hops, p.Expires,
-                    p.RandomBlobs, p.InterfaceHash, p.PacketHash)).ToArray(), [], state.PacketHashes,
-                state.CachedPackets.Select(p => new PersistedPacket(p.PacketHash, p.Raw, p.Announce)).ToArray());
+                    p.RandomBlobs, p.InterfaceHash, p.PacketHash)).ToArray(),
+                (state.Tunnels ?? []).Select(t => new PersistedTunnel(t.TunnelId, t.InterfaceHash,
+                    t.Paths.Select(p => new PersistedPath(p.DestinationHash, p.Timestamp, p.ReceivedFrom, p.Hops, p.Expires,
+                        p.RandomBlobs, p.InterfaceHash, p.PacketHash)).ToArray(), t.Expires)).ToArray(), state.PacketHashes,
+                state.CachedPackets.Select(p => new PersistedPacket(p.PacketHash, p.Raw, p.Announce, p.CachedAt)).ToArray());
         }
 
         public void RestoreState(RuntimeStateSnapshot snapshot)
         {
-            if (snapshot.Tunnels.Count != 0)
-                throw new NotSupportedException("Stored transport tunnels require the Parity 4 tunnel implementation.");
             host.Router.Engine.Known.RestoreSnapshot(snapshot.KnownDestinations);
             host.Router.ImportState(new TransportStateSnapshot(
                 snapshot.Paths.Select(p => new TransportPathState(p.DestinationHash, p.Timestamp, p.ReceivedFrom, p.Hops, p.Expires,
                     p.RandomBlobs, p.InterfaceHash, p.PacketHash)).ToArray(),
                 snapshot.PacketHashes,
-                snapshot.CachedPackets.Select(p => new TransportPacketState(p.PacketHash, p.Raw, p.Announce)).ToArray()),
+                snapshot.CachedPackets.Select(p => new TransportPacketState(p.PacketHash, p.Raw, p.Announce, p.CachedAt)).ToArray(),
+                snapshot.Tunnels.Select(t => new TransportTunnelState(t.TunnelId, t.InterfaceHash,
+                    t.Paths.Select(p => new TransportPathState(p.DestinationHash, p.Timestamp, p.ReceivedFrom, p.Hops, p.Expires,
+                        p.RandomBlobs, p.InterfaceHash, p.PacketHash)).ToArray(), t.Expires)).ToArray()),
                 hash => host.ResolveInterface(hash));
         }
     }

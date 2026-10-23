@@ -56,8 +56,9 @@ public sealed class LinkManager : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(destinationIdentity);
         ArgumentNullException.ThrowIfNull(destinationHash);
-        var hops = _router.HopsTo(destinationHash) ?? 1;
-        var timeout = establishmentTimeout ?? ((Link.EstablishmentTimeoutPerHop * Math.Max(1, hops)) + 1);
+        var hops = _router.HopsTo(destinationHash) ?? Packet.HopLimit;
+        var timeout = establishmentTimeout ?? ((Link.EstablishmentTimeoutPerHop * Math.Max(1, hops)) + _router.FirstHopTimeout(destinationHash));
+        if (!double.IsFinite(timeout) || timeout <= 0) throw new ArgumentOutOfRangeException(nameof(establishmentTimeout));
         lock (_gate)
         {
             if (_router.IsIdentityBlocked(destinationIdentity.Hash)) throw new InvalidOperationException("The destination identity is blocked.");
@@ -284,6 +285,7 @@ public sealed class LinkManager : IAsyncDisposable
             {
                 try
                 {
+                    if (packet.PacketType == PacketType.LinkRequest && Find(Link.LinkIdFromRequest(packet)) is not { Status: LinkStatus.Pending }) continue;
                     if (iface is null)
                     {
                         await _router.SendAsync(packet, ct).ConfigureAwait(false);
@@ -295,7 +297,16 @@ public sealed class LinkManager : IAsyncDisposable
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    Log?.Invoke($"Could not send link packet: {ex.Message}");
+                    if (packet.PacketType == PacketType.LinkRequest)
+                    {
+                        var link = Find(Link.LinkIdFromRequest(packet));
+                        if (link is { IsInitiator: true, Status: LinkStatus.Pending })
+                        {
+                            link.FailEstablishment();
+                        }
+                    }
+                    try { Log?.Invoke($"Could not send link packet: {ex.Message}"); }
+                    catch { }
                 }
             }
         }

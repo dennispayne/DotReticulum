@@ -212,7 +212,7 @@ public sealed class Resource
     private Resource(Link link)
     {
         _link = link;
-        _sdu = link.Mtu - HeaderMaxSize - IfacMinSize;
+        _sdu = Math.Min(link.Mtu, Packet.Mtu) - HeaderMaxSize - IfacMinSize;
         _timeoutFactor = Link.TrafficTimeoutFactor;
     }
 
@@ -1074,7 +1074,7 @@ public sealed class Resource
 
                 Status = ResourceStatus.Complete;
                 byte[] proof = [.. Hash, .. SHA256.HashData([.. result, .. Hash])];
-                _link.SendPrebuilt(Packet.Create(PacketType.Proof, DestinationType.Link, _link.LinkId, proof, LinkContext.ResourcePrf));
+                _link.SendResourceProof(Packet.Create(PacketType.Proof, DestinationType.Link, _link.LinkId, proof, LinkContext.ResourcePrf));
 
                 if (_accumulator is not null)
                 {
@@ -1261,6 +1261,7 @@ public sealed class Resource
                     else
                     {
                         _retriesLeft--;
+                        _link.RequestResourceProof(Hash, _expectedProof);
                         _lastPartSent = now;
                     }
                 }

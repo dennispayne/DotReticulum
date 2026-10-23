@@ -285,7 +285,9 @@ public sealed class RuntimeStateStore
             ["known_ratchets"] = snapshot.KnownDestinations.Where(e => e.Entry.Ratchet is not null).Select(e =>
                 (object?)new object?[] { e.DestinationHash, e.Entry.Ratchet, e.Entry.RatchetReceivedTimestamp }).ToArray(),
             ["packet_hashes"] = snapshot.PacketHashes.Cast<object?>().ToArray(),
-            ["cached_packets"] = snapshot.CachedPackets.Select(p => (object?)new object?[] { p.PacketHash, p.Raw, p.Announce }).ToArray(),
+            ["cached_packets"] = snapshot.CachedPackets.Select(p => (object?)(p.CachedAt is { } cachedAt
+                ? new object?[] { p.PacketHash, p.Raw, p.Announce, cachedAt }
+                : new object?[] { p.PacketHash, p.Raw, p.Announce })).ToArray(),
         });
         if (body.Length > MaximumStateBytes - 128) throw new InvalidDataException("Runtime snapshot exceeds the byte limit.");
         var packed = MsgPack.Pack(new Dictionary<object, object?>
@@ -339,16 +341,17 @@ public sealed class RuntimeStateStore
         foreach (var value in packets)
         {
             var fields = Array(value, "cached packet");
-            if (fields.Length != 3) throw new InvalidDataException("Cached packet must have three fields.");
+            if (fields.Length is not (3 or 4)) throw new InvalidDataException("Cached packet must have three fields and an optional cache timestamp.");
             var packetHash = Bytes(fields[0], 32, "cached packet hash");
             var raw = NullableBytes(fields[1], "cached packet wire bytes") ?? throw new InvalidDataException("Null cached packet.");
             var announce = fields[2] is bool kind ? kind : throw new InvalidDataException("Invalid cached packet kind.");
+            double? cachedAt = fields.Length == 4 && fields[3] is not null ? Timestamp(fields[3], "packet cache timestamp") : null;
             var packet = Packet.Parse(raw);
             if (!packet.CalculateHash().AsSpan().SequenceEqual(packetHash)) throw new InvalidDataException("Cached packet hash does not match the wire packet.");
             if (announce && (packet.PacketType != PacketType.Announce || !Announce.Validate(packet).IsValid))
                 throw new InvalidDataException("Cached announce is not a valid signed announce.");
             if (!packetIds.Add((announce ? "a" : "p") + Convert.ToHexString(packetHash))) throw new InvalidDataException("Duplicate cached packet.");
-            cached.Add(new(packetHash, raw, announce));
+            cached.Add(new(packetHash, raw, announce, cachedAt));
         }
         return new(known.Values.ToArray(), paths.Where(p => p.Expires > now).ToArray(),
             tunnels.Where(t => t.Expires > now).Select(t => t with { Paths = t.Paths.Where(p => p.Expires > now).ToArray() }).ToArray(),

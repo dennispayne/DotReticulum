@@ -8,6 +8,15 @@ namespace DotReticulum.Core;
 /// </summary>
 public interface IPacketInterface : IAsyncDisposable
 {
+    /// <summary>Configured or estimated bearer bitrate in bits per second; zero means unknown.</summary>
+    long Bitrate => 0;
+
+    /// <summary>Maximum unprotected packet length supported by this bearer.</summary>
+    int HardwareMtu => Packet.Mtu;
+
+    /// <summary>Whether link setup may negotiate an upgraded MTU on this bearer.</summary>
+    bool SupportsMtuDiscovery => false;
+
     /// <summary>Opens the underlying bearer (bind, connect, open). Must not be called twice.</summary>
     ValueTask StartAsync(CancellationToken cancellationToken);
 
@@ -19,6 +28,18 @@ public interface IPacketInterface : IAsyncDisposable
 
     /// <summary>Transmits one packet (already a complete wire packet of at most the MTU).</summary>
     ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken);
+}
+
+/// <summary>A persistent initiating bearer that can establish a new connection without changing interface identity.</summary>
+public interface IReconnectingPacketInterface : IPacketInterface
+{
+    bool IsConnected { get; }
+
+    /// <summary>Raised after the initial connection and each successful reconnection.</summary>
+    event Action? Connected;
+
+    /// <summary>Raised after a connection is lost, before reconnection attempts start; not raised for disposal.</summary>
+    event Action? Disconnected;
 }
 
 /// <summary>A parsed packet together with the interface it arrived on.</summary>

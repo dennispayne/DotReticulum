@@ -1,0 +1,54 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "version": "1.5.7",
+  "sources_sha256": {
+    "Transport.py": "333b34eeab020946eefdd8a7e75d3fa74d2ffc5adfef7c0080752980f455bf2c"
+  },
+  "private_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+  "interface_hash": "8cf30694762938a5eabeb9b1dd8f6ec109ed1b4a2f24e32a86806c768ef5148e",
+  "random_hash": "000102030405060708090a0b0c0d0e0f",
+  "tunnel_id": "bf4883b0b4ad98e8e8a84037b40713dee55ea346ad004be66e532f232d10b439",
+  "synthesis_packet": "080091bf0910267b59b0e864e0d4c91602ca008f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd78cf30694762938a5eabeb9b1dd8f6ec109ed1b4a2f24e32a86806c768ef5148e000102030405060708090a0b0c0d0e0f95730eb1c7a7a53221e4d6078136bb541adc7b25e1a3e664c3cf178a250844897361dc588864490840ed6b206ecf73f22e5dc007a8bee865730f9019bb7f700b",
+  "wants_tunnel_after_send": false,
+  "timeout": 28800,
+  "path_timeout": 28800,
+  "restoration": [
+    {
+      "name": "absent_valid",
+      "restored": true,
+      "retained": true,
+      "tunnel_expires": 1800028800.25
+    },
+    {
+      "name": "absent_expired",
+      "restored": false,
+      "retained": false,
+      "tunnel_expires": 1800028800.25
+    },
+    {
+      "name": "shorter_current",
+      "restored": false,
+      "retained": false,
+      "tunnel_expires": 1800028800.25
+    },
+    {
+      "name": "same_hops_newer_tunnel",
+      "restored": true,
+      "retained": true,
+      "tunnel_expires": 1800028800.25
+    },
+    {
+      "name": "same_hops_older_tunnel",
+      "restored": false,
+      "retained": false,
+      "tunnel_expires": 1800028800.25
+    },
+    {
+      "name": "expired_current",
+      "restored": true,
+      "retained": true,
+      "tunnel_expires": 1800028800.25
+    }
+  ],
+  "harness": "Frozen clock/random and Packet.send capture; synthetic interface/path tables, unmodified reference methods."
+}

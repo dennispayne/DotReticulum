@@ -9,6 +9,9 @@ namespace DotReticulum.Interfaces;
 public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterfaceDiagnostics
 {
     public const int HardwareMtu = 262144;
+    int IPacketInterface.HardwareMtu => HardwareMtu;
+    public long Bitrate => 1_000_000_000;
+    public bool SupportsMtuDiscovery => true;
     private readonly EndPoint endpoint;
     private readonly TimeSpan reconnectDelay;
     private readonly TimeSpan connectTimeout;
@@ -295,6 +298,9 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
 /// <summary>Exclusive-bind local instance election and independently owned accepted peers.</summary>
 public sealed class LocalSharedServerInterface : ISpawningPacketInterface, IPacketInterfaceDiagnostics
 {
+    public int HardwareMtu => LocalSharedPacketInterface.HardwareMtu;
+    public long Bitrate => 1_000_000_000;
+    public bool SupportsMtuDiscovery => true;
     private readonly EndPoint endpoint;
     private readonly int maximumClients;
     private readonly Action<Exception>? diagnostic;

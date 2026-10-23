@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Threading.Channels;
 using DotReticulum.Core;
 
 namespace DotReticulum.Transport;
@@ -49,6 +50,13 @@ public sealed class TransportRouterOptions
     public TimeSpan AnnounceInterval { get; init; } = TimeSpan.FromSeconds(1);
 
     public TimeSpan CullInterval { get; init; } = TimeSpan.FromSeconds(5);
+
+    public int ControlCapacity { get; init; } = 65_536;
+    public TimeSpan PathRequestMinimumInterval { get; init; } = TimeSpan.FromSeconds(20);
+    public int InboundDataCapacity { get; init; } = 1024;
+    public int InboundAnnounceCapacity { get; init; } = 128;
+    public int InboundPathRequestCapacity { get; init; } = 128;
+    public int InboundIngressLimitedCapacity { get; init; } = 8;
 
     public TimeProvider? TimeProvider { get; init; }
 
@@ -149,6 +157,10 @@ public sealed partial class TransportRouter : IAsyncDisposable
     {
         _manager = manager ?? throw new ArgumentNullException(nameof(manager));
         _options = options ?? new TransportRouterOptions();
+        ArgumentOutOfRangeException.ThrowIfLessThan(_options.ControlCapacity, 1);
+        _inboundCapacities = [_options.InboundDataCapacity, _options.InboundAnnounceCapacity,
+            _options.InboundPathRequestCapacity, _options.InboundIngressLimitedCapacity];
+        if (_inboundCapacities.Any(capacity => capacity < 1)) throw new ArgumentOutOfRangeException(nameof(options));
         _time = _options.TimeProvider ?? TimeProvider.System;
         _ownsTransportIdentity = _options.TransportIdentity is null;
         TransportIdentity = _options.TransportIdentity ?? Identity.Generate();
@@ -157,6 +169,9 @@ public sealed partial class TransportRouter : IAsyncDisposable
             TransportEnabled = _options.TransportEnabled,
             TransportId = TransportIdentity.Hash,
             RateLimit = _options.RateLimit,
+            GravityFor = source => source is null ? null : GetInterfaceAnnounceOptions(source).Gravity,
+            RateLimitFor = source => source is null ? null : GetInterfaceAnnounceOptions(source).RateLimit,
+            PathLifetimeFor = PathLifetimeFor,
         }, timeProvider: _time);
         Links = new LinkManager(this, _manager, _time);
     }
@@ -183,6 +198,8 @@ public sealed partial class TransportRouter : IAsyncDisposable
     public void DetachInterface(IPacketInterface iface)
     {
         ArgumentNullException.ThrowIfNull(iface);
+        DetachTunnelInterface(iface);
+        DetachRoutingControls(iface);
         if (IsSharedClient) SharedConnectionDisappeared();
         var affectedLinks = Links.Links.Where(link => ReferenceEquals(link.AttachedInterface, iface)
             || (link.AttachedInterface is null && ReferenceEquals(Engine.GetPath(link.DestinationHash)?.Interface, iface))).ToArray();
@@ -212,12 +229,15 @@ public sealed partial class TransportRouter : IAsyncDisposable
 
     public void SetInterfaceMode(IPacketInterface iface, InterfaceMode mode)
     {
+        ArgumentNullException.ThrowIfNull(iface);
+        if (!Enum.IsDefined(mode)) throw new ArgumentOutOfRangeException(nameof(mode));
+        _routingModes[iface] = mode;
         lock (_gate) _modes[iface] = mode;
     }
 
     public InterfaceMode GetInterfaceMode(IPacketInterface iface)
     {
-        lock (_gate) return _modes.TryGetValue(iface, out var m) ? m : InterfaceMode.Full;
+        return _routingModes.GetValueOrDefault(iface, InterfaceMode.Full);
     }
 
     public void RegisterLocalDestination(LocalDestination destination)
@@ -286,11 +306,27 @@ public sealed partial class TransportRouter : IAsyncDisposable
 
     private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
     {
-        await foreach (var received in _manager.ReceiveWithSourceAsync(cancellationToken).ConfigureAwait(false))
+        var wake = System.Threading.Channels.Channel.CreateBounded<bool>(new BoundedChannelOptions(1) { SingleReader = true, SingleWriter = false, FullMode = BoundedChannelFullMode.DropWrite });
+        _inboundWake = wake.Writer;
+        var dispatcher = DrainInboundAsync(wake.Reader, cancellationToken);
+        try
         {
-            try { await HandleAsync(received, cancellationToken).ConfigureAwait(false); }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-            catch (Exception ex) { Log?.Invoke($"Error while processing a packet: {ex.Message}"); }
+            await foreach (var received in _manager.ReceiveWithSourceAsync(cancellationToken).ConfigureAwait(false))
+                if (TryQueueInbound(received)) wake.Writer.TryWrite(true);
+        }
+        finally
+        {
+            _inboundWake = null;
+            wake.Writer.TryComplete();
+            try { await dispatcher.ConfigureAwait(false); }
+            finally
+            {
+                lock (_inboundGate)
+                {
+                    foreach (var queue in _inboundQueues) queue.Clear();
+                    _inflightPathRequests.Clear();
+                }
+            }
         }
     }
 
@@ -321,11 +357,19 @@ public sealed partial class TransportRouter : IAsyncDisposable
     }
 
     /// <summary>Processes one received packet (the receive loop calls this; exposed for deterministic tests).</summary>
-    public async ValueTask HandleAsync(ReceivedPacket received, CancellationToken cancellationToken = default)
+    public ValueTask HandleAsync(ReceivedPacket received, CancellationToken cancellationToken = default) =>
+        HandleCoreAsync(received, cancellationToken, false);
+
+    private async ValueTask HandleCoreAsync(ReceivedPacket received, CancellationToken cancellationToken, bool registeredPathRequest,
+        bool ingressPrepared = false, bool? ingressLimitedPathRequest = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
         var packet = received.Packet;
+        if (await HandleResourceCacheRequestAsync(received, cancellationToken).ConfigureAwait(false)) return;
+        if (!ingressPrepared && packet.PacketType == PacketType.Announce && !PrepareAnnounceIngress(received)) return;
         if (!Filter(packet)) return;
+        if (TryHandleTunnelSynthesis(received)) return;
         var fromLocalClient = IsLocalClientInterface(received.Source);
         var canRelayLinks = _options.TransportEnabled || HasLocalClients;
         var linkAddressed = canRelayLinks && IsLinkTableTraffic(packet);
@@ -390,7 +434,7 @@ public sealed partial class TransportRouter : IAsyncDisposable
             case PacketType.Data:
                 if (packet.DestinationType == DestinationType.Plain && packet.DestinationHash.Span.SequenceEqual(PathRequestHash))
                 {
-                    await HandlePathRequestAsync(received, cancellationToken).ConfigureAwait(false);
+                    await HandlePathRequestAsync(received, cancellationToken, registeredPathRequest, ingressLimitedPathRequest).ConfigureAwait(false);
                     return;
                 }
 
@@ -428,9 +472,15 @@ public sealed partial class TransportRouter : IAsyncDisposable
             }
 
             await _manager.SendToAsync(outgoing, iface, cancellationToken).ConfigureAwait(false);
+            Engine.TouchPath(packet.DestinationHash.Span);
             return;
         }
 
+        if (packet.PacketType == PacketType.Announce)
+        {
+            await SendAnnounceControlledAsync(packet, null, null, cancellationToken).ConfigureAwait(false);
+            return;
+        }
         await _manager.SendAsync(packet, cancellationToken).ConfigureAwait(false);
     }
 
@@ -440,18 +490,36 @@ public sealed partial class TransportRouter : IAsyncDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(destination);
         var packet = Announce.Create(destination.Identity, destination.Destination, destination.AppData, destination.Ratchets, pathResponse);
-        if (onlyOn is null) await _manager.SendAsync(packet, cancellationToken).ConfigureAwait(false);
-        else await _manager.SendToAsync(packet, onlyOn, cancellationToken).ConfigureAwait(false);
+        await SendAnnounceControlledAsync(packet, null, onlyOn, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Upstream <c>Transport.request_path</c>: broadcasts a path request (carrying our transport id when transport is enabled).</summary>
     public ValueTask RequestPathAsync(ReadOnlySpan<byte> destinationHash, IPacketInterface? onInterface = null, byte[]? tag = null, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
         if (destinationHash.Length != Destination.HashLength) throw new ArgumentException("Destination hash must be 16 bytes.", nameof(destinationHash));
         tag ??= RandomNumberGenerator.GetBytes(Destination.HashLength);
         var data = _options.TransportEnabled ? [.. destinationHash, .. TransportId, .. tag] : (byte[])[.. destinationHash, .. tag];
         var packet = Packet.Create(PacketType.Data, DestinationType.Plain, PathRequestHash, data);
-        return onInterface is null ? _manager.SendAsync(packet, cancellationToken) : _manager.SendToAsync(packet, onInterface, cancellationToken);
+        RecordPathRequest(destinationHash);
+        return SendPathRequestPacketAsync(packet, onInterface, cancellationToken);
+    }
+
+    private async ValueTask SendPathRequestPacketAsync(Packet packet, IPacketInterface? onInterface, CancellationToken cancellationToken)
+    {
+        var targets = onInterface is null ? _manager.Interfaces : new[] { onInterface };
+        foreach (var iface in targets)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await _manager.SendToAsync(packet, iface, cancellationToken).ConfigureAwait(false);
+                TrafficController(iface).SentPathRequest(packet.ToArray().Length);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            { Log?.Invoke($"Could not transmit path request on {Describe(iface)}: {ex.Message}"); }
+        }
     }
 
     private bool Filter(Packet packet)
@@ -519,9 +587,8 @@ public sealed partial class TransportRouter : IAsyncDisposable
             return false;
         }
 
+        RememberTunnelPath(received.Packet.DestinationHash.Span, received.Source);
         Log?.Invoke($"Destination {Convert.ToHexStringLower(received.Packet.DestinationHash.Span)} is now {result.Hops} hops away on {Describe(received.Source)}");
-        if (!_options.TransportEnabled && !fromLocalClient) return true;
-
         DiscoveryEntry? waiting;
         var key = Convert.ToHexStringLower(received.Packet.DestinationHash.Span);
         lock (_gate)
@@ -581,11 +648,18 @@ public sealed partial class TransportRouter : IAsyncDisposable
 
         if (packet.PacketType == PacketType.LinkRequest)
         {
-            ClampLinkRequestMtu(forwarded);
+            forwarded = ClampLinkRequestMtu(forwarded, received.Source, outbound);
             var now = _time.GetUtcNow();
             var remaining = Math.Max(1, path.Hops);
-            var entry = new LinkEntry(now, nextHop, outbound, path.Hops, received.Source, hops, destination, false, now.AddSeconds(Link.EstablishmentTimeoutPerHop * remaining));
-            lock (_gate) _linkTable[Convert.ToHexStringLower(Link.LinkIdFromRequest(packet))] = entry;
+            var mediumTimeout = outbound.Bitrate > 0 ? Packet.Mtu * 8.0 / outbound.Bitrate : 0;
+            var entry = new LinkEntry(now, nextHop, outbound, path.Hops, received.Source, hops, destination, false,
+                now.AddSeconds(Link.EstablishmentTimeoutPerHop * remaining + mediumTimeout));
+            lock (_gate)
+            {
+                var linkKey = Convert.ToHexStringLower(Link.LinkIdFromRequest(packet));
+                if (!_linkTable.ContainsKey(linkKey) && _linkTable.Count >= _options.ControlCapacity) return;
+                _linkTable[linkKey] = entry;
+            }
             await _manager.SendRawToAsync(forwarded, outbound, cancellationToken).ConfigureAwait(false);
             Engine.TouchPath(destination);
             return;
@@ -613,14 +687,17 @@ public sealed partial class TransportRouter : IAsyncDisposable
         && !(packet.PacketType == PacketType.Proof && packet.Context == LinkContext.LrProof)
         && HasLinkEntry(packet.DestinationHash.Span);
 
-    /// <summary>The link MTU is fixed at 500 here, so a larger MTU signalled by the initiator is lowered on the way through (path-MTU clamp).</summary>
-    private static void ClampLinkRequestMtu(byte[] raw)
+    /// <summary>Upstream path-MTU bottleneck clamp; an incapable next hop strips optional upgrade signalling.</summary>
+    private static byte[] ClampLinkRequestMtu(byte[] raw, IPacketInterface ingress, IPacketInterface outbound)
     {
         var headerSize = (raw[0] & 0x40) != 0 ? Packet.Header2Size : Packet.Header1Size;
-        if (raw.Length - headerSize != Link.EcPubSize + Link.SignallingSize) return;
+        if (raw.Length - headerSize != Link.EcPubSize + Link.SignallingSize) return raw;
+        if (!outbound.SupportsMtuDiscovery) return raw[..^Link.SignallingSize];
         var signalling = raw.AsSpan(raw.Length - Link.SignallingSize);
-        if (Link.MtuFromSignalling(signalling) <= Packet.Mtu) return;
-        Link.SignallingBytes(Packet.Mtu, Link.ModeFromSignalling(signalling)).CopyTo(signalling);
+        var mtu = Math.Min(Packet.Mtu, Math.Min(Math.Max(Packet.Mtu, ingress.HardwareMtu), Math.Max(Packet.Mtu, outbound.HardwareMtu)));
+        if (Link.MtuFromSignalling(signalling) <= mtu) return raw;
+        Link.SignallingBytes(mtu, Link.ModeFromSignalling(signalling)).CopyTo(signalling);
+        return raw;
     }
 
     private void DeliverLinkRequest(ReceivedPacket received)
@@ -676,7 +753,9 @@ public sealed partial class TransportRouter : IAsyncDisposable
         }
 
         var data = packet.Payload.Span;
-        if ((data.Length != 96 && data.Length != 96 + Link.SignallingSize) || Engine.Known.Recall(entry.DestinationHash) is not { } peer)
+        if (data.Length != 96 && data.Length != 96 + Link.SignallingSize) return;
+        using var peer = Engine.Known.Recall(entry.DestinationHash);
+        if (peer is null)
         {
             return;
         }
@@ -700,6 +779,7 @@ public sealed partial class TransportRouter : IAsyncDisposable
             entry.Validated = true;
         }
 
+        NotifyLinkProofValidated(entry.DestinationHash, hops);
         if (!_manager.Contains(entry.ReceivedInterface)) return;
         var raw = received.Raw.ToArray();
         raw[1] = hops;
@@ -733,14 +813,20 @@ public sealed partial class TransportRouter : IAsyncDisposable
     {
         LocalDestination? local;
         lock (_gate) _locals.TryGetValue(Convert.ToHexStringLower(received.Packet.DestinationHash.Span), out local);
-        if (local?.PacketReceived is { } handler && local.Destination.Type == received.Packet.DestinationType)
+        if (local is not null && local.Destination.Type == received.Packet.DestinationType)
         {
             if (received.Packet.PacketType == PacketType.Data) await ProveIfRequiredAsync(local, received).ConfigureAwait(false);
-            await handler(received).ConfigureAwait(false);
+            if (local.PacketReceived is { } handlers)
+                foreach (Func<ReceivedPacket, ValueTask> handler in handlers.GetInvocationList())
+                {
+                    try { await handler(received).ConfigureAwait(false); }
+                    catch (Exception ex) { Engine.ReportCallbackError(nameof(local.PacketReceived), received.Packet.DestinationHash.Span, ex); }
+                }
         }
     }
 
-    private async ValueTask HandlePathRequestAsync(ReceivedPacket received, CancellationToken cancellationToken)
+    private async ValueTask HandlePathRequestAsync(ReceivedPacket received, CancellationToken cancellationToken,
+        bool registeredPathRequest = false, bool? ingressLimited = null)
     {
         var data = received.Packet.Payload.ToArray();
         if (data.Length < Destination.HashLength) return;
@@ -759,7 +845,9 @@ public sealed partial class TransportRouter : IAsyncDisposable
 
         if (tag.Length == 0) return;
         if (tag.Length > Destination.HashLength) tag = tag[..Destination.HashLength];
-        if (!RememberTag(Convert.ToHexStringLower(destination) + Convert.ToHexStringLower(tag))) return;
+        if (!registeredPathRequest && !RememberTag(Convert.ToHexStringLower(destination) + Convert.ToHexStringLower(tag))) return;
+        if (!registeredPathRequest) TrafficController(received.Source).ReceivedPathRequest(received.Raw.Length);
+        var limitPathRequests = ingressLimited ?? ShouldIngressLimitPathRequests(received.Source);
 
         var attached = received.Source;
         var mode = GetInterfaceMode(attached);
@@ -783,23 +871,43 @@ public sealed partial class TransportRouter : IAsyncDisposable
             if (!_options.TransportEnabled && !fromLocalClient && !forLocalClient) return;
             if (mode == InterfaceMode.Roaming && ReferenceEquals(path.Interface, attached)) return;
             if (requestor is not null && Engine.GetNextHop(destination) is { } nextHop && nextHop.AsSpan().SequenceEqual(requestor)) return;
-            var delay = _options.PathRequestGrace + (mode == InterfaceMode.Roaming ? _options.RoamingGrace : TimeSpan.Zero);
+            var delay = fromLocalClient || forLocalClient ? TimeSpan.Zero
+                : _options.PathRequestGrace + (mode == InterfaceMode.Roaming ? _options.RoamingGrace : TimeSpan.Zero);
             Engine.QueuePathResponse(destination, attached, delay);
             return;
         }
 
-        var searchModes = fromLocalClient || HasLocalClients || mode is InterfaceMode.AccessPoint or InterfaceMode.Gateway or InterfaceMode.Roaming or InterfaceMode.Internal or InterfaceMode.Boundary;
-        if (!searchModes) return;
+        var searchModes = fromLocalClient || GetInterfaceAnnounceOptions(attached).RecursivePathRequests
+            || mode is InterfaceMode.AccessPoint or InterfaceMode.Gateway or InterfaceMode.Roaming or InterfaceMode.Internal or InterfaceMode.Boundary;
+        if (!searchModes)
+        {
+            if (!HasLocalClients) return;
+            lock (_gate)
+            {
+                if (_discovery.TryGetValue(key, out var pending))
+                {
+                    if (!pending.Interfaces.Contains(attached) && pending.Interfaces.Count < _options.ControlCapacity) pending.Interfaces.Add(attached);
+                    return;
+                }
+                if (_discovery.Count >= _options.ControlCapacity) return;
+                _discovery[key] = new DiscoveryEntry(_time.GetUtcNow() + MediumDiscoveryTimeout()) { Interfaces = { attached } };
+            }
+            foreach (var client in _manager.Interfaces.Where(IsLocalClientInterface))
+                await RequestPathAsync(destination, client, cancellationToken: cancellationToken).ConfigureAwait(false);
+            return;
+        }
 
+        if (!fromLocalClient && limitPathRequests) return;
         lock (_gate)
         {
             if (_discovery.TryGetValue(key, out var existing))
             {
-                if (!existing.Interfaces.Contains(attached)) existing.Interfaces.Add(attached);
+                if (!existing.Interfaces.Contains(attached) && existing.Interfaces.Count < _options.ControlCapacity) existing.Interfaces.Add(attached);
                 return;
             }
 
-            _discovery[key] = new DiscoveryEntry(_time.GetUtcNow() + _options.DiscoveryTimeout) { Interfaces = { attached } };
+            if (_discovery.Count >= _options.ControlCapacity) return;
+            _discovery[key] = new DiscoveryEntry(_time.GetUtcNow() + MediumDiscoveryTimeout()) { Interfaces = { attached } };
         }
 
         foreach (var other in _manager.Interfaces)
@@ -807,7 +915,11 @@ public sealed partial class TransportRouter : IAsyncDisposable
             if (ReferenceEquals(other, attached)) continue;
             if (!_options.TransportEnabled && !fromLocalClient && !IsLocalClientInterface(other)) continue;
             if (mode == InterfaceMode.Boundary && GetInterfaceMode(other) is not (InterfaceMode.Boundary or InterfaceMode.Gateway)) continue;
-            try { await RequestPathAsync(destination, other, tag, cancellationToken).ConfigureAwait(false); }
+            try
+            {
+                if (!fromLocalClient && !ReserveRecursivePathRequest(other, destination.Length + tag.Length + (_options.TransportEnabled ? 16 : 0) + Packet.Header1Size)) continue;
+                await RequestPathAsync(destination, other, tag, cancellationToken).ConfigureAwait(false);
+            }
             catch (Exception ex) when (ex is not OperationCanceledException) { Log?.Invoke($"Could not forward path request on {Describe(other)}: {ex.Message}"); }
         }
     }
@@ -821,22 +933,22 @@ public sealed partial class TransportRouter : IAsyncDisposable
     /// <summary>One pass of upstream's announce job: transmits every announce and path response that is due.</summary>
     public async ValueTask FlushAnnouncesAsync(CancellationToken cancellationToken = default)
     {
-        foreach (var due in Engine.CollectDueRebroadcasts())
+        cancellationToken.ThrowIfCancellationRequested();
+        await FlushPathRecoveryAsync(cancellationToken).ConfigureAwait(false);
+        await ReleaseHeldIngressAsync(cancellationToken).ConfigureAwait(false);
+        await FlushInterfaceAnnounceQueuesAsync(cancellationToken).ConfigureAwait(false);
+        var pending = Engine.CollectDueRebroadcasts();
+        for (var index = 0; index < pending.Count; index++)
         {
+            var due = pending[index];
             try
             {
-                if (due.TargetInterface is { } target)
-                {
-                    if (_manager.Contains(target)) await _manager.SendToAsync(due.Packet, target, cancellationToken).ConfigureAwait(false);
-                }
-                else if (due.ExcludedInterface is { } excluded && _manager.Contains(excluded))
-                {
-                    await _manager.SendExceptAsync(due.Packet, excluded, cancellationToken).ConfigureAwait(false);
-                }
-                else
-                {
-                    await _manager.SendAsync(due.Packet, cancellationToken).ConfigureAwait(false);
-                }
+                await SendAnnounceControlledAsync(due.Packet, due.ExcludedInterface, due.TargetInterface, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                for (var unsent = index; unsent < pending.Count; unsent++) Engine.DeferRebroadcast(pending[unsent]);
+                throw;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -853,6 +965,7 @@ public sealed partial class TransportRouter : IAsyncDisposable
     /// <summary>One pass of upstream's table culling: expired or interface-less paths, stale reverse entries and discovery requests.</summary>
     public void Cull()
     {
+        CullTunnels();
         var removed = Engine.CullPaths(source =>
         {
             if (source is null) return _options.PathLifetime;
@@ -867,6 +980,7 @@ public sealed partial class TransportRouter : IAsyncDisposable
         if (removed > 0) Log?.Invoke($"Removed {removed} path(s)");
 
         var now = _time.GetUtcNow();
+        List<LinkEntry> failed = [];
         lock (_gate)
         {
             foreach (var key in _reverse.Where(kv => now - kv.Value.Created > _options.ReverseTimeout
@@ -883,12 +997,15 @@ public sealed partial class TransportRouter : IAsyncDisposable
                 : now > kv.Value.ProofTimeout)
                     || !_manager.Contains(kv.Value.ReceivedInterface) || !_manager.Contains(kv.Value.NextHopInterface)).Select(kv => kv.Key).ToArray())
             {
+                if (!_linkTable[key].Validated) failed.Add(_linkTable[key]);
                 _linkTable.Remove(key);
             }
             foreach (var iface in _modes.Keys.Where(i => !_manager.Contains(i)).ToArray()) _modes.Remove(iface);
             _localClientInterfaces.RemoveWhere(iface => !_manager.Contains(iface));
         }
 
+        foreach (var entry in failed) RecoverForwardedLink(entry);
+        CullRoutingControls();
         ExpireReceipts();
     }
 

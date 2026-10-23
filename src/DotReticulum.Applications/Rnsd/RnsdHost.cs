@@ -60,7 +60,9 @@ public sealed partial class RnsdHost : IAsyncDisposable
         _executionPolicy = executionPolicy;
         _timeProvider = timeProvider;
         manager.Diagnostic += (iface, error) => log(1, $"{InterfaceName(iface)}: {error.Message}");
-        manager.InterfaceRemoved += router.DetachInterface;
+        manager.InterfaceRemoved += TransportInterfaceRemoved;
+        manager.InterfaceConnected += TransportInterfaceConnected;
+        manager.InterfaceDisconnected += TransportInterfaceDisconnected;
     }
 
     public TransportRouter Router { get; }
@@ -135,6 +137,11 @@ public sealed partial class RnsdHost : IAsyncDisposable
                 TransportEnabled = config.EnableTransport && session.Role != SharedInstanceRole.Client,
                 TransportIdentity = identity,
                 IsIdentityBlocked = blackholes.IsBlackholed,
+                InboundDataCapacity = config.Routing.InboundDataCapacity,
+                InboundAnnounceCapacity = config.Routing.InboundAnnounceCapacity,
+                InboundPathRequestCapacity = config.Routing.InboundPathRequestCapacity,
+                InboundIngressLimitedCapacity = config.Routing.InboundIngressLimitedCapacity,
+                TimeProvider = timeProvider,
             })
             {
                 Log = message => log(5, message),
@@ -142,7 +149,14 @@ public sealed partial class RnsdHost : IAsyncDisposable
             var host = new RnsdHost(manager, router, interfaces, config, extensions, log,
                 internalIdentity, networkIdentity, session, blackholes, storageDirectory, executionPolicy ?? new(), timeProvider ?? TimeProvider.System);
             constructed = host;
-            foreach (var (iface, mode) in modes) host.ConfigureMode(iface, mode);
+            foreach (var cfg in config.Interfaces.Where(i => i.Enabled))
+            {
+                if (interfaces.FirstOrDefault(i => i.Name == cfg.Name && modes.ContainsKey(i.Interface)).Interface is { } iface)
+                {
+                    manager.SetInterfaceAccessCode(iface, cfg.CreateAccessCode());
+                    host.ConfigureMode(iface, cfg.Mode, cfg.Routing.ToAnnounceOptions);
+                }
+            }
             host.ConfigureSharedRouting();
             host.InitializeServices();
             return host;
@@ -201,20 +215,23 @@ public sealed partial class RnsdHost : IAsyncDisposable
         {
             case RnsdInterfaceType.TcpServer:
                 return new TcpServerPacketInterface(new IPEndPoint(Address(cfg, "listen_ip", "0.0.0.0"), cfg.GetInt("listen_port", cfg.GetInt("port", 4242), 0, 65535)),
-                    perClientInterfaces: true);
+                    perClientInterfaces: true, nominalBitrate: cfg.Bitrate, fixedMtu: cfg.FixedMtu);
             case RnsdInterfaceType.TcpClient:
                 return new TcpClientPacketInterface(cfg.Get("target_host") ?? throw new FormatException($"Interface '{cfg.Name}': target_host is required."),
-                    cfg.GetInt("target_port", cfg.GetInt("port", 4242), 1, 65535));
+                    cfg.GetInt("target_port", cfg.GetInt("port", 4242), 1, 65535),
+                    nominalBitrate: cfg.Bitrate, reconnect: true, maxReconnectAttempts: cfg.MaxReconnectAttempts,
+                    fixedMtu: cfg.FixedMtu, connectTimeout: cfg.ConnectTimeout);
             case RnsdInterfaceType.Udp:
             {
                 var port = cfg.GetInt("port", 4242, 0, 65535);
                 return new UdpPacketInterface(
                     new IPEndPoint(Address(cfg, "listen_ip", "0.0.0.0"), cfg.GetInt("listen_port", port, 0, 65535)),
-                    new IPEndPoint(Address(cfg, "forward_ip", "255.255.255.255"), cfg.GetInt("forward_port", port, 1, 65535)));
+                    new IPEndPoint(Address(cfg, "forward_ip", "255.255.255.255"), cfg.GetInt("forward_port", port, 1, 65535)),
+                    nominalBitrate: cfg.Bitrate);
             }
             case RnsdInterfaceType.Serial:
                 return new SerialPacketInterface(cfg.Get("port") ?? throw new FormatException($"Interface '{cfg.Name}': port is required."),
-                    cfg.GetInt("speed", 9600, 1));
+                    cfg.GetInt("speed", 9600, 1), nominalBitrate: cfg.Bitrate);
             default:
                 throw new FormatException($"Interface '{cfg.Name}': unsupported type.");
         }
@@ -230,11 +247,18 @@ public sealed partial class RnsdHost : IAsyncDisposable
         return peer is null ? iface.GetType().Name : $"{iface.GetType().Name}[{peer}]";
     }
 
-    private void ConfigureMode(IPacketInterface iface, InterfaceMode mode)
+    private void ConfigureMode(IPacketInterface iface, InterfaceMode mode, Func<InterfaceAnnounceOptions>? optionsFactory = null)
     {
-        Router.SetInterfaceMode(iface, mode);
+        var options = optionsFactory?.Invoke();
+        void Configure(IPacketInterface target, InterfaceAnnounceOptions? controls)
+        {
+            Router.SetInterfaceMode(target, mode);
+            if (controls is not null) Router.SetInterfaceAnnounceOptions(target, controls);
+        }
+        Configure(iface, options);
+        lock (_gate) _interfaceReconfigure[iface] = () => Configure(iface, options);
         if (iface is not ISpawningPacketInterface spawner) return;
-        Action<IPacketInterface> handler = child => Router.SetInterfaceMode(child, mode);
+        Action<IPacketInterface> handler = child => Configure(child, optionsFactory?.Invoke());
         _modeHandlers.Add(spawner, handler);
         spawner.ChildConnected += handler;
     }

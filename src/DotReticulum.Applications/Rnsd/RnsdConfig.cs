@@ -1,5 +1,6 @@
 using System.Globalization;
 using DotReticulum.Applications.Runtime;
+using DotReticulum.Core;
 using DotReticulum.Transport;
 
 namespace DotReticulum.Applications.Rnsd;
@@ -20,7 +21,45 @@ public sealed record RnsdInterfaceConfig(string Name, RnsdInterfaceType Type, bo
     public string TypeName { get; init; } = Type.ToString();
     public IReadOnlyDictionary<string, string> RawOptions { get; init; } = Options;
     public RnsdInterfaceDiscoveryConfig Discovery { get; init; } = new();
+    public RnsdInterfaceRoutingConfig Routing { get; init; } = new();
     public bool BootstrapOnly { get; init; }
+    public long? ConfiguredBitrate
+    {
+        get
+        {
+            if (Get("bitrate") is not { } text) return null;
+            if (!long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+                throw new FormatException($"Interface '{Name}': 'bitrate' must be an integer.");
+            return value >= 5 ? value : null;
+        }
+    }
+    public long Bitrate => ConfiguredBitrate ?? (Type == RnsdInterfaceType.Serial ? GetInt("speed", 9600, 1) : 10_000_000);
+    public int? FixedMtu => GetInt("fixed_mtu", 0, 0, InterfaceAccessCode.MaximumPacketSize) is var value && value != 0
+        ? value >= Packet.Mtu ? value : throw new FormatException($"Interface '{Name}': 'fixed_mtu' must be at least {Packet.Mtu}.")
+        : null;
+    public int? MaxReconnectAttempts => Get("max_reconnect_tries") is null ? null : GetInt("max_reconnect_tries", 0);
+    public TimeSpan ConnectTimeout => TimeSpan.FromSeconds(GetInt("connect_timeout", 5, 1));
+    public string? IfacNetworkName => IfacAlias("networkname", "network_name");
+    public string? IfacPassphrase => IfacAlias("passphrase", "pass_phrase");
+    public int IfacSize
+    {
+        get
+        {
+            var bits = GetInt("ifac_size", 0, int.MinValue, 512);
+            return bits >= 8 ? bits / 8 : Type == RnsdInterfaceType.Serial ? 8 : 16;
+        }
+    }
+
+    private string? IfacAlias(string first, string second)
+    {
+        static bool Present(string? value) => value is not (null or "" or "None");
+        var primary = Get(first);
+        var alias = Get(second);
+        return Present(alias) ? alias : Present(primary) ? primary : null;
+    }
+
+    public InterfaceAccessCode? CreateAccessCode() => IfacNetworkName is null && IfacPassphrase is null
+        ? null : InterfaceAccessCode.Derive(IfacNetworkName, IfacPassphrase, IfacSize);
     public string? Get(string key) => Options.TryGetValue(key, out var v) ? v : null;
     public IReadOnlyList<string> GetList(string key) =>
         RawOptions.TryGetValue(key, out var value) ? RnsdConfigParser.ParseList(value) : [];
@@ -44,6 +83,7 @@ public sealed record RnsdConfig(bool EnableTransport, int LogLevel, IReadOnlyLis
     public SharedInstanceOptions SharedInstance { get; init; } = new();
     public DiscoveryOptions Discovery { get; init; } = new();
     public BlackholeOptions Blackholes { get; init; } = new();
+    public RnsdRoutingConfig Routing { get; init; } = new();
     public string? NetworkIdentityPath { get; init; }
     public bool EnableRemoteManagement { get; init; }
     public bool EnableInterfaceManagement { get; init; } = true;
@@ -55,7 +95,7 @@ public sealed record RnsdConfig(bool EnableTransport, int LogLevel, IReadOnlyLis
 /// <summary>
 /// Reads supported ConfigObj sections, scalar/list quoting and comments. Ineffective controls are rejected rather than silently ignored.
 /// </summary>
-public static class RnsdConfigParser
+public static partial class RnsdConfigParser
 {
     private static readonly Dictionary<string, RnsdInterfaceType> Types = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -126,9 +166,10 @@ public static class RnsdConfigParser
         }
 
         ValidateKeys(reticulum, "reticulum",
-            "enable_transport static_transport_identity share_instance instance_name shared_instance_type shared_instance_port instance_control_port rpc_key network_identity enable_remote_management enable_interface_management remote_management_allowed discover_interfaces required_discovery_value interface_discovery_sources autoconnect_discovered_interfaces autoconnect_unverified_implementations autoconnect_interface_mode autoconnect_interface_gravity autoconnect_announces_to_internal publish_blackhole blackhole_sources blackhole_update_interval");
+            $"enable_transport static_transport_identity share_instance instance_name shared_instance_type shared_instance_port instance_control_port rpc_key network_identity enable_remote_management enable_interface_management remote_management_allowed discover_interfaces required_discovery_value interface_discovery_sources autoconnect_discovered_interfaces autoconnect_unverified_implementations autoconnect_interface_mode autoconnect_interface_gravity autoconnect_announces_to_internal publish_blackhole blackhole_sources blackhole_update_interval {RoutingGlobalKeys}");
         ValidateKeys(logging, "logging", "loglevel logtimestamps");
         var enableTransport = reticulum.TryGetValue("enable_transport", out var et) && ParseBool(et, "enable_transport");
+        var routing = ParseRouting(reticulum);
         var logLevel = 3;
         if (logging.TryGetValue("loglevel", out var ll))
         {
@@ -165,14 +206,14 @@ public static class RnsdConfigParser
             {
                 var typeKeys = type switch
                 {
-                    RnsdInterfaceType.TcpServer => "listen_ip listen_port port",
-                    RnsdInterfaceType.TcpClient => "target_host target_port",
+                    RnsdInterfaceType.TcpServer => "listen_ip listen_port port fixed_mtu",
+                    RnsdInterfaceType.TcpClient => "target_host target_port fixed_mtu connect_timeout max_reconnect_tries",
                     RnsdInterfaceType.Udp => "listen_ip listen_port forward_ip forward_port port",
                     RnsdInterfaceType.Serial => "port speed",
                     _ => "",
                 };
                 if (type != RnsdInterfaceType.Extension)
-                    ValidateKeys(options, $"interface '{name}'", $"type enabled interface_enabled mode interface_mode bootstrap_only {typeKeys} {RnsdInterfaceDiscoveryConfig.AcceptedKeys}");
+                    ValidateKeys(options, $"interface '{name}'", $"type enabled interface_enabled mode interface_mode bootstrap_only bitrate networkname network_name passphrase pass_phrase ifac_size {typeKeys} {RnsdInterfaceDiscoveryConfig.AcceptedKeys} {RoutingInterfaceKeys}");
                 if (type == RnsdInterfaceType.TcpServer)
                 {
                     if (scalars.TryGetValue("port", out var port)) scalars["listen_port"] = port;
@@ -190,10 +231,15 @@ public static class RnsdConfigParser
                 }
                 if (type == RnsdInterfaceType.Serial) Require(scalars, name, "port");
                 var cfg = new RnsdInterfaceConfig(name, type, enabled, mode, scalars);
+                _ = cfg.ConfiguredBitrate;
+                _ = cfg.IfacSize;
+                if (type is RnsdInterfaceType.TcpClient or RnsdInterfaceType.TcpServer) _ = cfg.FixedMtu;
+                if (type == RnsdInterfaceType.TcpClient) { _ = cfg.ConnectTimeout; _ = cfg.MaxReconnectAttempts; }
                 foreach (var key in new[] { "listen_port", "target_port", "forward_port" })
                     if (scalars.ContainsKey(key)) _ = cfg.GetInt(key, 0, key == "listen_port" ? 0 : 1, 65535);
             }
             var configured = new RnsdInterfaceConfig(name, type, enabled, mode, scalars) { TypeName = typeName, RawOptions = options };
+            if (enabled) configured = configured with { Routing = ParseInterfaceRouting(configured, routing, enableTransport) };
             var discovery = RnsdInterfaceDiscoveryConfig.Parse(configured);
             if (discovery.Enabled && !discovery.IgnoreConfigWarnings && mode is not (InterfaceMode.Gateway or InterfaceMode.AccessPoint or InterfaceMode.Internal))
                 mode = InterfaceMode.Gateway;
@@ -236,6 +282,7 @@ public static class RnsdConfigParser
             StaticTransportIdentity = Bool("static_transport_identity") || interfaces.Any(i => i.Discovery.Enabled),
             LogTimestamps = !logging.TryGetValue("logtimestamps", out var timestamps) || ParseBool(timestamps, "logtimestamps"),
             ReticulumOptions = reticulum,
+            Routing = routing,
             LoggingOptions = logging,
             NetworkIdentityPath = Value("network_identity"),
             EnableRemoteManagement = Bool("enable_remote_management"),

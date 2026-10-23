@@ -36,11 +36,16 @@ public sealed class TcpServerPacketInterface : ISpawningPacketInterface, IPacket
 
     private readonly bool _perClient;
 
-    public TcpServerPacketInterface(IPEndPoint localEndpoint, int maxClients = DefaultMaxClients, bool perClientInterfaces = false)
+    public TcpServerPacketInterface(IPEndPoint localEndpoint, int maxClients = DefaultMaxClients, bool perClientInterfaces = false,
+        long nominalBitrate = 10_000_000, int? fixedMtu = null)
     {
         _perClient = perClientInterfaces;
         ArgumentNullException.ThrowIfNull(localEndpoint);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxClients, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(nominalBitrate, 1);
+        if (fixedMtu is < Packet.Mtu or > InterfaceAccessCode.MaximumPacketSize) throw new ArgumentOutOfRangeException(nameof(fixedMtu));
+        Bitrate = nominalBitrate;
+        HardwareMtu = fixedMtu ?? PacketInterfaceCapabilities.MtuForBitrate(nominalBitrate);
         _local = localEndpoint;
         _maxClients = maxClients;
         _received = Channel.CreateBounded<ReadOnlyMemory<byte>>(new BoundedChannelOptions(ReceiveQueueCapacity)
@@ -55,6 +60,9 @@ public sealed class TcpServerPacketInterface : ISpawningPacketInterface, IPacket
     public event Action<IPacketInterface>? ChildConnected;
 
     public bool SendsThroughChildren => _perClient;
+    public long Bitrate { get; }
+    public int HardwareMtu { get; }
+    public bool SupportsMtuDiscovery => true;
 
     /// <summary>The bound listening endpoint (resolves an ephemeral port 0); null before start.</summary>
     public IPEndPoint? LocalEndpoint { get; private set; }
@@ -77,7 +85,8 @@ public sealed class TcpServerPacketInterface : ISpawningPacketInterface, IPacket
             ["rxb"] = Interlocked.Read(ref _rxBytes),
             ["txb"] = Interlocked.Read(ref _txBytes),
             ["clients"] = _clients.Count,
-            ["bitrate"] = 10_000_000L,
+            ["bitrate"] = Bitrate,
+            ["hardware_mtu"] = HardwareMtu,
             ["dotreticulum_bitrate_kind"] = "configured_estimate",
             ["rejected_clients"] = _rejectedClients,
             ["listen_address"] = LocalEndpoint?.ToString(),
@@ -161,7 +170,9 @@ public sealed class TcpServerPacketInterface : ISpawningPacketInterface, IPacket
         }
 
         // Validates up front so malformed input is an argument error rather than a per-client failure.
-        _ = HdlcPacketFraming.Encode(packet);
+        if (packet.IsEmpty || packet.Length > HardwareMtu + ((packet.Span[0] & 0x80) != 0 ? 64 : 0))
+            throw new ArgumentException("Packet exceeds the bearer frame bound.", nameof(packet));
+        _ = HdlcPacketFraming.Encode(packet, HardwareMtu + 64, validatePacket: (packet.Span[0] & 0x80) == 0);
         var bytes = packet.ToArray();
         var sends = new Task[snapshot.Length];
         for (var i = 0; i < snapshot.Length; i++)
@@ -234,7 +245,8 @@ public sealed class TcpServerPacketInterface : ISpawningPacketInterface, IPacket
                 socket.NoDelay = true;
                 client = new Client(new HdlcStreamEndpoint(new NetworkStream(socket, ownsSocket: true),
                     received: length => Interlocked.Add(ref _rxBytes, length),
-                    sent: length => Interlocked.Add(ref _txBytes, length)));
+                    sent: length => Interlocked.Add(ref _txBytes, length),
+                    maxFrameLength: HardwareMtu + 64, authenticatedFrames: true));
             }
             catch (SocketException)
             {
@@ -252,7 +264,15 @@ public sealed class TcpServerPacketInterface : ISpawningPacketInterface, IPacket
                     return;
                 }
 
-                handler(new TcpServerClientInterface(client.Endpoint, () => RemoveClientAsync(client), socket.RemoteEndPoint!.ToString()!));
+                var child = new TcpServerClientInterface(client.Endpoint, () => RemoveClientAsync(client), socket.RemoteEndPoint!.ToString()!,
+                    Bitrate, HardwareMtu);
+                var observed = false;
+                foreach (Action<IPacketInterface> observer in handler.GetInvocationList())
+                {
+                    try { observer(child); observed = true; }
+                    catch (Exception error) { System.Diagnostics.Trace.TraceError("TCP child connection observer failed: {0}", error); }
+                }
+                if (!observed) _ = RemoveClientAsync(client);
                 return;
             }
 

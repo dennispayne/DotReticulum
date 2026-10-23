@@ -148,6 +148,31 @@ public sealed class RuntimeStateStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task OptionalPacketCacheTimestampSurvivesRestartWithoutChangingLegacyRows()
+    {
+        var clock = new Clock(1_800_000_020);
+        var store = new RuntimeStateStore(_directory, clock);
+        var first = Packet.Create(PacketType.Proof, DestinationType.Link, new byte[16], new byte[] { 1 });
+        var legacy = Packet.Create(PacketType.Proof, DestinationType.Link, new byte[16], new byte[] { 2 });
+        var state = RuntimeStateSnapshot.Empty with
+        {
+            CachedPackets =
+            [
+                new PersistedPacket(first.CalculateHash(), first.ToArray(), false, 1_800_000_000.125),
+                new PersistedPacket(legacy.CalculateHash(), legacy.ToArray(), false),
+            ],
+        };
+        await store.SaveAsync(state);
+        var restored = await new RuntimeStateStore(_directory, clock).LoadAsync();
+        Assert.Equal(1_800_000_000.125, restored.CachedPackets[0].CachedAt);
+        Assert.Null(restored.CachedPackets[1].CachedAt);
+        var committed = await File.ReadAllBytesAsync(store.StatePath);
+        var invalid = state with { CachedPackets = [state.CachedPackets[0] with { CachedAt = double.NaN }] };
+        await Assert.ThrowsAsync<InvalidDataException>(() => store.SaveAsync(invalid));
+        Assert.Equal(committed, await File.ReadAllBytesAsync(store.StatePath));
+    }
+
+    [Fact]
     public async Task CancelledSavePreservesCommittedGenerationAndCleansOwnedStaging()
     {
         var store = new RuntimeStateStore(_directory);

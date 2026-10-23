@@ -9,12 +9,12 @@ public sealed record PersistedPath(
     byte[] DestinationHash, double Timestamp, byte[] ReceivedFrom, int Hops, double Expires,
     IReadOnlyList<byte[]> RandomBlobs, byte[]? InterfaceHash, byte[] PacketHash);
 
-/// <summary>Upstream Transport.save_tunnel_table's four fields. This DTO does not implement tunnel synthesis.</summary>
+/// <summary>Upstream Transport.save_tunnel_table's four fields, restored dormant until authenticated synthesis.</summary>
 public sealed record PersistedTunnel(byte[] TunnelId, byte[]? InterfaceHash, IReadOnlyList<PersistedPath> Paths, double Expires);
 
 /// <summary>A complete cached wire packet, keyed by its full upstream packet hash. Announce identifies the
 /// separate upstream announce cache namespace; interface association is resolved from the path table.</summary>
-public sealed record PersistedPacket(byte[] PacketHash, byte[] Raw, bool Announce);
+public sealed record PersistedPacket(byte[] PacketHash, byte[] Raw, bool Announce, double? CachedAt = null);
 
 /// <summary>Detached, caller-owned runtime state. Only public identities and public ratchets belong here.
 /// Capture must be synchronized by the provider. Secret identities and local destination ratchets use
@@ -31,7 +31,7 @@ public sealed record RuntimeStateSnapshot(
 
 /// <summary>Boundary for the runtime's existing equivalent state. Implementations must reject expired,
 /// blackholed, unavailable-interface and missing/corrupt-announcement paths before restoring them.
-/// Unsupported tunnel mechanics must remain empty rather than being synthesized by persistence.</summary>
+/// Tunnel paths remain dormant until the authenticated transport endpoint reappears.</summary>
 public interface IRuntimeStateProvider
 {
     RuntimeStateSnapshot CaptureState();

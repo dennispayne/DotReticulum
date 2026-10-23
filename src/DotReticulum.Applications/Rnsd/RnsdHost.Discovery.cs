@@ -75,16 +75,19 @@ public sealed partial class RnsdHost
         var advertisement = request.Advertisement;
         if (advertisement.InterfaceType != "BackboneInterface")
             throw new NotSupportedException($"Discovery autoconnect for {advertisement.InterfaceType} has no native bearer.");
-        if (advertisement.NetworkName is not null || advertisement.Passphrase is not null)
-            throw new NotSupportedException("Discovered IFAC-protected interfaces require the Parity 4 authentication implementation; refusing an unauthenticated connection.");
-        if (request.Gravity != 0 || request.AnnouncesToInternal is false)
-            throw new NotSupportedException("The requested discovered-interface gravity/internal-announcement controls are not implemented.");
         var iface = new TcpClientPacketInterface(advertisement.ReachableOn ?? throw new InvalidDataException("Missing discovery endpoint."),
-            advertisement.Port ?? throw new InvalidDataException("Missing discovery port."), request.ConfiguredBitrate);
+            advertisement.Port ?? throw new InvalidDataException("Missing discovery port."), request.ConfiguredBitrate, reconnect: true);
+        var accessCode = advertisement.NetworkName is null && advertisement.Passphrase is null ? null
+            : InterfaceAccessCode.Derive(advertisement.NetworkName, advertisement.Passphrase, size: 16);
         var mode = request.Mode is null ? InterfaceMode.Full : ParseDiscoveryMode(request.Mode);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(TimeSpan.FromSeconds(5));
-        try { await AttachDiscoveredInterfaceAsync(request.Name, iface, mode, deadline.Token).ConfigureAwait(false); }
+        try
+        {
+            await AttachDiscoveredInterfaceAsync(request.Name, iface, mode, deadline.Token, accessCode,
+                () => _configuration.Routing.CreateInterfaceOptions(Router.TransportEnabled,
+                    request.Gravity, request.AnnouncesToInternal)).ConfigureAwait(false);
+        }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         { throw new TimeoutException($"Discovery connection to {advertisement.ReachableOn}:{advertisement.Port} exceeded the reference five-second initial connection timeout."); }
         return CreateDiscoveryLease(request.Name, iface);
@@ -124,23 +127,27 @@ public sealed partial class RnsdHost
         return result;
     }
 
-    private async ValueTask AttachDiscoveredInterfaceAsync(string name, IPacketInterface iface, InterfaceMode mode, CancellationToken token)
+    private async ValueTask AttachDiscoveredInterfaceAsync(string name, IPacketInterface iface, InterfaceMode mode, CancellationToken token,
+        InterfaceAccessCode? accessCode = null, Func<InterfaceAnnounceOptions>? optionsFactory = null)
     {
-        await _mutation.WaitAsync(token).ConfigureAwait(false);
+        var acquired = false;
         try
         {
+            await _mutation.WaitAsync(token).ConfigureAwait(false);
+            acquired = true;
             lock (_gate)
                 if (_interfaces.Any(i => i.Name == name)) throw new InvalidOperationException($"Interface '{name}' is already attached.");
-            ConfigureMode(iface, mode);
-            await _manager.AttachAsync(iface, token, isolateFailure: true).ConfigureAwait(false);
+            ConfigureMode(iface, mode, optionsFactory);
+            await _manager.AttachAsync(iface, token, isolateFailure: true, accessCode: accessCode).ConfigureAwait(false);
             lock (_gate) _interfaces.Add((name, iface));
         }
         catch
         {
             RemoveModeHandler(iface);
+            accessCode?.Dispose();
             await iface.DisposeAsync().ConfigureAwait(false);
             throw;
         }
-        finally { _mutation.Release(); }
+        finally { if (acquired) _mutation.Release(); }
     }
 }

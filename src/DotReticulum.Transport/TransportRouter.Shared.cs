@@ -22,6 +22,7 @@ public sealed partial class TransportRouter
             _linkTable.Clear();
             _discovery.Clear();
         }
+        ClearRoutingControls();
     }
 
     /// <summary>Upstream shared_connection_reappeared: reannounce registered SINGLE destinations as path responses.</summary>
@@ -64,6 +65,7 @@ public sealed partial class TransportRouter
             ObjectDisposedException.ThrowIf(_disposed, this);
             _localClientInterfaces.Add(iface);
             _modes[iface] = InterfaceMode.Internal;
+            _routingModes[iface] = InterfaceMode.Internal;
         }
     }
 
@@ -92,7 +94,7 @@ public sealed partial class TransportRouter
         {
             if (ReferenceEquals(iface, received.Source)) continue;
             if (!IsLocalClientInterface(iface) && (!fromLocal || packet.Context == Announce.PathResponseContext)) continue;
-            await _manager.SendToAsync(outgoing, iface, cancellationToken).ConfigureAwait(false);
+            await SendAnnounceControlledAsync(outgoing, received.Source, iface, cancellationToken, applyModeToTarget: !IsLocalClientInterface(iface)).ConfigureAwait(false);
         }
     }
 

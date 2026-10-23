@@ -16,7 +16,13 @@ public sealed record PacketInterfaceStatistics(
     long FailedSends,
     long FailedSendBytes,
     long BackpressureWaits,
-    int PendingSends);
+    int PendingSends)
+{
+    public long IfacViolations { get; init; }
+    public int? IfacSize { get; init; }
+    public string? IfacNetworkName { get; init; }
+    public byte[]? IfacSignature { get; init; }
+}
 
 /// <summary>Optional actual device measurements supplied by a bearer; absent values must remain absent.</summary>
 public interface IPacketInterfaceDiagnostics

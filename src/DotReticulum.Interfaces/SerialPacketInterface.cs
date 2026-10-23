@@ -17,12 +17,17 @@ public sealed class SerialPacketInterface : IPacketInterface, IPacketInterfaceDi
     private HdlcStreamEndpoint? _endpoint;
     private bool _started;
     private bool _disposed;
+    public long Bitrate { get; }
+    public int HardwareMtu => 564;
 
     /// <summary>Uses a real serial port (8 data bits, no parity, 1 stop bit by default, as upstream).</summary>
-    public SerialPacketInterface(string portName, int baudRate = 9600, Parity parity = Parity.None, int dataBits = 8, StopBits stopBits = StopBits.One)
+    public SerialPacketInterface(string portName, int baudRate = 9600, Parity parity = Parity.None, int dataBits = 8, StopBits stopBits = StopBits.One,
+        long? nominalBitrate = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(portName);
         ArgumentOutOfRangeException.ThrowIfLessThan(baudRate, 1);
+        if (nominalBitrate is < 1) throw new ArgumentOutOfRangeException(nameof(nominalBitrate));
+        Bitrate = nominalBitrate ?? baudRate;
         _baudRate = baudRate;
         _open = () =>
         {
@@ -41,9 +46,11 @@ public sealed class SerialPacketInterface : IPacketInterface, IPacketInterfaceDi
     }
 
     /// <summary>Uses a duplex stream (for tests, pseudo-terminals or other byte pipes). The interface takes ownership.</summary>
-    public SerialPacketInterface(Stream duplexStream)
+    public SerialPacketInterface(Stream duplexStream, long? nominalBitrate = null)
     {
         ArgumentNullException.ThrowIfNull(duplexStream);
+        if (nominalBitrate is < 1) throw new ArgumentOutOfRangeException(nameof(nominalBitrate));
+        Bitrate = nominalBitrate ?? 0;
         if (!duplexStream.CanRead || !duplexStream.CanWrite)
         {
             throw new ArgumentException("The stream must be readable and writable.", nameof(duplexStream));
@@ -68,7 +75,7 @@ public sealed class SerialPacketInterface : IPacketInterface, IPacketInterfaceDi
 
         cancellationToken.ThrowIfCancellationRequested();
         var (stream, owner) = _open();
-        var endpoint = new HdlcStreamEndpoint(stream, owner);
+        var endpoint = new HdlcStreamEndpoint(stream, owner, maxFrameLength: HardwareMtu + 64, authenticatedFrames: true);
         lock (_gate)
         {
             if (!_disposed)
@@ -93,8 +100,9 @@ public sealed class SerialPacketInterface : IPacketInterface, IPacketInterfaceDi
         {
             ["rxb"] = _endpoint?.ReceivedBytes ?? 0,
             ["txb"] = _endpoint?.SentBytes ?? 0,
-            ["bitrate"] = _baudRate,
-            ["dotreticulum_bitrate_kind"] = _baudRate is null ? null : "configured_baud",
+            ["bitrate"] = Bitrate == 0 ? null : (long?)Bitrate,
+            ["hardware_mtu"] = HardwareMtu,
+            ["dotreticulum_bitrate_kind"] = Bitrate == 0 ? null : _baudRate == Bitrate ? "configured_baud" : "configured_estimate",
             ["status"] = _endpoint is not null && !_disposed && _endpoint.IsConnected,
         };
     }

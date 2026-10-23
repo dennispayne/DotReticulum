@@ -209,7 +209,7 @@ public sealed class RnsdConfigurationParityTests : IDisposable
         Assert.Throws<FormatException>(() => RnsdConfigParser.Parse("[interfaces]\n[[Published]]\ntype=TCPServerInterface\nenabled=yes\nport=4242\ndiscoverable=yes\n" + options));
 
     [Theory]
-    [InlineData("[reticulum]\nqlen_in_data=1")]
+    [InlineData("[reticulum]\nqlen_in_unknown=1")]
     [InlineData("[reticulum]\npanic_on_interface_error=yes")]
     [InlineData("[logging]\ncompact_log_fmt=yes")]
     [InlineData("[other]\na=b")]

@@ -40,9 +40,14 @@ public sealed class AnnounceProcessor(PacketInterfaceManager manager, AnnounceEn
                         }
                     }
                 }
-                else if (PacketReceived is { } handler)
+                else if (PacketReceived is { } handlers)
                 {
-                    await handler(received).ConfigureAwait(false);
+                    foreach (Func<ReceivedPacket, ValueTask> handler in handlers.GetInvocationList())
+                    {
+                        try { await handler(received).ConfigureAwait(false); }
+                        catch (OperationCanceledException) when (linked.IsCancellationRequested) { throw; }
+                        catch (Exception ex) { engine.ReportCallbackError(nameof(PacketReceived), received.Packet.DestinationHash.Span, ex); }
+                    }
                 }
             }
         }
@@ -64,7 +69,11 @@ public sealed class AnnounceProcessor(PacketInterfaceManager manager, AnnounceEn
         {
             foreach (var due in engine.CollectDueRebroadcasts())
             {
-                if (due.ExcludedInterface is null) await manager.SendAsync(due.Packet, cancellationToken).ConfigureAwait(false);
+                if (due.TargetInterface is { } target)
+                {
+                    if (manager.Contains(target)) await manager.SendToAsync(due.Packet, target, cancellationToken).ConfigureAwait(false);
+                }
+                else if (due.ExcludedInterface is null) await manager.SendAsync(due.Packet, cancellationToken).ConfigureAwait(false);
                 else await manager.SendExceptAsync(due.Packet, due.ExcludedInterface, cancellationToken).ConfigureAwait(false);
             }
         }

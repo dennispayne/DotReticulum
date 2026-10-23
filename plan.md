@@ -65,7 +65,7 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] Shared-instance/local-client operation and management RPC semantics
   - [x] Authenticated local/remote management framing, required-shared/fallback behavior, instance election and daemon restart/reconnect
   - [x] Destination/identity usage and retain/unretain management operations
-  - [x] Persistent identities, known destinations, ratchets, paths and caches with restart/expiry/corruption behavior; tunnel serialization/expiry, with protocol restoration explicitly remaining in Parity 4
+  - [x] Persistent identities, known destinations, ratchets, paths and caches with restart/expiry/corruption behavior; tunnel serialization/expiry (authenticated protocol restoration completed in Parity 4)
   - [x] Interface attach/detach/reload, statistics, logging, housekeeping and graceful shutdown
   - [x] Per-interface/peer traffic, queue/drop/pressure/violation, PHY/device and optional profiling snapshots, with unavailable measurements explicitly null/absent
   - [x] Logging levels through PATHING/EXTREME, timestamp controls, file rotation, service/interactive/version modes and graceful persistence; POSIX signal execution explicitly unverified on Windows
@@ -75,22 +75,22 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] Blackhole identity management, publication and update behavior
   - [x] Blackhole expiry/reason/source authorization, failed-source updates, persistence and identified endpoint/link rejection integration
   - [x] AOT-safe interface extension mechanism with explicit differences from Python dynamic loading
-- [ ] Parity 4 - Transport and interface-control fidelity
-  - [ ] Complete interface modes, routing/path selection, requests, proofs, receipt and cache semantics
-  - [ ] Gravity/responsive-path selection, mode-specific replacement expiry and local outbound path-use refresh
-  - [ ] Failed pending/forwarded link rediscovery, shared-client/standalone and one-hop/boundary branches, throttled queued recovery and detached validated-link cleanup
-  - [ ] Authenticated LRPROOF rebalance effects on destination paths and expected terminus hops
-  - [ ] Concurrent path-request target delivery, held-announcement restoration, engaged/inflight scheduling and slow-medium limits
-  - [ ] Receipt eligibility, culling/1024 limit, conclusion metadata and upstream timeout calculations
-  - [ ] Forced resource-proof caching/query/replay after proof loss without inventing general cache behavior
-  - [ ] IFAC network identity/key derivation, packet authentication and rejection behavior
-  - [ ] IFAC configuration aliases and legacy HKDF expansion behavior at upgraded frame sizes, without weakening documented crypto hardening
-  - [ ] Tunnel establishment, synthesis, restoration and expiry
-  - [ ] Announce queues, bandwidth caps, rate penalties, ingress/egress controls and path-request limits
-  - [ ] Full ingress/origin/egress mode matrix, internal/roaming/AP boundaries, per-interface rates and newer-announcement queue replacement
-  - [ ] Data/announce/path-request/ingress-limited saturation behavior and bounded priority/rejection policy
-  - [ ] TCP reconnect, disconnect recovery and peer isolation
-  - [ ] Interface bitrate/MTU handling and link MTU discovery
+- [x] Parity 4 - Transport and interface-control fidelity
+  - [x] Complete interface modes, routing/path selection, requests, proofs, receipt and cache semantics
+  - [x] Gravity/responsive-path selection, mode-specific replacement expiry and local outbound path-use refresh
+  - [x] Failed pending/forwarded link rediscovery, shared-client/standalone and one-hop/boundary branches, throttled queued recovery and detached validated-link cleanup
+  - [x] Authenticated LRPROOF rebalance effects on destination paths and expected terminus hops
+  - [x] Concurrent path-request target delivery, held-announcement restoration, engaged/inflight scheduling and slow-medium limits
+  - [x] Receipt eligibility, culling/1024 limit, conclusion metadata and upstream timeout calculations
+  - [x] Forced resource-proof caching/query/replay after proof loss without inventing general cache behavior
+  - [x] IFAC network identity/key derivation, packet authentication and rejection behavior
+  - [x] IFAC configuration aliases and legacy HKDF expansion behavior at upgraded frame sizes, without weakening documented crypto hardening
+  - [x] Tunnel establishment, synthesis, restoration and expiry
+  - [x] Announce queues, bandwidth caps, rate penalties, ingress/egress controls and path-request limits
+  - [x] Full ingress/origin/egress mode matrix, internal/roaming/AP boundaries, per-interface rates and newer-announcement queue replacement
+  - [x] Data/announce/path-request/ingress-limited saturation behavior and bounded priority/rejection policy
+  - [x] TCP reconnect, disconnect recovery and peer isolation
+  - [x] Interface bitrate/MTU handling and link MTU discovery
 - [ ] Parity 5 - Endpoint and transfer fidelity
   - [ ] Complete applicable Identity, Destination and Packet behavior beyond existing vectors
   - [ ] Explicit AOT-safe MessagePack application-value domain, extension/timestamp support or diagnosed intentional restrictions, numeric/UTF-8/map-key and nesting/length failure behavior

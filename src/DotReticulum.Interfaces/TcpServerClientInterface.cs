@@ -3,9 +3,13 @@ using DotReticulum.Core;
 namespace DotReticulum.Interfaces;
 
 /// <summary>One accepted connection of a per-client <see cref="TcpServerPacketInterface"/>, handed out already connected.</summary>
-internal sealed class TcpServerClientInterface(HdlcStreamEndpoint endpoint, Func<Task> onClosed, string peer) : IPacketInterface, IPacketInterfaceDiagnostics
+internal sealed class TcpServerClientInterface(HdlcStreamEndpoint endpoint, Func<Task> onClosed, string peer,
+    long bitrate, int hardwareMtu) : IPacketInterface, IPacketInterfaceDiagnostics
 {
     private int _disposed;
+    public long Bitrate => bitrate;
+    public int HardwareMtu => hardwareMtu;
+    public bool SupportsMtuDiscovery => true;
 
     public ValueTask StartAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
@@ -18,7 +22,8 @@ internal sealed class TcpServerClientInterface(HdlcStreamEndpoint endpoint, Func
         ["rxb"] = endpoint.ReceivedBytes,
         ["txb"] = endpoint.SentBytes,
         ["peer"] = peer,
-        ["bitrate"] = 10_000_000L,
+        ["bitrate"] = Bitrate,
+        ["hardware_mtu"] = HardwareMtu,
         ["dotreticulum_bitrate_kind"] = "configured_estimate",
         ["status"] = Volatile.Read(ref _disposed) == 0 && endpoint.IsConnected,
     };

@@ -97,7 +97,7 @@ public sealed class RuntimeOperationsTests
         Assert.Null(entry["txb"]);
         Assert.False(entry.ContainsKey("rssi"));
         Assert.False(entry.ContainsKey("snr"));
-        Assert.Null(entry["ifac_violations"]);
+        Assert.Equal(0L, entry["ifac_violations"]);
         Assert.Null(stats["rss"]);
         Assert.Equal(0.0, stats["tqpressure"]);
         var profiled = RuntimeStatistics.Collect(manager, [("Memory", iface)], profiling: true);

@@ -129,10 +129,11 @@ public sealed partial class RnsdHost
         var maintenance = MaintenanceAsync(linked.Token);
         var discovery = ProcessDiscoveryAsync(linked.Token);
         var reconnects = ProcessSharedReconnectsAsync(linked.Token);
-        await Task.WhenAny(routing, maintenance, discovery, reconnects).ConfigureAwait(false);
+        var tunnels = ProcessTunnelSynthesisAsync(linked.Token);
+        await Task.WhenAny(routing, maintenance, discovery, reconnects, tunnels).ConfigureAwait(false);
         await linked.CancelAsync().ConfigureAwait(false);
-        try { await Task.WhenAll(routing, maintenance, discovery, reconnects).ConfigureAwait(false); }
-        catch (OperationCanceledException) when (linked.IsCancellationRequested && !routing.IsFaulted && !maintenance.IsFaulted && !discovery.IsFaulted && !reconnects.IsFaulted) { }
+        try { await Task.WhenAll(routing, maintenance, discovery, reconnects, tunnels).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (linked.IsCancellationRequested && !routing.IsFaulted && !maintenance.IsFaulted && !discovery.IsFaulted && !reconnects.IsFaulted && !tunnels.IsFaulted) { }
     }
 
     private async Task ProcessSharedReconnectsAsync(CancellationToken token)

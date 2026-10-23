@@ -42,6 +42,7 @@ public class LifecycleTests
         var link = router.Links.Connect(identity, new byte[16], closed: _ => throw new InvalidOperationException("close observer failed"));
         var packet = Packet.Create(PacketType.Data, DestinationType.Single, new byte[16], new byte[] { 1 });
         var receipt = await router.SendWithReceiptAsync(packet, identity);
+        Assert.NotNull(receipt);
         receipt.TimedOut = _ => throw new InvalidOperationException("receipt observer failed");
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => router.RunAsync(CancellationToken.None));

@@ -1,0 +1,234 @@
+{
+  "pinned": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "version": "1.5.7",
+  "sourceSha256": "70bf362bc54872e24c124e503d8c52c487886aa141f62faed739e46c396c689c",
+  "method": "Direct unmodified Interface counters/burst/frequency/hold/process_held_announces; clock patched, release thread made synchronous and Transport.inbound callback replaced with the real counter/burst/hold method sequence (isolated controller evidence, not full inbound interoperability)",
+  "announceCases": [
+    {
+      "seconds": 0,
+      "limited": false,
+      "active": false,
+      "received": 1,
+      "samples": 1,
+      "frequency": 0
+    },
+    {
+      "seconds": 0.1,
+      "limited": false,
+      "active": false,
+      "received": 2,
+      "samples": 2,
+      "frequency": 0
+    },
+    {
+      "seconds": 0.2,
+      "limited": true,
+      "active": true,
+      "received": 3,
+      "samples": 3,
+      "frequency": 14.999996423722166
+    },
+    {
+      "seconds": 0.3,
+      "limited": true,
+      "active": true,
+      "received": 4,
+      "samples": 4,
+      "frequency": 13.333335452609928
+    },
+    {
+      "seconds": 1,
+      "limited": true,
+      "active": true,
+      "received": 5,
+      "samples": 5,
+      "frequency": 5.0
+    },
+    {
+      "seconds": 2,
+      "limited": true,
+      "active": true,
+      "received": 6,
+      "samples": 6,
+      "frequency": 3.0
+    },
+    {
+      "seconds": 16,
+      "limited": true,
+      "active": true,
+      "received": 7,
+      "samples": 5,
+      "frequency": 0.3773584883026598
+    },
+    {
+      "seconds": 18,
+      "limited": true,
+      "active": false,
+      "received": 8,
+      "samples": 4,
+      "frequency": 0.2824858749451991
+    },
+    {
+      "seconds": 19,
+      "limited": false,
+      "active": false,
+      "received": 9,
+      "samples": 3,
+      "frequency": 0.23529411764705882
+    }
+  ],
+  "requestCases": [
+    {
+      "seconds": 0,
+      "limited": false,
+      "active": false,
+      "received": 1,
+      "samples": 1,
+      "frequency": 0
+    },
+    {
+      "seconds": 0.1,
+      "limited": false,
+      "active": false,
+      "received": 2,
+      "samples": 2,
+      "frequency": 0
+    },
+    {
+      "seconds": 0.2,
+      "limited": true,
+      "active": true,
+      "received": 3,
+      "samples": 3,
+      "frequency": 14.999996423722166
+    },
+    {
+      "seconds": 0.3,
+      "limited": true,
+      "active": true,
+      "received": 4,
+      "samples": 4,
+      "frequency": 13.333335452609928
+    },
+    {
+      "seconds": 20,
+      "limited": true,
+      "active": true,
+      "received": 5,
+      "samples": 3,
+      "frequency": 0.2010050241623451
+    },
+    {
+      "seconds": 21,
+      "limited": true,
+      "active": true,
+      "received": 6,
+      "samples": 2,
+      "frequency": 0.14492753589803462
+    },
+    {
+      "seconds": 22,
+      "limited": true,
+      "active": true,
+      "received": 7,
+      "samples": 3,
+      "frequency": 1.5
+    },
+    {
+      "seconds": 23,
+      "limited": true,
+      "active": false,
+      "received": 8,
+      "samples": 4,
+      "frequency": 1.3333333333333333
+    },
+    {
+      "seconds": 24,
+      "limited": false,
+      "active": false,
+      "received": 9,
+      "samples": 5,
+      "frequency": 1.25
+    }
+  ],
+  "egressCases": [
+    {
+      "seconds": 0,
+      "send": true,
+      "limited": false,
+      "frequency": 0,
+      "sent": 1,
+      "samples": 1
+    },
+    {
+      "seconds": 0.1,
+      "send": true,
+      "limited": true,
+      "frequency": 20.000019073504518,
+      "sent": 2,
+      "samples": 2
+    },
+    {
+      "seconds": 0.5,
+      "send": false,
+      "limited": true,
+      "frequency": 4.0,
+      "sent": 2,
+      "samples": 2
+    },
+    {
+      "seconds": 0.6,
+      "send": false,
+      "limited": true,
+      "frequency": 3.333333863152482,
+      "sent": 2,
+      "samples": 2
+    },
+    {
+      "seconds": 20,
+      "send": false,
+      "limited": false,
+      "frequency": 0,
+      "sent": 2,
+      "samples": 1
+    }
+  ],
+  "sampleBounds": [
+    48,
+    48,
+    48,
+    48
+  ],
+  "heldReleaseCases": [
+    {
+      "seconds": 2,
+      "held": 2,
+      "nearAccepted": false,
+      "farAccepted": false
+    },
+    {
+      "seconds": 4,
+      "held": 2,
+      "nearAccepted": false,
+      "farAccepted": false
+    },
+    {
+      "seconds": 6.1,
+      "held": 1,
+      "nearAccepted": true,
+      "farAccepted": false
+    },
+    {
+      "seconds": 7,
+      "held": 1,
+      "nearAccepted": true,
+      "farAccepted": false
+    },
+    {
+      "seconds": 8.2,
+      "held": 0,
+      "nearAccepted": true,
+      "farAccepted": true
+    }
+  ]
+}

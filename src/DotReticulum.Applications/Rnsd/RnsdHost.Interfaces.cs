@@ -69,10 +69,14 @@ public sealed partial class RnsdHost
         }
         ValidateAdvertisement(settings);
         var iface = CreateInterface(settings, _extensions);
+        InterfaceAccessCode? accessCode = null;
         try
         {
-            ConfigureMode(iface, settings.Mode);
-            await _manager.AttachAsync(iface, cancellationToken).ConfigureAwait(false);
+            accessCode = settings.CreateAccessCode();
+            var routing = settings.Enabled ? settings.Routing
+                : RnsdConfigParser.ResolveInterfaceRouting(settings, configuration.Routing, configuration.EnableTransport);
+            ConfigureMode(iface, settings.Mode, routing.ToAnnounceOptions);
+            await _manager.AttachAsync(iface, cancellationToken, accessCode: accessCode).ConfigureAwait(false);
             lock (_gate) _interfaces.Add((name, iface));
             RegisterAdvertisement(settings);
         }
@@ -85,7 +89,11 @@ public sealed partial class RnsdHost
                 else await iface.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception cleanup) { throw new AggregateException("Interface attach and cleanup failed.", original, cleanup); }
-            finally { lock (_gate) _interfaces.RemoveAll(i => ReferenceEquals(i.Interface, iface)); }
+            finally
+            {
+                accessCode?.Dispose();
+                lock (_gate) _interfaces.RemoveAll(i => ReferenceEquals(i.Interface, iface));
+            }
             throw;
         }
         _log(4, $"Interface '{name}' was attached.");
@@ -133,6 +141,11 @@ public sealed partial class RnsdHost
 
     private void RemoveModeHandler(IPacketInterface iface)
     {
+        lock (_gate)
+        {
+            _interfaceReconfigure.Remove(iface);
+            _pendingTunnelSynthesis.Remove(iface);
+        }
         if (iface is ISpawningPacketInterface spawner && _modeHandlers.Remove(spawner, out var handler))
             spawner.ChildConnected -= handler;
     }

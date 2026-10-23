@@ -39,10 +39,18 @@ def main():
     parser.add_argument("--config", required=True)
     parser.add_argument("--tcp-server-port", type=int, default=0)
     parser.add_argument("--rnsd-port", type=int, required=True)
+    parser.add_argument("--network-name", default="")
+    parser.add_argument("--network-key", default="")
     args = parser.parse_args()
     verify_reference()
     transport = bool(args.tcp_server_port)
     os.makedirs(args.config, exist_ok=True)
+    ifac = f"""
+    network_name = {args.network_name}
+    pass_phrase = {args.network_key}
+    ifac_size = 128
+    bitrate = 64000
+""" if args.network_name or args.network_key else ""
     server = f"""
   [[ToLeaf]]
     type = TCPServerInterface
@@ -50,6 +58,7 @@ def main():
     mode = gateway
     listen_ip = 127.0.0.1
     listen_port = {args.tcp_server_port}
+{ifac}
 """ if transport else ""
     with open(os.path.join(args.config, "config"), "w", encoding="utf-8") as config:
         config.write(f"""[reticulum]
@@ -64,6 +73,7 @@ def main():
     mode = gateway
     target_host = 127.0.0.1
     target_port = {args.rnsd_port}
+{ifac}
 {server}""")
     RNS.Reticulum(configdir=args.config, loglevel=RNS.LOG_WARNING)
     identity = RNS.Identity()
@@ -91,6 +101,19 @@ def main():
         command = parts[0]
         if command == "quit":
             break
+        if command == "tunnels":
+            with RNS.Transport.tunnels_lock:
+                emit("tunnels", entries=[
+                    {"id": key.hex(), "paths": [destination.hex() for destination in value[2]],
+                     "attached": value[1] is not None, "expires": value[3]}
+                    for key, value in RNS.Transport.tunnels.items()])
+            continue
+        if command == "synthesize":
+            interface = next(interface for interface in RNS.Transport.interfaces
+                             if interface.name == "ToDotNet")
+            RNS.Transport.synthesize_tunnel(interface)
+            emit("synthesized")
+            continue
         if command in ("path", "request_path"):
             target = bytes.fromhex(parts[1])
             if command == "request_path":

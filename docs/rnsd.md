@@ -69,8 +69,32 @@ Statically compiled extensions can be registered through `Runtime.InterfaceFacto
 requires that registry and validates the factory's declared option names. The daemon does not execute
 upstream Python files from `<config>/interfaces`.
 
-Controls not listed above are rejected, including IFAC/networkname/passphrase, ingress/egress caps,
-queue sizing, `panic_on_interface_error` (native top-level/child failure ownership is fixed),
+Interfaces support IFAC `networkname` / `network_name` and `passphrase` /
+`pass_phrase`. The nonempty underscored alias wins; empty strings and the exact
+string `None` are ignored without erasing an earlier alias. `ifac_size` is in
+**bits**, while the native API exposes bytes. IFAC authenticates and masks
+complete frames before packet parsing; wrong, missing, tampered or unexpected
+authentication is rejected and counted. Neither passphrases nor derived private
+keys appear in runtime statistics. Discovery publication includes credentials
+only when explicitly configured with `publish_ifac`.
+
+`bitrate` supplies the configured bits/second estimate used by MTU selection and
+transport scheduling. TCP accepts `fixed_mtu`, `connect_timeout` and
+`max_reconnect_tries`; the daemon enables owned client reconnects. A reusable
+TCP client retains its configured mode/authentication across disconnections,
+while routes, links and the disconnected peer are released. See
+[transport controls](transport-controls.md) for bounded recovery and staged link
+MTU support.
+
+Routing defaults, priority queue sizes, announce bandwidth/rate controls and
+operational ingress/egress burst controls are documented in
+[transport controls](transport-controls.md). These controls apply to configured,
+accepted-child and discovered interfaces, not merely to parsed configuration.
+`connect_timeout` is seconds (default 5); omitted `max_reconnect_tries` leaves
+recovery unbounded in attempts but cancellation-aware.
+
+Controls not listed above are rejected, including
+`panic_on_interface_error` (native top-level/child failure ownership is fixed),
 interface device selection, KISS framing and serial-format overrides. This is an explicit
 remaining parity limitation, not a claim that all upstream configuration is supported.
 
@@ -159,7 +183,9 @@ Its missing `FixtureOnlyInterface` is a disclosed no-I/O synthesis probe, not li
 
 ## Limitations
 
-No ingress control or announce bandwidth caps, persisted live tunnel recreation or IFAC.
 Link requests, proofs and link-addressed packets are forwarded through the link table.
-A failing interface at startup stops
-the daemon; TCP clients do not reconnect.
+An owned top-level interface failure is terminal unless its bearer implements the
+configured reconnect lifecycle. Accepted peer failure is isolated; tunnel paths
+can bind to a replacement peer only after authenticated synthesis. Other bearer
+families, physical hardware, broader upgraded resource/channel payloads and
+platform acceptance remain in their later roadmap phases.

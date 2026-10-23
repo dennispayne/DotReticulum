@@ -9,7 +9,8 @@ internal sealed class HdlcStreamEndpoint : IAsyncDisposable
 
     private readonly Stream _stream;
     private readonly IDisposable? _owner;
-    private readonly HdlcFrameDecoder _decoder = new();
+    private readonly HdlcFrameDecoder _decoder;
+    private readonly int _maxFrameLength;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly CancellationTokenSource _disposeCts = new();
     private int _disposed;
@@ -23,12 +24,15 @@ internal sealed class HdlcStreamEndpoint : IAsyncDisposable
     public long ReceivedBytes => Interlocked.Read(ref _receivedBytes);
     public long SentBytes => Interlocked.Read(ref _sentBytes);
 
-    public HdlcStreamEndpoint(Stream stream, IDisposable? owner = null, Action<int>? received = null, Action<int>? sent = null)
+    public HdlcStreamEndpoint(Stream stream, IDisposable? owner = null, Action<int>? received = null, Action<int>? sent = null,
+        int maxFrameLength = DotReticulum.Core.Packet.Mtu, bool authenticatedFrames = false)
     {
         _stream = stream;
         _owner = owner;
         _received = received;
         _sent = sent;
+        _maxFrameLength = maxFrameLength;
+        _decoder = new HdlcFrameDecoder(maxFrameLength, validatePackets: !authenticatedFrames);
     }
 
     public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
@@ -95,7 +99,7 @@ internal sealed class HdlcStreamEndpoint : IAsyncDisposable
     public async ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(IsDisposed, this);
-        var framed = HdlcPacketFraming.Encode(packet);
+        var framed = HdlcPacketFraming.Encode(packet, _maxFrameLength, validatePacket: packet.IsEmpty || (packet.Span[0] & 0x80) == 0);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCts.Token);
         await _writeLock.WaitAsync(linked.Token).ConfigureAwait(false);
         try

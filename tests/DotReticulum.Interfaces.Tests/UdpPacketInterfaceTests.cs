@@ -50,7 +50,10 @@ public class UdpPacketInterfaceTests
         await using var _a = a;
         await using var _b = b;
         await Assert.ThrowsAsync<ArgumentException>(async () => await a.SendAsync(ReadOnlyMemory<byte>.Empty, default));
-        await Assert.ThrowsAsync<ArgumentException>(async () => await a.SendAsync(new byte[Packet.Mtu + 1], default));
+        await Assert.ThrowsAsync<ArgumentException>(async () => await a.SendAsync(new byte[a.HardwareMtu + 1], default));
+        var oversizedIfac = new byte[a.HardwareMtu + 65];
+        oversizedIfac[0] = 0x80;
+        await Assert.ThrowsAsync<ArgumentException>(async () => await a.SendAsync(oversizedIfac, default));
     }
 
     [Fact]

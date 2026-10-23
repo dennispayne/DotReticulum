@@ -58,16 +58,38 @@ several files. `runtime-state-v1.msgpack` is a MessagePack map
 `known_destinations`, `paths`, and `tunnels` as binary upstream-format blobs;
 `known_ratchets` as `[destination_hash, public_key, received_timestamp]` rows;
 `packet_hashes` as full binary hashes; and `cached_packets` as
-`[packet_hash, raw_wire_packet, is_announce]` rows. The checksum detects accidental corruption;
+`[packet_hash, raw_wire_packet, is_announce]` rows. Forced resource proofs can append a
+fourth field, their original fractional Unix cache timestamp; legacy three-field rows
+remain readable. Import assigns a missing proof timestamp once, and subsequent saves
+preserve that age rather than extending expiry on every restart.
+The checksum detects accidental corruption;
 it does **not** authenticate the publisher or protect against a local writer.
 Cached packet hashes and signed announces are validated during save and load.
 Only public material belongs in this aggregate. Expired paths and tunnels are filtered on load.
 
 `IRuntimeStateProvider` is the router integration boundary. It must capture synchronized existing
 state, resolve persistent interface hashes to active interfaces, require the matching valid cached
-announce before restoring paths, and apply current blackhole policy. Persistence does not create
-tunnel synthesis, restore disconnected TCP children, resurrect old links or claim Parity 4 mechanics.
-An implementation without tunnel state supplies an empty tunnel list.
+announce before restoring paths, and apply current blackhole policy. Tunnel paths are loaded
+**dormant**, without binding an old accepted TCP peer or resurrecting links. The live transport
+restores them only after a signed synthesis from the same remote transport/interface identity
+arrives on a current bearer. See [transport controls](transport-controls.md).
+
+Tunnel synthesis follows `Transport.py:2764-2874`: the 176-byte payload is
+`public_key(64) || interface_hash(32) || random_hash(16) || signature(64)`, with the signature
+covering the preceding 112 bytes and the tunnel ID equal to SHA-256 of the first 96 bytes.
+It is addressed to the plain `rnstransport.tunnel.synthesize` destination.
+Invalid signatures, malformed keys and blocked transport identities do not establish tunnels.
+The existing strict public-key checks remain in force.
+
+Accepted announcements associate their actual path and signed cached packet with the ingress
+tunnel. Detaching an interface voids its live association but retains these paths for recovery.
+Authenticated reappearance rebinds eligible paths to the new interface: hop count/expiry and
+the newest five-byte announce timebase decide whether a current path can be replaced.
+Rejected restoration candidates are removed from that tunnel, not broadcast as fresh announces.
+Tunnel and tunnel-path housekeeping use the reference's eight-hour windows, including rejection
+of implausibly far-future tunnel expiry. Runtime tables are bounded to 1024 tunnels and 65,536
+tunnel paths; tunnel-capacity eviction is diagnosed, and the aggregate path bound
+evicts the oldest saved path. No arbitrary packet cache is inferred from this.
 
 Stable runtime identities retain upstream's raw 64-private-byte format. Atomic create-only
 publication makes competing processes adopt the same complete identity; corrupt existing files

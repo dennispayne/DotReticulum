@@ -12,6 +12,7 @@ public sealed class InterfaceFactoryRegistry
     private static readonly HashSet<string> CommonOptions = new(StringComparer.OrdinalIgnoreCase)
     {
         "type", "enabled", "interface_enabled", "mode", "interface_mode",
+        "bitrate", "networkname", "network_name", "passphrase", "pass_phrase", "ifac_size",
     };
 
     public void Register(string typeName, IEnumerable<string> supportedOptions, Func<RnsdInterfaceConfig, IPacketInterface> factory)

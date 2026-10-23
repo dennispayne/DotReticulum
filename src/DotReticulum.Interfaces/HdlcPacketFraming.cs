@@ -18,9 +18,9 @@ internal static class HdlcPacketFraming
     public static int MaxEncodedLength(int packetLength) => 2 + (2 * packetLength);
 
     /// <summary>Frames a complete, valid wire packet. Throws <see cref="ArgumentException"/> if it is not one.</summary>
-    public static byte[] Encode(ReadOnlyMemory<byte> packet)
+    public static byte[] Encode(ReadOnlyMemory<byte> packet, int maxFrameLength = Packet.Mtu, bool validatePacket = true)
     {
-        if (!Packet.TryParse(packet, out _))
+        if (packet.IsEmpty || packet.Length > maxFrameLength || (validatePacket && !Packet.TryParse(packet, out _, maxFrameLength)))
         {
             throw new ArgumentException("Not a valid Reticulum packet (or larger than the MTU).", nameof(packet));
         }
@@ -61,12 +61,14 @@ internal sealed class HdlcFrameDecoder
     private bool _inFrame;
     private bool _escape;
     private bool _discard;
+    private readonly bool _validatePackets;
 
-    public HdlcFrameDecoder(int maxFrameLength = Packet.Mtu)
+    public HdlcFrameDecoder(int maxFrameLength = Packet.Mtu, bool validatePackets = true)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxFrameLength, 1);
         MaxFrameLength = maxFrameLength;
         _buffer = new byte[maxFrameLength];
+        _validatePackets = validatePackets;
     }
 
     public int MaxFrameLength { get; }
@@ -81,7 +83,7 @@ internal sealed class HdlcFrameDecoder
                 if (_inFrame && !_discard && !_escape && _length > 0)
                 {
                     var frame = _buffer.AsSpan(0, _length).ToArray();
-                    if (Packet.TryParse(frame, out _, MaxFrameLength))
+                    if (_validatePackets ? Packet.TryParse(frame, out _, MaxFrameLength) : frame.Length > 2)
                     {
                         packets.Add(frame);
                     }

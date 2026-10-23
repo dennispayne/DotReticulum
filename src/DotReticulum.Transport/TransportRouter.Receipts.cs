@@ -8,39 +8,45 @@ public sealed partial class TransportRouter
     private const int ExplicitProofLength = 32 + 64;
     private const int ImplicitProofLength = 64;
 
-    private readonly Dictionary<string, PendingReceipt> _receipts = new();
+    private readonly Dictionary<PacketReceipt, PendingReceipt> _receipts = new();
+    public const int MaximumReceipts = 1024;
+    private readonly object _receiptTrackingGate = new();
+    private readonly Queue<PacketReceipt> _receiptOrder = new();
 
     private sealed record PendingReceipt(PacketReceipt Receipt, Identity Destination, double Deadline);
 
     /// <summary>Number of sent packets still awaiting a proof.</summary>
     public int PendingReceiptCount
     {
-        get { lock (_gate) return _receipts.Count; }
+        get { lock (_gate) return _receipts.Values.Count(item => item.Receipt.Status == PacketReceiptStatus.Sent); }
     }
 
     /// <summary>
-    /// Sends a packet to a SINGLE destination and tracks its proof. The returned receipt completes with true when a valid explicit or implicit
+    /// Sends an endpoint packet and tracks its proof when eligible. The returned receipt completes with true when a valid explicit or implicit
     /// proof signed by <paramref name="destinationIdentity"/> arrives, and with false when <paramref name="timeout"/> elapses
-    /// (default 6 s plus 6 s per known hop, as upstream).
+    /// (default 6 s plus first-hop serialization time and 6 s per hop; unknown paths use 128 hops, as upstream).
     /// </summary>
-    public async ValueTask<PacketReceipt> SendWithReceiptAsync(Packet packet, Identity destinationIdentity, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
+    public async ValueTask<PacketReceipt?> SendWithReceiptAsync(Packet packet, Identity destinationIdentity, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(packet);
         ArgumentNullException.ThrowIfNull(destinationIdentity);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!PacketReceipt.IsEligible(packet))
+        {
+            await SendAsync(packet, cancellationToken).ConfigureAwait(false);
+            return null;
+        }
+        if (packet.DestinationType == DestinationType.Link) throw new ArgumentException("Use the link's send API for link receipts.", nameof(packet));
         var hash = packet.CalculateHash();
-        var seconds = timeout?.TotalSeconds ?? 6 + (6 * (HopsTo(packet.DestinationHash.Span) ?? 0));
+        var seconds = timeout?.TotalSeconds ?? FirstHopTimeout(packet.DestinationHash.Span) + (6 * (HopsTo(packet.DestinationHash.Span) ?? Packet.HopLimit));
+        if (!double.IsFinite(seconds) || seconds < 0) throw new ArgumentOutOfRangeException(nameof(timeout));
         var now = Links.UnixNow;
         var receipt = new PacketReceipt(hash, now, seconds);
-        var key = Convert.ToHexStringLower(hash.AsSpan(0, Destination.HashLength));
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (_receipts.Remove(key, out var replaced))
-            {
-                replaced.Receipt.Status = PacketReceiptStatus.Failed;
-                replaced.Receipt.Complete(false);
-            }
-            _receipts[key] = new PendingReceipt(receipt, destinationIdentity, now + seconds);
+            TrackReceipt(receipt);
+            _receipts[receipt] = new PendingReceipt(receipt, destinationIdentity, now + seconds);
         }
         try
         {
@@ -50,9 +56,8 @@ public sealed partial class TransportRouter
         {
             lock (_gate)
             {
-                if (_receipts.TryGetValue(key, out var current) && ReferenceEquals(current.Receipt, receipt)) _receipts.Remove(key);
-                receipt.Status = PacketReceiptStatus.Failed;
-                receipt.Complete(false);
+                _receipts.Remove(receipt);
+                receipt.Conclude(PacketReceiptStatus.Failed, Links.UnixNow);
             }
             throw;
         }
@@ -83,12 +88,12 @@ public sealed partial class TransportRouter
         if (local.ProofStrategy == ProofStrategy.App && local.ProofRequested is { } callback)
         {
             try { prove = callback(received.Packet); }
-            catch (Exception ex) { Log?.Invoke("Proof request callback failed: " + ex.Message); }
+            catch (Exception ex) { LogReceiptFailure("Proof request callback failed: " + ex.Message); }
         }
 
         if (!prove || local.Decrypt(received.Packet.Payload.Span) is null) return;
         try { await ProveAsync(local, received).ConfigureAwait(false); }
-        catch (Exception ex) when (ex is not OperationCanceledException) { Log?.Invoke("Could not send packet proof: " + ex.Message); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { LogReceiptFailure("Could not send packet proof: " + ex.Message); }
     }
 
     private bool TryValidateReceipt(ReceivedPacket received)
@@ -97,27 +102,24 @@ public sealed partial class TransportRouter
         if (packet.DestinationType != DestinationType.Single) return false;
         var data = packet.Payload.Span;
         if (data.Length != ExplicitProofLength && data.Length != ImplicitProofLength) return false;
-        PendingReceipt? pending;
-        lock (_gate) _receipts.TryGetValue(Convert.ToHexStringLower(packet.DestinationHash.Span), out pending);
-        if (pending is null) return false;
-
-        var hash = pending.Receipt.Hash;
-        if (data.Length == ExplicitProofLength && !data[..32].SequenceEqual(hash)) return false;
-        if (!pending.Destination.Verify(data[^64..], hash)) return false;
-
-        var receipt = pending.Receipt;
-        lock (_gate)
+        PendingReceipt[] candidates;
+        lock (_gate) candidates = [.. _receipts.Values];
+        var delivered = false;
+        foreach (var pending in candidates)
         {
-            var key = Convert.ToHexStringLower(packet.DestinationHash.Span);
-            if (!_receipts.TryGetValue(key, out var current) || !ReferenceEquals(current, pending)) return false;
-            _receipts.Remove(key);
-            receipt.Status = PacketReceiptStatus.Delivered;
-            receipt.Rtt = Links.UnixNow - receipt.SentAt;
-            receipt.Complete(true);
+            var receipt = pending.Receipt;
+            if (receipt.Status != PacketReceiptStatus.Sent
+                || (data.Length == ExplicitProofLength && !data[..32].SequenceEqual(receipt.Hash))
+                || !pending.Destination.Verify(data[^64..], receipt.Hash)) continue;
+            lock (_gate)
+            {
+                if (!_receipts.Remove(receipt) || !receipt.Conclude(PacketReceiptStatus.Delivered, Links.UnixNow, packet)) continue;
+            }
+            delivered = true;
+            try { receipt.Delivered?.Invoke(receipt); }
+            catch (Exception ex) { LogReceiptFailure("Delivery callback failed: " + ex.Message); }
         }
-        try { receipt.Delivered?.Invoke(receipt); }
-        catch (Exception ex) { Log?.Invoke("Delivery callback failed: " + ex.Message); }
-        return true;
+        return delivered;
     }
 
     private void ExpireReceipts()
@@ -126,12 +128,10 @@ public sealed partial class TransportRouter
         List<PendingReceipt> expired = [];
         lock (_gate)
         {
-            foreach (var kv in _receipts.Where(kv => now > kv.Value.Deadline).ToArray())
+            foreach (var kv in _receipts.Where(kv => kv.Value.Receipt.Status != PacketReceiptStatus.Sent || now > kv.Value.Deadline).ToArray())
             {
                 _receipts.Remove(kv.Key);
-                kv.Value.Receipt.Status = PacketReceiptStatus.Failed;
-                kv.Value.Receipt.Complete(false);
-                expired.Add(kv.Value);
+                if (kv.Value.Receipt.Conclude(PacketReceiptStatus.Failed, now)) expired.Add(kv.Value);
             }
         }
 
@@ -139,7 +139,7 @@ public sealed partial class TransportRouter
         {
             var receipt = pending.Receipt;
             try { receipt.TimedOut?.Invoke(receipt); }
-            catch (Exception ex) { Log?.Invoke("Receipt timeout callback failed: " + ex.Message); }
+            catch (Exception ex) { LogReceiptFailure("Receipt timeout callback failed: " + ex.Message); }
         }
     }
 
@@ -150,20 +150,57 @@ public sealed partial class TransportRouter
         {
             pending = [.. _receipts.Values];
             _receipts.Clear();
-            foreach (var item in pending)
-            {
-                item.Receipt.Status = PacketReceiptStatus.Failed;
-                item.Receipt.Complete(false);
-            }
         }
         foreach (var item in pending)
         {
+            if (!item.Receipt.Conclude(PacketReceiptStatus.Failed, Links.UnixNow)) continue;
             try { item.Receipt.TimedOut?.Invoke(item.Receipt); }
             catch (Exception ex)
             {
                 try { Log?.Invoke("Receipt cleanup callback failed: " + ex.Message); }
                 catch { }
             }
+        }
+    }
+
+    internal double FirstHopTimeout(ReadOnlySpan<byte> destinationHash)
+    {
+        var bitrate = Engine.GetPath(destinationHash)?.Interface?.Bitrate ?? 0;
+        return 6 + (bitrate > 0 ? Packet.Mtu * 8.0 / bitrate : 0);
+    }
+
+    private void LogReceiptFailure(string message)
+    {
+        try { Log?.Invoke(message); }
+        catch { }
+    }
+
+    internal void TrackReceipt(PacketReceipt receipt)
+    {
+        List<PacketReceipt> culled = [];
+        lock (_receiptTrackingGate)
+        {
+            if (_receiptOrder.Count >= MaximumReceipts)
+            {
+                var pending = _receiptOrder.Where(r => r.Status == PacketReceiptStatus.Sent).ToArray();
+                _receiptOrder.Clear();
+                foreach (var item in pending) _receiptOrder.Enqueue(item);
+            }
+            _receiptOrder.Enqueue(receipt);
+            while (_receiptOrder.Count > MaximumReceipts)
+            {
+                var oldest = _receiptOrder.Dequeue();
+                oldest.Timeout = -1;
+                if (oldest.Conclude(PacketReceiptStatus.Culled, Links.UnixNow)) culled.Add(oldest);
+            }
+        }
+        foreach (var item in culled)
+        {
+            lock (_gate)
+            {
+                _receipts.Remove(item);
+            }
+            Links.Dispatch(() => item.TimedOut?.Invoke(item));
         }
     }
 }

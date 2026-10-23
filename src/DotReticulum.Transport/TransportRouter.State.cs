@@ -35,7 +35,7 @@ public sealed partial class TransportRouter
 
     public int DropAllPaths() => Paths.Count(path => DropPath(path.DestinationHash));
 
-    /// <summary>Captures real path announcements and packet-filter hashes; no tunnels or arbitrary cached packets are synthesized.</summary>
+    /// <summary>Captures real paths, disconnected tunnel paths and packet-filter hashes.</summary>
     public TransportStateSnapshot ExportState(Func<IPacketInterface, byte[]> interfaceHash)
     {
         ArgumentNullException.ThrowIfNull(interfaceHash);
@@ -51,9 +51,34 @@ public sealed partial class TransportRouter
                 path.Expires, saved.RandomBlobs, hash.ToArray(), path.PacketHash));
             packets.Add(new TransportPacketState(path.PacketHash.ToArray(), saved.Raw, true));
         }
+        var tunnels = ExportTunnels(interfaceHash, packets);
+        packets.AddRange(CaptureProofCache());
         byte[][] hashes;
         lock (_gate) hashes = _hashes.Concat(_hashesPrev).Distinct().Select(Convert.FromBase64String).ToArray();
-        return new TransportStateSnapshot(paths, hashes, packets);
+        var snapshot = new TransportStateSnapshot(paths, hashes,
+            packets.DistinctBy(packet => Convert.ToHexStringLower(packet.PacketHash)).ToArray(), tunnels);
+        var bounded = LimitSnapshotPackets(snapshot);
+        if (bounded.CachedPackets.Count != snapshot.CachedPackets.Count)
+            Log?.Invoke($"Persistent packet cache capacity reached: retained {bounded.CachedPackets.Count} packets, prioritizing active paths over dormant tunnel paths and proofs.");
+        return bounded;
+    }
+
+    internal static TransportStateSnapshot LimitSnapshotPackets(TransportStateSnapshot snapshot)
+    {
+        const int capacity = 65_536;
+        if (snapshot.CachedPackets.Count <= capacity) return snapshot;
+        var packets = snapshot.CachedPackets.Take(capacity).ToArray();
+        var retained = packets.Select(packet => Convert.ToHexStringLower(packet.PacketHash)).ToHashSet();
+        bool HasPacket(TransportPathState path) => retained.Contains(Convert.ToHexStringLower(path.PacketHash));
+        return snapshot with
+        {
+            Paths = snapshot.Paths.Where(HasPacket).ToArray(),
+            CachedPackets = packets,
+            Tunnels = snapshot.Tunnels?.Select(tunnel => tunnel with
+            {
+                Paths = tunnel.Paths.Where(HasPacket).ToArray(),
+            }).ToArray(),
+        };
     }
 
     /// <summary>
@@ -106,6 +131,8 @@ public sealed partial class TransportRouter
             if (now > path.Timestamp + lifetime.TotalSeconds) continue;
             Engine.RestorePath(path, iface, packet, validation.Data!);
         }
+        ImportTunnels(state.Tunnels, packets);
+        RestoreProofCache(state.CachedPackets.Where(packet => !packet.Announce));
         lock (_gate)
         {
             _hashes = [];

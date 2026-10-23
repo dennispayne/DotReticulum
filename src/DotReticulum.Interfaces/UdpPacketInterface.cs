@@ -12,8 +12,7 @@ namespace DotReticulum.Interfaces;
 /// </summary>
 public sealed class UdpPacketInterface : IPacketInterface, IPacketInterfaceDiagnostics
 {
-    // Upstream UDPInterface HW_MTU; larger datagrams are still handed over and then dropped by the manager's parser.
-    private const int ReceiveBufferSize = 1064;
+    private const int ReceiveBufferSize = 1064 + 64 + 1;
 
     private readonly IPEndPoint _local;
     private readonly IPEndPoint _peer;
@@ -25,6 +24,8 @@ public sealed class UdpPacketInterface : IPacketInterface, IPacketInterfaceDiagn
     private int _receiving;
     private long _receivedBytes;
     private long _sentBytes;
+    public long Bitrate { get; }
+    public int HardwareMtu => 1064;
 
     public IReadOnlyDictionary<string, object?> GetDiagnostics()
     {
@@ -32,7 +33,8 @@ public sealed class UdpPacketInterface : IPacketInterface, IPacketInterfaceDiagn
         {
             ["rxb"] = Interlocked.Read(ref _receivedBytes),
             ["txb"] = Interlocked.Read(ref _sentBytes),
-            ["bitrate"] = 10_000_000L,
+            ["bitrate"] = Bitrate,
+            ["hardware_mtu"] = HardwareMtu,
             ["dotreticulum_bitrate_kind"] = "configured_estimate",
             ["listen_address"] = LocalEndpoint?.ToString(),
             ["forward_address"] = _peer.ToString(),
@@ -40,10 +42,12 @@ public sealed class UdpPacketInterface : IPacketInterface, IPacketInterfaceDiagn
         };
     }
 
-    public UdpPacketInterface(IPEndPoint localEndpoint, IPEndPoint peerEndpoint)
+    public UdpPacketInterface(IPEndPoint localEndpoint, IPEndPoint peerEndpoint, long nominalBitrate = 10_000_000)
     {
         ArgumentNullException.ThrowIfNull(localEndpoint);
         ArgumentNullException.ThrowIfNull(peerEndpoint);
+        ArgumentOutOfRangeException.ThrowIfLessThan(nominalBitrate, 1);
+        Bitrate = nominalBitrate;
         _local = localEndpoint;
         _peer = peerEndpoint;
     }
@@ -115,6 +119,10 @@ public sealed class UdpPacketInterface : IPacketInterface, IPacketInterfaceDiagn
                 // Windows reports an earlier ICMP port-unreachable (our send had no listener) on the next receive.
                 continue;
             }
+            catch (SocketException ex) when (ex.SocketErrorCode == SocketError.MessageSize)
+            {
+                continue;
+            }
             catch (Exception) when (_disposeCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
                 yield break;
@@ -131,9 +139,9 @@ public sealed class UdpPacketInterface : IPacketInterface, IPacketInterfaceDiagn
     public async ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken)
     {
         var socket = GetSocket();
-        if (packet.IsEmpty || packet.Length > Packet.Mtu)
+        if (packet.IsEmpty || packet.Length > HardwareMtu + ((packet.Span[0] & 0x80) != 0 ? 64 : 0))
         {
-            throw new ArgumentException("A packet must be 1 to 500 bytes.", nameof(packet));
+            throw new ArgumentException("Packet exceeds the bearer frame bound.", nameof(packet));
         }
 
         var sent = await socket.SendToAsync(packet, SocketFlags.None, _peer, cancellationToken).ConfigureAwait(false);

@@ -8,12 +8,14 @@ namespace DotReticulum.Transport;
 /// An established (or establishing) encrypted link between two peers (upstream <c>RNS.Link</c>): X25519 key agreement bound to the destination
 /// identity by an Ed25519 proof, Token (AES-256-CBC + HMAC) encryption keyed by HKDF(shared, salt = link id), RTT measurement, keep-alives,
 /// stale detection, teardown, initiator identification, packet proofs and the request/response API. Resources are layered on top
-/// (<see cref="Resource"/>). The link MTU is fixed at <see cref="Packet.Mtu"/> (no MTU discovery); see plan.md for the deviation record.
+/// (<see cref="Resource"/>). Operational MTU offers and confirmations remain capped at the 500-byte receive codec until Parity 5.
 /// </summary>
 public sealed partial class Link
 {
     public const int EcPubSize = 64;
     public const int SignallingSize = 3;
+    /// <summary>Current receive-codec ceiling. Larger negotiated payloads remain staged for Parity 5.</summary>
+    public const int MaximumOperationalMtu = Packet.Mtu;
     public const byte ModeAes256Cbc = 0x01;
     public const double KeepaliveMax = 360;
     public const double KeepaliveMin = 5;
@@ -149,13 +151,25 @@ public sealed partial class Link
 
     public static byte[] SignallingBytes(int mtu, byte mode)
     {
+        if (mode != ModeAes256Cbc) throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported link mode.");
         var value = (mtu & MtuMask) + (((mode << 5) & 0xE0) << 16);
         return [(byte)(value >> 16), (byte)(value >> 8), (byte)value];
     }
 
-    public static int MtuFromSignalling(ReadOnlySpan<byte> signalling) => ((signalling[0] << 16) + (signalling[1] << 8) + signalling[2]) & MtuMask;
+    public static int MtuFromSignalling(ReadOnlySpan<byte> signalling)
+    {
+        if (signalling.Length != SignallingSize) throw new ArgumentException("Link signalling must contain three bytes.", nameof(signalling));
+        return ((signalling[0] << 16) + (signalling[1] << 8) + signalling[2]) & MtuMask;
+    }
 
-    public static byte ModeFromSignalling(ReadOnlySpan<byte> signalling) => (byte)((signalling[0] & 0xE0) >> 5);
+    public static byte ModeFromSignalling(ReadOnlySpan<byte> signalling)
+    {
+        if (signalling.Length != SignallingSize) throw new ArgumentException("Link signalling must contain three bytes.", nameof(signalling));
+        return (byte)((signalling[0] & 0xE0) >> 5);
+    }
+
+    internal static int InterfaceMtu(IPacketInterface? iface) =>
+        iface is { SupportsMtuDiscovery: true, HardwareMtu: > 0 } ? Math.Min(iface.HardwareMtu, MtuMask) : Packet.Mtu;
 
     /// <summary>Upstream <c>link_id_from_lr_packet</c>: the hash of the request's hashable part with any trailing signalling bytes removed.</summary>
     public static byte[] LinkIdFromRequest(Packet request)
@@ -182,7 +196,8 @@ public sealed partial class Link
         var seed = fixedSigSeed ?? Ed25519.GenerateSeed();
         var pub = X25519.GetPublicKey(prv);
         var sigPub = Ed25519.GetPublicKey(seed);
-        byte[] requestData = [.. pub, .. sigPub, .. SignallingBytes(Packet.Mtu, ModeAes256Cbc)];
+        var mtu = Math.Min(InterfaceMtu(mgr.Router.Engine.GetPath(destinationHash)?.Interface), MaximumOperationalMtu);
+        byte[] requestData = [.. pub, .. sigPub, .. SignallingBytes(mtu, ModeAes256Cbc)];
         var request = Packet.Create(PacketType.LinkRequest, DestinationType.Single, destinationHash, requestData);
         var link = new Link(mgr, true, LinkIdFromRequest(request), destinationHash, null, destinationIdentity)
         {
@@ -194,6 +209,8 @@ public sealed partial class Link
             Hops = hops,
             EstablishmentTimeout = establishmentTimeout,
             RemoteIdentity = destinationIdentity,
+            Mtu = mtu,
+            Mdu = ComputeMdu(mtu),
         };
         return link;
     }
@@ -214,10 +231,10 @@ public sealed partial class Link
         {
             mode = ModeFromSignalling(data[EcPubSize..]);
             var requested = MtuFromSignalling(data[EcPubSize..]);
-            mtu = requested == 0 ? Packet.Mtu : Math.Min(requested, Packet.Mtu);
+            mtu = Math.Min(requested == 0 ? Packet.Mtu : requested, Math.Min(InterfaceMtu(received.Source), MaximumOperationalMtu));
         }
 
-        if (mode != ModeAes256Cbc || !X25519.IsValidPublicKey(data[..32]) || !Ed25519.IsValidPublicKey(data[32..64]))
+        if (mode != ModeAes256Cbc || ComputeMdu(mtu) <= 0 || !X25519.IsValidPublicKey(data[..32]) || !Ed25519.IsValidPublicKey(data[32..64]))
         {
             return null;
         }
@@ -262,13 +279,40 @@ public sealed partial class Link
 
     private void Prove()
     {
-        var signalling = SignallingBytes(Mtu, ModeAes256Cbc);
-        byte[] signedData = [.. LinkId, .. _pub, .. _sigPub, .. signalling];
-        var signature = Sign(signedData);
-        byte[] proofData = [.. signature, .. _pub, .. signalling];
-        var proof = Packet.Create(PacketType.Proof, DestinationType.Link, LinkId, proofData, LinkContext.LrProof);
+        var proof = BuildProofPacket(LinkId, _pub, _owner!.Identity, Mtu);
         _mgr.Enqueue(proof, AttachedInterface);
         HadOutbound();
+    }
+
+    internal static Packet BuildProofPacket(ReadOnlyMemory<byte> linkId, ReadOnlySpan<byte> ephemeralPublicKey, Identity identity, int mtu)
+    {
+        if (ephemeralPublicKey.Length != 32) throw new ArgumentException("An ephemeral public key must contain 32 bytes.", nameof(ephemeralPublicKey));
+        var signalling = SignallingBytes(mtu, ModeAes256Cbc);
+        byte[] signed = [.. linkId.Span, .. ephemeralPublicKey, .. identity.ExportPublicKey().AsSpan(32), .. signalling];
+        return Packet.Create(PacketType.Proof, DestinationType.Link, linkId,
+            (byte[])[.. identity.Sign(signed), .. ephemeralPublicKey, .. signalling], LinkContext.LrProof);
+    }
+
+    internal static bool TryValidateProofData(ReadOnlySpan<byte> linkId, ReadOnlySpan<byte> data, Identity identity,
+        out int mtu, out byte[] peerPublicKey)
+    {
+        mtu = Packet.Mtu;
+        peerPublicKey = [];
+        ReadOnlySpan<byte> signalling = [];
+        if (linkId.Length != Packet.HashLength) return false;
+        if (data.Length == 96 + SignallingSize)
+        {
+            signalling = data[96..];
+            if (ModeFromSignalling(signalling) != ModeAes256Cbc) return false;
+            mtu = MtuFromSignalling(signalling);
+            if (mtu == 0) mtu = Packet.Mtu;
+        }
+        else if (data.Length != 96) return false;
+        if (ComputeMdu(mtu) <= 0 || !X25519.IsValidPublicKey(data.Slice(64, 32))) return false;
+        byte[] signed = [.. linkId, .. data.Slice(64, 32), .. identity.ExportPublicKey().AsSpan(32), .. signalling];
+        if (!identity.Verify(data[..64], signed)) return false;
+        peerPublicKey = data.Slice(64, 32).ToArray();
+        return true;
     }
 
     private byte[] Sign(ReadOnlySpan<byte> message) => IsInitiator ? Ed25519.Sign(_sigSeed!, message) : _owner!.Identity.Sign(message);
@@ -324,17 +368,20 @@ public sealed partial class Link
             }
 
             var payload = encrypt ? Encrypt(data) : data.ToArray();
-            if (payload.Length > Mtu - Packet.Header1Size)
+            if (payload.Length > Math.Min(Mtu, Packet.Mtu) - Packet.Header1Size)
             {
                 throw new ArgumentException("Link packet payload exceeds the link MTU.", nameof(data));
             }
 
             var packet = Packet.Create(PacketType.Data, DestinationType.Link, LinkId, payload, context);
             PacketReceipt? receipt = null;
-            if (createReceipt)
+            if (createReceipt && PacketReceipt.IsEligible(packet))
             {
-                receipt = new PacketReceipt(packet.CalculateHash(), Now, Math.Max((Rtt ?? 0) * TrafficTimeoutFactor, 0.005) + 0.5);
+                var timeout = Math.Max((Rtt ?? 0) * TrafficTimeoutFactor, 0.005);
+                receipt = new PacketReceipt(packet.CalculateHash(), _mgr.UnixNow, timeout) { TimeoutOrigin = Now };
                 _receipts.Add(receipt);
+                _mgr.Router.TrackReceipt(receipt);
+                if (_receipts.Count > TransportRouter.MaximumReceipts) _receipts.RemoveAll(item => item.Status != PacketReceiptStatus.Sent);
             }
 
             _mgr.Enqueue(packet, AttachedInterface);
@@ -365,44 +412,22 @@ public sealed partial class Link
 
                 var data = received.Packet.Payload.Span;
                 EstablishmentCost = (RequestPacket?.Length ?? 0) + received.Packet.Length;
-                var confirmedMtu = Packet.Mtu;
-                byte[] signalling = [];
-                if (data.Length == 64 + 32 + SignallingSize)
-                {
-                    signalling = data[96..].ToArray();
-                    if (ModeFromSignalling(signalling) != ModeAes256Cbc)
-                    {
-                        return false;
-                    }
-
-                    confirmedMtu = MtuFromSignalling(signalling);
-                    data = data[..96];
-                }
-                else if (data.Length != 96)
+                if (!TryValidateProofData(LinkId, data, _destinationIdentity!, out var confirmedMtu, out var peerPub)
+                    || confirmedMtu > Math.Min(Mtu, MaximumOperationalMtu))
                 {
                     return false;
                 }
-
-                var peerPub = data[64..96].ToArray();
-                if (!X25519.IsValidPublicKey(peerPub))
-                {
-                    return false;
-                }
-
                 _peerPub = peerPub;
                 _peerSigPub = _destinationIdentity!.ExportPublicKey()[32..];
                 Handshake();
-                byte[] signedData = [.. LinkId, .. _peerPub, .. _peerSigPub, .. signalling];
-                if (!ValidatePeer(data[..64], signedData))
-                {
-                    return false;
-                }
 
                 var now = Now;
                 Rtt = now - RequestTime;
                 AttachedInterface = received.Source;
-                Mtu = Math.Min(confirmedMtu == 0 ? Packet.Mtu : confirmedMtu, Packet.Mtu);
+                Mtu = confirmedMtu == 0 ? Packet.Mtu : confirmedMtu;
                 Mdu = ComputeMdu(Mtu);
+                Hops = received.Packet.Hops + _mgr.Router.InboundHopIncrement(received.Source);
+                _mgr.Router.NotifyLinkProofValidated(DestinationHash, Hops);
                 Status = LinkStatus.Active;
                 ActivatedAt = now;
                 LastProof = now;
@@ -441,6 +466,8 @@ public sealed partial class Link
             {
                 return;
             }
+
+            if (packet.PacketType == PacketType.Data && packet.Context == LinkContext.CacheRequest) return;
 
             if (IsInitiator && packet.Context == LinkContext.Keepalive && packet.Payload.Length == 1 && packet.Payload.Span[0] == 0xFF)
             {
@@ -637,27 +664,24 @@ public sealed partial class Link
         if (packet.Context == LinkContext.None)
         {
             var data = packet.Payload.Span;
-            if (data.Length != 32 + 64)
+            if (data.Length < 32 + 64)
             {
                 return;
             }
 
-            for (var i = 0; i < _receipts.Count; i++)
+            for (var i = _receipts.Count - 1; i >= 0; i--)
             {
                 var receipt = _receipts[i];
-                if (receipt.Status == PacketReceiptStatus.Sent && data[..32].SequenceEqual(receipt.Hash) && ValidatePeer(data[32..], receipt.Hash))
+                if (receipt.Status == PacketReceiptStatus.Sent && data[..32].SequenceEqual(receipt.Hash) && ValidatePeer(data.Slice(32, 64), receipt.Hash))
                 {
-                    receipt.Status = PacketReceiptStatus.Delivered;
-                    receipt.Rtt = Now - receipt.SentAt;
+                    if (!receipt.Conclude(PacketReceiptStatus.Delivered, _mgr.UnixNow, packet)) continue;
                     LastProof = Now;
                     _receipts.RemoveAt(i);
                     var cb = receipt.Delivered;
                     after.Add(() =>
                     {
-                        receipt.Complete(true);
                         cb?.Invoke(receipt);
                     });
-                    break;
                 }
             }
         }
@@ -758,6 +782,18 @@ public sealed partial class Link
         HadOutbound();
     }
 
+    internal void FailEstablishment()
+    {
+        List<Action> after = [];
+        lock (_gate)
+        {
+            if (!IsInitiator || Status is not (LinkStatus.Pending or LinkStatus.Handshake)) return;
+            _mgr.Router.NotifyLinkEstablishmentFailed(DestinationHash, AttachedInterface);
+            CloseLocked(LinkTeardownReason.Timeout, after);
+        }
+        foreach (var action in after) _mgr.Dispatch(action);
+    }
+
     private void CloseLocked(LinkTeardownReason reason, List<Action> after)
     {
         if (Status == LinkStatus.Closed)
@@ -770,9 +806,7 @@ public sealed partial class Link
         CancelResources(after);
         foreach (var r in _receipts.ToArray())
         {
-            r.Status = PacketReceiptStatus.Failed;
-            r.Complete(false);
-            if (r.TimedOut is { } timedOut) after.Add(() => timedOut(r));
+            if (r.Conclude(PacketReceiptStatus.Failed, _mgr.UnixNow) && r.TimedOut is { } timedOut) after.Add(() => timedOut(r));
         }
 
         _receipts.Clear();
@@ -829,6 +863,7 @@ public sealed partial class Link
                 case LinkStatus.Handshake:
                     if (now >= RequestTime + EstablishmentTimeout)
                     {
+                        if (IsInitiator) _mgr.Router.NotifyLinkEstablishmentFailed(DestinationHash, AttachedInterface);
                         CloseLocked(LinkTeardownReason.Timeout, after);
                     }
 
@@ -870,14 +905,17 @@ public sealed partial class Link
                 for (var i = _receipts.Count - 1; i >= 0; i--)
                 {
                     var receipt = _receipts[i];
-                    if (now >= receipt.SentAt + receipt.Timeout)
+                    if (receipt.Status != PacketReceiptStatus.Sent)
                     {
-                        receipt.Status = PacketReceiptStatus.Failed;
                         _receipts.RemoveAt(i);
+                    }
+                    else if (now > receipt.TimeoutOrigin + receipt.Timeout)
+                    {
+                        _receipts.RemoveAt(i);
+                        receipt.Conclude(PacketReceiptStatus.Failed, _mgr.UnixNow + Math.Max(0, now - Now));
                         var cb = receipt.TimedOut;
                         after.Add(() =>
                         {
-                            receipt.Complete(false);
                             cb?.Invoke(receipt);
                         });
                     }

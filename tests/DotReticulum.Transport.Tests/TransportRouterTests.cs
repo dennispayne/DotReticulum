@@ -402,6 +402,7 @@ public class TransportRouterTests
         var publicIdentity = Identity.FromPublicKey(id.ExportPublicKey());
         var packet = Packet.Create(PacketType.Data, DestinationType.Single, dest.Hash, publicIdentity.Encrypt("hello"u8));
         var receipt = await sender.Router.SendWithReceiptAsync(packet, publicIdentity);
+        Assert.NotNull(receipt);
         Assert.Equal(PacketReceiptStatus.Sent, receipt.Status);
         Assert.Equal(1, sender.Router.PendingReceiptCount);
         await receiver.Receive(receiver.Ifaces[0], sender.Ifaces[0].Packets().Single());
@@ -445,10 +446,23 @@ public class TransportRouterTests
         await using var _ = sender;
         await using var __ = receiver;
         Assert.False(receipt.Completion.IsCompleted);
-        sender.Time.Advance(60);
+        Assert.Equal(6 + (6 * Packet.HopLimit), receipt.Timeout);
+        Assert.False(receipt.Proved);
+        Assert.Null(receipt.ProofPacket);
+        Assert.Null(receipt.ConcludedAt);
+        sender.Time.Advance(checked((long)Math.Ceiling(receipt.Timeout)) + 1);
         sender.Router.Cull();
-        Assert.False(await receipt.Completion);
+        Assert.True(receipt.Completion.IsCompletedSuccessfully);
+        Assert.False(await receipt.Completion.WaitAsync(TimeSpan.FromSeconds(3)));
         Assert.Equal(PacketReceiptStatus.Failed, receipt.Status);
+        Assert.False(receipt.Proved);
+        Assert.Null(receipt.ProofPacket);
+        Assert.Null(receipt.Rtt);
+        Assert.Equal(sender.Router.Links.UnixNow, receipt.ConcludedAt);
         Assert.Equal(0, sender.Router.PendingReceiptCount);
+        var concludedAt = receipt.ConcludedAt;
+        sender.Time.Advance(1);
+        sender.Router.Cull();
+        Assert.Equal(concludedAt, receipt.ConcludedAt);
     }
 }

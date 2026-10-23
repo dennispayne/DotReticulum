@@ -60,6 +60,10 @@ public sealed class AnnounceEngineOptions
     /// <summary>Applied to every receiving interface (upstream configures this per interface). Null disables rate limiting.</summary>
     public AnnounceRateLimit? RateLimit { get; init; }
 
+    public Func<IPacketInterface?, AnnounceRateLimit?>? RateLimitFor { get; init; }
+    public Func<IPacketInterface?, int?>? GravityFor { get; init; }
+    public Func<IPacketInterface?, TimeSpan>? PathLifetimeFor { get; init; }
+
     /// <summary>Capacity of each internal table (paths, announce table, rate table); the oldest entries are evicted beyond it.</summary>
     public int TableCapacity { get; init; } = 65536;
 
@@ -88,7 +92,7 @@ public sealed partial class AnnounceEngine
     private readonly TimeProvider _time;
     private readonly Dictionary<string, PathState> _paths = new();
     private readonly Dictionary<string, TableEntry> _table = new();
-    private readonly Dictionary<string, TableEntry> _responses = new();
+    private readonly Dictionary<string, List<TableEntry>> _responses = new();
     private readonly Dictionary<string, RateEntry> _rates = new();
     private readonly HashSet<string> _local = new();
     private readonly List<IAnnounceHandler> _handlers = [];
@@ -141,7 +145,7 @@ public sealed partial class AnnounceEngine
         lock (_gate)
         {
             return _paths.TryGetValue(Key(destinationHash), out var p)
-                ? new AnnouncePathInfo((long)p.Timestamp, p.Hops, (long)p.Expires, p.TransportId, p.Source, p.PacketHash)
+                ? new AnnouncePathInfo((long)p.Timestamp, p.Hops, (long)p.Expires, p.TransportId?.ToArray(), p.Source, p.PacketHash.ToArray())
                 : null;
         }
     }
@@ -154,6 +158,7 @@ public sealed partial class AnnounceEngine
         if (packet.DestinationType != DestinationType.Single) return new(AnnounceOutcome.WrongDestinationType);
 
         var validation = Announce.Validate(packet);
+        using var validatedIdentity = validation.Identity;
         if (!validation.IsValid) return new(AnnounceOutcome.Invalid, validation.Status);
         var data = validation.Data!;
         ArgumentOutOfRangeException.ThrowIfNegative(hopIncrement);
@@ -162,7 +167,7 @@ public sealed partial class AnnounceEngine
         var destinationHash = packet.DestinationHash.ToArray();
         var key = Key(destinationHash);
         var packetHash = packet.CalculateHash();
-        using var identity = validation.Identity!;
+        var identity = validation.Identity!;
 
         var known = Known.GetPublicKey(destinationHash);
         if (known is not null && !CryptographicOperations.FixedTimeEquals(known, data.PublicKey))
@@ -210,6 +215,10 @@ public sealed partial class AnnounceEngine
                 if (hops <= path.Hops)
                 {
                     shouldAdd = !known1 && emitted > Timebase(blobs);
+                    if (!shouldAdd && emitted == Timebase(blobs)
+                        && _options.GravityFor?.Invoke(source) is { } gravity
+                        && _options.GravityFor?.Invoke(path.Source) is { } currentGravity)
+                        shouldAdd = gravity > currentGravity;
                 }
                 else
                 {
@@ -222,13 +231,18 @@ public sealed partial class AnnounceEngine
 
                     if (now >= path.Expires) shouldAdd = !known1;
                     else if (emitted > pathEmitted) shouldAdd = !known1;
+                    else if (emitted == pathEmitted && path.Responsiveness == PathResponsiveness.Unresponsive) shouldAdd = true;
                 }
             }
 
             if (!shouldAdd) return new(AnnounceOutcome.Duplicate, AnnounceStatus.Valid, hops);
 
+            var responsiveness = path?.Responsiveness ?? PathResponsiveness.Unknown;
+            if (path is null || !blobs.Any(b => b.AsSpan().SequenceEqual(blob))
+                && (emitted > Timebase(blobs) || hops > path.Hops && now >= path.Expires))
+                responsiveness = PathResponsiveness.Unknown;
             var isPathResponse = packet.Context == Announce.PathResponseContext;
-            var rateBlocked = !isPathResponse && _options.RateLimit is { } limit && ApplyRateLimit(key, limit, now);
+            var rateBlocked = !isPathResponse && (_options.RateLimitFor?.Invoke(source) ?? _options.RateLimit) is { } limit && ApplyRateLimit(key, limit, now);
 
             if (!blobs.Any(b => b.AsSpan().SequenceEqual(blob)))
             {
@@ -242,7 +256,9 @@ public sealed partial class AnnounceEngine
                 Trim(_table, e => e.Timestamp, key);
             }
 
-            _paths[key] = new PathState(now, receivedFrom, transportId, hops, now + PathExpiry.TotalSeconds, blobs, source, packetHash, packet);
+            _paths[key] = new PathState(now, receivedFrom, transportId, hops,
+                now + (_options.PathLifetimeFor?.Invoke(source) ?? PathExpiry).TotalSeconds, blobs, source, packetHash, packet)
+            { Responsiveness = responsiveness };
             Trim(_paths, p => p.Timestamp, key);
 
             handlers = [.. _handlers];
@@ -265,7 +281,16 @@ public sealed partial class AnnounceEngine
         lock (_gate)
         {
             Collect(_table, now, due);
-            Collect(_responses, now, due);
+            foreach (var key in _responses.Keys.ToArray())
+            {
+                var responses = _responses[key];
+                foreach (var entry in responses.Where(entry => now > entry.RetransmitAt).ToArray())
+                {
+                    AddRebroadcast(entry, due);
+                    responses.Remove(entry);
+                }
+                if (responses.Count == 0) _responses.Remove(key);
+            }
         }
 
         return due;
@@ -276,26 +301,32 @@ public sealed partial class AnnounceEngine
         var completed = new List<string>();
         foreach (var (key, entry) in table)
         {
+            if (_responses.ContainsKey(key)) continue;
             if (entry.Retries > 0 && entry.Retries >= LocalRebroadcastsMax) { completed.Add(key); continue; }
             if (entry.Retries > MaxRetransmitRetries) { completed.Add(key); continue; }
             if (now <= entry.RetransmitAt) continue;
 
             entry.RetransmitAt = now + RetransmitGraceSeconds + RandomWindowSeconds;
             entry.Retries++;
-            var original = entry.Packet;
-            if (Known.Get(original.DestinationHash.Span) is null) { completed.Add(key); continue; }
-
-            var context = entry.Blocked ? Announce.PathResponseContext : (byte)0;
-            var rebroadcast = _options.TransportId is { } transportId
-                ? Packet.Create(PacketType.Announce, DestinationType.Single, original.DestinationHash, original.Payload,
-                    context: context, headerType: HeaderType.Header2, transportId: transportId, transportType: TransportType.Transport,
-                    contextFlag: original.ContextFlag, hops: (byte)entry.Hops)
-                : Packet.Create(PacketType.Announce, DestinationType.Single, original.DestinationHash, original.Payload,
-                    context: context, contextFlag: original.ContextFlag, hops: (byte)entry.Hops);
-            due.Add(new AnnounceRebroadcast(rebroadcast, entry.Source, entry.Attached));
+            if (!AddRebroadcast(entry, due)) completed.Add(key);
         }
 
         foreach (var key in completed) table.Remove(key);
+    }
+
+    private bool AddRebroadcast(TableEntry entry, List<AnnounceRebroadcast> due)
+    {
+        var original = entry.Packet;
+        if (Known.Get(original.DestinationHash.Span) is null || entry.Hops >= Packet.HopLimit) return false;
+        var context = entry.Blocked ? Announce.PathResponseContext : (byte)0;
+        var rebroadcast = _options.TransportId is { } transportId
+            ? Packet.Create(PacketType.Announce, DestinationType.Single, original.DestinationHash, original.Payload,
+                context: context, headerType: HeaderType.Header2, transportId: transportId, transportType: TransportType.Transport,
+                contextFlag: original.ContextFlag, hops: (byte)entry.Hops)
+            : Packet.Create(PacketType.Announce, DestinationType.Single, original.DestinationHash, original.Payload,
+                context: context, contextFlag: original.ContextFlag, hops: (byte)entry.Hops);
+        due.Add(new AnnounceRebroadcast(rebroadcast, entry.Source, entry.Attached));
+        return true;
     }
 
     /// <summary>
@@ -309,12 +340,20 @@ public sealed partial class AnnounceEngine
         {
             if (!_paths.TryGetValue(key, out var path)) return false;
             var now = Now;
-            _responses[key] = new TableEntry(now, now + delay.TotalSeconds, path.ReceivedFrom, path.Hops, path.Packet, path.Source)
+            if (_responses.TryGetValue(key, out var pending) && pending.Any(entry => ReferenceEquals(entry.Attached, attached))) return true;
+            if (_responses.Values.Sum(entries => entries.Count) >= _options.TableCapacity) return false;
+            if (!_responses.TryGetValue(key, out var responses))
+            {
+                responses = [];
+                _responses[key] = responses;
+                Trim(_responses, entries => entries[0].Timestamp, key);
+            }
+            responses.Add(new TableEntry(now, now + delay.TotalSeconds, path.ReceivedFrom, path.Hops, path.Packet, path.Source)
             {
                 Attached = attached,
                 Blocked = true,
                 Retries = MaxRetransmitRetries,
-            };
+            });
             return true;
         }
     }
@@ -322,7 +361,7 @@ public sealed partial class AnnounceEngine
     /// <summary>The next hop towards the destination: the transport id of the last announce hop, or the destination itself when directly attached.</summary>
     public byte[]? GetNextHop(ReadOnlySpan<byte> destinationHash)
     {
-        lock (_gate) return _paths.TryGetValue(Key(destinationHash), out var p) ? p.ReceivedFrom : null;
+        lock (_gate) return _paths.TryGetValue(Key(destinationHash), out var p) ? p.ReceivedFrom.ToArray() : null;
     }
 
     public int PathCount
@@ -443,7 +482,8 @@ public sealed partial class AnnounceEngine
         public Packet Packet { get; } = packet;
         public byte[] ReceivedFrom { get; } = receivedFrom;
         public byte[]? TransportId { get; } = transportId;
-        public int Hops { get; } = hops;
+        public int Hops { get; set; } = hops;
+        public PathResponsiveness Responsiveness { get; set; }
         public double Expires { get; } = expires;
         public List<byte[]> RandomBlobs { get; } = blobs;
         public IPacketInterface? Source { get; } = source;

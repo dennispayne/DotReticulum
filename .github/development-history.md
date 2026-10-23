@@ -2,9 +2,255 @@
 
 Development chronology, verification evidence, upstream comparisons and recorded limitations. Phase and subphase completion is tracked only in [plan.md](../plan.md); this document is not a second progress checklist.
 
-Current live interoperability uses the authoritative Reticulum-hosted upstream at `a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7). Earlier protocol vectors and their reproduction generators retain their original `e40191b3d193b46b7f2d8a44424a594cd758839b` provenance; the new Parity 3 runtime fixtures explicitly record the hosted `a29bfb51...` revision and source hashes. Earlier records describe the pins and tooling used at that time, including Python coverage scripts since replaced by PowerShell.
+Current live interoperability uses the authoritative Reticulum-hosted upstream at `a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7). Earlier protocol vectors and their reproduction generators retain their original `e40191b3d193b46b7f2d8a44424a594cd758839b` provenance; Parity 3 runtime and Parity 4 transport/interface fixtures explicitly record the hosted `a29bfb51...` revision and source hashes. Earlier records describe the pins and tooling used at that time, including Python coverage scripts since replaced by PowerShell.
 
 ## Verification records
+
+### Parity 4 transport and interface-control implementation (2026-10-23)
+
+Resumed clean pushed `main` at `be71bb8`; no reference-pin change, push or
+GitHub Actions work is authorized by this milestone. Fresh
+`dotnet build DotReticulum.slnx -c Release` completed with **zero warnings/errors**;
+`dotnet test DotReticulum.slnx -c Release --no-build` established **868 passed,
+60 skipped, zero failed**. The discovery-reload and cancelled-receiver disposal
+regressions remain part of the regression suite.
+
+Implementation ownership separates the tightly coupled routing/proof/path/
+announce state machine, IFAC/bearer controls, and receipt/resource-proof/link-MTU
+contracts. The coordinator owns authenticated tunnels, runtime/persistence
+integration, mixed-transport impairment and native-process acceptance.
+All .NET builds/tests/coverage/publish commands are coordinator-serialized.
+
+The reference is the previously verified .NET-fetched checkout, still
+`a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7), with LXMF 1.2.1
+in the isolated reference environment. New generators verify actual imports
+through `tests\Interop\reference_environment.py`; older fixture provenance
+is not changed.
+
+Tunnel completion criteria were established from `Transport.py:2764-2874`
+(176-byte signed synthesis and replacement decisions), `2467-2476`
+(announcement-backed path association), `1015-1060` (expiry/timebase culling),
+`462-500` (dormant restart) and `3879-3950` (existing serialization).
+`GenerateParity4TunnelVectors.py` executes the pinned synthesis and restoration
+methods; its fixture records source SHA-256
+`333b34eeab020946eefdd8a7e75d3fa74d2ffc5adfef7c0080752980f455bf2c`.
+The vector adapter freezes clock/random values, captures `Packet.send`, and
+provides synthetic interface/path tables. It does not modify reference source
+or establish live interoperability. Acceptance requires malformed/blocked
+synthesis rejection, detached-path retention, authenticated rebind after
+restart, path/timebase competition, expiry and bounded concurrent state.
+
+The other acceptance contracts were established against the same pin:
+`Transport.py:690-725,875-952,1450-1595,2222-2350,2610-2715,3278-3599`
+and `Interface.py:391-432` for mode/path competition, failed-link recovery,
+authenticated LRPROOF effects, scheduling, requests and announce controls;
+`Packet.py:399-588` and `Transport.py:745-759,1358-1369,2576-2582,2748-2761,3053-3123,3194-3197`
+for eligibility, receipt completion/timeouts and forced resource-proof cache
+queries; `Resource.py:652-670,765-774` for proof-loss recovery;
+`Link.py:148-212,306-310,366-432,512-514` for signed MTU fields and discovery;
+`Reticulum.py:884-902,1221-1269`, `Transport.py:1272-1318,1689-1794`,
+`Cryptography\HKDF.py:43-111`, `Interface.py:251-265` and
+`TCPInterface.py:169-180,271-309,346-435` for IFAC, aliases, raw frame sizing
+and owned TCP recovery.
+
+| Pinned source | SHA-256 |
+| --- | --- |
+| `Transport.py` | `333b34eeab020946eefdd8a7e75d3fa74d2ffc5adfef7c0080752980f455bf2c` |
+| `Reticulum.py` | `c655675a799413d9bb11d44ab90d56bc1f4fe339fee1ee5d108754dc8bf812d7` |
+| `Packet.py` | `f1b12a7068c6036e20439f87f8bfb6ad2dd92689c03be387e2bb697d46bdb075` |
+| `Link.py` | `4267ab1c5b11d9c415693298376f2a984aa9bca13a6245e9bc3dce3236365a7c` |
+| `Resource.py` | `9e4543ee19255ab7269d8861a2d977587319968b7986f4846d75ee7dba453699` |
+| `Cryptography\HKDF.py` | `543479e703b6946876a593f1c7179de49fedd689597766cee4a4aa385ace25fa` |
+| `Interfaces\Interface.py` | `70bf362bc54872e24c124e503d8c52c487886aa141f62faed739e46c396c689c` |
+| `Interfaces\TCPInterface.py` | `d9a4fcaf6e76a9dcb810d335850ab0398d21054848fd84766a62f687a9ec942d` |
+| `Interfaces\UDPInterface.py` | `575d1137716139b238649ae5b35a0f66a6a25a8661bc919f5226942df79f4fa5` |
+| `Interfaces\SerialInterface.py` | `676f7b038c2950b92ac71f29653cbbe35ba6513a53ca41742d43e19966e1ef1f` |
+
+New independent generators are `GenerateParity4RoutingVectors.py`,
+`GenerateParity4RoutingTrafficVectors.py`,
+`GenerateParity4RoutingConfiguration.py`, `GenerateParity4IfacVectors.py`,
+`GenerateParity4ReceiptLinkMtuVectors.py` and `GenerateParity4TunnelVectors.py`
+beside their owning tests. They execute the verified Python implementation;
+their fixtures retain the actual revision, imports and source hashes.
+Evidence includes 17 path cases, 98 mode cases, eight rate cases, 15 routing
+configuration cases, nine announce/nine path-request/five egress/five held-release
+traffic steps, eight IFAC cases, 32 bitrate/MTU thresholds, 4096 receipt-eligibility
+combinations, seven MTUs and twelve signed proofs. Fake clocks, random inputs,
+synthetic interface/path tables and captured sends make vectors deterministic;
+they are not claims of unmodified full-node execution. No tracked reference
+source was changed. No new live reference-side shim was introduced.
+The traffic generator makes the held-release thread synchronous and substitutes
+the counter/burst/hold method sequence for `Transport.inbound`, so its evidence
+is isolated controller behavior, not full inbound dispatch. IFAC long-frame
+generation explicitly raises the reference packet MTU; it does not claim those
+frames are accepted by the unconfigured 500-byte codec. Existing discovery
+adapters retain deterministic stamp selection using real LXMF workblocks and
+validation, not the CPU-count-sized multiprocessing scheduler. Existing
+`rncp_win_shim.py` retains the Windows open-file move workaround; passing
+rncp tests do not establish unmodified upstream Windows file retention.
+
+`Parity4RoutingTests` and `Parity4RoutingTrafficTests` exercise gravity,
+responsiveness, expiry/use refresh, the ingress/origin/egress mode matrix,
+failed pending/forwarded link branches, authenticated and malformed LRPROOF,
+detached validated links, throttled recovery, concurrent requester delivery,
+engaged/inflight scheduling, slow-medium limits, held release, bandwidth caps,
+penalties, queue replacement and all four saturated priority classes.
+Controllers own their receive/transmit counters and bounded 48-sample windows;
+configuration does not require an application delegate to become effective.
+The shared-owner regression found during integration was fixed by retaining
+physical requesters while searching local clients.
+
+`Parity4ReceiptTests` verifies source eligibility, terminal metadata,
+duplicate-packet receipts, the 1024-entry limit and source timeout calculations.
+The old bad-signature regression assumed 60 seconds; the source's unknown-path
+timeout is 774 seconds, so it now advances the actual timeout plus one second,
+asserts failure and repeated-cull metadata, and bounds its completion wait.
+`Parity4ReceiptCacheTests` verifies forced-only cache membership, malformed and
+cross-link rejection, bounded expiry, real lost-proof query/replay, cancellation,
+bearer binding and unchanged fractional cache age across restarts. Legacy
+timestamp-less entries receive an import time once, not on every restart.
+The existing atomic format accepts an optional fourth cached-packet timestamp.
+
+`Parity4IfacTests`, `Parity4IfacConfigurationTests` and `Parity4BearerTests`
+verify aliases/size units, derivation, authenticated/rejected frames,
+long-mask legacy counter rollover, hardened key rejection, bitrate thresholds,
+raw-versus-decoded MTU boundaries, reconnect limits/cancellation, disconnect
+recovery and accepted-peer isolation. General HKDF remains RFC-length-limited;
+the legacy expansion exception is isolated to IFAC. Packet parsing still rejects
+oversized fixed-MTU decoded packets even when the raw frame permits IFAC overhead.
+
+`Parity4TunnelTests` verifies the signed synthesis vector, malformed/blocked
+input, correct bearer, cancellation, six competing-route restoration branches,
+dormant restart, expired/invalid persisted state, concurrency and 1025-tunnel
+saturation with explicit eviction diagnostics. The source's expired-current-route
+restoration quirk is preserved and disclosed in `docs\transport-controls.md`.
+`Parity4SnapshotCapacityTests` verifies the exact 65,536 combined cached-packet
+bound, active-before-tunnel-before-proof snapshot priority and removal of dangling
+tunnel references without modifying live state.
+`Parity4DiscoveryControlsTests` additionally carries an authenticated announce
+over the controlled compatible HDLC adapter, asserting actual discovered-bearer
+mode, gravity, internal-announcement override and inherited ingress defaults.
+This deliberately synthetic Backbone-compatible advertisement is not labeled
+actual Python Backbone evidence.
+Explicit management attachment/reload of disabled configuration entries also
+resolves global and per-interface routing controls at attachment time, rather
+than retaining inactive placeholder defaults. Two real TCP attach/reload cases
+assert gravity, cap, rate and ingress overrides; disabled unsupported interfaces
+remain parseable until explicitly activated.
+
+The first full integration run exposed an operational MTU regression: advertising
+upgraded frames caused Python to exceed the still-500-byte packet codec at a
+resource-response boundary. Operational link offers/confirmations now cap at
+**500 bytes**, live MDU **431**, while signed-field vectors retain larger values.
+This stages discovery honestly; upgraded resource/channel payload acceptance
+remains the explicit Parity 5 item, not a hidden claim or weakened assertion.
+The existing blackhole resource-response regression then passed.
+
+Live/native focused command (with the verified reference environment,
+`DOTRETICULUM_LIVE=1`, `DOTRETICULUM_NATIVE_EXE` pointing at the published binary):
+
+```powershell
+dotnet test DotReticulum.slnx -c Release --filter "FullyQualifiedName~Parity4|FullyQualifiedName~NativeResourceTests|FullyQualifiedName~LiveMixedTransportTests|FullyQualifiedName~LiveLinkTransportTests|FullyQualifiedName~LiveLinkTests|FullyQualifiedName~LiveRncpRnxTests|FullyQualifiedName~LiveLxmdTests|FullyQualifiedName~LiveLxmfTests" --nologo -v quiet -m:1 --logger trx --results-directory TestResults\parity4-live-native -- 'xUnit.ParallelizeTestCollections=false'
+```
+
+Result: **349 passed, zero failed/skipped** (Applications 74, Core 15,
+Interfaces 18, LXMF 7, Transport 235). This predates the final additional
+discovery integration test, which separately passed all five cases.
+`Parity4TransportLiveTests` uses actual Python and .NET transports, IFAC on the
+inter-transport connection, a C# bounded HDLC proxy with **64 kbit/s and 20 ms
+one-way latency**, one dropped announce, authenticated bidirectional encrypted
+datagrams/proofs, tunnel synthesis and forced TCP disconnect/reconnect.
+The reverse direction explicitly requests/recalls the originating identity before
+encryption; assuming that recall without an announce was a test precondition bug.
+`Parity4NativeTransportTests` runs the published daemon, persists real Python
+transport tunnel paths, restarts the daemon while that transport reconnects,
+and restores the two-hop leaf route without a new leaf announcement.
+`NativeResourceTests.NativeListener_DecryptsDecompressesAndReturnsCompressedMultiMegabyteResource`
+roundtrips **2,200,017 bytes**, asserting byte equality and compression in both
+directions. Existing direct/multi-hop Python link/resource/channel, rncp/rnx,
+LXMF and `lxmd` regressions also passed in that run.
+
+Native publish and execution used one MSVC-initialized process, with the Visual
+Studio Installer directory available to `vswhere`:
+
+```powershell
+cmd.exe /c 'call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" >nul && dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o artifacts\native-parity4 --nologo -v minimal'
+.\artifacts\native-parity4\DotReticulum.Applications.exe --help
+pwsh -NoProfile -File tests\run-pester.ps1
+pwsh -NoProfile -File tests\run-pester.ps1 -Application artifacts\native-parity4\DotReticulum.Applications.exe
+```
+
+Publish and help succeeded with no warnings. Each managed/native Pester run
+passed **19**, failed **zero**, explicitly skipped **one** Windows-inapplicable
+Unix SIGTERM test. Tests execute separate processes, authenticated multi-megabyte
+rncp send/fetch, wrong IFAC credential rejection followed by corrected-alias
+resource transfer, malformed/disconnected peer survival, shared-owner election,
+actual Python RPC authentication and existing-client recovery after daemon restart.
+Both Pester runs supplied the verified `DOTRETICULUM_PYTHON` and
+`DOTRETICULUM_UPSTREAM` environment values.
+
+After the disabled-entry integration correction, the focused two-case
+`ExplicitAttachOfDisabledEntryResolvesGlobalAndConfiguredOperationalRouting`
+selector passed, `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`
+again completed with **zero warnings/errors**, and the same warnings-as-errors
+NativeAOT publish/help commands were rerun successfully.
+
+Final full Release verification and fresh merged production coverage used:
+
+```powershell
+pwsh -NoProfile -File tests\run-tests.ps1 -Coverage -Live -NativeExe artifacts\native-parity4\DotReticulum.Applications.exe -ResultsDirectory TestResults\coverage-parity4-accepted-20261023
+```
+
+The verified reference checkout/venv were supplied through
+`DOTRETICULUM_UPSTREAM` / `DOTRETICULUM_PYTHON`; `PYTHONPATH` pointed at that
+checkout and `PYTHONUTF8=1`. The runner enabled live interop and native execution,
+serialized projects with `-m:1`, disabled parallel test collections and collected
+the complete suite with `tests\coverage.runsettings`. Result: **1252 passed,
+8 explicitly skipped, zero failed**: Applications **606/8**, Core **107/0**,
+Crypto **47/0**, Interfaces **81/0**, LXMF **35/0**, Transport **376/0**
+(passed/skipped). No build, test, coverage or publish shared output directories
+concurrently. Earlier integration failures were resolved before this run; the
+one transient Git-release fixture setup failure did not recur in either full
+serialized live run and no unrelated Git implementation change was made.
+
+| Production project | Merged lines | Merged branches |
+| --- | ---: | ---: |
+| Applications | 7832/9420 (83.14%) | 6740/10061 (66.99%) |
+| Core | 1168/1213 (96.29%) | 611/657 (93.00%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 794/903 (87.93%) | 326/420 (77.62%) |
+| LXMF | 389/430 (90.47%) | 194/272 (71.32%) |
+| Transport | 3848/4257 (90.39%) | 2567/3138 (81.80%) |
+| **Overall** | **14141/16339 (86.55%)** | **10485/14598 (71.82%)** |
+
+Six OpenCover reports were merged by source line/branch identity, counting shared
+production code once, not averaging test-project percentages. Reports remain
+ignored generated artifacts. Inspection of uncovered integration paths retains
+explicit limitations rather than coverage-only assertions: exceptional discovery
+startup/timeout/cleanup branches, synthesis queue saturation/interrupted-send
+diagnostics and aggregate tunnel-path eviction are not all exercised by the live
+topology. Deterministic tests cover cancellation, malformed imports and the exact
+65,536 cached-snapshot bound; the live loss/reconnect/native restart flows are
+separate evidence, not a claim of exhaustive impairment combinations.
+
+The eight full-suite skips are existing Windows-inapplicable executable/link/
+Unix-permission cases, actual Python Backbone's upstream OS restriction, and
+the explicitly unavailable pinned FFmpeg conversion mode. They are diagnosed
+test skips, not unsupported modes returning early as successes.
+The published-native `tests\run-pester.ps1 -Application
+artifacts\native-parity4\DotReticulum.Applications.exe` run was repeated after
+that final coverage command: **19 passed, one explicit Unix-only skip, zero failed**.
+All Parity 4 checklist items are supported by the evidence above; no Parity 5
+implementation, reference-pin move, workflow creation or push was performed.
+
+Final platform scope remains **Windows x64**. No serial/radio hardware, Unix
+signal execution, Linux/macOS/ARM/RISC-V/FreeBSD/mobile validation, or impaired
+UDP/serial multi-hop is inferred from loopback/HDLC vectors. Actual Python
+Backbone is upstream-platform-restricted and remains explicitly skipped on
+Windows; the compatible adapter is separate evidence. The new impairment test
+does not establish arbitrary loss/latency distributions or impaired live Python
+channel exhaustion. Broader endpoint/resource/channel acceptance and physical
+interface/platform completeness remain in their existing later parity phases.
 
 ### Discovery advertisement lifecycle regression follow-up (2026-10-22)
 

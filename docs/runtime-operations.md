@@ -88,8 +88,13 @@ pressure are exposed without inventing per-priority queue measurements.
 Malformed HDLC frames discarded before the packet boundary are not included
 in the decoded-packet violation counter.
 
-PHY values (RSSI/SNR/quality), IFAC violations and device/queue controls that
+PHY values (RSSI/SNR/quality) and device/queue controls that
 the bearer cannot measure are absent or `null`, never fabricated zeros.
+The packet manager now measures IFAC rejections, size, public network name and
+signature; these are reported alongside configured bitrate, hardware MTU and
+MTU-discovery capability. An IFAC rejection count of zero is an observed manager
+counter, not an unavailable PHY measurement. Passphrases and derived private
+keys are never statistics fields.
 Optional bearer diagnostics can supply actual additional measurements.
 Profiling is opt-in and reports actual process RSS, CPU time, GC heap,
 allocated bytes and thread count under `.NET`-specific field names; these are
@@ -172,8 +177,11 @@ five-second initial connection deadline; this is not a claim of full Backbone
 configuration/server/platform parity. Unverified implementations require the
 explicit source-compatible opt-in. Active connections release bootstrap-only
 interfaces; offline removal and bootstrap restoration retain explicit leases.
-IFAC credentials and unimplemented gravity/internal-announcement controls fail
-explicitly rather than creating an unprotected or misconfigured connection.
+Published IFAC credentials configure authentication before the bearer is
+attached. Gravity and internal-announcement overrides use the same operational
+controls as configured interfaces; reconnect retains that configuration.
+Actual Python Backbone execution remains platform-specific evidence, separate
+from a controlled compatible HDLC adapter.
 
 Discovery executable metadata is default-deny; see `rnsd
 --allow-discovery-commands`. The shared owned process runner uses a single
@@ -203,7 +211,9 @@ Known-destination cleanup and scoped cache cleanup run every fifteen minutes:
 only hash-named regular files are eligible, with one-day resource and seven-day
 packet-cache lifetimes. Symlinks and unrelated files are not followed/deleted.
 See [runtime-state](runtime-state.md) for atomic formats, corruption failures,
-opt-in local ratchets and the tunnel-codec versus Parity 4 protocol boundary.
+opt-in local ratchets, forced proof-cache age and authenticated dormant-tunnel
+restoration. Transport priority queues are separate from the packet manager's
+backpressure channel; see [transport controls](transport-controls.md).
 
 ## Lifetime
 

@@ -1,0 +1,390 @@
+{
+  "upstream_sha": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "rns_version": "1.5.7",
+  "source_sha256": {
+    "RNS/Reticulum.py": "c655675a799413d9bb11d44ab90d56bc1f4fe339fee1ee5d108754dc8bf812d7",
+    "RNS/Transport.py": "333b34eeab020946eefdd8a7e75d3fa74d2ffc5adfef7c0080752980f455bf2c",
+    "RNS/Cryptography/HKDF.py": "543479e703b6946876a593f1c7179de49fedd689597766cee4a4aa385ace25fa",
+    "RNS/Interfaces/Interface.py": "70bf362bc54872e24c124e503d8c52c487886aa141f62faed739e46c396c689c",
+    "RNS/Interfaces/TCPInterface.py": "d9a4fcaf6e76a9dcb810d335850ab0398d21054848fd84766a62f687a9ec942d",
+    "RNS/Interfaces/UDPInterface.py": "575d1137716139b238649ae5b35a0f66a6a25a8661bc919f5226942df79f4fa5",
+    "RNS/Interfaces/SerialInterface.py": "676f7b038c2950b92ac71f29653cbbe35ba6513a53ca41742d43e19966e1ef1f"
+  },
+  "method": "Reticulum._add_interface + Transport.handle_outgoing_ifac/handle_ifac; Interface.optimise_mtu; real upstream Packet.pack with explicit upgraded Packet.MTU; in-memory Interface subclass initializes only bitrate/HW_MTU/ifac_violations to avoid singleton startup; no reference source changes",
+  "vectors": [
+    {
+      "network_name": "parity4-test",
+      "passphrase": null,
+      "size": 1,
+      "packet_length": 20,
+      "public_key": "7623fddec9943ee948069923a1fd3456a7676ca24bc44a9e07b7d21791accc3a6823a2b59f620e82d38ffe13845ce191ac3d8d74f83af7285cb161c6aa5749e4",
+      "signature": "fa21bc6a92ec6ffecdb08b9a54acf528be8d6162414442b91ca23efddcfbf93daae3440a413fc89a77f2275f4dd0ceda74dcb50339d88da99c2737bcbee22708",
+      "raw_header": "0800a9d36609c40e0bbab5a694002900259000",
+      "frame": "ca3d0004d25e6704c9f6f4df644346afccf224e2e2",
+      "frame_sha256": "f0e059182feb25663f975859aa48f9cebf1ae299fb607f27b63504329aae7c7a",
+      "samples": [
+        {
+          "offset": 0,
+          "hex": "ca3d0004d25e6704c9f6f4df644346afccf224e2e2"
+        }
+      ],
+      "wrong_key_valid": false,
+      "wrong_network_valid": false,
+      "tampered_valid": false
+    },
+    {
+      "network_name": null,
+      "passphrase": "synthetic test passphrase",
+      "size": 8,
+      "packet_length": 500,
+      "public_key": "3da777b5b037ff70ac11fe28d078bd9ebc256e8694ce828b3f214212e2e55554feff4851a9f6353a45d82ac72ed93a1a309aa7843174ce427cc66d2938898fa9",
+      "signature": "4c8d569d941eb74f7636abbb95486cb73ebe15f8c6bfe5bfbe74523146c8d44ad0efe3323204db931a60c10398023bf3c81cdbe81727d51fc5909afa3b0a200a",
+      "raw_header": "0800a9d36609c40e0bbab5a694002900259000",
+      "frame": "e7039cf311a43b5c8d0e9b6eaa27938fe08134585752c884d5153186114eb48193039f828cb02a9932585d5287d0b7c92505108375594a1b3a4b00f69bbc7fa1e06dbd737d4c5b5c16df42f0511586f362a2e43369d11330a9984643e29f2cbbc6278be9f70de89b46c04a721e260c32256a868b1af8e1148c8039aeb7b541b3020f6abf61d66a8cebd9273b8f66d362338cfaf9d658957a48cfd3e209eb772c207009b7fc6e5a41de526c00468c53239dc5461841331da19bd1481c55862bb6f27c736227559a87ad99cadb81e64ac367b9bfc65d4391201d5e01e8e2bb86018d0d43c8862b5e20d258c06c7468184ba8455a3707bcae2791653a2ef4e6522a367d0c964b7fc5989c9c28749e25f084014a669dc09a283efcd659d13a3c5e8480cfe5d07b0e89e970c83f1d9db689aa359f9a3cba209072f9c4378789552f38d1c62a16be930d44d25994ee8de6f46ded5ef4629de865eaedd7f2986acf485f896785ea00f0bcf7c7c7aad608135f78b6579e88d2db84e946f941eb9d7041e8f5dffc6c15d7d87a943f865e5b25d1a984dd23e939535c168618c88eeff8ac2ae0cad041da068b60a923b787b4448788dd9382fdcb183c268e74e5d8b300be3d0f08aa5cb118d6133de839c6ee8fc73b46a2af28563e9bdc5718dff369416f6af1d21c8d5312237ab2332ae723a7020aab573ad46be241d4716a54df",
+      "frame_sha256": "8113171172d79fb6f7c4f0499daa804e881f128ae1f7ac67f74445045b2f7ec7",
+      "samples": [
+        {
+          "offset": 0,
+          "hex": "e7039cf311a43b5c8d0e9b6eaa27938fe08134585752c884d5153186114eb481"
+        },
+        {
+          "offset": 476,
+          "hex": "69416f6af1d21c8d5312237ab2332ae723a7020aab573ad46be241d4716a54df"
+        }
+      ],
+      "wrong_key_valid": false,
+      "wrong_network_valid": false,
+      "tampered_valid": false
+    },
+    {
+      "network_name": "μ-network 🛰",
+      "passphrase": "synthetic κλειδί",
+      "size": 16,
+      "packet_length": 500,
+      "public_key": "0c79fc23e6314961a65d06e561b056c6e2e22b2402ce182dd7c13f65f07e30312ffbc42dbe3475d24c8c0f4fadf4e8214930dbca92d9d6c0b880cc131b015893",
+      "signature": "37b43a66ed83556c0d54f895fb465cc37a2cce8fb704d0c4d692cb13a1f41a6f12397ce23f0ef89ae4465e69934ba8ee44dd24fced6042fb5d6848303efc2c02",
+      "raw_header": "0800a9d36609c40e0bbab5a694002900259000",
+      "frame": "e9f16d70f4f86ae5f0f7d9b6cc469c9eb406fd3db08ba731365463bcd8ed25988ab039f1381a0d1c3aef90f475b7b77eef1cb69d3caa002c5e5e1c7c8031d5b5388e597da7f246104d7f858518c62d5cb79204226441c7be9dc4cf997d1e0008dfc824d5b3d6e4065b4a8923e83abd36ece972dd700f1abb60929b140112c367a2ed2b843606ccca9efe66d7d225e562a897d4583c7548632924f9e45ff1729957607c2a63d4327a873f1196740e186074ffa08f6a8892d72cdc0a6480fca951005aa488e9a47aa4394606dd5a3a27d756890054a852b9604197e5bcc92258e4530ffcff002e3aa71ce9aa38984e84dc22b0ada3fc7d53b289e4d1b95857655481567160d8456a3a2781564a9e4b702296bbefa2fd55c24ff20438bd8c4e18147785213e769c104aaea84876c28f715a005ea40a9969325ea384e631959794597281784a4738097f60987a0b0d2b43650fe5366999f5447855a7af7516b820818eacaf671b12f592fd2efefa95b821c3841c0378b1dfa27f4d524f87761865c405219792439cbb9bf92f416c4a29014c4709001056755f2fa475edd6171cc5fabf77e5d687a3e87a307732d33f9ed4db46de680483f327c81a254e16bbc3128b61b721fad7855c311817c0600c8f1fa9241cd9bf9a5a64a7a433a1f6f4f3a88105f8af34783e5c19933ba2b08c7c631be1ff9188869556db5f3a329a74135028e6a60d44",
+      "frame_sha256": "cd97acfb5e38a14d2527073e76192c6cd46eed80be936654d794eb19289c0d16",
+      "samples": [
+        {
+          "offset": 0,
+          "hex": "e9f16d70f4f86ae5f0f7d9b6cc469c9eb406fd3db08ba731365463bcd8ed2598"
+        },
+        {
+          "offset": 484,
+          "hex": "783e5c19933ba2b08c7c631be1ff9188869556db5f3a329a74135028e6a60d44"
+        }
+      ],
+      "wrong_key_valid": false,
+      "wrong_network_valid": false,
+      "tampered_valid": false
+    },
+    {
+      "network_name": "parity4-test",
+      "passphrase": "synthetic test passphrase",
+      "size": 64,
+      "packet_length": 500,
+      "public_key": "2df1bd5bc3c4a7b085b16480d89c696af51dab8f380198225597d05490dced45b0ffa5133e0f4d3258a1d0f06f765a494e9022cfb1f3d4bbe65511f58f85c893",
+      "signature": "637161b6e3805b10afe7a6fd3d96fcc61ebbb68351e2bbf31841240a1d7ad810d868d7cd35d78a6fdc0a31f1eb38da450268abe645ba1a45f33e88ae02d8850e",
+      "raw_header": "0800a9d36609c40e0bbab5a694002900259000",
+      "frame": "a2b9c998e7be0c5364088e5856d7ac52f9d476e5e54e9666429f4b462491d181ed7abc38e15f203a931ab434cfed42cb3c4e036d51404ba5c1291f2b3768d50cf008fd0d1aece0c84afe6a8f1935eae93d017b85617bfd1a4a0e53259e982fca166374813cd90585b35aab3c3a7bfcf3285c99451c8020e2f47797f0be57744ae0ff86a226a0d9c603075f7e7b8976ecc4f0602849e773086536dc0dd2975917e08347648d1fa479639dec2ada45ce0e10cb381d5d277652e7a625122a9b9e00f6b3c38df8788a01fa6598f6506a7cfd6cad11f0260182491b798abadfdf642c0295340390533daff3cc062a86fa9de587af9b17f96a28233a6bf7eb112bb8736467f5bf7209a17b75d48e503a8f2075c556d9fd533bf89c757c6e266e0992acfd3a83879e10ca7b1f0f57779ae0397ace5457c290bbf74da213bcff3a246d4e5d5ef1a065a4069f62135aa881d441c6c7c2657887336686c33da70039d9b00f8f81bfeff40c90332072b77ee0fa2ab2c3a4c2fde9d32ca1f7551d98f8eac59346450aba2fa7a17a61c236d1f21b796d67b5cabefb579a28227332b050f3951813718376591ffeb6ab9a0fb28dc59338db2201d6dba0db94f223d104a127165438527e96b689e652ee350aaa24d432e736239d00e02775c9de678b204d395bb853b151e06cff5d2ad3440764837bf50d5606e1d3ee964559f1869e1eea6cd6f1719a5ced530b784e90002cfadd604ccfc4574e09a8858755eb4f4fd2079871a9733f75196e3710504b8dec3e22f1bbd5c141cb6b",
+      "frame_sha256": "7f439452b7f9a59400f8fcafd0b8116885dd8b581f11ef35418e022d9e068c14",
+      "samples": [
+        {
+          "offset": 0,
+          "hex": "a2b9c998e7be0c5364088e5856d7ac52f9d476e5e54e9666429f4b462491d181"
+        },
+        {
+          "offset": 532,
+          "hex": "a8858755eb4f4fd2079871a9733f75196e3710504b8dec3e22f1bbd5c141cb6b"
+        }
+      ],
+      "wrong_key_valid": false,
+      "wrong_network_valid": false,
+      "tampered_valid": false
+    },
+    {
+      "network_name": "parity4-test",
+      "passphrase": "synthetic test passphrase",
+      "size": 16,
+      "packet_length": 8144,
+      "public_key": "2df1bd5bc3c4a7b085b16480d89c696af51dab8f380198225597d05490dced45b0ffa5133e0f4d3258a1d0f06f765a494e9022cfb1f3d4bbe65511f58f85c893",
+      "signature": "637161b6e3805b10afe7a6fd3d96fcc61ebbb68351e2bbf31841240a1d7ad810d868d7cd35d78a6fdc0a31f1eb38da450268abe645ba1a45f33e88ae02d8850e",
+      "raw_header": "0800a9d36609c40e0bbab5a694002900259000",
+      "frame": null,
+      "frame_sha256": "60656a70707f6e959daba42b232e1d0c558156eb1f7b82436c9c058caa63e6ab",
+      "samples": [
+        {
+          "offset": 0,
+          "hex": "e52f02c48abc1438185e7cf93acfe7c7d5039ca7bcac060e5ba75a17d75439d0"
+        },
+        {
+          "offset": 8128,
+          "hex": "39d001039efbc4701a6fe89d9dd962c0c3a1af133af03f7e737d84aeb433330d"
+        },
+        {
+          "offset": 8159,
+          "hex": "0d"
+        }
+      ],
+      "wrong_key_valid": false,
+      "wrong_network_valid": false,
+      "tampered_valid": false
+    },
+    {
+      "network_name": "parity4-test",
+      "passphrase": "synthetic test passphrase",
+      "size": 16,
+      "packet_length": 8145,
+      "public_key": "2df1bd5bc3c4a7b085b16480d89c696af51dab8f380198225597d05490dced45b0ffa5133e0f4d3258a1d0f06f765a494e9022cfb1f3d4bbe65511f58f85c893",
+      "signature": "637161b6e3805b10afe7a6fd3d96fcc61ebbb68351e2bbf31841240a1d7ad810d868d7cd35d78a6fdc0a31f1eb38da450268abe645ba1a45f33e88ae02d8850e",
+      "raw_header": "0800a9d36609c40e0bbab5a694002900259000",
+      "frame": null,
+      "frame_sha256": "f4068890f5d3a1b9985ba75f73636024512ec35d1c9c9002b32f08ad6f933c22",
+      "samples": [
+        {
+          "offset": 0,
+          "hex": "db75435d33361baccb4605ed3ad1ae3b34001d364c65f91c955f30b0612f1a4b"
+        },
+        {
+          "offset": 8128,
+          "hex": "77353bd906568e0e7c605c140265b933698a2a912996357a645c35522bde9d2f"
+        },
+        {
+          "offset": 8129,
+          "hex": "353bd906568e0e7c605c140265b933698a2a912996357a645c35522bde9d2ff8"
+        },
+        {
+          "offset": 8159,
+          "hex": "2ff8"
+        },
+        {
+          "offset": 8160,
+          "hex": "f8"
+        }
+      ],
+      "wrong_key_valid": false,
+      "wrong_network_valid": false,
+      "tampered_valid": false
+    },
+    {
+      "network_name": "parity4-test",
+      "passphrase": "synthetic test passphrase",
+      "size": 16,
+      "packet_length": 8177,
+      "public_key": "2df1bd5bc3c4a7b085b16480d89c696af51dab8f380198225597d05490dced45b0ffa5133e0f4d3258a1d0f06f765a494e9022cfb1f3d4bbe65511f58f85c893",
+      "signature": "637161b6e3805b10afe7a6fd3d96fcc61ebbb68351e2bbf31841240a1d7ad810d868d7cd35d78a6fdc0a31f1eb38da450268abe645ba1a45f33e88ae02d8850e",
+      "raw_header": "0800a9d36609c40e0bbab5a694002900259000",
+      "frame": null,
+      "frame_sha256": "287fcedf69d8587ba9266299432222f2c16e0c925363b7b90c57267888440af7",
+      "samples": [
+        {
+          "offset": 0,
+          "hex": "a53f3ff1d93a3be706c40772a346631a2704262353a056b7fd0af30df6148e33"
+        },
+        {
+          "offset": 8128,
+          "hex": "52d8cba3431578844314fbcc8cad4ddfc2946bf7c0119dc1e4fb51df4cc28acd"
+        },
+        {
+          "offset": 8159,
+          "hex": "cde8b8983df0a33076aeb90df42aa333871ce61c56425bfc0c1e098bf24a6929"
+        },
+        {
+          "offset": 8160,
+          "hex": "e8b8983df0a33076aeb90df42aa333871ce61c56425bfc0c1e098bf24a6929b0"
+        },
+        {
+          "offset": 8161,
+          "hex": "b8983df0a33076aeb90df42aa333871ce61c56425bfc0c1e098bf24a6929b075"
+        },
+        {
+          "offset": 8191,
+          "hex": "b075"
+        },
+        {
+          "offset": 8192,
+          "hex": "75"
+        }
+      ],
+      "wrong_key_valid": false,
+      "wrong_network_valid": false,
+      "tampered_valid": false
+    },
+    {
+      "network_name": "parity4-test",
+      "passphrase": "synthetic test passphrase",
+      "size": 16,
+      "packet_length": 16384,
+      "public_key": "2df1bd5bc3c4a7b085b16480d89c696af51dab8f380198225597d05490dced45b0ffa5133e0f4d3258a1d0f06f765a494e9022cfb1f3d4bbe65511f58f85c893",
+      "signature": "637161b6e3805b10afe7a6fd3d96fcc61ebbb68351e2bbf31841240a1d7ad810d868d7cd35d78a6fdc0a31f1eb38da450268abe645ba1a45f33e88ae02d8850e",
+      "raw_header": "0800a9d36609c40e0bbab5a694002900259000",
+      "frame": null,
+      "frame_sha256": "c7337042adbbebfb3b176021557d10efc788efa34329287417870f86746e6a34",
+      "samples": [
+        {
+          "offset": 0,
+          "hex": "fd41dc2a0327f3da038a1e531810fac014073c7ffc0e465afb5f9032578614ef"
+        },
+        {
+          "offset": 8128,
+          "hex": "fd0b7e17001a3d3bb03abdfb565962c760ff05ae201614e3b046a01c2a9d9634"
+        },
+        {
+          "offset": 8159,
+          "hex": "34a84a9a6a5161a2bcf0fcb6bd07aaa95f00188b03898a944d337bcbbb3f4d19"
+        },
+        {
+          "offset": 8160,
+          "hex": "a84a9a6a5161a2bcf0fcb6bd07aaa95f00188b03898a944d337bcbbb3f4d19bb"
+        },
+        {
+          "offset": 8191,
+          "hex": "bbfd0fd5e68ea406f244918d5a6031bfc1236ec4c74ed843910c486a0b3a259c"
+        },
+        {
+          "offset": 8192,
+          "hex": "fd0fd5e68ea406f244918d5a6031bfc1236ec4c74ed843910c486a0b3a259c0d"
+        },
+        {
+          "offset": 16368,
+          "hex": "cf5ac414304021b800accc8ee42bdb70e4631c4becda89c5ffceb2da799b63ea"
+        }
+      ],
+      "wrong_key_valid": false,
+      "wrong_network_valid": false,
+      "tampered_valid": false
+    }
+  ],
+  "bitrate_mtus": [
+    {
+      "bitrate": 0,
+      "hardware_mtu": null
+    },
+    {
+      "bitrate": 5,
+      "hardware_mtu": null
+    },
+    {
+      "bitrate": 62499,
+      "hardware_mtu": null
+    },
+    {
+      "bitrate": 62500,
+      "hardware_mtu": 1024
+    },
+    {
+      "bitrate": 62501,
+      "hardware_mtu": 1024
+    },
+    {
+      "bitrate": 999999,
+      "hardware_mtu": 1024
+    },
+    {
+      "bitrate": 1000000,
+      "hardware_mtu": 2048
+    },
+    {
+      "bitrate": 1000001,
+      "hardware_mtu": 2048
+    },
+    {
+      "bitrate": 1999999,
+      "hardware_mtu": 2048
+    },
+    {
+      "bitrate": 2000000,
+      "hardware_mtu": 4096
+    },
+    {
+      "bitrate": 2000001,
+      "hardware_mtu": 4096
+    },
+    {
+      "bitrate": 4999999,
+      "hardware_mtu": 4096
+    },
+    {
+      "bitrate": 5000000,
+      "hardware_mtu": 8192
+    },
+    {
+      "bitrate": 5000001,
+      "hardware_mtu": 8192
+    },
+    {
+      "bitrate": 9999999,
+      "hardware_mtu": 8192
+    },
+    {
+      "bitrate": 10000000,
+      "hardware_mtu": 16384
+    },
+    {
+      "bitrate": 10000001,
+      "hardware_mtu": 16384
+    },
+    {
+      "bitrate": 99999999,
+      "hardware_mtu": 16384
+    },
+    {
+      "bitrate": 100000000,
+      "hardware_mtu": 32768
+    },
+    {
+      "bitrate": 100000001,
+      "hardware_mtu": 32768
+    },
+    {
+      "bitrate": 199999999,
+      "hardware_mtu": 32768
+    },
+    {
+      "bitrate": 200000000,
+      "hardware_mtu": 65536
+    },
+    {
+      "bitrate": 200000001,
+      "hardware_mtu": 65536
+    },
+    {
+      "bitrate": 399999999,
+      "hardware_mtu": 65536
+    },
+    {
+      "bitrate": 400000000,
+      "hardware_mtu": 131072
+    },
+    {
+      "bitrate": 400000001,
+      "hardware_mtu": 131072
+    },
+    {
+      "bitrate": 749999999,
+      "hardware_mtu": 131072
+    },
+    {
+      "bitrate": 750000000,
+      "hardware_mtu": 262144
+    },
+    {
+      "bitrate": 750000001,
+      "hardware_mtu": 262144
+    },
+    {
+      "bitrate": 999999999,
+      "hardware_mtu": 262144
+    },
+    {
+      "bitrate": 1000000000,
+      "hardware_mtu": 524288
+    },
+    {
+      "bitrate": 1000000001,
+      "hardware_mtu": 524288
+    }
+  ]
+}
