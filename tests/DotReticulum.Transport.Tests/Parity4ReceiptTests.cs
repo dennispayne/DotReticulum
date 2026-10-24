@@ -163,7 +163,10 @@ public class Parity4ReceiptTests
         oldest.TimedOut = _ => { culled.TrySetResult(); throw new InvalidOperationException("culling observer"); };
         var link = FixedInitiator(node);
         for (var i = 0; i < TransportRouter.MaximumReceipts; i++)
+        {
+            await LinkTests.Until(() => node.Router.Links.QueuedOutboundPackets < LinkManager.WorkQueueCapacity);
             Assert.NotNull(link.Send(BitConverter.GetBytes(i)));
+        }
         await culled.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(PacketReceiptStatus.Culled, oldest.Status);
         Assert.Equal(-1, oldest.Timeout);

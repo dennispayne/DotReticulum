@@ -1,0 +1,196 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "rns_version": "1.5.7",
+  "sources": [
+    {
+      "source": "RNS/Interfaces/RNodeInterface.py",
+      "sha256": "ae3ec2e539ca9a888dcd9dad3bdd52f1914c24e33b3dcf63cc066ba0883ab369"
+    },
+    {
+      "source": "RNS/Interfaces/RNodeMultiInterface.py",
+      "sha256": "f99f562355bc19e1ae7896f0a3039cb57fd377fcfc8ec9f8b4d7e913bf1350d9"
+    },
+    {
+      "source": "RNS/Interfaces/Interface.py",
+      "sha256": "70bf362bc54872e24c124e503d8c52c487886aa141f62faed739e46c396c689c"
+    },
+    {
+      "source": "RNS/Reticulum.py",
+      "sha256": "c655675a799413d9bb11d44ab90d56bc1f4fe339fee1ee5d108754dc8bf812d7"
+    }
+  ],
+  "single": {
+    "detect": "c00873c05000c04800c04900c0",
+    "configuration": [
+      "c00133bca100c0",
+      "c0020001e848c0",
+      "c00307c0",
+      "c00407c0",
+      "c00505c0",
+      "c00b007dc0",
+      "c00c1388c0",
+      "c00601c0"
+    ],
+    "leave": "c00affc0",
+    "data": [
+      {
+        "payload": "01c0db02",
+        "wire": "c00001dbdcdbdd02c0"
+      },
+      {
+        "payload": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "wire": "c000000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfdbdcc1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdddcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeffc0"
+      },
+      {
+        "payload": "dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0dbc0",
+        "wire": "c000dbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcdbdddbdcc0"
+      }
+    ],
+    "frequency_100_accepted": true,
+    "frequency_101_accepted": false,
+    "cr_mismatch_accepted": true,
+    "bitrate_cr8": 3417.96875,
+    "display_commands": [
+      "c04101c0",
+      "c04100c0",
+      "c043dbdcdbdcdbdd010203040506c0",
+      "c04201c0",
+      "c06601c0",
+      "c055f8c0"
+    ],
+    "receive": {
+      "wire": "c02364c0c024f0c0c026040003e80008001000070009c0c0270278c0c02991c0c042000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfdbdcc1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdddcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfdbdcc1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdddcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeffc0c066000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfdbdcc1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdddcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfdbdcc1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdddcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfdbdcc1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdddcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfdbdcc1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdddcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeffc0c00001dbdcdbdd02c0",
+      "observed": {
+        "r_stat_rssi": -57,
+        "r_stat_snr": -4.0,
+        "r_stat_q": 33.3,
+        "r_symbol_time_ms": 1.024,
+        "r_symbol_rate": 1000,
+        "r_preamble_symbols": 8,
+        "r_premable_time_ms": 16,
+        "r_csma_slot_time_ms": 7,
+        "r_csma_difs_ms": 9,
+        "r_battery_state": 2,
+        "r_battery_percent": 100,
+        "r_temperature": 25,
+        "packets": [
+          "01c0db02"
+        ],
+        "framebuffer": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+        "display": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
+      }
+    }
+  },
+  "multi": {
+    "detect": "c00873c05000c04800c04900c07100c0",
+    "children": [
+      {
+        "index": 0,
+        "configuration": [
+          "c01f00c0c00133bca100c0",
+          "c01f00c0c0020001e848c0",
+          "c01f00c0c003f7c0",
+          "c01f00c0c00407c0",
+          "c01f00c0c00505c0",
+          "c01f00c0c00b007dc0",
+          "c01f00c0c00c1388c0",
+          "c01f00c0c00601c0"
+        ],
+        "data": "c01f00c0c00001dbdcdbdd02c0"
+      },
+      {
+        "index": 2,
+        "configuration": [
+          "c01f02c0c00133bca100c0",
+          "c01f02c0c0020001e848c0",
+          "c01f02c0c003f7c0",
+          "c01f02c0c00407c0",
+          "c01f02c0c00505c0",
+          "c01f02c0c00b007dc0",
+          "c01f02c0c00c1388c0",
+          "c01f02c0c00601c0"
+        ],
+        "data": "c01f02c0c00001dbdcdbdd02c0"
+      },
+      {
+        "index": 10,
+        "configuration": [
+          "c01f0ac0c00133bca100c0",
+          "c01f0ac0c0020001e848c0",
+          "c01f0ac0c003f7c0",
+          "c01f0ac0c00407c0",
+          "c01f0ac0c00505c0",
+          "c01f0ac0c00b007dc0",
+          "c01f0ac0c00c1388c0",
+          "c01f0ac0c00601c0"
+        ],
+        "data": "c01f0ac0c00001dbdcdbdd02c0"
+      }
+    ],
+    "nested_configuration": [
+      {
+        "case": "child-interface-enabled",
+        "subinterfaces": [
+          [
+            "radio-a",
+            "2",
+            868000000,
+            125000,
+            -9,
+            7,
+            5,
+            false,
+            null,
+            null,
+            false
+          ]
+        ]
+      },
+      {
+        "case": "parent-enabled-override",
+        "subinterfaces": [
+          [
+            "radio-a",
+            "2",
+            868000000,
+            125000,
+            -9,
+            7,
+            5,
+            false,
+            null,
+            null,
+            false
+          ]
+        ]
+      },
+      {
+        "case": "nested-enabled-is-not-an-alias",
+        "error": "No subinterfaces enabled for nested-oracle"
+      }
+    ],
+    "constructor_context": "Unstarted Reticulum object, ingress defaults None; no methods replaced or devices opened",
+    "chip_types": {
+      "0": "SX127X",
+      "1": "SX127X",
+      "2": "SX127X",
+      "16": "SX126X",
+      "17": "SX126X",
+      "32": "SX128X",
+      "33": "SX128X",
+      "255": "SX127X"
+    }
+  },
+  "tcp_defaults": {
+    "TARGET_PORT": 7633,
+    "CONNECT_TIMEOUT": 5.0,
+    "INITIAL_CONNECT_TIMEOUT": 5.0,
+    "RECONNECT_WAIT": 4.0,
+    "ACTIVITY_TIMEOUT": 6.0,
+    "ACTIVITY_KEEPALIVE": 3.5,
+    "TCP_USER_TIMEOUT": 24,
+    "TCP_PROBE_AFTER": 5,
+    "TCP_PROBE_INTERVAL": 2,
+    "TCP_PROBES": 12
+  }
+}

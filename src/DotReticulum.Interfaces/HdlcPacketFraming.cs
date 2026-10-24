@@ -62,16 +62,28 @@ internal sealed class HdlcFrameDecoder
     private bool _escape;
     private bool _discard;
     private readonly bool _validatePackets;
+    private readonly bool _sharedFlags;
 
-    public HdlcFrameDecoder(int maxFrameLength = Packet.Mtu, bool validatePackets = true)
+    public HdlcFrameDecoder(int maxFrameLength = Packet.Mtu, bool validatePackets = true, bool sharedFlags = true)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxFrameLength, 1);
         MaxFrameLength = maxFrameLength;
         _buffer = new byte[maxFrameLength];
         _validatePackets = validatePackets;
+        _sharedFlags = sharedFlags;
     }
 
     public int MaxFrameLength { get; }
+    public bool HasPartialData => _length > 0;
+
+    public void ExpirePartial()
+    {
+        if (!HasPartialData) return;
+        _inFrame = false;
+        _length = 0;
+        _escape = false;
+        _discard = false;
+    }
 
     /// <summary>Consumes <paramref name="data"/> and appends every complete valid packet to <paramref name="packets"/>.</summary>
     public void Feed(ReadOnlySpan<byte> data, List<byte[]> packets)
@@ -89,7 +101,7 @@ internal sealed class HdlcFrameDecoder
                     }
                 }
 
-                _inFrame = true;
+                _inFrame = _sharedFlags || !_inFrame;
                 _length = 0;
                 _escape = false;
                 _discard = false;

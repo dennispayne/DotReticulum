@@ -12,6 +12,15 @@ public enum RnsdInterfaceType
     Udp,
     Serial,
     Extension,
+    Auto,
+    Backbone,
+    Pipe,
+    Kiss,
+    Ax25Kiss,
+    RNode,
+    RNodeMulti,
+    I2p,
+    Weave,
 }
 
 /// <param name="Name">The <c>[[Name]]</c> section title.</param>
@@ -20,9 +29,12 @@ public sealed record RnsdInterfaceConfig(string Name, RnsdInterfaceType Type, bo
 {
     public string TypeName { get; init; } = Type.ToString();
     public IReadOnlyDictionary<string, string> RawOptions { get; init; } = Options;
+    public IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Subinterfaces { get; init; } =
+        new Dictionary<string, IReadOnlyDictionary<string, string>>();
     public RnsdInterfaceDiscoveryConfig Discovery { get; init; } = new();
     public RnsdInterfaceRoutingConfig Routing { get; init; } = new();
     public bool BootstrapOnly { get; init; }
+    public bool Outgoing => Get("outgoing") is not { } value || RnsdConfigParser.ParseBool(value, "outgoing");
     public long? ConfiguredBitrate
     {
         get
@@ -33,7 +45,16 @@ public sealed record RnsdInterfaceConfig(string Name, RnsdInterfaceType Type, bo
             return value >= 5 ? value : null;
         }
     }
-    public long Bitrate => ConfiguredBitrate ?? (Type == RnsdInterfaceType.Serial ? GetInt("speed", 9600, 1) : 10_000_000);
+    public long Bitrate => ConfiguredBitrate ?? Type switch
+    {
+        RnsdInterfaceType.Serial => GetInt("speed", 9600, 1),
+        RnsdInterfaceType.Kiss or RnsdInterfaceType.Ax25Kiss => 1200,
+        RnsdInterfaceType.Backbone => 100_000_000,
+        RnsdInterfaceType.Pipe => 1_000_000,
+        RnsdInterfaceType.Weave => 250_000,
+        RnsdInterfaceType.I2p => 256_000,
+        _ => 10_000_000,
+    };
     public int? FixedMtu => GetInt("fixed_mtu", 0, 0, InterfaceAccessCode.MaximumPacketSize) is var value && value != 0
         ? value >= Packet.Mtu ? value : throw new FormatException($"Interface '{Name}': 'fixed_mtu' must be at least {Packet.Mtu}.")
         : null;
@@ -46,7 +67,8 @@ public sealed record RnsdInterfaceConfig(string Name, RnsdInterfaceType Type, bo
         get
         {
             var bits = GetInt("ifac_size", 0, int.MinValue, 512);
-            return bits >= 8 ? bits / 8 : Type == RnsdInterfaceType.Serial ? 8 : 16;
+            return bits >= 8 ? bits / 8 : Type is RnsdInterfaceType.Serial or RnsdInterfaceType.Pipe
+                or RnsdInterfaceType.Kiss or RnsdInterfaceType.Ax25Kiss or RnsdInterfaceType.RNode or RnsdInterfaceType.RNodeMulti ? 8 : 16;
         }
     }
 
@@ -61,6 +83,8 @@ public sealed record RnsdInterfaceConfig(string Name, RnsdInterfaceType Type, bo
     public InterfaceAccessCode? CreateAccessCode() => IfacNetworkName is null && IfacPassphrase is null
         ? null : InterfaceAccessCode.Derive(IfacNetworkName, IfacPassphrase, IfacSize);
     public string? Get(string key) => Options.TryGetValue(key, out var v) ? v : null;
+    public bool GetBool(string key, bool fallback = false) =>
+        Get(key) is { } value ? RnsdConfigParser.ParseBool(value, key) : fallback;
     public IReadOnlyList<string> GetList(string key) =>
         RawOptions.TryGetValue(key, out var value) ? RnsdConfigParser.ParseList(value) : [];
 
@@ -69,6 +93,22 @@ public sealed record RnsdInterfaceConfig(string Name, RnsdInterfaceType Type, bo
         if (Get(key) is not { } text) return fallback;
         if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) || value < min || value > max)
             throw new FormatException($"Interface '{Name}': '{key}' must be an integer between {min} and {max}, got '{text}'.");
+        return value;
+    }
+
+    public long GetLong(string key, long fallback, long min = 0, long max = long.MaxValue)
+    {
+        if (Get(key) is not { } text) return fallback;
+        if (!long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) || value < min || value > max)
+            throw new FormatException($"Interface '{Name}': '{key}' must be an integer between {min} and {max}, got '{text}'.");
+        return value;
+    }
+
+    public double GetDouble(string key, double fallback, double min = 0, double max = double.MaxValue)
+    {
+        if (Get(key) is not { } text) return fallback;
+        if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) || !double.IsFinite(value) || value < min || value > max)
+            throw new FormatException($"Interface '{Name}': '{key}' must be a finite number between {min} and {max}, got '{text}'.");
         return value;
     }
 }
@@ -103,17 +143,33 @@ public static partial class RnsdConfigParser
         ["TCPClientInterface"] = RnsdInterfaceType.TcpClient,
         ["UDPInterface"] = RnsdInterfaceType.Udp,
         ["SerialInterface"] = RnsdInterfaceType.Serial,
+        ["AutoInterface"] = RnsdInterfaceType.Auto,
+        ["PipeInterface"] = RnsdInterfaceType.Pipe,
+        ["KISSInterface"] = RnsdInterfaceType.Kiss,
+        ["AX25KISSInterface"] = RnsdInterfaceType.Ax25Kiss,
+        ["WeaveInterface"] = RnsdInterfaceType.Weave,
+        ["I2PInterface"] = RnsdInterfaceType.I2p,
+        ["RNodeInterface"] = RnsdInterfaceType.RNode,
+        ["RNodeMultiInterface"] = RnsdInterfaceType.RNodeMulti,
+        ["BackboneInterface"] = RnsdInterfaceType.Backbone,
+        ["BackboneClientInterface"] = RnsdInterfaceType.Backbone,
     };
+
+    private sealed record InterfaceSection(string Name, Dictionary<string, string> Options)
+    {
+        public Dictionary<string, Dictionary<string, string>> Children { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
 
     public static RnsdConfig Parse(string text, InterfaceFactoryRegistry? extensions = null)
     {
         ArgumentNullException.ThrowIfNull(text);
         var reticulum = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var logging = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var sections = new List<(string Name, Dictionary<string, string> Options)>();
+        var sections = new List<InterfaceSection>();
         var topSections = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         string? section = null;
         Dictionary<string, string>? current = null;
+        InterfaceSection? currentInterface = null;
         var lineNumber = 0;
 
         foreach (var rawLine in text.Split('\n'))
@@ -124,9 +180,9 @@ public static partial class RnsdConfigParser
 
             if (line[0] == '[')
             {
-                var sub = line.StartsWith("[[", StringComparison.Ordinal);
-                var open = sub ? 2 : 1;
-                var close = line.IndexOf(sub ? "]]" : "]", StringComparison.Ordinal);
+                var open = line.StartsWith("[[[", StringComparison.Ordinal) ? 3 : line.StartsWith("[[", StringComparison.Ordinal) ? 2 : 1;
+                var sub = open > 1;
+                var close = line.IndexOf(new string(']', open), StringComparison.Ordinal);
                 if (close < open) throw new FormatException($"Line {lineNumber}: malformed section header '{line}'.");
                 var name = line[open..close].Trim();
                 if (name.Length == 0) throw new FormatException($"Line {lineNumber}: empty section name.");
@@ -137,13 +193,24 @@ public static partial class RnsdConfigParser
                     if (!string.Equals(section, "interfaces", StringComparison.OrdinalIgnoreCase))
                         throw new FormatException($"Line {lineNumber}: subsection '[[{name}]]' is only valid inside [interfaces].");
                     current = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    if (sections.Any(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
-                        throw new FormatException($"Line {lineNumber}: duplicate interface '{name}'.");
-                    sections.Add((name, current));
+                    if (open == 3)
+                    {
+                        if (currentInterface is null) throw new FormatException($"Line {lineNumber}: nested radio requires an interface section.");
+                        if (!currentInterface.Children.TryAdd(name, current))
+                            throw new FormatException($"Line {lineNumber}: duplicate subinterface '{name}'.");
+                    }
+                    else
+                    {
+                        if (sections.Any(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                            throw new FormatException($"Line {lineNumber}: duplicate interface '{name}'.");
+                        currentInterface = new InterfaceSection(name, current);
+                        sections.Add(currentInterface);
+                    }
                 }
                 else
                 {
                     section = name.ToLowerInvariant();
+                    currentInterface = null;
                     if (!topSections.Add(section)) throw new FormatException($"Line {lineNumber}: duplicate section '[{name}]'.");
                     current = section switch
                     {
@@ -178,8 +245,9 @@ public static partial class RnsdConfigParser
         }
 
         var interfaces = new List<RnsdInterfaceConfig>();
-        foreach (var (name, options) in sections)
+        foreach (var definition in sections)
         {
+            var (name, options) = definition;
             var enabled = (options.TryGetValue("interface_enabled", out var ie) && ParseBool(ie, "interface_enabled"))
                 | (options.TryGetValue("enabled", out var en) && ParseBool(en, "enabled"));
 
@@ -198,28 +266,61 @@ public static partial class RnsdConfigParser
             }
 
             var mode = InterfaceMode.Full;
+            if (definition.Children.Count != 0 && type != RnsdInterfaceType.RNodeMulti)
+                throw new FormatException($"Interface '{name}': nested radio sections require RNodeMultiInterface.");
             var modeText = options.GetValueOrDefault("interface_mode") ?? options.GetValueOrDefault("mode");
             if (modeText is not null) mode = ParseMode(modeText, name);
             var scalars = options.ToDictionary(p => p.Key,
-                p => type == RnsdInterfaceType.Extension && IsList(p.Value) ? p.Value : Scalar(p.Value), StringComparer.OrdinalIgnoreCase);
+                p => IsList(p.Value) && (type == RnsdInterfaceType.Extension || p.Key is "devices" or "ignored_devices" or "peers")
+                    ? p.Value : Scalar(p.Value), StringComparer.OrdinalIgnoreCase);
             if (enabled)
             {
                 var typeKeys = type switch
                 {
-                    RnsdInterfaceType.TcpServer => "listen_ip listen_port port fixed_mtu",
-                    RnsdInterfaceType.TcpClient => "target_host target_port fixed_mtu connect_timeout max_reconnect_tries",
-                    RnsdInterfaceType.Udp => "listen_ip listen_port forward_ip forward_port port",
-                    RnsdInterfaceType.Serial => "port speed",
+                    RnsdInterfaceType.TcpServer => "device listen_ip listen_port port fixed_mtu prefer_ipv6 i2p_tunneled",
+                    RnsdInterfaceType.TcpClient => "target_host target_port fixed_mtu connect_timeout max_reconnect_tries kiss_framing i2p_tunneled",
+                    RnsdInterfaceType.Udp => "device listen_ip listen_port forward_ip forward_port port",
+                    RnsdInterfaceType.Serial => "port speed parity databits stopbits",
+                    RnsdInterfaceType.Auto => "group_id discovery_scope multicast_address_type discovery_port data_port devices ignored_devices",
+                    RnsdInterfaceType.Pipe => "command respawn_delay",
+                    RnsdInterfaceType.Kiss => "port speed databits parity stopbits preamble txtail persistence slottime flow_control id_interval id_callsign",
+                    RnsdInterfaceType.Ax25Kiss => "port speed databits parity stopbits preamble txtail persistence slottime flow_control callsign ssid",
+                    RnsdInterfaceType.Weave => "port",
+                    RnsdInterfaceType.I2p => "connectable peers",
+                    RnsdInterfaceType.RNode => "port frequency bandwidth txpower spreadingfactor codingrate flow_control airtime_limit_short airtime_limit_long id_interval id_callsign",
+                    RnsdInterfaceType.RNodeMulti => "port id_interval id_callsign",
+                    RnsdInterfaceType.Backbone => "device listen_ip listen_on listen_port port remote target_host target_port prefer_ipv6 connect_timeout max_reconnect_tries block_fast_flapping fast_flapping_threshold fast_flapping_grace fast_flapping_block_time",
                     _ => "",
                 };
                 if (type != RnsdInterfaceType.Extension)
-                    ValidateKeys(options, $"interface '{name}'", $"type enabled interface_enabled mode interface_mode bootstrap_only bitrate networkname network_name passphrase pass_phrase ifac_size {typeKeys} {RnsdInterfaceDiscoveryConfig.AcceptedKeys} {RoutingInterfaceKeys}");
+                    ValidateKeys(options, $"interface '{name}'", $"type enabled interface_enabled mode interface_mode bootstrap_only outgoing bitrate networkname network_name passphrase pass_phrase ifac_size {typeKeys} {RnsdInterfaceDiscoveryConfig.AcceptedKeys} {RoutingInterfaceKeys}");
                 if (type == RnsdInterfaceType.TcpServer)
                 {
                     if (scalars.TryGetValue("port", out var port)) scalars["listen_port"] = port;
                     Require(scalars, name, "listen_port");
                 }
                 if (type == RnsdInterfaceType.TcpClient) { Require(scalars, name, "target_host"); Require(scalars, name, "target_port"); }
+                if (type == RnsdInterfaceType.Backbone)
+                {
+                    if (scalars.TryGetValue("port", out var port))
+                    {
+                        scalars["listen_port"] = port;
+                        scalars["target_port"] = port;
+                    }
+                    if (scalars.TryGetValue("remote", out var remote)) scalars["target_host"] = remote;
+                    if (scalars.TryGetValue("listen_on", out var listenOn)) scalars["listen_ip"] = listenOn;
+                    if (scalars.ContainsKey("target_host") || typeName.Equals("BackboneClientInterface", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Require(scalars, name, "target_host");
+                        Require(scalars, name, "target_port");
+                    }
+                    else
+                    {
+                        Require(scalars, name, "listen_port");
+                        if (!scalars.ContainsKey("listen_ip") && !scalars.ContainsKey("device"))
+                            throw new FormatException($"Interface '{name}': Backbone listener requires listen_ip or device.");
+                    }
+                }
                 if (type == RnsdInterfaceType.Udp)
                 {
                     if (scalars.TryGetValue("port", out var port))
@@ -227,22 +328,36 @@ public static partial class RnsdConfigParser
                         scalars.TryAdd("listen_port", port);
                         scalars.TryAdd("forward_port", port);
                     }
-                    foreach (var key in new[] { "listen_ip", "listen_port", "forward_ip", "forward_port" }) Require(scalars, name, key);
+                    var receives = (scalars.ContainsKey("listen_ip") || scalars.ContainsKey("device")) && scalars.ContainsKey("listen_port");
+                    var forwards = (scalars.ContainsKey("forward_ip") || scalars.ContainsKey("device")) && scalars.ContainsKey("forward_port");
+                    if (!receives && !forwards)
+                        throw new FormatException($"Interface '{name}': UDP requires a complete receive or forwarding address/port pair.");
                 }
-                if (type == RnsdInterfaceType.Serial) Require(scalars, name, "port");
+                if (type is RnsdInterfaceType.Serial or RnsdInterfaceType.Kiss or RnsdInterfaceType.Ax25Kiss or RnsdInterfaceType.Weave
+                    or RnsdInterfaceType.RNode or RnsdInterfaceType.RNodeMulti)
+                    Require(scalars, name, "port");
+                if (type == RnsdInterfaceType.Pipe) Require(scalars, name, "command");
+                if (type == RnsdInterfaceType.Ax25Kiss) { Require(scalars, name, "callsign"); Require(scalars, name, "ssid"); }
                 var cfg = new RnsdInterfaceConfig(name, type, enabled, mode, scalars);
                 _ = cfg.ConfiguredBitrate;
                 _ = cfg.IfacSize;
+                _ = cfg.Outgoing;
                 if (type is RnsdInterfaceType.TcpClient or RnsdInterfaceType.TcpServer) _ = cfg.FixedMtu;
                 if (type == RnsdInterfaceType.TcpClient) { _ = cfg.ConnectTimeout; _ = cfg.MaxReconnectAttempts; }
                 foreach (var key in new[] { "listen_port", "target_port", "forward_port" })
-                    if (scalars.ContainsKey(key)) _ = cfg.GetInt(key, 0, key == "listen_port" ? 0 : 1, 65535);
+                    if (scalars.ContainsKey(key)) _ = cfg.GetInt(key, 0, key == "listen_port" || type == RnsdInterfaceType.Udp ? 0 : 1, 65535);
             }
-            var configured = new RnsdInterfaceConfig(name, type, enabled, mode, scalars) { TypeName = typeName, RawOptions = options };
+            var configured = new RnsdInterfaceConfig(name, type, enabled, mode, scalars)
+            {
+                TypeName = typeName,
+                RawOptions = options,
+                Subinterfaces = definition.Children.ToDictionary(p => p.Key,
+                    p => NormalizeRadioSubinterface(p.Key, p.Value, enabled), StringComparer.OrdinalIgnoreCase),
+            };
             if (enabled) configured = configured with { Routing = ParseInterfaceRouting(configured, routing, enableTransport) };
             var discovery = RnsdInterfaceDiscoveryConfig.Parse(configured);
             if (discovery.Enabled && !discovery.IgnoreConfigWarnings && mode is not (InterfaceMode.Gateway or InterfaceMode.AccessPoint or InterfaceMode.Internal))
-                mode = InterfaceMode.Gateway;
+                mode = type is RnsdInterfaceType.RNode or RnsdInterfaceType.RNodeMulti ? InterfaceMode.AccessPoint : InterfaceMode.Gateway;
             configured = configured with
             {
                 Discovery = discovery,
@@ -261,6 +376,7 @@ public static partial class RnsdConfigParser
                 throw new FormatException($"[reticulum] '{key}' must be an integer between {min} and {max}.");
             return number;
         }
+
         string? Value(string key) => reticulum.TryGetValue(key, out var value) ? Scalar(value) : null;
         var sharedType = Value("shared_instance_type")?.ToLowerInvariant();
         if (sharedType is not null && sharedType is not ("tcp" or "unix"))
@@ -314,6 +430,14 @@ public static partial class RnsdConfigParser
                 UpdateInterval = TimeSpan.FromMinutes(Math.Max(2, interval)),
             },
         };
+    }
+
+    private static IReadOnlyDictionary<string, string> NormalizeRadioSubinterface(string name, Dictionary<string, string> options, bool validate)
+    {
+        if (validate)
+            ValidateKeys(options, $"radio subinterface '{name}'",
+                "interface_enabled outgoing vport frequency bandwidth txpower spreadingfactor codingrate flow_control airtime_limit_short airtime_limit_long");
+        return options.ToDictionary(p => p.Key, p => Scalar(p.Value), StringComparer.OrdinalIgnoreCase);
     }
 
     public static bool ParseBool(string text, string key) => Scalar(text).ToLowerInvariant() switch

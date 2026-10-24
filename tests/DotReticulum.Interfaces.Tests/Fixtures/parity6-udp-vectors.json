@@ -1,0 +1,107 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "source": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\Interfaces\\UDPInterface.py",
+  "sourceSha256": "575d1137716139b238649ae5b35a0f66a6a25a8661bc919f5226942df79f4fa5",
+  "method": "Unmodified UDPInterface constructor; isolated unmodified runtime; real ephemeral loopback listeners; no traffic",
+  "cases": [
+    {
+      "name": "receive-only",
+      "settings": {
+        "listen_ip": "127.0.0.1",
+        "listen_port": 0
+      },
+      "receives": true,
+      "forwards": false,
+      "bindIp": "127.0.0.1",
+      "bindPort": 0,
+      "forwardIp": null,
+      "forwardPort": null,
+      "online": true,
+      "hardwareMtu": 1064,
+      "bitrate": 10000000
+    },
+    {
+      "name": "forward-only",
+      "settings": {
+        "forward_ip": "127.0.0.1",
+        "forward_port": 42345
+      },
+      "receives": false,
+      "forwards": true,
+      "bindIp": null,
+      "bindPort": null,
+      "forwardIp": "127.0.0.1",
+      "forwardPort": 42345,
+      "online": false,
+      "hardwareMtu": 1064,
+      "bitrate": 10000000
+    },
+    {
+      "name": "global-port-fallback",
+      "settings": {
+        "port": 42345,
+        "listen_ip": "127.0.0.1",
+        "listen_port": 0,
+        "forward_ip": "127.0.0.1"
+      },
+      "receives": true,
+      "forwards": true,
+      "bindIp": "127.0.0.1",
+      "bindPort": 0,
+      "forwardIp": "127.0.0.1",
+      "forwardPort": 42345,
+      "online": true,
+      "hardwareMtu": 1064,
+      "bitrate": 10000000
+    },
+    {
+      "name": "explicit-ports-win",
+      "settings": {
+        "port": 42345,
+        "listen_ip": "127.0.0.1",
+        "listen_port": 0,
+        "forward_ip": "127.0.0.1",
+        "forward_port": 42346
+      },
+      "receives": true,
+      "forwards": true,
+      "bindIp": "127.0.0.1",
+      "bindPort": 0,
+      "forwardIp": "127.0.0.1",
+      "forwardPort": 42346,
+      "online": true,
+      "hardwareMtu": 1064,
+      "bitrate": 10000000
+    },
+    {
+      "name": "incomplete-forward",
+      "settings": {
+        "listen_ip": "127.0.0.1",
+        "listen_port": 0,
+        "forward_ip": "127.0.0.1"
+      },
+      "receives": true,
+      "forwards": false,
+      "bindIp": "127.0.0.1",
+      "bindPort": 0,
+      "forwardIp": null,
+      "forwardPort": null,
+      "online": true,
+      "hardwareMtu": 1064,
+      "bitrate": 10000000
+    },
+    {
+      "name": "neither",
+      "settings": {},
+      "receives": false,
+      "forwards": false,
+      "bindIp": null,
+      "bindPort": null,
+      "forwardIp": null,
+      "forwardPort": null,
+      "online": false,
+      "hardwareMtu": 1064,
+      "bitrate": 10000000
+    }
+  ]
+}

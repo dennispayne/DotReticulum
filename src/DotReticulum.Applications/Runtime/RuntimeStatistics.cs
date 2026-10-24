@@ -37,6 +37,7 @@ public static class RuntimeStatistics
             {
                 ["name"] = name,
                 ["short_name"] = name,
+                ["outgoing"] = counter.Outgoing,
                 ["hash"] = InterfaceHash(counter.Interface, name),
                 ["type"] = counter.Interface.GetType().Name,
                 ["rxb"] = device?.GetValueOrDefault("rxb"),

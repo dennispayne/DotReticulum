@@ -70,6 +70,138 @@ public class PacketInterfaceManagerTests
     private static Packet MakePacket(byte tag) =>
         Packet.Create(PacketType.Data, DestinationType.Plain, new byte[16], new byte[] { tag, 1, 2, 3 });
 
+    [Fact]
+    public async Task OutgoingSelectionFiltersBroadcastWithoutInventingADirectTransmitProhibition()
+    {
+        var receiveOnly = new FakeInterface();
+        var outgoing = new FakeInterface();
+        await using var manager = new PacketInterfaceManager([receiveOnly, outgoing]);
+        manager.SetInterfaceOutgoing(receiveOnly, false);
+        await manager.StartAsync();
+        await manager.SendAsync(MakePacket(1));
+        Assert.Empty(receiveOnly.Sent);
+        Assert.Single(outgoing.Sent);
+        var initial = manager.GetStatistics().Single(s => ReferenceEquals(s.Interface, receiveOnly));
+        Assert.False(initial.Outgoing);
+        Assert.Equal(0, initial.SentPackets);
+        Assert.Equal(0, initial.FailedSends);
+
+        await manager.SendToAsync(MakePacket(2), receiveOnly);
+        Assert.Single(receiveOnly.Sent);
+        Assert.Equal(1, manager.GetStatistics().Single(s => ReferenceEquals(s.Interface, receiveOnly)).SentPackets);
+        Assert.Throws<InvalidOperationException>(() => manager.SetInterfaceOutgoing(outgoing, false));
+    }
+
+    [Fact]
+    public async Task SpawnedChildrenInheritOutgoingSelectionButContinueReceiving()
+    {
+        var parent = new FakeSpawner();
+        await using var manager = new PacketInterfaceManager([parent]);
+        manager.SetInterfaceOutgoing(parent, false);
+        await manager.StartAsync();
+        var child = new FakeInterface();
+        parent.Spawn(child);
+        Assert.False(manager.IsOutgoing(child));
+        await manager.SendAsync(MakePacket(1));
+        Assert.Empty(child.Sent);
+        await using var incoming = manager.ReceiveWithSourceAsync().GetAsyncEnumerator();
+        child.Inject(MakePacket(2).ToArray());
+        Assert.Same(child, (await Next(incoming)).Source);
+        Assert.False(manager.GetStatistics().Single(s => ReferenceEquals(s.Interface, child)).Outgoing);
+    }
+
+    [Fact]
+    public async Task AttachedInterfaceSelectionIsInstalledBeforeStart()
+    {
+        await using var manager = new PacketInterfaceManager([], keepAlive: true);
+        await manager.StartAsync();
+        var attached = new FakeInterface();
+        await manager.AttachAsync(attached, outgoing: false);
+        Assert.False(manager.IsOutgoing(attached));
+        await manager.SendAsync(MakePacket(1));
+        Assert.Empty(attached.Sent);
+        await manager.SendRawToAsync(MakePacket(2).ToArray(), attached);
+        Assert.Single(attached.Sent);
+    }
+
+    private sealed class IndependentChild(bool countParentTraffic) : IPacketInterface, IPacketInterfaceChildPolicy
+    {
+        public FakeInterface Inner { get; } = new();
+        public bool InheritParentOutgoing => false;
+        public bool Outgoing => true;
+        public bool CountParentTraffic => countParentTraffic;
+        public bool InheritParentAccessCode => false;
+        public ValueTask StartAsync(CancellationToken cancellationToken) => Inner.StartAsync(cancellationToken);
+        public IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync(CancellationToken cancellationToken) => Inner.ReceiveAsync(cancellationToken);
+        public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken) => Inner.SendAsync(packet, cancellationToken);
+        public ValueTask DisposeAsync() => Inner.DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SourceSpecificChildrenCanKeepIndependentSelectionAccessCodeAndAccounting(bool countParentTraffic)
+    {
+        var parent = new FakeSpawner();
+        await using var manager = new PacketInterfaceManager([parent]);
+        manager.SetInterfaceOutgoing(parent, false);
+        manager.SetInterfaceAccessCode(parent, InterfaceAccessCode.Derive("child-policy-fixture", null, size: 8));
+        await manager.StartAsync();
+        var child = new IndependentChild(countParentTraffic);
+        parent.Spawn(child);
+        Assert.True(manager.IsOutgoing(child));
+        var childStatistics = manager.GetStatistics().Single(s => ReferenceEquals(s.Interface, child));
+        Assert.Null(childStatistics.IfacSize);
+        Assert.Equal(8, manager.GetStatistics().Single(s => ReferenceEquals(s.Interface, parent)).IfacSize);
+        await manager.SendAsync(MakePacket(1));
+        var frame = Assert.Single(child.Inner.Sent);
+        Assert.Equal(MakePacket(1).ToArray(), frame);
+        Assert.Equal(countParentTraffic ? 1 : 0, manager.GetStatistics().Single(s => ReferenceEquals(s.Interface, parent)).SentPackets);
+        await using var incoming = manager.ReceiveWithSourceAsync().GetAsyncEnumerator();
+        child.Inner.Inject(MakePacket(2).ToArray());
+        Assert.Same(child, (await Next(incoming)).Source);
+        Assert.Equal(countParentTraffic ? 1 : 0, manager.GetStatistics().Single(s => ReferenceEquals(s.Interface, parent)).ReceivedPackets);
+    }
+
+    private sealed class FeedbackInterface : IPacketInterface, IPacketInterfaceIngressFeedback
+    {
+        public FakeInterface Inner { get; } = new();
+        public PacketInterfaceIngressQueue? Queue { get; private set; }
+        public void SetIngressQueue(PacketInterfaceIngressQueue queue) => Queue = queue;
+        public ValueTask StartAsync(CancellationToken cancellationToken)
+        {
+            Assert.NotNull(Queue);
+            return Inner.StartAsync(cancellationToken);
+        }
+        public IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync(CancellationToken cancellationToken) => Inner.ReceiveAsync(cancellationToken);
+        public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken) => Inner.SendAsync(packet, cancellationToken);
+        public ValueTask DisposeAsync() => Inner.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task IngressFeedbackSharesActualLiveQueueWithinItsOwningManagerOnly()
+    {
+        var first = new FeedbackInterface();
+        var second = new FeedbackInterface();
+        var separate = new FeedbackInterface();
+        await using var manager = new PacketInterfaceManager([first, second], channelCapacity: 2);
+        await using var other = new PacketInterfaceManager([separate], channelCapacity: 4);
+        Assert.Same(first.Queue, second.Queue);
+        Assert.NotSame(first.Queue, separate.Queue);
+        Assert.Equal(2, first.Queue!.Capacity);
+        Assert.Equal(4, separate.Queue!.Capacity);
+        await manager.StartAsync();
+        first.Inner.Inject(MakePacket(1).ToArray());
+        await WaitUntil(() => first.Queue.Depth == 1);
+        Assert.Equal(0, separate.Queue.Depth);
+        await using var incoming = manager.ReceiveWithSourceAsync().GetAsyncEnumerator();
+        Assert.Same(first, (await Next(incoming)).Source);
+        Assert.Equal(0, first.Queue.Depth);
+        var attached = new FeedbackInterface();
+        await manager.AttachAsync(attached);
+        Assert.Same(first.Queue, attached.Queue);
+    }
+
     private sealed class BlockingStartInterface : IPacketInterface
     {
         public TaskCompletionSource Starting { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -317,7 +317,9 @@ public sealed class RnsdConfigurationParityTests : IDisposable
         var file = Path.Combine(dir, "config");
         Assert.True(RnsdConfigurationFiles.EnsureCreated(dir, file));
         var text = File.ReadAllText(file);
-        Assert.Empty(RnsdConfigParser.Parse(text).Interfaces);
+        var configured = Assert.Single(RnsdConfigParser.Parse(text).Interfaces);
+        Assert.Equal(RnsdInterfaceType.Auto, configured.Type);
+        Assert.False(configured.Enabled);
         Assert.False(RnsdConfigurationFiles.EnsureCreated(dir, file));
         Assert.Equal(text, File.ReadAllText(file));
     }

@@ -1,0 +1,489 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "rns_version": "1.5.7",
+  "rns_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "auto_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\Interfaces\\AutoInterface.py",
+  "lxmf_version": "1.2.1",
+  "lxmf_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\refvenv\\Lib\\site-packages\\LXMF\\__init__.py",
+  "auto_source_sha256": "c92fe1da13d7633b4bd443660041c8471fd8762fc9f3535cf92926f9f323c9df",
+  "auto_source_canonical_lf_sha256": "88efeadbe2e48e374910fa9b7ea747076cdf6ee6163bc95a098596096672aedf",
+  "auto_git_blob_sha256": "88efeadbe2e48e374910fa9b7ea747076cdf6ee6163bc95a098596096672aedf",
+  "auto_source_hash_method": "Preserve raw imported-file SHA-256; independently read the exact pinned Git blob with binary git cat-file and require byte equality after CRLF-to-LF normalization.",
+  "method": "Execute AutoInterface constructor with no devices, descope_linklocal, discovery_handler, peer_jobs (one iteration), and AutoInterfacePeer.process_incoming with deterministic clocks. Runtime singleton adapter supplies None configuration fields to real default accessors. No sockets or reference-source modifications; not unmodified runtime/live evidence.",
+  "constructors": [
+    {
+      "group": "reticulum",
+      "scope": "link",
+      "kind": "temporary",
+      "multicast": "ff12:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "link",
+      "kind": "permanent",
+      "multicast": "ff02:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "link",
+      "kind": "unknown",
+      "multicast": "ff12:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "admin",
+      "kind": "temporary",
+      "multicast": "ff14:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "admin",
+      "kind": "permanent",
+      "multicast": "ff04:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "admin",
+      "kind": "unknown",
+      "multicast": "ff14:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "site",
+      "kind": "temporary",
+      "multicast": "ff15:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "site",
+      "kind": "permanent",
+      "multicast": "ff05:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "site",
+      "kind": "unknown",
+      "multicast": "ff15:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "organisation",
+      "kind": "temporary",
+      "multicast": "ff18:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "organisation",
+      "kind": "permanent",
+      "multicast": "ff08:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "organisation",
+      "kind": "unknown",
+      "multicast": "ff18:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "global",
+      "kind": "temporary",
+      "multicast": "ff1e:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "global",
+      "kind": "permanent",
+      "multicast": "ff0e:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "reticulum",
+      "scope": "global",
+      "kind": "unknown",
+      "multicast": "ff1e:0:d70b:fb1c:16e4:5e39:485e:31e1",
+      "source": "fe80::1234:abcd",
+      "token": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0"
+    },
+    {
+      "group": "",
+      "scope": "link",
+      "kind": "temporary",
+      "multicast": "ff12:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "link",
+      "kind": "permanent",
+      "multicast": "ff02:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "link",
+      "kind": "unknown",
+      "multicast": "ff12:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "admin",
+      "kind": "temporary",
+      "multicast": "ff14:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "admin",
+      "kind": "permanent",
+      "multicast": "ff04:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "admin",
+      "kind": "unknown",
+      "multicast": "ff14:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "site",
+      "kind": "temporary",
+      "multicast": "ff15:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "site",
+      "kind": "permanent",
+      "multicast": "ff05:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "site",
+      "kind": "unknown",
+      "multicast": "ff15:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "organisation",
+      "kind": "temporary",
+      "multicast": "ff18:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "organisation",
+      "kind": "permanent",
+      "multicast": "ff08:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "organisation",
+      "kind": "unknown",
+      "multicast": "ff18:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "global",
+      "kind": "temporary",
+      "multicast": "ff1e:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "global",
+      "kind": "permanent",
+      "multicast": "ff0e:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "",
+      "scope": "global",
+      "kind": "unknown",
+      "multicast": "ff1e:0:c442:98fc:1c14:9afb:f4c8:996f",
+      "source": "fe80::1234:abcd",
+      "token": "de095a654d7ac122f644ceddb177f2638039f5846166756147ce8f28ba82e808"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "link",
+      "kind": "temporary",
+      "multicast": "ff12:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "link",
+      "kind": "permanent",
+      "multicast": "ff02:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "link",
+      "kind": "unknown",
+      "multicast": "ff12:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "admin",
+      "kind": "temporary",
+      "multicast": "ff14:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "admin",
+      "kind": "permanent",
+      "multicast": "ff04:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "admin",
+      "kind": "unknown",
+      "multicast": "ff14:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "site",
+      "kind": "temporary",
+      "multicast": "ff15:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "site",
+      "kind": "permanent",
+      "multicast": "ff05:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "site",
+      "kind": "unknown",
+      "multicast": "ff15:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "organisation",
+      "kind": "temporary",
+      "multicast": "ff18:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "organisation",
+      "kind": "permanent",
+      "multicast": "ff08:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "organisation",
+      "kind": "unknown",
+      "multicast": "ff18:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "global",
+      "kind": "temporary",
+      "multicast": "ff1e:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "global",
+      "kind": "permanent",
+      "multicast": "ff0e:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    },
+    {
+      "group": "Parity6-å-網",
+      "scope": "global",
+      "kind": "unknown",
+      "multicast": "ff1e:0:426c:f627:246b:bb95:10b:5ec7",
+      "source": "fe80::1234:abcd",
+      "token": "298be8f7aa5e78da3af598e523e04fe0432b63dc4c5947781237bcae9ab76101"
+    }
+  ],
+  "discovery": [
+    {
+      "name": "exact",
+      "data": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff0",
+      "accepted": true
+    },
+    {
+      "name": "trailing",
+      "data": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecff06578747261",
+      "accepted": true
+    },
+    {
+      "name": "short",
+      "data": "2158465c9c7ece3cc433c698231ebd4304b7f278e352c769426ade2b0ebecf",
+      "accepted": false
+    },
+    {
+      "name": "wrong",
+      "data": "0000000000000000000000000000000000000000000000000000000000000000",
+      "accepted": false
+    },
+    {
+      "name": "empty",
+      "data": "",
+      "accepted": false
+    }
+  ],
+  "duplicates": [
+    {
+      "time": 100,
+      "frame": "6f6e65",
+      "accepted": true
+    },
+    {
+      "time": 100.749,
+      "frame": "6f6e65",
+      "accepted": false
+    },
+    {
+      "time": 100.75,
+      "frame": "6f6e65",
+      "accepted": true
+    },
+    {
+      "time": 100.8,
+      "frame": "74776f",
+      "accepted": true
+    },
+    {
+      "time": 101,
+      "frame": "6f6e65",
+      "accepted": false
+    },
+    {
+      "time": 101.5,
+      "frame": "6f6e65",
+      "accepted": true
+    }
+  ],
+  "peer_jobs": [
+    {
+      "elapsed": 5.200000000000003,
+      "expired": false,
+      "reverse": false
+    },
+    {
+      "elapsed": 5.200001,
+      "expired": false,
+      "reverse": true
+    },
+    {
+      "elapsed": 22,
+      "expired": false,
+      "reverse": true
+    },
+    {
+      "elapsed": 22.000000999999997,
+      "expired": true,
+      "reverse": false
+    }
+  ],
+  "descope": [
+    {
+      "source": "fe80::1234%en0",
+      "result": "fe80::1234"
+    },
+    {
+      "source": "fe80:0007::1234%7",
+      "result": "fe80::1234"
+    },
+    {
+      "source": "fe80:abcd::1",
+      "result": "fe80::1"
+    },
+    {
+      "source": "fe80::beef",
+      "result": "fe80::beef"
+    },
+    {
+      "source": "2001:db8::1%en0",
+      "result": "2001:db8::1"
+    }
+  ],
+  "constants": {
+    "mtu": 1196,
+    "discovery_port": 29716,
+    "data_port": 42671,
+    "peering_timeout": 22.0,
+    "announce_interval": 1.6,
+    "peer_job_interval": 4.0,
+    "echo_timeout": 6.5,
+    "duplicate_capacity": 48,
+    "duplicate_ttl": 0.75
+  }
+}

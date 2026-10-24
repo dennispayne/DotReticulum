@@ -22,6 +22,7 @@ if (!$ToolingOnly) {
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity3Configuration.Tests.ps1') -Data @{ Application = $resolved }
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity4Interfaces.Tests.ps1') -Data @{ Application = $resolved }
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity5Resources.Tests.ps1') -Data @{ Application = $resolved }
+    $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity6Interfaces.Tests.ps1') -Data @{ Application = $resolved }
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\SharedRuntime.Tests.ps1') -Data @{
         Application = $resolved
         Python = $Python

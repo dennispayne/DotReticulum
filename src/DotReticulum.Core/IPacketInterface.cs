@@ -42,6 +42,15 @@ public interface IReconnectingPacketInterface : IPacketInterface
     event Action? Disconnected;
 }
 
+/// <summary>Source-specific child selection and accounting exceptions; ownership still belongs to the parent.</summary>
+public interface IPacketInterfaceChildPolicy
+{
+    bool InheritParentOutgoing { get; }
+    bool Outgoing { get; }
+    bool CountParentTraffic { get; }
+    bool InheritParentAccessCode => true;
+}
+
 /// <summary>A parsed packet together with the interface it arrived on.</summary>
 /// <param name="Raw">The packet bytes exactly as received.</param>
 /// <param name="Packet">The parsed packet.</param>

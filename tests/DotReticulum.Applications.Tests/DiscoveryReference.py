@@ -9,11 +9,12 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 import sys
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "Interop"))
-from reference_environment import verify_reference
+from reference_environment import PINNED_RNS_SHA, verify_reference
 import RNS
 import RNS.Discovery as discovery
 from LXMF import LXStamper
@@ -105,9 +106,21 @@ def main():
             link.set_packet_callback(packet_received)
         data_destination.set_link_established_callback(link_established)
         source = Path(sys.modules[BackboneInterface.__module__].__file__)
+        raw_source = source.read_bytes()
+        canonical_source = raw_source.replace(b"\r\n", b"\n")
+        git_blob = subprocess.run(
+            ["git", "-C", str(source.resolve().parents[2]), "show",
+             PINNED_RNS_SHA + ":RNS/Interfaces/BackboneInterface.py"],
+            check=True, capture_output=True,
+        ).stdout
+        if canonical_source != git_blob.replace(b"\r\n", b"\n"):
+            raise RuntimeError("Imported Backbone source differs from the pinned Git blob")
         emit({"event": "ready", "identity": network.hash.hex(), "backbone_type": type(interface).__name__,
               "backbone_module": BackboneInterface.__module__, "backbone_port": interface.bind_port,
-              "backbone_source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+              "backbone_source": str(source.resolve()),
+              "backbone_source_sha256": hashlib.sha256(raw_source).hexdigest(),
+              "backbone_canonical_lf_sha256": hashlib.sha256(canonical_source).hexdigest(),
+              "backbone_git_blob_sha256": hashlib.sha256(git_blob).hexdigest(),
               "data_destination": data_destination.hash.hex()})
     else:
         interface = type("TCPServerInterface", (), {})()

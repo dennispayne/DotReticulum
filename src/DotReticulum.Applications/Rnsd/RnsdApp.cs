@@ -165,7 +165,7 @@ public static class RnsdApp
         var logger = new RnsdLogger(level, config.LogTimestamps, output, error, service ? Path.Combine(configDir, "logfile") : null);
         void Log(int messageLevel, string message) => logger.Log(messageLevel, message);
         if (created)
-            Log(2, $"Default config file created at '{configFile}'. AutoInterface is unsupported; no external interface is enabled. Configure a supported interface and restart.");
+            Log(2, $"Default config file created at '{configFile}'. AutoInterface is disabled by default; no external interface is enabled. Explicitly enable network discovery or configure another interface and restart.");
 
         RnsdHost host;
         try

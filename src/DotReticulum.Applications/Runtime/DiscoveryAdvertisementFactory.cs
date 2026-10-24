@@ -13,8 +13,8 @@ public static class DiscoveryAdvertisementFactory
         ArgumentNullException.ThrowIfNull(transportIdentity);
         if (!configuration.Enabled || !configuration.Discovery.Enabled)
             throw new InvalidOperationException($"Interface '{configuration.Name}' is not enabled for discovery advertisements.");
-        if (configuration.Type != RnsdInterfaceType.TcpServer)
-            throw new NotSupportedException($"Discovery advertising for {configuration.TypeName} is unsupported; only a native TCPServerInterface can be advertised.");
+        if (configuration.Type is not (RnsdInterfaceType.TcpServer or RnsdInterfaceType.Backbone) || configuration.Get("target_host") is not null)
+            throw new NotSupportedException($"Discovery advertising for {configuration.TypeName} is unsupported; a native listening TCP or Backbone bearer is required.");
         var discovery = configuration.Discovery;
         var port = boundPort ?? configuration.GetInt("listen_port", 0, 0, 65535);
         if (port is < 1 or > 65535) throw new InvalidOperationException("Discovery advertising requires the actual bound TCP listening port.");
@@ -22,7 +22,7 @@ public static class DiscoveryAdvertisementFactory
             throw new InvalidOperationException($"Interface '{configuration.Name}' has no reachable_on discovery address.");
         return new()
         {
-            InterfaceType = "TCPServerInterface",
+            InterfaceType = configuration.Type == RnsdInterfaceType.Backbone ? "BackboneInterface" : "TCPServerInterface",
             Transport = transportEnabled,
             TransportIdentity = transportIdentity.Hash.ToArray(),
             Name = discovery.Name,

@@ -18,6 +18,7 @@ public sealed record PacketInterfaceStatistics(
     long BackpressureWaits,
     int PendingSends)
 {
+    public bool Outgoing { get; init; } = true;
     public long IfacViolations { get; init; }
     public int? IfacSize { get; init; }
     public string? IfacNetworkName { get; init; }

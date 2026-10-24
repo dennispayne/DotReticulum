@@ -6,6 +6,207 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
+### Parity 6 interface integration, partial (2026-10-24)
+
+Parity 4 cleanup (`6da44c4`) and Parity 5 (`c992e74`) remain completed and
+pushed; independent skill commit `3728dfd` is preserved. This is an intermediate
+verified interface integration, **not completion of Parity 6**. Parity 7, 8
+and repository CI/CD workflows have not been started. Required physical/mobile
+acceptance cannot be supplied by this environment; additional software and
+actual-router recovery gaps are explicitly retained below rather than called
+hardware-only blockers.
+
+The reference remains the authoritative .NET-fetched
+`a29bfb51c468945c96a1ee22cae0114e993e2391`, RNS 1.5.7, isolated LXMF 1.2.1.
+Actual Windows and Linux imports, clean tracked source and exact revision
+were checked with `reference_environment.py`. Older `e40191...` provenance is
+unchanged. New `GenerateParity6{Auto,BackbonePipe,I2p,Kiss,RNode,Stream,Udp,Weave}Vectors.py`
+and `GenerateParity6OutgoingVectors.py` execute the pinned reference; their
+fixtures retain imported paths, methods and raw source fingerprints.
+Reference-side recording devices/default accessors and other bounded adapters
+are disclosed in the individual documents, not described as physical devices.
+
+Source maps, preimplementation observable criteria, intentional differences
+and configuration/API boundaries:
+
+| Contract | Source-backed documentation |
+| --- | --- |
+| IPv6 discovery/peers/expiry, duplicate handling | [Auto](../docs/auto-interface.md) |
+| Linux/Android Backbone, scoped ingress/flap/egress state; subprocess ownership | [Backbone/Pipe](../docs/backbone-pipe.md) |
+| KISS and AX.25 framing, TNC controls/flow/beacons | [KISS](../docs/kiss-interfaces.md) |
+| RNode/Multi detection, nested radios, firmware/control/PHY/flow/reconnect | [RNode](../docs/rnode-interfaces.md) |
+| SAM sessions, destination persistence, accepted/initiating peers, stream recovery | [I2P](../docs/i2p-interface.md) |
+| Weave device/endpoint framing, queues and reconnect | [Weave](../docs/weave-interface.md) |
+| UDP direction/address/port/device and truncation boundaries | [UDP](../docs/udp-interface.md) |
+| TCP/serial configuration, framing, retry and ownership | [Streams](../docs/stream-interfaces.md) |
+| OUT selection and actual DATA-queue pressure | [Interface policy](../docs/interface-policy.md) |
+| Local sharing and Android USB/Bluetooth/service/platform gaps | [Platform audit](../docs/interface-platforms.md) |
+
+All new bearer factories are wired through runtime configuration, including
+RNodeMulti triple-nested radio sections. Backbone aliases follow the pinned
+source, not the TCP-client parser. Discovery publishes real TCP/Backbone types
+and actual bound ports; Linux/Android autoconnect uses native Backbone, other
+platforms retain the explicitly compatible HDLC adapter. Default Auto creation
+remains conservatively disabled pending explicit opt-in, no longer described
+as unimplemented, and never rewrites existing user configuration.
+
+Generic `outgoing=no` affects selection, not source-authorized known-path/raw
+sends. Children inherit policy/IFAC/accounting except source-backed RNodeMulti
+and I2P initiating-child exceptions. Backbone pressure feedback binds to the
+router's actual bounded DATA queue, including rejected admission attempts;
+state is scoped by manager identity, not process-global. The immediate
+watermark preserves the source's 128-frame floor.
+
+Concrete integration fixes include duplex TCP receive-enumeration ownership,
+hostname address fallback within one configured deadline, and Unix UDP
+`ReceiveMessageFromAsync` truncation detection. Actual Linux probes showed an
+8192-byte datagram could disappear before delivery in this environment, so
+the test now checks exact 1065/1129/1193-byte IFAC/truncation boundaries rather
+than treating delivery of that oversized proxy as guaranteed.
+Link-manager startup/stop now captures the token before worker scheduling and
+keeps its CTS owned until workers join. A 32-iteration immediate-stop regression
+passes. The 1024-receipt regression waits for the separate bounded outbound
+queue without weakening successful-send/culling assertions. Coverage exposed
+a telemetry test's mutable-list snapshot race and a multipart test polling
+an intentionally 10-ms-lived status; snapshots are now locked copies and the
+multipart test uses the existing controllable clock, retaining the exact
+expiry/cancellation and exactly-once assertions.
+
+I2P source tracing confirmed SAM sessions belong to tunnels, not individual
+streams. Ready initiating sessions now survive normal stream retries while
+control failure/`INVALID_ID` recreates them; independent simulator cases verify
+stable session ID/public identity and genuine session recreation. Private
+destination persistence was already stable; the correction preserves tunnel
+readiness, not a previously regenerated identity. Upstream setup-error reset
+differences and bounded native deadlines remain explicit.
+
+**Windows verification.** Commands sharing outputs were serialized. An
+intermediate opt-out suite passed **1675**, skipped **82**, failed zero.
+The first full parallel-project live/coverage attempt failed five tests;
+all six selected cases passed on focused retry. After the deterministic
+test fixes above, the final full solution gate used `-m:1`, preserving protocol
+assertions/deadlines while avoiding competing instrumented test projects.
+
+```powershell
+dotnet build DotReticulum.slnx -c Release --no-restore -m:1 -v:minimal
+dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 --no-restore -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o artifacts\native-parity6
+artifacts\native-parity6\DotReticulum.Applications.exe --help
+dotnet test DotReticulum.slnx -c Release --no-restore -m:1 --settings tests\coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults\coverage-parity6-1376b1c553914ea4b7f6e985b7dc990d --logger trx -v:minimal
+pwsh -NoProfile -File tests\coverage_summary.ps1 TestResults\coverage-parity6-1376b1c553914ea4b7f6e985b7dc990d
+pwsh -NoProfile -File tests\run-pester.ps1 -GitHosting -GitRemote
+pwsh -NoProfile -File tests\run-pester.ps1 -Application artifacts\native-parity6\DotReticulum.Applications.exe -GitHosting -GitRemote
+```
+
+Build: **zero warnings/errors**. Publication ran with MSVC setup and publish
+in the same `cmd.exe` process; trimming/compiler warnings are errors. Help
+executed. Full solution: **1742 passed, 24 explicitly skipped, zero failed**,
+with `DOTRETICULUM_LIVE=1`, actual reference variables and
+`DOTRETICULUM_NATIVE_EXE` set. Counts come from actual TRX outcomes, not an
+absent skipped-counter attribute. Linux-only, physical/mobile and separately
+opt-in router/multicast cases are not silently treated as passed. Managed
+Pester: **110 passed, 2 skipped, zero failed**; published-native Pester:
+**110 passed, 2 skipped, zero failed**, including authenticated file transfer
+through independent UDP receive/forward ports, actual Pipe child startup and
+graceful joined shutdown, and existing streamed/multipart/Git/runtime flows.
+
+Fresh production coverage merged 12 reports without double-counting shared code:
+
+| Project | Lines | Branches |
+| --- | ---: | ---: |
+| Applications | 8026/9651 (83.16%) | 6897/10273 (67.14%) |
+| Core | 1688/1741 (96.96%) | 1045/1136 (91.99%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 4396/5122 (85.83%) | 2492/3179 (78.39%) |
+| Lxmf | 389/430 (90.47%) | 194/272 (71.32%) |
+| Transport | 4935/5374 (91.83%) | 3247/3940 (82.41%) |
+| Overall | 19544/22434 (87.12%) | 13922/18850 (73.86%) |
+
+**Linux execution.** Used an isolated source snapshot under WSL Ubuntu
+26.04.1, kernel 6.18.54.1, real SDK 10.0.402, PowerShell 7.6.8, isolated
+Python 3.14.4/reference and real ICU/clang/zlib/bzip2 support. Windows outputs
+were not copied. Missing application test imports initially caused a
+`--no-restore` invocation to discover no tests: that no-op is **not evidence**.
+`dotnet restore DotReticulum.slnx` supplied the missing Linux test dependencies,
+and subsequent commands required actual test results.
+
+```powershell
+dotnet test tests/DotReticulum.Interfaces.Tests/DotReticulum.Interfaces.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~Parity6|FullyQualifiedName~AutoInterfaceTests" --logger trx --results-directory TestResults/interfaces-final -v:minimal
+dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~ActualPythonBackboneAdvertisementAutoconnectsAndCarriesEncryptedLinkAfterBootstrapDetaches --logger trx --results-directory TestResults/backbone-live-canonical -v:minimal
+pwsh -NoProfile -File tests/Interop/invoke-auto-topology.ps1 -Dotnet /home/dennis/.dotreticulum-dotnet/dotnet -Python .reference-venv/bin/python -Upstream .reference -Repository . -Build -TimeoutSeconds 300
+dotnet publish src/DotReticulum.Applications/DotReticulum.Applications.csproj -c Release -r linux-x64 --no-restore -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o artifacts/native-parity6
+artifacts/native-parity6/DotReticulum.Applications --help
+dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~NativeResourceTests|FullyQualifiedName~SharedLiveTests" --logger trx --results-directory TestResults/native-local-live-final -v:minimal
+```
+
+Commands ran through `wsl --exec env` with actual SDK/Python/PATH variables;
+the Auto runner used root only for its owned namespaces/veth and scoped Git
+safe-directory configuration. Linux bearer selection: **236 passed,
+6 explicitly skipped, zero failed**. Actual pinned Python Backbone discovery,
+bootstrap detachment and encrypted link flow: **1 passed, zero skipped/failed**.
+Owned Auto namespace/veth topology: **2 passed, zero skipped/failed**,
+`TestResults/auto-live-09ac0c56/auto-live.trx`; actual bidirectional raw/IFAC
+packets, discovery, wrong-key rejection and expiry, not physical LAN evidence.
+No existing NIC/routes were modified and owned namespaces were cleaned.
+Linux warnings-as-errors NativeAOT publish/help passed. Final native/resource
+and shared-reference selection: **7 passed, zero skipped/failed**; the published
+native listener decrypts/decompresses and returns the exact compressed
+**2,200,017-byte** resource. The six shared-reference cases use TCP explicitly:
+they do not establish Linux abstract-Unix or Android interoperability.
+
+Windows CRLF and Linux LF checkouts have different raw source hashes despite
+the same clean pin. Auto, I2P and actual Backbone adapters now independently
+compare normalized imported bytes with the pinned Git blob and report actual
+raw, canonical-LF and Git-blob hashes separately. Native tests independently
+hash the reported imported file. Original Windows raw-vector provenance is
+not relabeled. For Backbone the original raw SHA-256 is `c3445132...150438`;
+canonical/pinned-blob SHA-256 is
+`b83f226ff847f140dabf782eac173177ba74c6a99bbc067c2a971fecdcf5e369`.
+
+**Actual I2P results, not accepted recovery.** An owned extracted official
+Ubuntu i2pd 2.59.0 process used private state, loopback SAM and bounded lifetime.
+Isolated real SAM persistence passed **1** case; initial no-transport startup
+failed explicitly and was corrected to an owned loopback NTCP2 transport,
+private net ID 222, no seeds/SSU2/NTP/subscriptions. This is not overlay traffic
+or independently verified physical isolation. A public-bootstrap run retained
+certificate verification and used:
+
+```powershell
+pwsh -NoProfile -File tests/Interop/invoke-i2p-topology.ps1 -RouterBinary .i2p-tools/unpacked/usr/bin/i2pd -CertificatesDirectory .i2p-tools/unpacked/usr/share/i2pd/certificates -AllowPublicNetwork -RunStreamTests -PythonExecutable .reference-venv/bin/python -UpstreamPath .reference -NoBuild -KeepArtifacts -TestTimeoutSeconds 900
+```
+
+Latest result: **3 passed, 1 failed, zero skipped** in 7m51s,
+`TestResults/i2p-topology-a5ab16658d8b490396c218fd8bd8cca3/results/i2p-live.trx`.
+Real SAM persistence and both pinned Python roles pass. Initial native
+bidirectional packets also pass, but after persisted server-bearer restart the
+replacement accepted stream does not arrive within the unchanged four-minute
+case deadline. Diagnostics show one retained initiating SAM session, eventual
+disconnect and a second SAM CONNECT; SAM OK is not remote-handshake proof.
+Source review of i2pd rules out a first-payload accept deadlock and found no
+concrete native accept re-arm defect. Router logs include publication/tunnel
+failures, but **do not prove an environmental root cause**. Actual recovery
+remains failed/unresolved, with safe SYN/lease/accept-transition diagnosis
+needed; simulator recovery is not a substitute. Earlier failed raw-hash
+assertions were checkout-normalization mistakes, not moved pins.
+The runner stopped its owned router/test processes; known PIDs and namespace
+cleanup were checked. Private router/destination state remains ignored local
+artifacts, never committed.
+
+**Remaining acceptance and external prerequisites.** The Local/Android audit
+finds native Local RX counts raw socket bytes versus upstream decoded bytes,
+missing Android sleep/pause policy, missing explicit Android abstract-socket
+selection, and no Android-targeted USB/RFCOMM/GATT/permission/service host.
+Desktop shared TCP, simulated devices and Android-permitting socket guards
+do not resolve those gaps. Required hardware tests need identified, owned
+serial loopback/TNC, RNode/Multi/Weave devices and peers, firmware/chip details,
+driver/port access, explicit configuration/transmission authority and lawful
+frequency/bandwidth/power/SF/CR; Android acceptance additionally needs an
+authorized Android host and USB/Bluetooth devices. The only enumerated
+COM4 (`VID_239A`, `PID_8029`) is unidentified and was **not opened**.
+No firmware, EEPROM, bonding or RF action was attempted. These physical/mobile
+prerequisites cannot be manufactured from software tests; affected checkboxes
+remain open. They are not presented as the cause of the separate I2P failure
+or as completion of remaining software contracts. CI remains strictly last.
+
 ### Parity 5 endpoint and transfer implementation (2026-10-24)
 
 Resumed the requested remaining-roadmap scope from `07c977d`; Parity 4's

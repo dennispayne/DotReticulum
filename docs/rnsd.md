@@ -20,13 +20,15 @@ Stop with Ctrl+C or SIGTERM (graceful shutdown).
 A supported subset of Reticulum's ConfigObj format: `[section]`, `[[subsection]]`, `key = value`,
 `#` comments outside quotes, single/double quoted values, and comma-delimited lists (including
 quoted items containing commas and trailing list commas). Duplicate settings/interfaces,
-unclosed quotes, unknown sections, and ineffective controls are errors. Multiline/triple-quoted
-values and arbitrary deeper nesting are not supported; they are not silently treated as working controls.
+unclosed quotes, unknown sections, and ineffective controls are errors. RNodeMulti
+radio settings use `[[[Radio name]]]` inside the parent interface. Other deeper
+nesting and multiline/triple-quoted values are unsupported and diagnosed.
 
 Missing directories/configs are created without replacing existing files. Upstream's default config
-enables `AutoInterface`, which is not yet implemented natively. The native default explicitly disables
-that interface and logs a warning; it does **not** silently open a TCP listener instead.
-Enable a supported interface before expecting external connectivity.
+enables `AutoInterface`; the native default conservatively keeps multicast discovery
+disabled until explicitly enabled and logs that decision. Auto is implemented,
+but no existing configuration is rewritten and no TCP listener is substituted.
+Enable an interface before expecting external connectivity.
 
 | Section | Key | Meaning |
 |---|---|---|
@@ -61,10 +63,18 @@ the host/discovery lifecycle owns detaching and reactivating that interface as a
 |---|---|
 | `TCPServerInterface` | `listen_ip` (0.0.0.0), required `listen_port` or `port`. If both are set, **port wins**; 0 permits an ephemeral listener. Each client becomes its own interface. |
 | `TCPClientInterface` | Required `target_host` and `target_port`. `port` is not an upstream alias here. |
-| `UDPInterface` | Explicit `listen_ip`, `forward_ip`, and ports. `port` supplies missing `listen_port`/`forward_port`; it does not override explicit values. Receive-only/send-only configurations are explicitly unsupported by this native adapter. |
-| `SerialInterface` | `port` (required), `speed` (9600). |
+| `UDPInterface` | Independent receive and forward address/port pairs; receive-only and forward-only operation are supported. `port` supplies missing direction ports without overriding explicit values. `device` and IPv4 hostname resolution follow the [UDP contract](udp-interface.md). |
+| `SerialInterface` | Required `port`; `speed` (9600), `parity`, `databits`, `stopbits`. Owned reconnect and partial-frame expiry: [stream interfaces](stream-interfaces.md). |
+| `AutoInterface` | IPv6 multicast group/device/scope/port controls: [Auto](auto-interface.md). |
+| `BackboneInterface`, `BackboneClientInterface` | Linux/Android; bind/device/IPv6, listener/client aliases, reconnect and flap controls: [Backbone/Pipe](backbone-pipe.md). `port` overrides both direction ports, `remote` overrides `target_host`, and `listen_on` overrides `listen_ip`. A target host selects client operation; the explicit client type requires one. |
+| `PipeInterface` | Required executable `command` (argument splitting, no shell); fractional `respawn_delay`: [Backbone/Pipe](backbone-pipe.md). |
+| `KISSInterface`, `AX25KISSInterface` | Serial format, KISS flow/timing/port and AX.25 addressing: [KISS interfaces](kiss-interfaces.md). |
+| `RNodeInterface`, `RNodeMultiInterface` | Serial/TCP device, required radio configuration, flow/airtime controls and nested radios: [RNode](rnode-interfaces.md). |
+| `I2PInterface` | SAM router, destinations, peer policies and persistent inbound keys: [I2P](i2p-interface.md). |
+| `WeaveInterface` | Required serial `port`, generic bitrate/IFAC/policy; fixed device format: [Weave](weave-interface.md). |
 
-Other types (AutoInterface, RNodeInterface, …) are errors when enabled, ignored when disabled.
+Unknown types are errors when enabled, ignored when disabled. A registered type
+does not establish hardware/platform acceptance; see the individual evidence boundaries.
 Statically compiled extensions can be registered through `Runtime.InterfaceFactoryRegistry`; parsing
 requires that registry and validates the factory's declared option names. The daemon does not execute
 upstream Python files from `<config>/interfaces`.
@@ -79,7 +89,8 @@ keys appear in runtime statistics. Discovery publication includes credentials
 only when explicitly configured with `publish_ifac`.
 
 `bitrate` supplies the configured bits/second estimate used by MTU selection and
-transport scheduling. TCP accepts `fixed_mtu`, `connect_timeout` and
+transport scheduling. TCP accepts device/address-family selection, optional
+KISS framing, `fixed_mtu`, `connect_timeout` and
 `max_reconnect_tries`; the daemon enables owned client reconnects. A reusable
 TCP client retains its configured mode/authentication across disconnections,
 while routes, links and the disconnected peer are released. See
@@ -93,10 +104,11 @@ accepted-child and discovered interfaces, not merely to parsed configuration.
 `connect_timeout` is seconds (default 5); omitted `max_reconnect_tries` leaves
 recovery unbounded in attempts but cancellation-aware.
 
-Controls not listed above are rejected, including
-`panic_on_interface_error` (native top-level/child failure ownership is fixed),
-interface device selection, KISS framing and serial-format overrides. This is an explicit
-remaining parity limitation, not a claim that all upstream configuration is supported.
+Unrecognized or ineffective controls are rejected, including
+`panic_on_interface_error` (native top-level/child failure ownership is fixed).
+Type-specific settings are validated against their bearer, not silently applied
+to unrelated types. Generic `outgoing=no` controls selection, not known-path or
+explicit low-level sends; see [interface policy](interface-policy.md).
 
 ### Discovery advertisement settings
 
@@ -105,16 +117,17 @@ Supported-interface configuration accepts the pinned source's discovery metadata
 `discovery_encrypt`, `reachable_on`, `publish_ifac`, `location_cmd`, `latitude`,
 `longitude`, `height`, `discovery_frequency`, `discovery_bandwidth`,
 `discovery_modulation`, `discovery_lxmf_address`, and `ignore_config_warnings`.
-These populate `RnsdInterfaceConfig.Discovery`; native publication is supported only for
-an enabled, discoverable `TCPServerInterface`. It advertises the actual TCP type and current
-bound listening port, not a Backbone type. Parsed radio frequency/bandwidth/modulation
+These populate `RnsdInterfaceConfig.Discovery`; native publication supports enabled,
+discoverable TCP and Backbone listeners. It advertises the actual bearer type and current
+bound listening port; a TCP listener is never mislabeled Backbone. Parsed radio frequency/bandwidth/modulation
 settings do not turn a TCP bearer into a radio interface or fabricated radio measurements.
 
 Defaults are non-discoverable, six-hour announces (minimum five minutes), stamp value 16,
 no encryption, no IFAC publication, and no optional location/operator/radio fields.
 `announce_interval` is configured in minutes. Nonpositive stamp values select 16; values above
 the native maximum 256 fail. Coordinates must be finite; LXMF addresses must be 16-byte hex.
-Discovery normally promotes a mode other than gateway/AP/internal to gateway; setting
+Discovery normally promotes a mode other than gateway/AP/internal to gateway
+(AP for RNode interfaces); setting
 `ignore_config_warnings=yes` retains the explicit mode. Discoverability also implies a static
 active transport identity, matching the pinned source.
 

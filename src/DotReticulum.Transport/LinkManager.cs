@@ -271,10 +271,11 @@ public sealed class LinkManager : IAsyncDisposable
             }
 
             var cts = new CancellationTokenSource();
-            _loops = [Task.Run(() => PumpAsync(cts.Token)),
-                Task.Run(() => WorkLoopAsync(_callbacks.Reader, _observerSlots, cts.Token)),
-                Task.Run(() => WorkLoopAsync(_requests.Reader, _requestSlots, cts.Token)),
-                Task.Run(() => TickLoopAsync(cts.Token))];
+            var token = cts.Token;
+            _loops = [Task.Run(() => PumpAsync(token)),
+                Task.Run(() => WorkLoopAsync(_callbacks.Reader, _observerSlots, token)),
+                Task.Run(() => WorkLoopAsync(_requests.Reader, _requestSlots, token)),
+                Task.Run(() => TickLoopAsync(token))];
             _cts = cts;
         }
     }
@@ -302,7 +303,7 @@ public sealed class LinkManager : IAsyncDisposable
         }
         try
         {
-            if (cts is not null) CancelOwnedWork(cts);
+            if (cts is not null) CancelOwnedWork(cts, disposeCancellationSource: false);
             try { await Task.WhenAll(loops).ConfigureAwait(false); }
             catch (OperationCanceledException) { }
         }
@@ -373,12 +374,12 @@ public sealed class LinkManager : IAsyncDisposable
         return true;
     }
 
-    internal void CancelOwnedWork(CancellationTokenSource cancellation)
+    internal void CancelOwnedWork(CancellationTokenSource cancellation, bool disposeCancellationSource = true)
     {
         var task = cancellation.CancelAsync();
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (_gate) _invocations.Add(completion.Task);
-        _ = ObserveCancellationAsync(task, cancellation, completion);
+        _ = ObserveCancellationAsync(task, cancellation, completion, disposeCancellationSource);
     }
 
     internal void ObserveRequiredCleanup(Task work, string description)
@@ -399,14 +400,14 @@ public sealed class LinkManager : IAsyncDisposable
         }
     }
 
-    private async Task ObserveCancellationAsync(Task task, CancellationTokenSource cancellation, TaskCompletionSource completion)
+    private async Task ObserveCancellationAsync(Task task, CancellationTokenSource cancellation, TaskCompletionSource completion, bool disposeCancellationSource)
     {
         try { await task.ConfigureAwait(false); }
         catch (Exception ex) { Report("Link cancellation callback failed: " + ex.Message); }
         finally
         {
             lock (_gate) _invocations.Remove(completion.Task);
-            cancellation.Dispose();
+            if (disposeCancellationSource) cancellation.Dispose();
             completion.TrySetResult();
         }
     }
@@ -424,7 +425,7 @@ public sealed class LinkManager : IAsyncDisposable
                     {
                         await _router.SendAsync(packet, ct).ConfigureAwait(false);
                     }
-                    else if (_manager.Contains(iface))
+                    else if (_manager.IsOutgoing(iface))
                     {
                         await _manager.SendToAsync(packet, iface, ct).ConfigureAwait(false);
                     }

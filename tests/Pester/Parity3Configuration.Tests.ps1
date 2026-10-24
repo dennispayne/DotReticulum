@@ -80,14 +80,14 @@ Describe 'Parity 3 daemon configuration and logging processes' -Tag E2E, Runtime
         Test-Path -LiteralPath (Join-Path $config.FullName 'storage\transport_identity') | Should -BeFalse
     }
 
-    It 'creates missing directory configuration and explicitly discloses unavailable AutoInterface' {
+    It 'creates missing directory configuration without silently opting into network discovery' {
         $config = Join-Path $workspace 'created'
         $log = Join-Path $config 'logfile'
         $peer = Start-TestProcess $executable ($prefix + @('rnsd', '--config', $config, '--service'))
         try {
             Wait-RnsdLog $peer $log 'rnsd ready'
             Test-Path -LiteralPath (Join-Path $config 'config') | Should -BeTrue
-            [IO.File]::ReadAllText($log) | Should -Match 'AutoInterface is unsupported'
+            [IO.File]::ReadAllText($log) | Should -Match 'AutoInterface is disabled by default'
             [IO.File]::ReadAllText((Join-Path $config 'config')) | Should -Match 'enabled = no'
             Test-Path -LiteralPath (Join-Path $config 'storage\transport_identity') | Should -BeTrue
         }

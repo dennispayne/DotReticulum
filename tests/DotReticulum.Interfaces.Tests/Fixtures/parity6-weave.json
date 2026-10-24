@@ -1,0 +1,25 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "rns_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "lxmf_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\refvenv\\Lib\\site-packages\\LXMF\\__init__.py",
+  "source_sha256": "99b4f217fce0afdfef16ea9641fc740065358eec512e22ec92366558051195c5",
+  "shims": "Construct WDCL via __new__, recording serial.write, no constructor/port/threads. WeaveDevice methods unmodified. No device trust claim.",
+  "host_test_private_key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+  "host_public_key": "29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7",
+  "host_switch_id": "22966dd7",
+  "remote_public_key": "174553b456dddfc6908ecab1c101fe6ab21e2baa0617795b7d43a63482993fd5",
+  "remote_switch_id": "82993fd5",
+  "discovery_response": "22966dd700174553b456dddfc6908ecab1c101fe6ab21e2baa0617795b7d43a63482993fd56403bb1afee339e59608e11c0c1da6c0593c4cb2c673b8f1b97e687387169f400d6643eda647b9adcc21c402474de92a9e587bd58fcca02b50dd2ec17d07a30b",
+  "endpoint": "0102030405060708",
+  "payload": "007d7eff10203040",
+  "writes": [
+    "7effffffff0022966dd77e",
+    "7e82993fd50129acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7f47d5d05fff29449392f4fde6ac7b18a070b23b0d82adc6c2d1f740c11a83437f89f7d5df1afaf446b8c671416b4f0ddc8e904726c352118946e2fcd4f1940267f007e",
+    "7e82993fd50200010102030405060708007d5d7d5eff102030407e",
+    "7e82993fd5020a00017e",
+    "7e82993fd5020a00007e",
+    "7e82993fd50201007e",
+    "7effffffff06007d5d7d5eff102030407e"
+  ],
+  "wire_transmitted": 189
+}

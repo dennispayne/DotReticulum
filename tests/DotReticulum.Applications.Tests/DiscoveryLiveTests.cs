@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DotReticulum.Applications.Rnsd;
@@ -105,8 +106,13 @@ public sealed class DiscoveryLiveTests
             var ready = await WaitEvent("ready");
             Assert.Equal("BackboneInterface", ready.GetProperty("backbone_type").GetString());
             Assert.Equal("RNS.Interfaces.BackboneInterface", ready.GetProperty("backbone_module").GetString());
-            Assert.Equal("c3445132d89af04998c35b12e5101c8975d73599f62fe71b501b3d734c150438",
+            Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(
+                    File.ReadAllBytes(ready.GetProperty("backbone_source").GetString()!))),
                 ready.GetProperty("backbone_source_sha256").GetString());
+            Assert.Equal("b83f226ff847f140dabf782eac173177ba74c6a99bbc067c2a971fecdcf5e369",
+                ready.GetProperty("backbone_git_blob_sha256").GetString());
+            Assert.Equal(ready.GetProperty("backbone_git_blob_sha256").GetString(),
+                ready.GetProperty("backbone_canonical_lf_sha256").GetString());
             Assert.Equal(backbonePort, ready.GetProperty("backbone_port").GetInt32());
             Assert.Equal(sourceIdentity.HexHash, ready.GetProperty("identity").GetString());
             await Command("{\"op\":\"announce\"}");

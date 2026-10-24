@@ -77,7 +77,10 @@ public sealed partial class TransportRouter
         var signature = destination.Identity.Sign(hash);
         byte[] data = explicitProof ? [.. hash, .. signature] : signature;
         var proof = Packet.Create(PacketType.Proof, DestinationType.Single, hash.AsMemory(0, Destination.HashLength), data);
-        if (_manager.Contains(received.Source)) await _manager.SendToAsync(proof, received.Source, cancellationToken).ConfigureAwait(false);
+        if (_manager.Contains(received.Source))
+        {
+            if (_manager.IsOutgoing(received.Source)) await _manager.SendToAsync(proof, received.Source, cancellationToken).ConfigureAwait(false);
+        }
         else await _manager.SendAsync(proof, cancellationToken).ConfigureAwait(false);
     }
 

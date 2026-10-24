@@ -1,0 +1,47 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "sourceSha256": "333b34eeab020946eefdd8a7e75d3fa74d2ffc5adfef7c0080752980f455bf2c",
+  "method": "Unmodified Transport._outbound/transmit; recording bearer; isolated runtime; no network",
+  "cases": [
+    {
+      "branch": "broadcast",
+      "outgoing": false,
+      "frames": 0
+    },
+    {
+      "branch": "broadcast",
+      "outgoing": true,
+      "frames": 1
+    },
+    {
+      "branch": "attached",
+      "outgoing": false,
+      "frames": 0
+    },
+    {
+      "branch": "attached",
+      "outgoing": true,
+      "frames": 1
+    },
+    {
+      "branch": "known-path",
+      "outgoing": false,
+      "frames": 1
+    },
+    {
+      "branch": "known-path",
+      "outgoing": true,
+      "frames": 1
+    },
+    {
+      "branch": "direct",
+      "outgoing": false,
+      "frames": 1
+    },
+    {
+      "branch": "direct",
+      "outgoing": true,
+      "frames": 1
+    }
+  ]
+}

@@ -34,10 +34,10 @@ public class LinkTests
         public PacketInterfaceManager Manager { get; }
         public TransportRouter Router { get; }
 
-        public Node(IEnumerable<Loopback> interfaces, bool transport = false)
+        public Node(IEnumerable<Loopback> interfaces, bool transport = false, TimeProvider? timeProvider = null)
         {
             Manager = new PacketInterfaceManager(interfaces);
-            Router = new TransportRouter(Manager, new TransportRouterOptions { TransportEnabled = transport, PathRequestGrace = TimeSpan.Zero });
+            Router = new TransportRouter(Manager, new TransportRouterOptions { TransportEnabled = transport, PathRequestGrace = TimeSpan.Zero, TimeProvider = timeProvider });
         }
 
         public async Task StartAsync()
@@ -97,7 +97,7 @@ public class LinkTests
         }
     }
 
-    internal static async Task<Topology> BuildAsync(bool viaTransport)
+    internal static async Task<Topology> BuildAsync(bool viaTransport, TimeProvider? timeProvider = null)
     {
         Node a, b;
         Node[] others = [];
@@ -105,16 +105,16 @@ public class LinkTests
         {
             var (a1, t1) = Pair();
             var (t2, b1) = Pair();
-            a = new Node([a1]);
-            var t = new Node([t1, t2], transport: true);
-            b = new Node([b1]);
+            a = new Node([a1], timeProvider: timeProvider);
+            var t = new Node([t1, t2], transport: true, timeProvider: timeProvider);
+            b = new Node([b1], timeProvider: timeProvider);
             others = [t];
         }
         else
         {
             var (a1, b1) = Pair();
-            a = new Node([a1]);
-            b = new Node([b1]);
+            a = new Node([a1], timeProvider: timeProvider);
+            b = new Node([b1], timeProvider: timeProvider);
         }
 
         await a.StartAsync();

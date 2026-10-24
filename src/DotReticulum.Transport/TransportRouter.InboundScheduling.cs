@@ -64,6 +64,7 @@ public sealed partial class TransportRouter
             trafficClass = ShouldIngressLimitPathRequests(received.Source) ? TransportTrafficClass.IngressLimited : TransportTrafficClass.PathRequest;
         }
         var index = (int)trafficClass;
+        if (trafficClass == TransportTrafficClass.Data) _manager.NotifyIngressQueuePressure();
         lock (_inboundGate)
         {
             if (requestKey is not null && _inflightPathRequests.TryGetValue(requestKey, out var inflight))

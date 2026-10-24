@@ -115,11 +115,16 @@ public class TelemetryTests
         var run = daemon.RunAsync(TimeSpan.FromMilliseconds(300), cts.Token);
         var failure = await TelemetryReceiver.WatchAsync(viewer, daemon.DestinationHash, TimeSpan.FromSeconds(30), report =>
         {
-            lock (reports) reports.Add(report);
-            if (reports.Count >= count) cts.Cancel();
+            bool complete;
+            lock (reports)
+            {
+                reports.Add(report);
+                complete = reports.Count == count;
+            }
+            if (complete) cts.Cancel();
         }, cts.Token);
         Assert.Null(failure);
         await run;
-        return reports;
+        lock (reports) return reports.ToList();
     }
 }

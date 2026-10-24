@@ -68,7 +68,7 @@ public sealed partial class RnsdHost
             return null;
         }
         ValidateAdvertisement(settings);
-        var iface = CreateInterface(settings, _extensions);
+        var iface = CreateInterface(settings, _extensions, _storageDirectory, Router.TransportIdentity.Hash);
         InterfaceAccessCode? accessCode = null;
         try
         {
@@ -76,7 +76,7 @@ public sealed partial class RnsdHost
             var routing = settings.Enabled ? settings.Routing
                 : RnsdConfigParser.ResolveInterfaceRouting(settings, configuration.Routing, configuration.EnableTransport);
             ConfigureMode(iface, settings.Mode, routing.ToAnnounceOptions);
-            await _manager.AttachAsync(iface, cancellationToken, accessCode: accessCode).ConfigureAwait(false);
+            await _manager.AttachAsync(iface, cancellationToken, accessCode: accessCode, outgoing: settings.Outgoing).ConfigureAwait(false);
             lock (_gate) _interfaces.Add((name, iface));
             RegisterAdvertisement(settings);
         }

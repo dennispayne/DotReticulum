@@ -42,11 +42,13 @@ public class RnsdConfigTests
 
         Assert.True(config.EnableTransport);
         Assert.Equal(6, config.LogLevel);
-        Assert.Equal(2, config.Interfaces.Count);
+        Assert.Equal(3, config.Interfaces.Count);
         var server = config.Interfaces[0];
         Assert.Equal(("Server", RnsdInterfaceType.TcpServer, true, InterfaceMode.Gateway), (server.Name, server.Type, server.Enabled, server.Mode));
         Assert.Equal(4242, server.GetInt("listen_port", 0));
         Assert.False(config.Interfaces[1].Enabled);
+        Assert.Equal(RnsdInterfaceType.RNode, config.Interfaces[2].Type);
+        Assert.False(config.Interfaces[2].Enabled);
     }
 
     [Fact]
@@ -59,7 +61,7 @@ public class RnsdConfigTests
     }
 
     [Theory]
-    [InlineData("[interfaces]\n[[X]]\ntype = AutoInterface\nenabled=yes\n")]
+    [InlineData("[interfaces]\n[[X]]\ntype = UnregisteredInterface\nenabled=yes\n")]
     [InlineData("[interfaces]\n[[X]]\nenabled = yes\n")]
     [InlineData("[reticulum]\nenable_transport = maybe\n")]
     [InlineData("[logging]\nloglevel = bad\n")]

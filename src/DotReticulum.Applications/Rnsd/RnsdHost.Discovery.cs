@@ -19,8 +19,8 @@ public sealed partial class RnsdHost
     private void ValidateAdvertisement(RnsdInterfaceConfig settings)
     {
         if (!settings.Enabled || !settings.Discovery.Enabled) return;
-        if (settings.Type != RnsdInterfaceType.TcpServer)
-            throw new NotSupportedException($"Interface '{settings.Name}': discovery publication is only supported for the native TCP server bearer.");
+        if (settings.Type is not (RnsdInterfaceType.TcpServer or RnsdInterfaceType.Backbone) || settings.Get("target_host") is not null)
+            throw new NotSupportedException($"Interface '{settings.Name}': discovery publication requires a native listening TCP or Backbone bearer.");
         if (settings.Discovery.Encrypt && _networkIdentity is null)
             throw new InvalidOperationException($"Interface '{settings.Name}': encrypted discovery requires network_identity.");
         if (settings.Discovery.LocationCommand is not null && !_executionPolicy.AllowDiscoveryCommands)
@@ -60,10 +60,16 @@ public sealed partial class RnsdHost
         token.ThrowIfCancellationRequested();
         IPacketInterface? iface;
         lock (_gate) iface = _interfaces.FirstOrDefault(i => i.Name == settings.Name).Interface;
-        if (iface is not TcpServerPacketInterface server || server.LocalEndpoint is null)
+        var port = iface switch
+        {
+            TcpServerPacketInterface { LocalEndpoint: { } endpoint } => endpoint.Port,
+            BackbonePacketInterface { LocalEndpoint: { } endpoint } => endpoint.Port,
+            _ => (int?)null,
+        };
+        if (port is null)
             throw new InvalidOperationException($"Discoverable interface '{settings.Name}' is not online.");
         return ValueTask.FromResult(DiscoveryAdvertisementFactory.Create(settings, Router.TransportIdentity,
-            Router.TransportEnabled, server.LocalEndpoint.Port) with
+            Router.TransportEnabled, port) with
         {
             Version = typeof(RnsdHost).Assembly.GetName().Version?.ToString() ?? "unknown",
         });
@@ -74,8 +80,11 @@ public sealed partial class RnsdHost
         var advertisement = request.Advertisement;
         if (advertisement.InterfaceType != "BackboneInterface")
             throw new NotSupportedException($"Discovery autoconnect for {advertisement.InterfaceType} has no native bearer.");
-        var iface = new TcpClientPacketInterface(advertisement.ReachableOn ?? throw new InvalidDataException("Missing discovery endpoint."),
-            advertisement.Port ?? throw new InvalidDataException("Missing discovery port."), request.ConfiguredBitrate, reconnect: true);
+        var host = advertisement.ReachableOn ?? throw new InvalidDataException("Missing discovery endpoint.");
+        var port = advertisement.Port ?? throw new InvalidDataException("Missing discovery port.");
+        IPacketInterface iface = OperatingSystem.IsLinux() || OperatingSystem.IsAndroid()
+            ? new BackboneClientPacketInterface(host, port, new BackbonePacketInterfaceOptions { NominalBitrate = request.ConfiguredBitrate })
+            : new TcpClientPacketInterface(host, port, request.ConfiguredBitrate, reconnect: true);
         var accessCode = advertisement.NetworkName is null && advertisement.Passphrase is null ? null
             : InterfaceAccessCode.Derive(advertisement.NetworkName, advertisement.Passphrase, size: 16);
         var mode = request.Mode is null ? InterfaceMode.Full : ParseDiscoveryMode(request.Mode);

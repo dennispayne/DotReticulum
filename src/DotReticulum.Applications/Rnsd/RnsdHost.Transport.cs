@@ -20,7 +20,8 @@ public sealed partial class RnsdHost
         lock (_gate)
         {
             if (_interfaceReconfigure.TryGetValue(iface, out var configure)) configure();
-            if (iface is not TcpClientPacketInterface) return;
+            if (iface is not (TcpClientPacketInterface { WantsTunnel: true }
+                or BackboneClientPacketInterface or I2pPacketPeer { IsInitiator: true })) return;
             if (_pendingTunnelSynthesis.Count >= 1024 && !_pendingTunnelSynthesis.Contains(iface))
             {
                 _log(2, "Tunnel synthesis queue capacity reached; connection was not queued.");

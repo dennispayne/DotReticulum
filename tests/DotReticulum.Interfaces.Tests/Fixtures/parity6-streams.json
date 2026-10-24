@@ -1,0 +1,142 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "rns_version": "1.5.7",
+  "generation_platform": "win32",
+  "rns_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "lxmf_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\refvenv\\Lib\\site-packages\\LXMF\\__init__.py",
+  "source_sha256": {
+    "TCPInterface.py": "d9a4fcaf6e76a9dcb810d335850ab0398d21054848fd84766a62f687a9ec942d",
+    "SerialInterface.py": "676f7b038c2950b92ac71f29653cbbe35ba6513a53ca41742d43e19966e1ef1f"
+  },
+  "payload": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff7e7dc0db",
+  "hdlc": "7e000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d5d7d5e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff7d5e7d5dc0db7e",
+  "kiss": "c000000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfdbdcc1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdddcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff7e7ddbdcdbddc0",
+  "retry_limits": [
+    {
+      "maximum": 0,
+      "connect_calls": 0
+    },
+    {
+      "maximum": 1,
+      "connect_calls": 1
+    },
+    {
+      "maximum": 2,
+      "connect_calls": 2
+    },
+    {
+      "maximum": 3,
+      "connect_calls": 3
+    }
+  ],
+  "initial_connect": {
+    "family": 23,
+    "timeouts": [
+      5,
+      null
+    ],
+    "address": [
+      "::1",
+      4242,
+      0,
+      0
+    ],
+    "connected": true
+  },
+  "tcp_client_configuration": [
+    {
+      "configuration": {
+        "name": "absent"
+      },
+      "initiator": false,
+      "initial_connect_calls": 0,
+      "target_host": null,
+      "target_port": null
+    },
+    {
+      "configuration": {
+        "name": "port_only",
+        "port": 4242
+      },
+      "initiator": false,
+      "initial_connect_calls": 0,
+      "target_host": null,
+      "target_port": null
+    },
+    {
+      "configuration": {
+        "name": "target_port_only",
+        "target_port": 4242
+      },
+      "error_type": "KeyError",
+      "error_message": "'target_host'"
+    },
+    {
+      "configuration": {
+        "name": "remote_and_port",
+        "remote": "example.invalid",
+        "port": 4242
+      },
+      "initiator": false,
+      "initial_connect_calls": 0,
+      "target_host": null,
+      "target_port": null
+    },
+    {
+      "configuration": {
+        "name": "target_host_only",
+        "target_host": "example.invalid"
+      },
+      "initiator": false,
+      "initial_connect_calls": 0,
+      "target_host": null,
+      "target_port": null
+    },
+    {
+      "configuration": {
+        "name": "explicit",
+        "target_host": "example.invalid",
+        "target_port": 4242,
+        "remote": "ignored.invalid",
+        "port": 9999
+      },
+      "initiator": true,
+      "initial_connect_calls": 1,
+      "target_host": "example.invalid",
+      "target_port": 4242
+    },
+    {
+      "configuration": {
+        "name": "blank",
+        "target_host": "",
+        "target_port": 4242
+      },
+      "initiator": true,
+      "initial_connect_calls": 1,
+      "target_host": "",
+      "target_port": 4242
+    },
+    {
+      "configuration": {
+        "name": "null_host",
+        "target_host": null,
+        "target_port": 4242
+      },
+      "initiator": false,
+      "initial_connect_calls": 0,
+      "target_host": null,
+      "target_port": null
+    }
+  ],
+  "tcp_client_configuration_adapter": "Interface base initializer bypassed (no active Reticulum instance); initial_connect suppressed (no network). TCP constructor configuration logic executes unchanged.",
+  "serial_separate_flags": [
+    "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff7e7dc0db",
+    "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff7e7dc0db"
+  ],
+  "serial_shared_flag": [
+    "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff7e7dc0db"
+  ],
+  "serial_idle_expired": [
+    "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff7e7dc0db"
+  ]
+}

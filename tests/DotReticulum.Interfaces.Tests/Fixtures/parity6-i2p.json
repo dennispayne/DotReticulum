@@ -1,0 +1,63 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "version": "1.5.7",
+  "rnsModule": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "sourceSha256": {
+    "RNS/Interfaces/I2PInterface.py": "b654c55fe588480a1211fad150edbc9102e510a6d88ccd9734774c63a7db06bb",
+    "RNS/vendor/i2plib/sam.py": "63991f237a3a48628fe62dd33de2d953ce26bfe95b56d664b8478cd638314891",
+    "RNS/vendor/i2plib/aiosam.py": "b19f9df6164d73e68220cbaf7df11b5fd832d559d0f4573077105484e359ce05",
+    "RNS/vendor/i2plib/tunnel.py": "9081790896d17c62d91f909d3785cec7a9aeeacaa917a319d7b11a5a36a6ac45",
+    "RNS/vendor/i2plib/utils.py": "5d860f934ac84067227c605577e285808d1420a035fc0d7a810ffd2e657d5ac6",
+    "RNS/Reticulum.py": "c655675a799413d9bb11d44ab90d56bc1f4fe339fee1ee5d108754dc8bf812d7",
+    "RNS/Interfaces/Interface.py": "70bf362bc54872e24c124e503d8c52c487886aa141f62faed739e46c396c689c"
+  },
+  "method": "Execute pinned RNS I2P framing/SAM/persistence paths without a router.\n\nShims: a capturing socket for process_outgoing and a file-existence sentinel\nwhich stops server_tunnel after its unmodified key-path calculations. No\nPython tunnel, router, private key generation or network traffic is involved.",
+  "bitrate": 256000,
+  "defaultIfacSize": 16,
+  "minimumConfiguredBitrate": 5,
+  "reconnectSeconds": 15,
+  "probeAfterSeconds": 10,
+  "readTimeoutSeconds": 110,
+  "samDefaultAddress": [
+    "127.0.0.1",
+    7656
+  ],
+  "samCommands": [
+    "HELLO VERSION MIN=3.1 MAX=3.1\n",
+    "DEST GENERATE SIGNATURE_TYPE=7\n",
+    "SESSION CREATE STYLE=STREAM ID=reticulum-vector DESTINATION=TRANSIENT \n",
+    "NAMING LOOKUP NAME=example.b32.i2p\n",
+    "STREAM CONNECT ID=reticulum-vector DESTINATION=public-destination SILENT=false\n",
+    "STREAM ACCEPT ID=reticulum-vector SILENT=false\n"
+  ],
+  "publicDestination": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "publicBase32": "gem7z2yovuoqqbg3sd5qzb5dhaiit6osezfdo3cbuonanzjsuzaq",
+  "frames": [
+    {
+      "payload": "00017e7dff",
+      "frame": "7e00017d5e7d5dff7e",
+      "txb": 9
+    },
+    {
+      "payload": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+      "frame": "7e000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d5d7d5e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff7e",
+      "txb": 260
+    }
+  ],
+  "paths": [
+    {
+      "name": "I2P vector",
+      "identityHash": "000102030405060708090a0b0c0d0e0f",
+      "legacyExists": false,
+      "legacyFile": "45decd19ea74db25719607c6d5df883c728ba45e7b2de645b0130ff5a104272c.i2p",
+      "selectedFile": "70bda7890354014685ff625b882b93ed6b5634b1002ad54520e9ce5e20411a2d.i2p"
+    },
+    {
+      "name": "I2P vector",
+      "identityHash": "000102030405060708090a0b0c0d0e0f",
+      "legacyExists": true,
+      "legacyFile": "45decd19ea74db25719607c6d5df883c728ba45e7b2de645b0130ff5a104272c.i2p",
+      "selectedFile": "45decd19ea74db25719607c6d5df883c728ba45e7b2de645b0130ff5a104272c.i2p"
+    }
+  ]
+}

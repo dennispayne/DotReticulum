@@ -389,7 +389,7 @@ public class Parity5ResourceTests
         var directory = Path.Combine(Environment.CurrentDirectory, "TestResults", "resource-" + Guid.NewGuid().ToString("N"));
         try
         {
-            await using var topology = await BuildAsync(false);
+            await using var topology = await BuildAsync(false, new Parity4LinkMtuTests.Clock());
             var (sender, receiver) = await Connect(topology);
             receiver.ResourcePolicy = new ResourcePolicy
             {

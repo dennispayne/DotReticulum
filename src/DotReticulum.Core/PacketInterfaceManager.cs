@@ -22,6 +22,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
     private bool _completed;
     private bool _receiversLaunched;
     private readonly Channel<ReceivedPacket> _channel;
+    private readonly PacketInterfaceIngressQueue _ingressQueue;
     private readonly CancellationTokenSource _receiversCts = new();
     private readonly object _gate = new();
     private readonly HashSet<Task> _receiverTasks = [];
@@ -46,26 +47,55 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
             throw new ArgumentException("The same interface was supplied more than once.", nameof(interfaces));
         }
 
-        foreach (var iface in _interfaces)
-        {
-            Register(iface, null);
-        }
-
         _channel = Channel.CreateBounded<ReceivedPacket>(new BoundedChannelOptions(channelCapacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleReader = false,
             SingleWriter = false,
         });
+        _ingressQueue = new PacketInterfaceIngressQueue(() => QueuedPackets, channelCapacity);
+        foreach (var iface in _interfaces)
+        {
+            Register(iface, null);
+        }
     }
 
     public int ChannelCapacity { get; }
     public int QueuedPackets => _channel.Reader.Count;
     public double QueuePressure => (double)QueuedPackets / ChannelCapacity;
+    public void SetIngressQueueSource(Func<int> depth, int capacity)
+    {
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposeTask is not null, this);
+            _ingressQueue.SetSource(depth, capacity);
+        }
+    }
+    public void NotifyIngressQueuePressure() => _ingressQueue.NotifyPressure();
     public event Action<IPacketInterface, Exception>? Diagnostic;
     public event Action<IPacketInterface>? InterfaceRemoved;
     public event Action<IPacketInterface>? InterfaceConnected;
     public event Action<IPacketInterface>? InterfaceDisconnected;
+
+    /// <summary>Configures broadcast/attached-interface selection; direct routed transmission is unaffected.</summary>
+    public void SetInterfaceOutgoing(IPacketInterface iface, bool outgoing)
+    {
+        ArgumentNullException.ThrowIfNull(iface);
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposeTask is not null, this);
+            if (_started) throw new InvalidOperationException("Configure outgoing selection before starting the manager.");
+            if (!_states.TryGetValue(iface, out var state) || state.Parent is not null)
+                throw new ArgumentException("The interface is not an owned top-level interface.", nameof(iface));
+            state.Outgoing = outgoing;
+        }
+    }
+
+    public bool IsOutgoing(IPacketInterface iface)
+    {
+        ArgumentNullException.ThrowIfNull(iface);
+        lock (_gate) return _states.TryGetValue(iface, out var state) && state.IsOutgoing;
+    }
 
     /// <summary>Transfers ownership of an access code before start; spawned peers inherit the parent's code.</summary>
     public void SetInterfaceAccessCode(IPacketInterface iface, InterfaceAccessCode? accessCode)
@@ -93,7 +123,12 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         public IPacketInterface Interface { get; } = iface;
         public InterfaceState? Parent { get; } = parent;
         public bool Isolated { get; } = isolateFailure;
-        public InterfaceAccessCode? AccessCode { get; set; } = parent?.AccessCode;
+        public bool Outgoing { get; set; } = iface is not IPacketInterfaceChildPolicy policy || policy.Outgoing;
+        public bool IsOutgoing => Outgoing && (Parent is null
+            || Interface is IPacketInterfaceChildPolicy { InheritParentOutgoing: false } || Parent.IsOutgoing);
+        private bool CountParentTraffic => Interface is not IPacketInterfaceChildPolicy { CountParentTraffic: false };
+        public InterfaceAccessCode? AccessCode { get; set; } =
+            iface is IPacketInterfaceChildPolicy { InheritParentAccessCode: false } ? null : parent?.AccessCode;
         public CancellationTokenSource Cancellation { get; } = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
         public Task Receiver { get; set; } = Task.CompletedTask;
         public long Rxb, Txb, RxPackets, TxPackets, Arxb, Atxb, Arxc, Atxc, Malformed, SendFailures, FailedBytes, Waits, IfacViolations;
@@ -108,12 +143,13 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
             IfacSize = AccessCode?.Size,
             IfacNetworkName = AccessCode?.NetworkName,
             IfacSignature = AccessCode?.Signature.ToArray(),
+            Outgoing = IsOutgoing,
         };
 
         public void RejectedAccessCode()
         {
             Interlocked.Increment(ref IfacViolations);
-            Parent?.RejectedAccessCode();
+            if (CountParentTraffic) Parent?.RejectedAccessCode();
         }
 
         public void Received(int length, Packet? packet)
@@ -126,7 +162,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
                 Interlocked.Add(ref Arxb, length);
                 Interlocked.Increment(ref Arxc);
             }
-            Parent?.Received(length, packet);
+            if (CountParentTraffic) Parent?.Received(length, packet);
         }
 
         public void Sent(int length, bool announce, bool failed)
@@ -146,7 +182,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
                     Interlocked.Increment(ref Atxc);
                 }
             }
-            Parent?.Sent(length, announce, failed);
+            if (CountParentTraffic) Parent?.Sent(length, announce, failed);
         }
     }
 
@@ -173,6 +209,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
 
     private void Register(IPacketInterface iface, InterfaceState? parent, bool isolateFailure = false)
     {
+        if (iface is IPacketInterfaceIngressFeedback feedback) feedback.SetIngressQueue(_ingressQueue);
         _states.Add(iface, new InterfaceState(iface, parent, _receiversCts.Token, isolateFailure));
         if (iface is ISpawningPacketInterface spawner)
         {
@@ -182,15 +219,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         }
         if (iface is IReconnectingPacketInterface reconnecting)
         {
-            Action handler = () =>
-            {
-                if (InterfaceConnected is not { } observers) return;
-                foreach (Action<IPacketInterface> observer in observers.GetInvocationList())
-                {
-                    try { observer(iface); }
-                    catch (Exception error) { Report(iface, error); }
-                }
-            };
+            Action handler = () => NotifyConnected(iface);
             _connectionSubscriptions.Add(reconnecting, handler);
             reconnecting.Connected += handler;
             Action disconnected = () =>
@@ -204,6 +233,16 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
             };
             _disconnectionSubscriptions.Add(reconnecting, disconnected);
             reconnecting.Disconnected += disconnected;
+        }
+    }
+
+    private void NotifyConnected(IPacketInterface iface)
+    {
+        if (InterfaceConnected is not { } observers) return;
+        foreach (Action<IPacketInterface> observer in observers.GetInvocationList())
+        {
+            try { observer(iface); }
+            catch (Exception error) { Report(iface, error); }
         }
     }
 
@@ -221,7 +260,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
 
     /// <summary>Starts and transfers ownership of a new top-level interface without interrupting other receivers.</summary>
     public async ValueTask AttachAsync(IPacketInterface iface, CancellationToken cancellationToken = default, bool isolateFailure = false,
-        InterfaceAccessCode? accessCode = null)
+        InterfaceAccessCode? accessCode = null, bool outgoing = true)
     {
         ArgumentNullException.ThrowIfNull(iface);
         await _management.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -235,6 +274,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
                 if (_interfaces.Contains(iface)) throw new ArgumentException("The interface is already attached.", nameof(iface));
                 Register(iface, null, isolateFailure);
                 _states[iface].AccessCode = accessCode;
+                _states[iface].Outgoing = outgoing;
                 _interfaces.Add(iface);
                 registered = true;
             }
@@ -332,6 +372,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
 
     private void AdoptChild(ISpawningPacketInterface parent, IPacketInterface child)
     {
+        var adopted = false;
         lock (_gate)
         {
             if (_disposeTask is null && _states.TryGetValue(parent, out var parentState) && !_interfaces.Contains(child))
@@ -344,10 +385,15 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
                     LaunchReceiver(child);
                 }
 
-                return;
+                adopted = true;
             }
         }
 
+        if (adopted)
+        {
+            if (child is IReconnectingPacketInterface { IsConnected: true }) NotifyConnected(child);
+            return;
+        }
         _ = DisposeRejectedChildAsync(child);
     }
 
@@ -523,6 +569,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
             }
 
             if (iface is ISpawningPacketInterface { SendsThroughChildren: true }) continue;
+            if (!IsOutgoing(iface)) continue;
             pending.Add(SendOneAsync(iface, bytes, cancellationToken));
         }
 

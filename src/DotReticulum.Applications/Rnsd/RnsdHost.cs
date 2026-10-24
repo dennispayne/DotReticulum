@@ -129,7 +129,7 @@ public sealed partial class RnsdHost : IAsyncDisposable
             if (session.Role != SharedInstanceRole.Client)
                 foreach (var cfg in config.Interfaces.Where(i => i.Enabled))
                 {
-                    var iface = CreateInterface(cfg, extensions);
+                    var iface = CreateInterface(cfg, extensions, storageDirectory, identity.Hash);
                     interfaces.Add((cfg.Name, iface));
                     modes[iface] = cfg.Mode;
                 }
@@ -160,6 +160,7 @@ public sealed partial class RnsdHost : IAsyncDisposable
                 if (interfaces.FirstOrDefault(i => i.Name == cfg.Name && modes.ContainsKey(i.Interface)).Interface is { } iface)
                 {
                     manager.SetInterfaceAccessCode(iface, cfg.CreateAccessCode());
+                    manager.SetInterfaceOutgoing(iface, cfg.Outgoing);
                     host.ConfigureMode(iface, cfg.Mode, cfg.Routing.ToAnnounceOptions);
                 }
             }
@@ -214,30 +215,110 @@ public sealed partial class RnsdHost : IAsyncDisposable
         }
     }
 
-    public static IPacketInterface CreateInterface(RnsdInterfaceConfig cfg, InterfaceFactoryRegistry? extensions = null)
+    public static IPacketInterface CreateInterface(RnsdInterfaceConfig cfg, InterfaceFactoryRegistry? extensions = null,
+        string? storageDirectory = null, ReadOnlyMemory<byte> transportIdentityHash = default)
     {
         if (extensions?.Contains(cfg.Get("type") ?? "") == true) return extensions.Create(cfg);
         switch (cfg.Type)
         {
             case RnsdInterfaceType.TcpServer:
-                return new TcpServerPacketInterface(new IPEndPoint(Address(cfg, "listen_ip", "0.0.0.0"), cfg.GetInt("listen_port", cfg.GetInt("port", 4242), 0, 65535)),
-                    perClientInterfaces: true, nominalBitrate: cfg.Bitrate, fixedMtu: cfg.FixedMtu);
+                return new TcpServerPacketInterface(cfg.Get("listen_ip"), cfg.GetInt("listen_port", cfg.GetInt("port", 4242), 0, 65535),
+                    device: cfg.Get("device"), preferIpv6: cfg.GetBool("prefer_ipv6"),
+                    perClientInterfaces: true, nominalBitrate: cfg.Bitrate, fixedMtu: cfg.FixedMtu,
+                    i2pTunneled: cfg.GetBool("i2p_tunneled"));
             case RnsdInterfaceType.TcpClient:
                 return new TcpClientPacketInterface(cfg.Get("target_host") ?? throw new FormatException($"Interface '{cfg.Name}': target_host is required."),
                     cfg.GetInt("target_port", cfg.GetInt("port", 4242), 1, 65535),
                     nominalBitrate: cfg.Bitrate, reconnect: true, maxReconnectAttempts: cfg.MaxReconnectAttempts,
-                    fixedMtu: cfg.FixedMtu, connectTimeout: cfg.ConnectTimeout);
+                    fixedMtu: cfg.FixedMtu, connectTimeout: cfg.ConnectTimeout,
+                    kissFraming: cfg.GetBool("kiss_framing"), i2pTunneled: cfg.GetBool("i2p_tunneled"));
             case RnsdInterfaceType.Udp:
             {
-                var port = cfg.GetInt("port", 4242, 0, 65535);
-                return new UdpPacketInterface(
-                    new IPEndPoint(Address(cfg, "listen_ip", "0.0.0.0"), cfg.GetInt("listen_port", port, 0, 65535)),
-                    new IPEndPoint(Address(cfg, "forward_ip", "255.255.255.255"), cfg.GetInt("forward_port", port, 1, 65535)),
-                    nominalBitrate: cfg.Bitrate);
+                int? OptionalPort(string key) => cfg.Get(key) is null ? null : cfg.GetInt(key, 0, 0, 65535);
+                return new UdpPacketInterface(new UdpPacketInterfaceOptions
+                {
+                    ListenAddress = cfg.Get("listen_ip"), ListenPort = OptionalPort("listen_port"),
+                    ForwardAddress = cfg.Get("forward_ip"), ForwardPort = OptionalPort("forward_port"),
+                    Port = OptionalPort("port"), Device = cfg.Get("device"), NominalBitrate = cfg.Bitrate,
+                });
             }
             case RnsdInterfaceType.Serial:
                 return new SerialPacketInterface(cfg.Get("port") ?? throw new FormatException($"Interface '{cfg.Name}': port is required."),
-                    cfg.GetInt("speed", 9600, 1), nominalBitrate: cfg.Bitrate);
+                    cfg.GetInt("speed", 9600, 1), parity: SerialParity(cfg), dataBits: cfg.GetInt("databits", 8, 5, 8),
+                    stopBits: cfg.GetInt("stopbits", 1, 1, 2) == 2 ? System.IO.Ports.StopBits.Two : System.IO.Ports.StopBits.One,
+                    nominalBitrate: cfg.Bitrate, reconnect: true);
+            case RnsdInterfaceType.Auto:
+                return new AutoPacketInterface(new AutoPacketInterfaceOptions
+                {
+                    GroupId = cfg.Get("group_id") ?? "reticulum",
+                    DiscoveryScope = cfg.Get("discovery_scope") ?? "link",
+                    MulticastAddressType = cfg.Get("multicast_address_type") ?? "temporary",
+                    DiscoveryPort = cfg.GetInt("discovery_port", 29716, 1, 65534),
+                    DataPort = cfg.GetInt("data_port", 42671, 1, 65535),
+                    Devices = cfg.GetList("devices"), IgnoredDevices = cfg.GetList("ignored_devices"),
+                    ConfiguredBitrate = cfg.Bitrate,
+                });
+            case RnsdInterfaceType.Pipe:
+            {
+                var command = CliSupport.ShellSplit(cfg.Get("command") ?? throw new FormatException($"Interface '{cfg.Name}': command is required."));
+                if (command.Count == 0 || string.IsNullOrWhiteSpace(command[0]))
+                    throw new FormatException($"Interface '{cfg.Name}': command requires an executable.");
+                return new PipePacketInterface(command[0], command.Skip(1), new PipePacketInterfaceOptions
+                {
+                    RespawnDelay = TimeSpan.FromSeconds(cfg.GetDouble("respawn_delay", 5, double.Epsilon)),
+                    ConfiguredBitrate = cfg.ConfiguredBitrate,
+                });
+            }
+            case RnsdInterfaceType.Kiss:
+                return new KissPacketInterface(cfg.Get("port")!, CreateKissOptions(cfg));
+            case RnsdInterfaceType.Ax25Kiss:
+                return new Ax25KissPacketInterface(cfg.Get("port")!, CreateKissOptions(cfg, ax25: true) as Ax25KissOptions
+                    ?? throw new InvalidOperationException("AX.25 settings were not constructed."));
+            case RnsdInterfaceType.Weave:
+                return new WeavePacketInterface(cfg.Get("port")!, new WeaveOptions { ConfiguredBitrate = cfg.Bitrate });
+            case RnsdInterfaceType.I2p:
+                return new I2pPacketInterface(new I2pPacketInterfaceOptions
+                {
+                    Name = cfg.Name,
+                    StoragePath = storageDirectory ?? throw new FormatException($"Interface '{cfg.Name}': I2P requires its runtime storage directory."),
+                    TransportIdentityHash = transportIdentityHash,
+                    Connectable = cfg.GetBool("connectable"),
+                    Peers = cfg.GetList("peers"),
+                    ConfiguredBitrate = cfg.ConfiguredBitrate,
+                });
+            case RnsdInterfaceType.RNode:
+                return new RNodePacketInterface(cfg.Get("port")!, new RNodeOptions
+                {
+                    Radio = CreateRadioOptions(cfg),
+                    ConfiguredBitrate = cfg.ConfiguredBitrate,
+                    IdCallsign = cfg.Get("id_callsign"),
+                    IdInterval = RadioIdInterval(cfg),
+                });
+            case RnsdInterfaceType.RNodeMulti:
+                return new RNodeMultiPacketInterface(cfg.Get("port")!, new RNodeMultiOptions
+                {
+                    EnableAllChildren = cfg.GetBool("enabled"),
+                    ConfiguredBitrate = cfg.ConfiguredBitrate,
+                    IdCallsign = cfg.Get("id_callsign"),
+                    IdInterval = RadioIdInterval(cfg),
+                    Subinterfaces = cfg.Subinterfaces.Select(p => CreateRadioSubinterface(cfg, p.Key, p.Value)).ToArray(),
+                });
+            case RnsdInterfaceType.Backbone:
+            {
+                var options = new BackbonePacketInterfaceOptions
+                {
+                    NominalBitrate = cfg.Bitrate, InterfaceAccessCodeSize = cfg.IfacSize,
+                    Device = cfg.Get("device"), PreferIPv6 = cfg.GetBool("prefer_ipv6"),
+                    MaximumReconnectAttempts = cfg.MaxReconnectAttempts, ConnectTimeout = cfg.ConnectTimeout,
+                    BlockFastFlapping = cfg.GetBool("block_fast_flapping", true),
+                    FastFlapThreshold = TimeSpan.FromSeconds(cfg.GetDouble("fast_flapping_threshold", 20, double.Epsilon)),
+                    FastFlapGrace = cfg.GetInt("fast_flapping_grace", 5),
+                    FastFlapBlockTime = TimeSpan.FromMinutes(cfg.GetDouble("fast_flapping_block_time", 720, double.Epsilon)),
+                };
+                return cfg.Get("target_host") is { } host
+                    ? new BackboneClientPacketInterface(host, cfg.GetInt("target_port", 0, 1, 65535), options)
+                    : new BackbonePacketInterface(cfg.Get("listen_ip"), cfg.GetInt("listen_port", 0, 0, 65535), options);
+            }
             default:
                 throw new FormatException($"Interface '{cfg.Name}': unsupported type.");
         }
@@ -258,11 +339,18 @@ public sealed partial class RnsdHost : IAsyncDisposable
         var options = optionsFactory?.Invoke();
         void Configure(IPacketInterface target, InterfaceAnnounceOptions? controls)
         {
-            Router.SetInterfaceMode(target, mode);
+            var targetMode = mode;
+            if (target is I2pPacketPeer { IsInitiator: true })
+            {
+                targetMode = InterfaceMode.Full;
+                controls = _configuration.Routing.CreateInterfaceOptions(_configuration.EnableTransport);
+            }
+            Router.SetInterfaceMode(target, targetMode);
             if (controls is not null) Router.SetInterfaceAnnounceOptions(target, controls);
+            var captured = controls;
+            lock (_gate) _interfaceReconfigure[target] = () => Configure(target, captured);
         }
         Configure(iface, options);
-        lock (_gate) _interfaceReconfigure[iface] = () => Configure(iface, options);
         if (iface is not ISpawningPacketInterface spawner) return;
         Action<IPacketInterface> handler = child => Configure(child, optionsFactory?.Invoke());
         _modeHandlers.Add(spawner, handler);

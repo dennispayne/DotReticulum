@@ -29,6 +29,8 @@ public sealed partial class TransportRouter
         ArgumentNullException.ThrowIfNull(iface);
         if (interfaceHash is not { Length: 32 }) throw new ArgumentException("Tunnel interface hash must be 32 bytes.", nameof(interfaceHash));
         cancellationToken.ThrowIfCancellationRequested();
+        if (!_manager.Contains(iface)) throw new ArgumentException("The interface is not owned by this router.", nameof(iface));
+        if (!_manager.IsOutgoing(iface)) return ValueTask.CompletedTask;
         var signed = (byte[])[.. TransportIdentity.ExportPublicKey(), .. interfaceHash, .. RandomNumberGenerator.GetBytes(16)];
         var packet = Packet.Create(PacketType.Data, DestinationType.Plain, TunnelSynthesisHash,
             (byte[])[.. signed, .. TransportIdentity.Sign(signed)]);

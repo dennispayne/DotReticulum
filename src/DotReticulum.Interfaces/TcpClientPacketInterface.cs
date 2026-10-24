@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
@@ -30,9 +31,14 @@ public sealed class TcpClientPacketInterface : IReconnectingPacketInterface, IPa
     private long _receivedBytes;
     private long _sentBytes;
     private int _reconnectAttempts;
+    private readonly bool _kissFraming;
+    private readonly bool _i2pTunneled;
+    private long _offlineSends;
+    private string? _lastError;
 
     public TcpClientPacketInterface(string host, int port, long nominalBitrate = 10_000_000, bool reconnect = false,
-        int? maxReconnectAttempts = null, int? fixedMtu = null, TimeSpan? reconnectDelay = null, TimeSpan? connectTimeout = null)
+        int? maxReconnectAttempts = null, int? fixedMtu = null, TimeSpan? reconnectDelay = null, TimeSpan? connectTimeout = null,
+        bool kissFraming = false, bool i2pTunneled = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
         ArgumentOutOfRangeException.ThrowIfLessThan(port, 1);
@@ -45,6 +51,9 @@ public sealed class TcpClientPacketInterface : IReconnectingPacketInterface, IPa
         Bitrate = nominalBitrate;
         HardwareMtu = fixedMtu ?? PacketInterfaceCapabilities.MtuForBitrate(nominalBitrate);
         _reconnect = reconnect;
+        _kissFraming = kissFraming;
+        _i2pTunneled = i2pTunneled;
+        FixedMtu = fixedMtu.HasValue;
         _maxReconnectAttempts = maxReconnectAttempts;
         _reconnectDelay = reconnectDelay ?? TimeSpan.FromSeconds(5);
         _connectTimeout = connectTimeout ?? TimeSpan.FromSeconds(5);
@@ -55,6 +64,9 @@ public sealed class TcpClientPacketInterface : IReconnectingPacketInterface, IPa
     public long Bitrate { get; }
     public int HardwareMtu { get; }
     public bool SupportsMtuDiscovery => true;
+    public bool FixedMtu { get; }
+    public bool KissFraming => _kissFraming;
+    public bool WantsTunnel => !_kissFraming;
     public bool IsConnected { get { lock (_gate) return !_disposed && _endpoint is { IsConnected: true }; } }
     public event Action? Connected;
     public event Action? Disconnected;
@@ -71,11 +83,16 @@ public sealed class TcpClientPacketInterface : IReconnectingPacketInterface, IPa
         try { await ConnectAsync(linked.Token).ConfigureAwait(false); }
         catch (Exception error) when (_reconnect && IsConnectionFailure(error) && !linked.IsCancellationRequested)
         {
-            Report(error);
+            RecordFailure(error);
         }
         catch (OperationCanceledException) when (_reconnect && !linked.IsCancellationRequested)
         {
-            Report(new TimeoutException("Initial TCP connection timed out."));
+            RecordFailure(new TimeoutException("Initial TCP connection timed out."));
+        }
+        catch (Exception error)
+        {
+            RecordFailure(error);
+            throw;
         }
         if (_reconnect)
         {
@@ -91,22 +108,39 @@ public sealed class TcpClientPacketInterface : IReconnectingPacketInterface, IPa
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(_connectTimeout);
-        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-        try
+        var addresses = await Dns.GetHostAddressesAsync(_host, timeout.Token).ConfigureAwait(false);
+        if (addresses.Length == 0) throw new SocketException((int)SocketError.HostNotFound);
+        Socket? socket = null;
+        SocketException? lastFailure = null;
+        foreach (var address in addresses)
         {
-            socket.NoDelay = true;
-            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
-            await socket.ConnectAsync(_host, _port, timeout.Token).ConfigureAwait(false);
+            timeout.Token.ThrowIfCancellationRequested();
+            Socket? candidate = null;
+            try
+            {
+                candidate = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                TcpSocketSettings.Apply(candidate, _i2pTunneled);
+                await candidate.ConnectAsync(new IPEndPoint(address, _port), timeout.Token).ConfigureAwait(false);
+                socket = candidate;
+                break;
+            }
+            catch (SocketException error) when (!timeout.IsCancellationRequested)
+            {
+                lastFailure = error;
+                candidate?.Dispose();
+            }
+            catch
+            {
+                candidate?.Dispose();
+                throw;
+            }
         }
-        catch
-        {
-            socket.Dispose();
-            throw;
-        }
+        if (socket is null) throw lastFailure ?? new SocketException((int)SocketError.HostUnreachable);
         var endpoint = new HdlcStreamEndpoint(new NetworkStream(socket, ownsSocket: true),
             received: length => Interlocked.Add(ref _receivedBytes, length),
             sent: length => Interlocked.Add(ref _sentBytes, length),
-            maxFrameLength: HardwareMtu + 64, authenticatedFrames: true);
+            maxFrameLength: HardwareMtu + 64, authenticatedFrames: true, kissFraming: _kissFraming,
+            unprotectedFrameLength: HardwareMtu);
         lock (_gate)
         {
             if (!_disposed) _endpoint = endpoint;
@@ -119,14 +153,14 @@ public sealed class TcpClientPacketInterface : IReconnectingPacketInterface, IPa
         Notify(Connected);
     }
 
-    private static void Notify(Action? handlers)
+    private void Notify(Action? handlers)
     {
         if (handlers is { } observers)
         {
             foreach (Action observer in observers.GetInvocationList())
             {
                 try { observer(); }
-                catch (Exception error) { Report(error); }
+                catch (Exception error) { RecordFailure(error); }
             }
         }
     }
@@ -143,18 +177,23 @@ public sealed class TcpClientPacketInterface : IReconnectingPacketInterface, IPa
                 lock (_gate) endpoint = _endpoint;
                 if (endpoint is null)
                 {
-                    if (_maxReconnectAttempts is { } maximum && attempts >= maximum) break;
+                    if (_maxReconnectAttempts is { } maximum && attempts >= maximum)
+                    {
+                        var exhausted = new IOException($"TCP reconnect limit of {maximum} attempts reached.");
+                        RecordFailure(exhausted);
+                        break;
+                    }
                     await Task.Delay(_reconnectDelay, token).ConfigureAwait(false);
                     attempts++;
                     Interlocked.Increment(ref _reconnectAttempts);
                     try { await ConnectAsync(token).ConfigureAwait(false); }
                     catch (Exception error) when (IsConnectionFailure(error) && !token.IsCancellationRequested)
                     {
-                        Report(error);
+                        RecordFailure(error);
                     }
                     catch (OperationCanceledException) when (!token.IsCancellationRequested)
                     {
-                        Report(new TimeoutException("TCP reconnection timed out."));
+                        RecordFailure(new TimeoutException("TCP reconnection timed out."));
                     }
                     continue;
                 }
@@ -164,7 +203,7 @@ public sealed class TcpClientPacketInterface : IReconnectingPacketInterface, IPa
                     await foreach (var packet in endpoint.ReceiveAsync(token).ConfigureAwait(false))
                         await _received.Writer.WriteAsync(packet, token).ConfigureAwait(false);
                 }
-                catch (Exception error) when (IsConnectionFailure(error) && !token.IsCancellationRequested) { Report(error); }
+                catch (Exception error) when (IsConnectionFailure(error) && !token.IsCancellationRequested) { RecordFailure(error); }
                 finally
                 {
                     lock (_gate)
@@ -180,7 +219,7 @@ public sealed class TcpClientPacketInterface : IReconnectingPacketInterface, IPa
         catch (Exception) when (token.IsCancellationRequested) { _received.Writer.TryComplete(); }
         catch (Exception error)
         {
-            Report(error);
+            RecordFailure(error);
             _received.Writer.TryComplete(error);
         }
     }
@@ -217,17 +256,28 @@ public sealed class TcpClientPacketInterface : IReconnectingPacketInterface, IPa
         if (packet.IsEmpty || packet.Length > HardwareMtu + ((packet.Span[0] & 0x80) != 0 ? 64 : 0))
             throw new ArgumentException("Packet exceeds the bearer frame bound.", nameof(packet));
         var endpoint = GetEndpoint();
-        if (endpoint is null) return;
-        try { await endpoint.SendAsync(packet, cancellationToken).ConfigureAwait(false); }
-        catch (Exception error) when (_reconnect && IsConnectionFailure(error) && !cancellationToken.IsCancellationRequested)
+        if (endpoint is null || !endpoint.IsConnected)
         {
-            Report(error);
+            Interlocked.Increment(ref _offlineSends);
+            System.Diagnostics.Trace.TraceWarning("TCP client interface: discarded send while disconnected.");
+            return;
+        }
+        try { await endpoint.SendAsync(packet, cancellationToken).ConfigureAwait(false); }
+        catch (Exception error) when (IsConnectionFailure(error) && !cancellationToken.IsCancellationRequested)
+        {
+            RecordFailure(error);
             await endpoint.DisposeAsync().ConfigureAwait(false);
+            throw;
         }
     }
 
     private static bool IsConnectionFailure(Exception error) => error is IOException or SocketException or ObjectDisposedException;
     private static void Report(Exception error) => System.Diagnostics.Trace.TraceError("TCP client interface: {0}", error);
+    private void RecordFailure(Exception error)
+    {
+        Volatile.Write(ref _lastError, error.Message);
+        Report(error);
+    }
 
     public IReadOnlyDictionary<string, object?> GetDiagnostics()
     {
@@ -243,6 +293,11 @@ public sealed class TcpClientPacketInterface : IReconnectingPacketInterface, IPa
             ["reconnecting"] = _reconnect && !_disposed && _endpoint is null && _worker is { IsCompleted: false },
             ["reconnect_attempts"] = Volatile.Read(ref _reconnectAttempts),
             ["status"] = IsConnected,
+            ["kiss_framing"] = _kissFraming,
+            ["i2p_tunneled"] = _i2pTunneled,
+            ["fixed_mtu"] = FixedMtu,
+            ["offline_sends"] = Interlocked.Read(ref _offlineSends),
+            ["last_error"] = Volatile.Read(ref _lastError),
         };
     }
 

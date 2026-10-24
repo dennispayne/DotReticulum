@@ -2,10 +2,9 @@ namespace DotReticulum.Applications.Rnsd;
 
 public static class RnsdConfigurationFiles
 {
-    // AutoInterface is not yet available natively. Do not silently open an unrelated TCP listener.
     public const string DefaultConfig = """
         # DotReticulum native default. Upstream enables AutoInterface here.
-        # AutoInterface is not implemented; configure an explicitly enabled supported interface.
+        # This experimental runtime requires explicit opt-in to network discovery.
         [reticulum]
           enable_transport = no
           share_instance = yes

@@ -70,7 +70,14 @@ public sealed class Parity4DiscoveryControlsTests
                 using var identity = Identity.Generate();
                 var destination = Destination.Create(DestinationType.Single, "parity4", ["discovery"], identity);
                 await peer.Router.AnnounceAsync(new LocalDestination(identity, destination), cancellationToken: stop.Token);
-                while (!host.Router.HasPath(destination.Hash)) await Task.Delay(20, stop.Token);
+                try
+                {
+                    while (!host.Router.HasPath(destination.Hash)) await Task.Delay(20, stop.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    Assert.Fail($"Discovery announcement timed out.\nPeer: {System.Text.Json.JsonSerializer.Serialize(peer.GetStatistics())}\nHost: {System.Text.Json.JsonSerializer.Serialize(host.GetStatistics())}\n{string.Join('\n', logs)}");
+                }
                 Assert.Same(connected, Assert.Single(host.Router.Paths).Interface);
                 Assert.False(run.IsCompleted, string.Join("\n", logs));
             }

@@ -149,7 +149,7 @@ stale states across restart, with one-/three-/seven-day boundaries and bounded
 capacity. Source/transport policy, duplicate endpoints, configured interfaces
 and connection limits are applied before attachment.
 
-Native TCP servers advertise their actual bearer type and bound port; they
+Native TCP and Backbone servers advertise their actual bearer type and bound port; they
 are never mislabeled Backbone servers to bypass eligibility. Publication requires
 both interface enablement and `discoverable=yes`. A successful named attach/reload
 registers the replacement's metadata, discovery name, `reachable_on`, location
@@ -172,9 +172,10 @@ Metadata providers run at publication time; provider failures are diagnosed and
 abort that publication, not silently replaced with stale metadata.
 
 Upstream autoconnect eligibility is Backbone-only, including its implementation/version
-policy. The bounded native client adapter speaks that HDLC stream with a
-five-second initial connection deadline; this is not a claim of full Backbone
-configuration/server/platform parity. Unverified implementations require the
+policy. Linux/Android uses the native Backbone client with scoped DATA-pressure
+and egress/flap controls. Other platforms retain the explicitly compatible bounded
+TCP/HDLC adapter with a five-second initial connection deadline, not a claim
+of native Backbone platform support. Unverified implementations require the
 explicit source-compatible opt-in. Active connections release bootstrap-only
 interfaces; offline removal and bootstrap restoration retain explicit leases.
 Published IFAC credentials configure authentication before the bearer is

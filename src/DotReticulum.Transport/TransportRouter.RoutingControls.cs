@@ -232,7 +232,7 @@ public sealed partial class TransportRouter
         var targets = onlyOn is null ? _manager.Interfaces : new[] { onlyOn };
         foreach (var iface in targets)
         {
-            if (!_manager.Contains(iface)) continue;
+            if (!_manager.IsOutgoing(iface)) continue;
             if (onlyOn is null && ReferenceEquals(iface, excluded)) continue;
             if ((onlyOn is null || applyModeToTarget) && !CanBroadcastAnnounce(iface, origin, local)) continue;
             var mode = GetInterfaceMode(iface);
@@ -282,7 +282,7 @@ public sealed partial class TransportRouter
         foreach (var (iface, state) in states)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!_manager.Contains(iface)) continue;
+            if (!_manager.IsOutgoing(iface)) continue;
             var options = GetInterfaceAnnounceOptions(iface);
             QueuedAnnounce? selected;
             lock (_gate)

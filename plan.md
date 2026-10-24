@@ -121,12 +121,16 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [ ] WeaveInterface
   - [ ] Android-specific adapters or documented native platform equivalents
   - [ ] Complete UDP/TCP/serial configuration and validate real serial/radio hardware
-  - [ ] UDP receive/forward independence, device/hostname/address-family resolution and configured port precedence
-  - [ ] TCP retry limits, KISS framing/IPv6/fixed MTU, optional-peer diagnostics and documented client-cap difference
+  - [x] UDP receive/forward independence, device/hostname/address-family resolution and configured port precedence
+  - [x] TCP retry limits, KISS framing/IPv6/fixed MTU, optional-peer diagnostics and documented client-cap difference
   - [ ] Serial parity/data/stop-bit configuration, idle partial-frame reset and reconnect/unplug recovery
   - [ ] Backbone flap blocking/watermarks/egress-stall recovery and Pipe owned-child exit/respawn/cancellation
   - [ ] Per-bearer bounded transmit bytes/frames, partial/zero/interrupted/would-block writes and egress hysteresis/accounting
   - [ ] RNodeMulti nested subinterface settings/shared queues and Android USB/Bluetooth permission/adaptor contracts
+  - [x] Generic outgoing-interface selection, inherited child settings and source-exact known-path/direct-transmit exceptions
+  - [ ] Local decoded-frame accounting and Android shared-client pause/keepalive/abstract-socket differences
+  - [ ] Actual I2P stream delivery after persisted bearer restart; SAM readiness alone is insufficient
+  - [ ] Authorized physical serial/TNC/RNode/Multi/Weave and Android USB/Bluetooth/RF acceptance (blocked on identified owned devices, peers, platform access and lawful radio configuration; see development history)
 - [ ] Parity 7 - Upstream utility coverage
   - [ ] rnid import/export, encryption/decryption, signing/verification, metadata, announcements and network lookup options
   - [ ] rnid recursive/stdin/file/current/legacy/wrapped/embedded RSG/RSM and explicitly authorized bounded editor flows; CLI formatting/base256 and boundary output fidelity

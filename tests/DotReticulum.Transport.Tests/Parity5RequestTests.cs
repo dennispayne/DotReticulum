@@ -9,6 +9,20 @@ namespace DotReticulum.Transport.Tests;
 public sealed class Parity5RequestTests
 {
     [Fact]
+    public async Task ImmediateManagerStopJoinsFreshWorkersBeforeDisposingTheirCancellationSource()
+    {
+        using var identity = Identity.Generate();
+        for (var iteration = 0; iteration < 32; iteration++)
+        {
+            await using var node = await Parity4LinkMtuTests.Harness.Create(clock: new Parity4LinkMtuTests.Clock());
+            node.Router.Links.Connect(identity, new byte[16]);
+            await node.Router.Links.StopAsync();
+            Assert.Empty(node.Router.Links.Links);
+            Assert.Equal(0, node.Router.Links.QueuedOutboundPackets);
+        }
+    }
+
+    [Fact]
     public async Task NewLinksCaptureValidatedManagerResourceDefaultsWithoutChangingExistingOverrides()
     {
         await using var topology = await LinkTests.BuildAsync(false);

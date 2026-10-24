@@ -87,7 +87,7 @@ public sealed partial class TransportRouter
         if (proof is null) return false;
         var local = Links.Find(request.DestinationHash.Span);
         if (local is not null && !ReferenceEquals(local.AttachedInterface, received.Source)) return false;
-        if (!_manager.Contains(received.Source)) return false;
+        if (!_manager.Contains(received.Source) || local is not null && !_manager.IsOutgoing(received.Source)) return false;
         cancellationToken.ThrowIfCancellationRequested();
         await _manager.SendToAsync(proof, received.Source, cancellationToken).ConfigureAwait(false);
         return true;

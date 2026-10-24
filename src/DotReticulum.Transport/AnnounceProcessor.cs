@@ -71,7 +71,7 @@ public sealed class AnnounceProcessor(PacketInterfaceManager manager, AnnounceEn
             {
                 if (due.TargetInterface is { } target)
                 {
-                    if (manager.Contains(target)) await manager.SendToAsync(due.Packet, target, cancellationToken).ConfigureAwait(false);
+                    if (manager.IsOutgoing(target)) await manager.SendToAsync(due.Packet, target, cancellationToken).ConfigureAwait(false);
                 }
                 else if (due.ExcludedInterface is null) await manager.SendAsync(due.Packet, cancellationToken).ConfigureAwait(false);
                 else await manager.SendExceptAsync(due.Packet, due.ExcludedInterface, cancellationToken).ConfigureAwait(false);

@@ -193,6 +193,10 @@ public sealed partial class TransportRouter : IAsyncDisposable
         _inboundCapacities = [_options.InboundDataCapacity, _options.InboundAnnounceCapacity,
             _options.InboundPathRequestCapacity, _options.InboundIngressLimitedCapacity];
         if (_inboundCapacities.Any(capacity => capacity < 1)) throw new ArgumentOutOfRangeException(nameof(options));
+        _manager.SetIngressQueueSource(() =>
+        {
+            lock (_inboundGate) return _inboundQueues[(int)TransportTrafficClass.Data].Count;
+        }, _options.InboundDataCapacity);
         _time = _options.TimeProvider ?? TimeProvider.System;
         _ownsTransportIdentity = _options.TransportIdentity is null;
         TransportIdentity = _options.TransportIdentity ?? Identity.Generate();
@@ -568,6 +572,7 @@ public sealed partial class TransportRouter : IAsyncDisposable
         foreach (var iface in targets)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!_manager.IsOutgoing(iface)) continue;
             try
             {
                 await _manager.SendToAsync(packet, iface, cancellationToken).ConfigureAwait(false);
