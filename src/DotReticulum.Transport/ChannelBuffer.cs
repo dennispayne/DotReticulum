@@ -15,6 +15,7 @@ public sealed class StreamDataMessage : MessageBase
 
     public StreamDataMessage(int streamId, byte[] data, bool eof = false, bool compressed = false)
     {
+        ArgumentNullException.ThrowIfNull(data);
         if (streamId is < 0 or > StreamIdMax)
         {
             throw new ArgumentOutOfRangeException(nameof(streamId), "stream_id must be 0-16383");
@@ -48,6 +49,7 @@ public sealed class StreamDataMessage : MessageBase
 
     public override void Unpack(ReadOnlySpan<byte> raw)
     {
+        if (raw.Length < HeaderLength) throw new IOException("Stream message header is truncated.");
         var header = BinaryPrimitives.ReadUInt16BigEndian(raw);
         Eof = (header & 0x8000) != 0;
         Compressed = (header & 0x4000) != 0;
@@ -63,23 +65,59 @@ public sealed class StreamDataMessage : MessageBase
 /// <summary>Readable stream fed by <see cref="StreamDataMessage"/>s of one stream id (upstream <c>RawChannelReader</c>).</summary>
 public sealed class RawChannelReader : Stream
 {
+    public const int DefaultMaxBufferedBytes = 1024 * 1024;
+    public const int MaximumReadyCallbacks = 64;
     private readonly int _streamId;
     private readonly Channel _channel;
     private readonly Func<MessageBase, bool> _handler;
     private readonly object _lock = new();
     private readonly List<Action<int>> _listeners = [];
-    private byte[] _buffer = [];
+    private byte[]? _buffer;
+    private int _readOffset;
+    private int _bufferedBytes;
     private bool _eof;
     private bool _disposed;
+    private IOException? _failure;
+    private bool _callbackPending;
+    private bool _callbackRunning;
+    private Task _callbackTask = Task.CompletedTask;
+    private readonly CancellationTokenRegistration _closedRegistration;
     private TaskCompletionSource _signal = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public RawChannelReader(int streamId, Channel channel)
+    public RawChannelReader(int streamId, Channel channel, int maxBufferedBytes = DefaultMaxBufferedBytes)
     {
+        ArgumentNullException.ThrowIfNull(channel);
+        if (streamId is < 0 or > StreamDataMessage.StreamIdMax) throw new ArgumentOutOfRangeException(nameof(streamId));
+        if (maxBufferedBytes < 1) throw new ArgumentOutOfRangeException(nameof(maxBufferedBytes));
         _streamId = streamId;
         _channel = channel;
+        MaxBufferedBytes = maxBufferedBytes;
         _handler = Handle;
         channel.RegisterSystemMessageType<StreamDataMessage>();
-        channel.AddMessageHandler(_handler);
+        channel.AddSystemMessageHandler(_handler);
+        _closedRegistration = channel.Closed.UnsafeRegister(
+            static state => ((RawChannelReader)state!).OnChannelClosed(), this);
+    }
+
+    private void OnChannelClosed()
+    {
+        lock (_lock)
+        {
+            _eof = true;
+            _signal.TrySetResult();
+        }
+    }
+
+    /// <summary>Unread-byte limit. Exceeding it fails the reader and tears down its link, rather than acknowledging silent loss.</summary>
+    public int MaxBufferedBytes { get; }
+
+    /// <summary>Currently owned callback work. Disposal stops queued callbacks; an already executing user callback must return itself.</summary>
+    public Task ReadyCallbacksCompletion
+    {
+        get
+        {
+            lock (_lock) return _callbackTask;
+        }
     }
 
     /// <summary>Number of bytes buffered and ready to read.</summary>
@@ -89,7 +127,7 @@ public sealed class RawChannelReader : Stream
         {
             lock (_lock)
             {
-                return _buffer.Length;
+                return _bufferedBytes;
             }
         }
     }
@@ -101,15 +139,19 @@ public sealed class RawChannelReader : Stream
         {
             lock (_lock)
             {
-                return _eof;
+                return _eof || _channel.Completion.IsCompleted;
             }
         }
     }
 
     public void AddReadyCallback(Action<int> callback)
     {
+        ArgumentNullException.ThrowIfNull(callback);
         lock (_lock)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_listeners.Count == MaximumReadyCallbacks)
+                throw new InvalidOperationException("The stream ready-callback limit has been reached.");
             _listeners.Add(callback);
         }
     }
@@ -129,51 +171,110 @@ public sealed class RawChannelReader : Stream
             return false;
         }
 
-        Action<int>[] listeners;
-        int ready;
         TaskCompletionSource signal;
+        var overflow = false;
         lock (_lock)
         {
             if (_disposed || _eof) return true;
-            _buffer = [.. _buffer, .. data.Data];
-            if (data.Eof)
+            if (data.Data.Length > MaxBufferedBytes - _bufferedBytes)
             {
+                _failure = new IOException($"Channel stream {_streamId} exceeded its {MaxBufferedBytes}-byte unread buffer limit.");
                 _eof = true;
+                _buffer = null;
+                _readOffset = _bufferedBytes = 0;
+                overflow = true;
+            }
+            else
+            {
+                if (data.Data.Length > 0)
+                {
+                    _buffer ??= GC.AllocateUninitializedArray<byte>(MaxBufferedBytes);
+                    var tail = (int)(((long)_readOffset + _bufferedBytes) % MaxBufferedBytes);
+                    var first = Math.Min(data.Data.Length, MaxBufferedBytes - tail);
+                    data.Data.AsSpan(0, first).CopyTo(_buffer.AsSpan(tail));
+                    data.Data.AsSpan(first).CopyTo(_buffer);
+                    _bufferedBytes += data.Data.Length;
+                }
+
+                _eof = data.Eof;
+                _callbackPending = true;
+                if (!_callbackRunning && _listeners.Count > 0)
+                {
+                    _callbackRunning = true;
+                    _callbackTask = Task.Run(RunReadyCallbacks);
+                }
             }
 
-            ready = _buffer.Length;
-            listeners = [.. _listeners];
             signal = _signal;
             _signal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
         signal.TrySetResult();
-        foreach (var listener in listeners)
+        if (overflow)
         {
-            _ = Task.Run(() => listener(ready));
+            _channel.RemoveSystemMessageHandler(_handler);
+            _channel.Abort(_failure!.Message);
         }
 
         return true;
     }
 
+    private void RunReadyCallbacks()
+    {
+        while (true)
+        {
+            Action<int>[] listeners;
+            int ready;
+            lock (_lock)
+            {
+                if (_disposed || _failure is not null || !_callbackPending)
+                {
+                    _callbackRunning = false;
+                    return;
+                }
+
+                _callbackPending = false;
+                listeners = [.. _listeners];
+                ready = _bufferedBytes;
+            }
+
+            foreach (var listener in listeners)
+            {
+                lock (_lock)
+                {
+                    if (_disposed) break;
+                }
+
+                try
+                {
+                    listener(ready);
+                }
+                catch (Exception ex)
+                {
+                    _channel.Log($"Channel stream {_streamId} ready callback failed: {ex}");
+                }
+            }
+        }
+    }
+
     /// <summary>Waits until data is available or the stream ended; returns 0 at end of stream.</summary>
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         while (true)
         {
             Task wait;
             lock (_lock)
             {
                 ObjectDisposedException.ThrowIf(_disposed, this);
-                if (_buffer.Length > 0)
+                if (_failure is not null) throw _failure;
+                if (buffer.IsEmpty) return 0;
+                if (_bufferedBytes > 0)
                 {
-                    var n = Math.Min(buffer.Length, _buffer.Length);
-                    _buffer.AsSpan(0, n).CopyTo(buffer.Span);
-                    _buffer = _buffer[n..];
-                    return n;
+                    return ReadBuffered(buffer.Span);
                 }
 
-                if (_eof || buffer.Length == 0)
+                if (_eof || _channel.Completion.IsCompleted)
                 {
                     return 0;
                 }
@@ -181,12 +282,7 @@ public sealed class RawChannelReader : Stream
                 wait = _signal.Task;
             }
 
-            await Task.WhenAny(wait, _channel.Completion).WaitAsync(cancellationToken).ConfigureAwait(false);
-            lock (_lock)
-            {
-                ObjectDisposedException.ThrowIf(_disposed, this);
-                if (_channel.Completion.IsCompleted) _eof = true;
-            }
+            await wait.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -194,25 +290,51 @@ public sealed class RawChannelReader : Stream
 
     public override int Read(Span<byte> buffer)
     {
-        var temp = new byte[buffer.Length];
-        var n = ReadAsync(temp).AsTask().GetAwaiter().GetResult();
-        temp.AsSpan(0, n).CopyTo(buffer);
-        return n;
+        while (true)
+        {
+            Task wait;
+            lock (_lock)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                if (_failure is not null) throw _failure;
+                if (buffer.IsEmpty) return 0;
+                if (_bufferedBytes > 0) return ReadBuffered(buffer);
+                if (_eof || _channel.Completion.IsCompleted) return 0;
+                wait = _signal.Task;
+            }
+
+            wait.GetAwaiter().GetResult();
+        }
+    }
+
+    private int ReadBuffered(Span<byte> buffer)
+    {
+        var copied = Math.Min(buffer.Length, _bufferedBytes);
+        var first = Math.Min(copied, MaxBufferedBytes - _readOffset);
+        _buffer.AsSpan(_readOffset, first).CopyTo(buffer);
+        _buffer.AsSpan(0, copied - first).CopyTo(buffer[first..]);
+        _readOffset = (int)(((long)_readOffset + copied) % MaxBufferedBytes);
+        _bufferedBytes -= copied;
+        return copied;
     }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
-            _channel.RemoveMessageHandler(_handler);
+            _channel.RemoveSystemMessageHandler(_handler);
             lock (_lock)
             {
                 _disposed = true;
                 _eof = true;
-                _buffer = [];
+                _buffer = null;
+                _bufferedBytes = _readOffset = 0;
                 _listeners.Clear();
+                _callbackPending = false;
                 _signal.TrySetResult();
             }
+
+            _closedRegistration.Dispose();
         }
 
         base.Dispose(disposing);
@@ -252,11 +374,16 @@ public sealed class RawChannelWriter : Stream
     private readonly int _streamId;
     private readonly Channel _channel;
     private readonly int _mdu;
-    private bool _eof;
-    private bool _closed;
+    private readonly SemaphoreSlim _operation = new(1, 1);
+    private readonly object _closeLock = new();
+    private bool _closeRequested;
+    private bool _eofSent;
+    private Task? _closeTask;
 
     public RawChannelWriter(int streamId, Channel channel)
     {
+        ArgumentNullException.ThrowIfNull(channel);
+        if (streamId is < 0 or > StreamDataMessage.StreamIdMax) throw new ArgumentOutOfRangeException(nameof(streamId));
         _streamId = streamId;
         _channel = channel;
         _mdu = channel.Mdu - StreamDataMessage.HeaderLength;
@@ -265,7 +392,22 @@ public sealed class RawChannelWriter : Stream
     /// <summary>Sends at most one chunk of <paramref name="data"/>; returns the number of bytes consumed (0 when the channel is not ready).</summary>
     public int WriteChunk(ReadOnlySpan<byte> data)
     {
-        ObjectDisposedException.ThrowIf(_closed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _closeRequested), this);
+        if (!_operation.Wait(0)) return 0;
+        try
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _closeRequested), this);
+            return WriteChunkCore(data);
+        }
+        finally
+        {
+            _operation.Release();
+        }
+    }
+
+    private int WriteChunkCore(ReadOnlySpan<byte> data)
+    {
+        if (!_channel.IsReadyToSend) return 0;
         try
         {
             var chunkLength = Math.Min(data.Length, MaxChunkLength);
@@ -300,7 +442,7 @@ public sealed class RawChannelWriter : Stream
                 processed = chunk.Length;
             }
 
-            _channel.Send(new StreamDataMessage(_streamId, chunk, _eof, success));
+            _channel.Send(new StreamDataMessage(_streamId, chunk, eof: false, compressed: success));
             return processed;
         }
         catch (ChannelException ex) when (ex.Type == ChannelExceptionType.LinkNotReady)
@@ -311,23 +453,27 @@ public sealed class RawChannelWriter : Stream
 
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_closed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _closeRequested), this);
         cancellationToken.ThrowIfCancellationRequested();
-        while (!buffer.IsEmpty)
+        await _operation.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            var written = WriteChunk(buffer.Span);
-            if (written > 0)
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _closeRequested), this);
+            while (!buffer.IsEmpty)
             {
-                buffer = buffer[written..];
-                continue;
-            }
+                await _channel.WaitForSendAsync(cancellationToken).ConfigureAwait(false);
+                var written = WriteChunkCore(buffer.Span);
+                if (written > 0)
+                {
+                    buffer = buffer[written..];
+                }
 
-            if (_channel.Link.Status == LinkStatus.Closed)
-            {
-                throw new IOException("The link was closed while writing to the channel stream.");
+                cancellationToken.ThrowIfCancellationRequested();
             }
-
-            await Task.Delay(10, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _operation.Release();
         }
     }
 
@@ -336,34 +482,62 @@ public sealed class RawChannelWriter : Stream
     public override void Write(byte[] buffer, int offset, int count) => Write(buffer.AsSpan(offset, count));
 
     /// <summary>Signals end of stream to the remote reader once pending messages are out.</summary>
-    public async Task CloseAsync(CancellationToken cancellationToken = default)
+    public Task CloseAsync(CancellationToken cancellationToken = default)
     {
-        if (_closed)
+        lock (_closeLock)
         {
-            return;
-        }
+            if (_closeTask is null || (!_eofSent && (_closeTask.IsCanceled || _closeTask.IsFaulted)))
+            {
+                Volatile.Write(ref _closeRequested, true);
+                _closeTask = CloseCoreAsync(cancellationToken);
+            }
 
-        _closed = true;
-        var deadline = DateTime.UtcNow.AddSeconds(15);
-        while (DateTime.UtcNow < deadline && !_channel.IsReadyToSend)
-        {
-            if (_channel.Completion.IsCompleted || _channel.Link.Status == LinkStatus.Closed) return;
-            await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+            return _closeTask;
         }
+    }
 
-        _eof = true;
-        while (DateTime.UtcNow < deadline && _channel.Link.Status != LinkStatus.Closed)
+    private async Task CloseCoreAsync(CancellationToken cancellationToken)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(15));
+        try
         {
+            await _operation.WaitAsync(deadline.Token).ConfigureAwait(false);
             try
             {
-                _channel.Send(new StreamDataMessage(_streamId, [], eof: true));
-                return;
+                while (!_eofSent && !_channel.Completion.IsCompleted)
+                {
+                    await _channel.WaitForSendAsync(deadline.Token).ConfigureAwait(false);
+                    try
+                    {
+                        _channel.Send(new StreamDataMessage(_streamId, [], eof: true));
+                        _eofSent = true;
+                    }
+                    catch (ChannelException ex) when (ex.Type == ChannelExceptionType.LinkNotReady)
+                    {
+                        // Another channel writer may have taken the available slot.
+                    }
+                }
             }
-            catch (ChannelException ex) when (ex.Type == ChannelExceptionType.LinkNotReady)
+            catch (IOException) when (_channel.Completion.IsCompleted)
             {
-                await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+                // Link teardown also ends this stream; there is no peer left to signal.
+            }
+            finally
+            {
+                _operation.Release();
             }
         }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new IOException("Timed out waiting to send channel stream EOF.");
+        }
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await CloseAsync().ConfigureAwait(false);
+        GC.SuppressFinalize(this);
     }
 
     protected override void Dispose(bool disposing)
@@ -380,7 +554,7 @@ public sealed class RawChannelWriter : Stream
 
     public override bool CanSeek => false;
 
-    public override bool CanWrite => !_closed;
+    public override bool CanWrite => !Volatile.Read(ref _closeRequested);
 
     public override long Length => throw new NotSupportedException();
 
@@ -404,9 +578,10 @@ public sealed class RawChannelWriter : Stream
 /// <summary>Factories for stream readers/writers over a channel (upstream <c>RNS.Buffer</c>).</summary>
 public static class ChannelBuffer
 {
-    public static RawChannelReader CreateReader(int streamId, Channel channel, Action<int>? readyCallback = null)
+    public static RawChannelReader CreateReader(int streamId, Channel channel, Action<int>? readyCallback = null,
+        int maxBufferedBytes = RawChannelReader.DefaultMaxBufferedBytes)
     {
-        var reader = new RawChannelReader(streamId, channel);
+        var reader = new RawChannelReader(streamId, channel, maxBufferedBytes);
         if (readyCallback is not null)
         {
             reader.AddReadyCallback(readyCallback);
@@ -417,6 +592,7 @@ public static class ChannelBuffer
 
     public static RawChannelWriter CreateWriter(int streamId, Channel channel) => new(streamId, channel);
 
-    public static (RawChannelReader Reader, RawChannelWriter Writer) CreateBidirectional(int receiveStreamId, int sendStreamId, Channel channel, Action<int>? readyCallback = null) =>
-        (CreateReader(receiveStreamId, channel, readyCallback), CreateWriter(sendStreamId, channel));
+    public static (RawChannelReader Reader, RawChannelWriter Writer) CreateBidirectional(int receiveStreamId, int sendStreamId,
+        Channel channel, Action<int>? readyCallback = null, int maxBufferedBytes = RawChannelReader.DefaultMaxBufferedBytes) =>
+        (CreateReader(receiveStreamId, channel, readyCallback, maxBufferedBytes), CreateWriter(sendStreamId, channel));
 }

@@ -384,11 +384,12 @@ public class TransportRouterTests
     {
         await using var rig = await Rig.CreateAsync(1);
         var (id, dest) = NewDestination("local");
-        byte[]? got = null;
-        rig.Router.RegisterLocalDestination(new LocalDestination(id, dest) { PacketReceived = r => { got = r.Packet.Payload.ToArray(); return ValueTask.CompletedTask; } });
+        var got = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        rig.Router.RegisterLocalDestination(new LocalDestination(id, dest) { PacketReceived = r => { got.TrySetResult(r.Packet.Payload.ToArray()); return ValueTask.CompletedTask; } });
 
-        await rig.Receive(rig.Ifaces[0], Packet.Create(PacketType.Data, DestinationType.Single, dest.Hash, new byte[] { 0xAB, 0xCD }));
-        Assert.Equal(new byte[] { 0xAB, 0xCD }, got);
+        var ciphertext = id.Encrypt(new byte[] { 0xAB, 0xCD });
+        await rig.Receive(rig.Ifaces[0], Packet.Create(PacketType.Data, DestinationType.Single, dest.Hash, ciphertext));
+        Assert.Equal(ciphertext, await got.Task.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
     private static async Task<(PacketReceipt Receipt, Packet Proof, Rig Sender, Rig Receiver)> ProofRoundTrip(bool explicitProof, Func<Packet, Packet>? tamper = null)

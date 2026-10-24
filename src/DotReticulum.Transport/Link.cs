@@ -8,14 +8,14 @@ namespace DotReticulum.Transport;
 /// An established (or establishing) encrypted link between two peers (upstream <c>RNS.Link</c>): X25519 key agreement bound to the destination
 /// identity by an Ed25519 proof, Token (AES-256-CBC + HMAC) encryption keyed by HKDF(shared, salt = link id), RTT measurement, keep-alives,
 /// stale detection, teardown, initiator identification, packet proofs and the request/response API. Resources are layered on top
-/// (<see cref="Resource"/>). Operational MTU offers and confirmations remain capped at the 500-byte receive codec until Parity 5.
+/// (<see cref="Resource"/>). Link MTU upgrades are constrained by every bearer on the negotiated path.
 /// </summary>
 public sealed partial class Link
 {
     public const int EcPubSize = 64;
     public const int SignallingSize = 3;
-    /// <summary>Current receive-codec ceiling. Larger negotiated payloads remain staged for Parity 5.</summary>
-    public const int MaximumOperationalMtu = Packet.Mtu;
+    /// <summary>Bounded native receive ceiling, matching the largest pinned bitrate-optimized bearer.</summary>
+    public const int MaximumOperationalMtu = InterfaceAccessCode.MaximumPacketSize;
     public const byte ModeAes256Cbc = 0x01;
     public const double KeepaliveMax = 360;
     public const double KeepaliveMin = 5;
@@ -30,6 +30,7 @@ public sealed partial class Link
 
     private readonly LinkManager _mgr;
     private readonly object _gate = new();
+    private readonly CancellationTokenSource _closedCancellation = new();
     private readonly List<PacketReceipt> _receipts = [];
     private readonly List<RequestReceipt> _pendingRequests = [];
     private byte[]? _prv;
@@ -59,6 +60,7 @@ public sealed partial class Link
     internal Link(LinkManager mgr, bool initiator, byte[] linkId, byte[] destinationHash, LocalDestination? owner, Identity? destinationIdentity)
     {
         _mgr = mgr;
+        ResourcePolicy = mgr.DefaultResourcePolicy;
         IsInitiator = initiator;
         LinkId = linkId;
         DestinationHash = destinationHash;
@@ -120,6 +122,19 @@ public sealed partial class Link
     public double LastProof { get; private set; }
 
     public double LastKeepalive { get; private set; }
+
+    public double? Age => Rtt is null ? null : Now - ActivatedAt;
+
+    public double NoInboundFor => Now - Math.Max(LastInbound, ActivatedAt);
+
+    public double NoOutboundFor => Now - LastOutbound;
+
+    public double NoDataFor => Now - LastData;
+
+    public double InactiveFor => Math.Min(NoInboundFor, NoOutboundFor);
+
+    /// <summary>Measured handshake rate in bits per second, when a positive RTT is available.</summary>
+    public double? EstablishmentRate => Rtt is > 0 && EstablishmentCost > 0 ? EstablishmentCost * 8 / Rtt : null;
 
     public double EstablishmentTimeout { get; internal set; }
 
@@ -281,6 +296,7 @@ public sealed partial class Link
     {
         var proof = BuildProofPacket(LinkId, _pub, _owner!.Identity, Mtu);
         _mgr.Enqueue(proof, AttachedInterface);
+        EstablishmentCost += proof.Length;
         HadOutbound();
     }
 
@@ -358,7 +374,8 @@ public sealed partial class Link
     /// <summary>Sends link data (encrypted) with an optional receipt. Returns null when the link is not usable.</summary>
     public PacketReceipt? Send(ReadOnlySpan<byte> data, bool createReceipt = true) => SendWithContext(data, LinkContext.None, createReceipt, encrypt: true);
 
-    internal PacketReceipt? SendWithContext(ReadOnlySpan<byte> data, byte context, bool createReceipt, bool encrypt)
+    internal PacketReceipt? SendWithContext(ReadOnlySpan<byte> data, byte context, bool createReceipt, bool encrypt,
+        Action<PacketReceipt?>? beforeSend = null, bool updateActivity = true)
     {
         lock (_gate)
         {
@@ -368,32 +385,66 @@ public sealed partial class Link
             }
 
             var payload = encrypt ? Encrypt(data) : data.ToArray();
-            if (payload.Length > Math.Min(Mtu, Packet.Mtu) - Packet.Header1Size)
+            if (payload.Length > Mtu - Packet.Header1Size)
             {
                 throw new ArgumentException("Link packet payload exceeds the link MTU.", nameof(data));
             }
 
-            var packet = Packet.Create(PacketType.Data, DestinationType.Link, LinkId, payload, context);
+            var packet = Packet.Create(PacketType.Data, DestinationType.Link, LinkId, payload, context, mtu: Mtu);
             PacketReceipt? receipt = null;
             if (createReceipt && PacketReceipt.IsEligible(packet))
             {
                 var timeout = Math.Max((Rtt ?? 0) * TrafficTimeoutFactor, 0.005);
-                receipt = new PacketReceipt(packet.CalculateHash(), _mgr.UnixNow, timeout) { TimeoutOrigin = Now };
+                receipt = new PacketReceipt(packet.CalculateHash(), _mgr.UnixNow, timeout)
+                { TimeoutOrigin = Now, SentPacket = packet, CoreCallbacks = context == LinkContext.Channel,
+                    ChannelOwner = context == LinkContext.Channel ? this : null };
                 _receipts.Add(receipt);
                 _mgr.Router.TrackReceipt(receipt);
                 if (_receipts.Count > TransportRouter.MaximumReceipts) _receipts.RemoveAll(item => item.Status != PacketReceiptStatus.Sent);
             }
 
-            _mgr.Enqueue(packet, AttachedInterface);
-            HadOutbound(keepalive: context == LinkContext.Keepalive);
+            beforeSend?.Invoke(receipt);
+            if (!_mgr.Enqueue(packet, AttachedInterface))
+            {
+                if (receipt is not null)
+                {
+                    _receipts.Remove(receipt);
+                    receipt.Conclude(PacketReceiptStatus.Failed, _mgr.UnixNow);
+                    if (receipt.TimedOut is { } failed) _mgr.Dispatch(() => failed(receipt));
+                }
+                return null;
+            }
+            if (updateActivity) HadOutbound(keepalive: context == LinkContext.Keepalive);
             return receipt;
+        }
+    }
+
+    internal PacketReceipt? ResendChannelPacket(PacketReceipt previous)
+    {
+        lock (_gate)
+        {
+            if (Status is not (LinkStatus.Active or LinkStatus.Stale)) return null;
+            if (!ReferenceEquals(previous.ChannelOwner, this))
+                throw new ArgumentException("Receipt does not belong to this link channel.", nameof(previous));
+            if (previous.Status == PacketReceiptStatus.Delivered) return previous;
+            var packet = previous.SentPacket ?? throw new ArgumentException("Receipt has no original packet.", nameof(previous));
+            if (packet.Context != LinkContext.Channel || !packet.DestinationHash.Span.SequenceEqual(LinkId))
+                throw new ArgumentException("Receipt does not belong to this link channel.", nameof(previous));
+            _receipts.Remove(previous);
+            var envelope = Decrypt(packet.Payload.Span) ??
+                throw new InvalidOperationException("The retained channel packet cannot be decrypted.");
+            try
+            {
+                return SendWithContext(envelope, LinkContext.Channel, createReceipt: true, encrypt: true,
+                    beforeSend: receipt => receipt!.Timeout = previous.Timeout, updateActivity: false);
+            }
+            finally { CryptographicOperations.ZeroMemory(envelope); }
         }
     }
 
     internal void SendProofPacket(Packet proof)
     {
         _mgr.Enqueue(proof, AttachedInterface);
-        EstablishmentCost += proof.Length;
         HadOutbound();
     }
 
@@ -460,10 +511,16 @@ public sealed partial class Link
     {
         var packet = received.Packet;
         List<Action> after = [];
+        List<Action> coreAfter = [];
         lock (_gate)
         {
             if (Status == LinkStatus.Closed)
             {
+                return;
+            }
+            if (packet.Length > Mtu)
+            {
+                _mgr.Log?.Invoke($"Link {LinkIdHex} packet exceeds negotiated MTU {Mtu}");
                 return;
             }
 
@@ -494,21 +551,26 @@ public sealed partial class Link
 
             if (packet.PacketType == PacketType.Data)
             {
-                ReceiveData(received, after);
+                ReceiveData(received, after, coreAfter);
             }
             else if (packet.PacketType == PacketType.Proof)
             {
-                ReceiveProof(received, after);
+                ReceiveProof(received, after, coreAfter);
             }
         }
 
+        foreach (var action in coreAfter)
+        {
+            try { action(); }
+            catch (Exception ex) { _mgr.Log?.Invoke($"Link {LinkIdHex} channel processing failed: {ex.Message}"); }
+        }
         foreach (var a in after)
         {
             _mgr.Dispatch(a);
         }
     }
 
-    private void ReceiveData(ReceivedPacket received, List<Action> after)
+    private void ReceiveData(ReceivedPacket received, List<Action> after, List<Action> coreAfter)
     {
         var packet = received.Packet;
         switch (packet.Context)
@@ -535,11 +597,11 @@ public sealed partial class Link
                 {
                     if (_channel is { } channel && Status == LinkStatus.Active)
                     {
-                        ProvePacket(packet);
                         var plaintext = Decrypt(packet.Payload.Span);
                         if (plaintext is not null)
                         {
-                            after.Add(() => channel.Receive(plaintext));
+                            ProvePacket(packet);
+                            coreAfter.Add(() => channel.Receive(plaintext));
                         }
                     }
 
@@ -591,8 +653,9 @@ public sealed partial class Link
                         var requestId = packet.CalculateTruncatedHash();
                         if (_owner is { } owner && (owner.MaxRequestSize is null || plaintext.Length <= owner.MaxRequestSize))
                         {
-                            _ = Task.Run(() => HandleRequest(requestId, plaintext));
+                            _mgr.DispatchRequestAsync(ct => HandleRequestAsync(requestId, plaintext, ct));
                         }
+                        else _mgr.Log?.Invoke($"Ignored request with excessive size {plaintext.Length} on {LinkIdHex}");
                     }
 
                     break;
@@ -601,10 +664,7 @@ public sealed partial class Link
             case LinkContext.Response:
                 {
                     var plaintext = Decrypt(packet.Payload.Span);
-                    if (plaintext is not null && MsgPack.TryUnpack(plaintext, out var unpacked) && unpacked is object?[] { Length: >= 2 } arr && arr[0] is byte[] requestId)
-                    {
-                        _ = Task.Run(() => HandleResponse(requestId, arr[1], rawResponse: plaintext));
-                    }
+                    if (plaintext is not null) HandlePackedResponse(plaintext, smallPacket: true);
 
                     break;
                 }
@@ -616,17 +676,21 @@ public sealed partial class Link
                     var plaintext = Decrypt(packet.Payload.Span);
                     if (plaintext is not null && MsgPack.TryUnpack(plaintext, out var v) && v is double or long)
                     {
-                        Rtt = Math.Max(measured, MsgPack.ToDouble(v));
+                        var reported = MsgPack.ToDouble(v);
+                        if (!double.IsFinite(reported) || reported < 0)
+                        {
+                            _mgr.Log?.Invoke($"Invalid RTT on link {LinkIdHex}");
+                            CloseLocked(LinkTeardownReason.Timeout, after);
+                            break;
+                        }
+                        Rtt = Math.Max(measured, reported);
                         Status = LinkStatus.Active;
                         ActivatedAt = Now;
                         UpdateKeepalive();
                         var owner = _owner;
                         var cb = Established;
-                        after.Add(() =>
-                        {
-                            owner?.LinkEstablished?.Invoke(this);
-                            cb?.Invoke(this);
-                        });
+                        if (owner?.LinkEstablished is { } accepted) after.Add(() => accepted(this));
+                        if (cb is not null) after.Add(() => cb(this));
                     }
                 }
 
@@ -658,7 +722,7 @@ public sealed partial class Link
         }
     }
 
-    private void ReceiveProof(ReceivedPacket received, List<Action> after)
+    private void ReceiveProof(ReceivedPacket received, List<Action> after, List<Action> coreAfter)
     {
         var packet = received.Packet;
         if (packet.Context == LinkContext.None)
@@ -678,7 +742,7 @@ public sealed partial class Link
                     LastProof = Now;
                     _receipts.RemoveAt(i);
                     var cb = receipt.Delivered;
-                    after.Add(() =>
+                    (receipt.CoreCallbacks ? coreAfter : after).Add(() =>
                     {
                         cb?.Invoke(receipt);
                     });
@@ -703,15 +767,17 @@ public sealed partial class Link
             var callback = ProofRequested ?? _owner?.ProofRequested;
             if (callback is not null)
             {
-                try
+                after.Add(() =>
                 {
-                    prove = callback(packet);
-                }
-                catch (Exception ex)
-                {
-                    _mgr.Log?.Invoke("Proof request callback failed: " + ex.Message);
-                }
+                    try
+                    {
+                        if (callback(packet))
+                            lock (_gate) { if (Status == LinkStatus.Active) ProvePacket(packet); }
+                    }
+                    catch (Exception ex) { _mgr.Log?.Invoke("Proof request callback failed: " + ex.Message); }
+                });
             }
+            return;
         }
 
         if (prove)
@@ -802,8 +868,10 @@ public sealed partial class Link
         }
 
         Status = LinkStatus.Closed;
+        _mgr.CancelOwnedWork(_closedCancellation);
         TeardownReason = reason;
         CancelResources(after);
+        _mgr.ObserveRequiredCleanup(DrainResourceWorkAsync(), "resource cleanup");
         foreach (var r in _receipts.ToArray())
         {
             if (r.Conclude(PacketReceiptStatus.Failed, _mgr.UnixNow) && r.TimedOut is { } timedOut) after.Add(() => timedOut(r));
@@ -855,6 +923,7 @@ public sealed partial class Link
     internal void Tick(double now)
     {
         List<Action> after = [];
+        List<Action> coreAfter = [];
         lock (_gate)
         {
             switch (Status)
@@ -914,7 +983,7 @@ public sealed partial class Link
                         _receipts.RemoveAt(i);
                         receipt.Conclude(PacketReceiptStatus.Failed, _mgr.UnixNow + Math.Max(0, now - Now));
                         var cb = receipt.TimedOut;
-                        after.Add(() =>
+                        (receipt.CoreCallbacks ? coreAfter : after).Add(() =>
                         {
                             cb?.Invoke(receipt);
                         });
@@ -935,6 +1004,11 @@ public sealed partial class Link
             }
         }
 
+        foreach (var action in coreAfter)
+        {
+            try { action(); }
+            catch (Exception ex) { _mgr.Log?.Invoke($"Link {LinkIdHex} channel receipt failed: {ex.Message}"); }
+        }
         foreach (var a in after)
         {
             _mgr.Dispatch(a);

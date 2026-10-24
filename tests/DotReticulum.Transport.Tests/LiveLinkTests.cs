@@ -54,8 +54,10 @@ public sealed class LiveLinkTests(ITestOutputHelper output)
             var identity = Router.Engine.Known.Recall(Py.Hash)!;
             var established = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
             var closed = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pythonUpBefore = Py.Count("link_up");
             var link = Router.Links.Connect(identity, Py.Hash, l => established.TrySetResult(l), l => closed.TrySetResult(l));
             await established.Task.WaitAsync(Patience);
+            await Py.NextAsync("link_up", pythonUpBefore, Patience);
             return (link, closed);
         }
 
@@ -419,6 +421,117 @@ public sealed class LiveLinkTests(ITestOutputHelper output)
             output.WriteLine("Python -> .NET buffer stream 200000 B sha256 identical");
             return 0;
         });
+    }
+
+    [LiveTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Parity5UpgradedMtu_DataResourceAndChannelPayloadsExceed500BytesInBothDirections(bool dotNetInitiator)
+    {
+        await using var s = await Session.StartAsync();
+        await WithLog(s, async () =>
+        {
+            Link link;
+            if (dotNetInitiator)
+            {
+                (link, _) = await s.ConnectToPythonAsync();
+            }
+            else
+            {
+                var accepted = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var local = s.ServeDotNet(l => accepted.TrySetResult(l));
+                await s.Router.AnnounceAsync(local);
+                await s.Py.WaitForAnnounce(local.Destination.Hash, Patience);
+                var pythonUpBefore = s.Py.Count("link_up");
+                await s.Py.SendLineAsync("connect " + Convert.ToHexStringLower(local.Destination.Hash));
+                link = await accepted.Task.WaitAsync(Patience);
+                await s.Py.NextAsync("link_up", pythonUpBefore, Patience);
+            }
+            var stat = await s.Py.Command("stat", "stat", Patience);
+            Assert.Equal(16384, link.Mtu);
+            Assert.Equal(link.Mtu, stat.GetProperty("mtu").GetInt32());
+            Assert.Equal(link.Mdu, stat.GetProperty("mdu").GetInt32());
+            var payload = RandomBytes(8193);
+            var before = s.Py.Count("data");
+            Assert.NotNull(link.Send(payload));
+            var seen = await s.Py.NextAsync("data", before, Patience);
+            Assert.Equal(Convert.ToHexStringLower(payload), seen.GetProperty("payload").GetString());
+            var received = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+            link.PacketReceived = (data, _) => received.TrySetResult(data);
+            await s.Py.SendLineAsync("send " + Convert.ToHexStringLower(payload));
+            Assert.Equal(payload, await received.Task.WaitAsync(Patience));
+
+            var channel = link.GetChannel();
+            channel.RegisterMessageType<LiveTextMessage>();
+            var message = new string('x', 3001);
+            var channelBefore = s.Py.Count("channel_msg");
+            channel.Send(new LiveTextMessage { Text = message });
+            Assert.Equal(message, (await s.Py.NextAsync("channel_msg", channelBefore, Patience)).GetProperty("text").GetString());
+            var incoming = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            channel.AddMessageHandler(m => { incoming.TrySetResult(((LiveTextMessage)m).Text); return true; });
+            await s.Py.SendLineAsync("chsend " + message);
+            Assert.Equal(message, await incoming.Task.WaitAsync(Patience));
+
+            var resourceData = RandomBytes(150_017);
+            var resourceBefore = s.Py.Count("resource_done");
+            var resourceFinished = new TaskCompletionSource<ResourceStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+            link.SendResource(resourceData, autoCompress: false, concluded: r => resourceFinished.TrySetResult(r.Status));
+            Assert.Equal(ResourceStatus.Complete, await resourceFinished.Task.WaitAsync(Patience));
+            var done = await s.Py.NextAsync("resource_done", resourceBefore, Patience);
+            Assert.Equal(resourceData.Length, done.GetProperty("size").GetInt32());
+            Assert.Equal(Sha(resourceData), done.GetProperty("sha256").GetString());
+            var incomingResource = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+            link.ResourceStrategy = ResourceStrategy.AcceptAll;
+            link.ResourceReceived = r => { if (r.Status == ResourceStatus.Complete) incomingResource.TrySetResult(r.Data!); };
+            await s.Py.SendLineAsync("resource 150019 upgraded-reverse random");
+            var reverse = await incomingResource.Task.WaitAsync(Patience);
+            var sent = await s.Py.NextAsync("resource_sent", 0, Patience);
+            Assert.Equal(150019, reverse.Length);
+            Assert.Equal(Sha(reverse), sent.GetProperty("sha256").GetString());
+            link.Teardown();
+            return 0;
+        });
+    }
+
+    [LiveFact]
+    public async Task Parity5StreamFileResponse_UpstreamReadsMultipartFileAndMetadata()
+    {
+        await using var s = await Session.StartAsync();
+        var file = Path.Combine(Path.GetTempPath(), "dotreticulum-response-" + Guid.NewGuid().ToString("N") + ".bin");
+        try
+        {
+            var data = RandomBytes(2_200_037);
+            await File.WriteAllBytesAsync(file, data);
+            await WithLog(s, async () =>
+            {
+                var accepted = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var local = s.ServeDotNet(link => accepted.TrySetResult(link));
+                local.RegisterRequestHandler("/stream", _ => new StreamFileResponse(
+                    new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read),
+                    new Dictionary<object, object?> { ["name"] = "stream-response" }), RequestPolicy.All);
+                await s.Router.AnnounceAsync(local);
+                await s.Py.WaitForAnnounce(local.Destination.Hash, Patience);
+                await s.Py.SendLineAsync("connect " + Convert.ToHexStringLower(local.Destination.Hash));
+                await accepted.Task.WaitAsync(Patience);
+                var response = await s.Py.Command("request /stream ignored", "response", Patience);
+                Assert.True(response.GetProperty("ok").GetBoolean());
+                Assert.Equal(data.Length, response.GetProperty("size").GetInt32());
+                Assert.Equal(Sha(data), response.GetProperty("sha256").GetString());
+                Assert.Contains("stream-response", response.GetProperty("metadata").GetString());
+                await Until(() =>
+                {
+                    try
+                    {
+                        using var reopened = new FileStream(file, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                        Assert.Equal(data.Length, reopened.Length);
+                        return true;
+                    }
+                    catch (IOException) { return false; }
+                }, 10);
+                return 0;
+            });
+        }
+        finally { File.Delete(file); }
     }
 
     // .NET requests of a Python responder: large request (sent as a Resource), echoed back as a large response Resource, and a file response

@@ -24,6 +24,7 @@ public sealed class DestinationRatchets : IDisposable
     private bool _persisting;
     private Action<DestinationRatchetSnapshot>? _persistence;
     private IDisposable? _persistenceLifetime;
+    private Func<IReadOnlyList<byte[]>>? _reload;
 
     /// <summary>Minimum time between rotations.</summary>
     public TimeSpan Interval
@@ -83,6 +84,56 @@ public sealed class DestinationRatchets : IDisposable
     }
 
     public bool HasPersistence { get { lock (_gate) return _persistence is not null; } }
+
+    /// <summary>Installs an optional signed-store reader. Returned keys are owned by the ring and are zeroed after import.
+    /// Reload and decrypt are serialized with rotation; a failed read leaves the current keys intact.</summary>
+    public void EnableReload(Func<IReadOnlyList<byte[]>> reload)
+    {
+        ArgumentNullException.ThrowIfNull(reload);
+        lock (_gate)
+        {
+            ThrowIfMutable();
+            if (_reload is not null) throw new InvalidOperationException("Ratchet reload is already enabled.");
+            _reload = reload;
+        }
+    }
+
+    public bool Reload()
+    {
+        lock (_gate)
+        {
+            ThrowIfMutable();
+            return ReloadCore();
+        }
+    }
+
+    private bool ReloadCore()
+    {
+        if (_reload is null) return false;
+        IReadOnlyList<byte[]>? loaded = null;
+        byte[][]? candidate = null;
+        try
+        {
+            _persisting = true;
+            loaded = _reload();
+            if (loaded.Any(key => key is not { Length: Identity.RatchetSize }))
+                throw new InvalidDataException("Ratchet private keys must be 32 bytes.");
+            candidate = loaded.Take(_retained).Select(key => key.ToArray()).ToArray();
+            foreach (var key in _keys) CryptographicOperations.ZeroMemory(key);
+            _keys.Clear();
+            _keys.AddRange(candidate);
+            candidate = null;
+            return true;
+        }
+        finally
+        {
+            _persisting = false;
+            if (loaded is not null)
+                foreach (var key in loaded) if (key is not null) CryptographicOperations.ZeroMemory(key);
+            if (candidate is not null)
+                foreach (var key in candidate) CryptographicOperations.ZeroMemory(key);
+        }
+    }
 
     /// <summary>Explicitly enables mandatory persistence, analogous to upstream enable_ratchets(path).
     /// The current state is saved before binding succeeds; every subsequent rotation/policy change saves
@@ -202,12 +253,20 @@ public sealed class DestinationRatchets : IDisposable
 
     /// <summary>Decrypts for the owning identity trying each ratchet, honouring <see cref="Enforce"/> (upstream <c>Destination.decrypt</c>).</summary>
     public byte[]? Decrypt(Identity identity, ReadOnlySpan<byte> token)
+        => DecryptWithMetadata(identity, token)?.Plaintext;
+
+    /// <summary>Returns metadata from the successful attempt, including a signed-store reload retry.</summary>
+    public IdentityDecryptionResult? DecryptWithMetadata(Identity identity, ReadOnlySpan<byte> token)
     {
         ArgumentNullException.ThrowIfNull(identity);
         lock (_gate)
         {
             ThrowIfDisposed();
-            return identity.Decrypt(token, _keys, _enforce);
+            var result = identity.DecryptWithMetadata(token, _keys, _enforce);
+            if (result is not null || _reload is null) return result;
+            ThrowIfMutable();
+            ReloadCore();
+            return identity.DecryptWithMetadata(token, _keys, _enforce);
         }
     }
 
@@ -245,6 +304,7 @@ public sealed class DestinationRatchets : IDisposable
             foreach (var key in _keys) CryptographicOperations.ZeroMemory(key);
             _keys.Clear();
             _persistence = null;
+            _reload = null;
             var lifetime = _persistenceLifetime;
             _persistenceLifetime = null;
             lifetime?.Dispose();

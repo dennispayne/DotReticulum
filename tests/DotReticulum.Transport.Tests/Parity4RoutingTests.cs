@@ -392,20 +392,30 @@ public sealed class Parity4RoutingTests
         var destination = Destination.Create(DestinationType.Single, "priority", [], identity);
         var limitedDestination = Destination.Create(DestinationType.Single, "priority", ["limited"], identity);
         var order = new List<string>();
+        var dataA = Packet.Create(PacketType.Data, DestinationType.Single, destination.Hash, identity.Encrypt("data-a"u8));
+        var dataB = Packet.Create(PacketType.Data, DestinationType.Single, destination.Hash, identity.Encrypt("data-b"u8));
         rig.Router.RegisterLocalDestination(new LocalDestination(identity, destination)
-        { PacketReceived = received => { order.Add(System.Text.Encoding.UTF8.GetString(received.Packet.Payload.Span)); return ValueTask.CompletedTask; } });
+        { ProofStrategy = ProofStrategy.All });
         rig.Router.RegisterLocalDestination(new LocalDestination(identity, limitedDestination));
         rig.Router.Engine.RegisterHandler(new CallbackAnnounceHandler(null, _ => order.Add("announce")));
         rig.Router.SetInterfaceAnnounceOptions(rig.Ifaces[1], new InterfaceAnnounceOptions { IngressLimitPathRequests = () => true });
-        rig.Ifaces[0].OnSend = packet => { if (packet.Context == Announce.PathResponseContext) order.Add("request"); };
+        rig.Ifaces[0].OnSend = packet =>
+        {
+            if (packet.Context == Announce.PathResponseContext) order.Add("request");
+            else if (packet.PacketType == PacketType.Proof)
+            {
+                if (packet.DestinationHash.Span.SequenceEqual(dataA.CalculateTruncatedHash())) order.Add("data-a");
+                else if (packet.DestinationHash.Span.SequenceEqual(dataB.CalculateTruncatedHash())) order.Add("data-b");
+            }
+        };
         rig.Ifaces[1].OnSend = packet => { if (packet.Context == Announce.PathResponseContext) order.Add("limited"); };
         var packets = new[]
         {
             Received(rig.Ifaces[1], Request(limitedDestination.Hash, 1)),
             Received(rig.Ifaces[0], Request(destination.Hash, 2)),
             Received(rig.Ifaces[0], ReferenceAnnounce),
-            Received(rig.Ifaces[0], Packet.Create(PacketType.Data, DestinationType.Single, destination.Hash, "data-a"u8.ToArray())),
-            Received(rig.Ifaces[0], Packet.Create(PacketType.Data, DestinationType.Single, destination.Hash, "data-b"u8.ToArray())),
+            Received(rig.Ifaces[0], dataA),
+            Received(rig.Ifaces[0], dataB),
         };
         foreach (var packet in packets) Assert.True(rig.Router.TryQueueInbound(packet));
         foreach (var index in new[] { 4, 2 }) Assert.False(rig.Router.TryQueueInbound(packets[index]));
@@ -426,19 +436,20 @@ public sealed class Parity4RoutingTests
         await using var rig = await Rig.CreateAsync();
         using var identity = Identity.Generate();
         var destination = Destination.Create(DestinationType.Single, "callbacks", [], identity);
-        var errors = new List<string>();
+        var errors = new System.Collections.Concurrent.ConcurrentQueue<string>();
         var delivered = 0;
-        rig.Router.Log = errors.Add;
+        rig.Router.Log = errors.Enqueue;
         var local = new LocalDestination(identity, destination);
         local.PacketReceived += _ => throw new InvalidOperationException("observer failure");
-        local.PacketReceived += _ => { delivered++; return ValueTask.CompletedTask; };
+        local.PacketReceived += _ => { Interlocked.Increment(ref delivered); return ValueTask.CompletedTask; };
         rig.Router.RegisterLocalDestination(local);
-        Assert.True(rig.Router.TryQueueInbound(Received(rig.Ifaces[0], Packet.Create(PacketType.Data, DestinationType.Single, destination.Hash, new byte[] { 1 }))));
+        Assert.True(rig.Router.TryQueueInbound(Received(rig.Ifaces[0], Packet.Create(PacketType.Data, DestinationType.Single, destination.Hash, identity.Encrypt(new byte[] { 1 })))));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => rig.Router.ProcessQueuedInboundAsync(cancellation.Token).AsTask());
         Assert.Equal(1, rig.Router.InboundQueues.Total);
         await rig.Router.ProcessQueuedInboundAsync();
+        await LinkTests.Until(() => Volatile.Read(ref delivered) == 1 && errors.Any(error => error.Contains("observer failure", StringComparison.Ordinal)));
         Assert.Equal(1, delivered);
         Assert.Contains(errors, error => error.Contains("observer failure", StringComparison.Ordinal));
     }

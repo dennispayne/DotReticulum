@@ -245,6 +245,9 @@ public sealed class DiscoveryLiveTests
             await Task.Delay(300, token);
             var pythonReceipts = 0;
             var nativeReceipts = 0;
+            using var local = new LocalDestination(sender,
+                Destination.Create(DestinationType.Single, "rnstransport", ["discovery", "interface"], sender));
+            node.Router.RegisterLocalDestination(local);
             foreach (var encrypted in new[] { false, true })
             {
                 // RNS transport ignores same-destination announces without a newer second-resolution emission time.
@@ -255,9 +258,7 @@ public sealed class DiscoveryLiveTests
                     ReachableOn = "native.example", Port = 4242, StampValue = 8, Encrypt = encrypted,
                 };
                 var data = DiscoveryCodec.Create(advertised, network, token);
-                var local = new LocalDestination(sender, Destination.Create(DestinationType.Single, "rnstransport", ["discovery", "interface"], sender)) { AppData = data };
-                node.Router.RegisterLocalDestination(local);
-                await node.Router.AnnounceAsync(local, cancellationToken: token);
+                await node.Router.AnnounceAsync(local, cancellationToken: token, appData: data);
                 var receipt = await Wait("received", ++pythonReceipts);
                 Assert.Equal(advertised.Name, receipt.GetProperty("name").GetString());
                 Assert.Equal("DotReticulum", receipt.GetProperty("implementation").GetString());

@@ -276,12 +276,11 @@ public sealed class RuntimeDiscoveryHostTests
                     InterfaceType = "BackboneInterface", Transport = true, TransportIdentity = producer.Router.TransportId,
                     Name = "Native HDLC adapter", ReachableOn = "localhost", Port = publicPort, StampValue = 1,
                 };
-                var discoveryDestination = DiscoveryAnnouncer.RegisterDestination(producer.Router.TransportIdentity, null, producer.Router.RegisterLocalDestination);
-                var announcement = new LocalDestination(discoveryDestination.Identity, discoveryDestination.Destination)
+                using var announcement = new LocalDestination(producer.Router.TransportIdentity,
+                    Destination.Create(DestinationType.Single, "rnstransport", ["discovery", "interface"], producer.Router.TransportIdentity))
                 {
                     AppData = DiscoveryCodec.Create(advertisement, cancellationToken: stop.Token),
                 };
-                producer.Router.RegisterLocalDestination(announcement);
                 await Task.Delay(1100, stop.Token);
                 await producer.Router.AnnounceAsync(announcement, cancellationToken: stop.Token);
                 while (!consumer.Interfaces.Any(i => i.Name == advertisement.Name)) await Task.Delay(25, stop.Token);

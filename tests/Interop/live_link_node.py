@@ -136,7 +136,12 @@ class TextMessage(CHANNEL.MessageBase):
 def configure_channel(link):
     channel = link.get_channel()
     channel.register_message_type(TextMessage)
-    channel.add_message_handler(lambda m: (emit({"event": "channel_msg", "text": m.text}), True)[1])
+    def on_message(message):
+        if not isinstance(message, TextMessage):
+            return False
+        emit({"event": "channel_msg", "text": message.text})
+        return True
+    channel.add_message_handler(on_message)
 
     raw_reader = BUFFER.RawChannelReader(1, channel)
     acc = {"data": bytearray(), "done": False}

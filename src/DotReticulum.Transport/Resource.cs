@@ -20,6 +20,9 @@ public enum ResourceStatus : byte
 /// <summary>A response that is sent as a Resource with metadata (upstream file responses).</summary>
 public sealed record FileResponse(byte[] Data, object? Metadata = null);
 
+/// <summary>A file response whose readable stream is owned until transfer completion unless <see cref="LeaveOpen"/> is true.</summary>
+public sealed record StreamFileResponse(Stream Data, object? Metadata = null, bool LeaveOpen = false);
+
 /// <summary>Upstream <c>ResourceAdvertisement</c>: the msgpack dictionary that announces a Resource (and its first hashmap segment).</summary>
 public sealed class ResourceAdvertisement
 {
@@ -81,8 +84,9 @@ public sealed class ResourceAdvertisement
             throw new InvalidDataException("Resource advertisement is not a map.");
         }
 
-        long Int(string key) => MsgPack.ToInt64(d[key] ?? throw new InvalidDataException($"Missing {key}"));
-        byte[] Bytes(string key) => d[key] as byte[] ?? throw new InvalidDataException($"Missing {key}");
+        long Int(string key) => d.TryGetValue(key, out var value) && value is sbyte or byte or short or ushort or int or uint or long or ulong
+            ? MsgPack.ToInt64(value) : throw new InvalidDataException($"Invalid integer {key}");
+        byte[] Bytes(string key) => d.TryGetValue(key, out var value) && value is byte[] bytes ? bytes : throw new InvalidDataException($"Missing {key}");
 
         var adv = new ResourceAdvertisement
         {
@@ -93,17 +97,23 @@ public sealed class ResourceAdvertisement
             RandomHash = Bytes("r"),
             OriginalHash = Bytes("o"),
             Hashmap = Bytes("m"),
-            Flags = (int)Int("f"),
-            SegmentIndex = (int)Int("i"),
-            TotalSegments = (int)Int("l"),
-            RequestId = d["q"] as byte[],
+            Flags = checked((int)Int("f")),
+            SegmentIndex = checked((int)Int("i")),
+            TotalSegments = checked((int)Int("l")),
+            RequestId = d.TryGetValue("q", out var request) && request is null or byte[] ? request as byte[] : throw new InvalidDataException("Invalid request ID"),
         };
         if (adv.TransferSize > (long)Resource.MaxEfficientSize * 3)
         {
             throw new InvalidDataException("Invalid transfer size");
         }
 
-        if (adv.Hash.Length != 32 || adv.RandomHash.Length != Resource.RandomHashSize || adv.OriginalHash.Length != 32 || adv.Parts < 0)
+        if (adv.TransferSize <= 0 || adv.DataSize < 0 || adv.Hash.Length != 32 ||
+            adv.RandomHash.Length != Resource.RandomHashSize || adv.OriginalHash.Length != 32 || adv.Parts <= 0 ||
+            adv.Flags is < 0 or > 0x3f || adv.SegmentIndex < 1 || adv.TotalSegments < 1 || adv.SegmentIndex > adv.TotalSegments ||
+            adv.Split != (adv.TotalSegments > 1) || adv.IsRequest && adv.IsResponse ||
+            (adv.IsRequest || adv.IsResponse) != (adv.RequestId is not null) || adv.RequestId is { Length: not 16 } ||
+            adv.Hashmap.Length != Math.Min(adv.Parts, HashmapMaxLength) * Resource.MapHashLength ||
+            adv.SegmentIndex == 1 && !adv.Hash.AsSpan().SequenceEqual(adv.OriginalHash))
         {
             throw new InvalidDataException("Invalid resource advertisement fields");
         }
@@ -117,7 +127,7 @@ public sealed class ResourceAdvertisement
 /// per-part map hashes, a sliding request window, hashmap updates, a proof, cancel/reject and segmentation above <see cref="MaxEfficientSize"/>.
 /// All state is guarded by the owning link's lock; callbacks are delivered in order through the link manager.
 /// </summary>
-public sealed class Resource
+public sealed class Resource : IDisposable, IAsyncDisposable
 {
     public const int Window = 4;
     public const int WindowMin = 2;
@@ -154,7 +164,7 @@ public sealed class Resource
     private readonly int _sdu;
 
     // sender
-    private byte[] _source = [];
+    private ResourceInput? _source;
     private byte[] _metadataBlock = [];
     private int _sentMetadataSize;
     private bool _autoCompressOption;
@@ -169,7 +179,13 @@ public sealed class Resource
     private double _advSent;
     private double _lastPartSent;
     private readonly HashSet<string> _requestHashes = [];
-    private Task<Resource>? _nextSegment;
+    private Resource? _nextSegment;
+    private readonly CancellationTokenSource _workCancellation = new();
+    private Task _assemblyWork = Task.CompletedTask;
+    private int _terminalPosted;
+    private bool _disposed;
+    private ResourceStorage? _completedStorage;
+    private byte[]? _data;
     private Action<Resource>? _progressCallback;
 
     // receiver
@@ -196,23 +212,31 @@ public sealed class Resource
     private int _fastRateRounds;
     private int _verySlowRateRounds;
     private double _partTimeoutFactor = PartTimeoutFactor;
-    private ResourceAdvertisement? _advertisement;
     private SegmentAccumulator? _accumulator;
 
     private double _lastActivity;
     private int _retriesLeft = MaxRetries;
     private double _timeoutFactor;
 
-    internal sealed class SegmentAccumulator
+    internal sealed class SegmentAccumulator(ResourcePolicy policy) : IDisposable
     {
-        public MemoryStream Data { get; } = new();
+        public ResourceStorage Data { get; } = new(policy);
         public byte[]? PackedMetadata { get; set; }
+        public int NextSegment { get; set; } = 1;
+        public int TotalSegments { get; set; }
+        public long TotalSize { get; set; }
+        public long ReceivedSize { get; set; }
+        public int Flags { get; set; }
+        public byte[]? RequestId { get; set; }
+        public double LastActivity { get; set; }
+        public Resource? LastResource { get; set; }
+        public void Dispose() => Data.Dispose();
     }
 
     private Resource(Link link)
     {
         _link = link;
-        _sdu = Math.Min(link.Mtu, Packet.Mtu) - HeaderMaxSize - IfacMinSize;
+        _sdu = link.Mtu - HeaderMaxSize - IfacMinSize;
         _timeoutFactor = Link.TrafficTimeoutFactor;
     }
 
@@ -241,13 +265,51 @@ public sealed class Resource
     public double? Rtt { get; private set; }
     public double? Eifr { get; private set; }
 
-    /// <summary>The received payload once <see cref="Status"/> is Complete (all segments joined; metadata stripped).</summary>
-    public byte[]? Data { get; private set; }
+    /// <summary>The completed payload. Disk-backed results are materialized on access for byte-array API compatibility.</summary>
+    public byte[]? Data
+    {
+        get
+        {
+            lock (_link.Gate)
+            {
+                if (_data is null && Status == ResourceStatus.Complete && SegmentIndex == TotalSegments && _completedStorage is { } storage)
+                {
+                    ObjectDisposedException.ThrowIf(_disposed, this);
+                    if (storage.Length > int.MaxValue) throw new InvalidOperationException("Use OpenRead for resources larger than a byte array.");
+                    using var input = storage.OpenRead();
+                    var data = new byte[checked((int)storage.Length)];
+                    input.ReadExactly(data);
+                    _data = data;
+                }
+                return _data;
+            }
+        }
+        private set => _data = value;
+    }
+
+    /// <summary>Whether payload bytes have been materialized; checking this does not read disk storage.</summary>
+    public bool HasDataInMemory => _data is not null;
+
+    /// <summary>True when the completed payload has disk storage; <see cref="OpenRead"/> avoids materializing a byte array.</summary>
+    public bool IsFileBacked => _completedStorage?.IsFileBacked == true;
+
+    /// <summary>Opens an independent read stream. Dispose the resource after consuming a disk-backed result.</summary>
+    public Stream OpenRead()
+    {
+        lock (_link.Gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (Status != ResourceStatus.Complete || SegmentIndex != TotalSegments)
+                throw new InvalidOperationException("The logical resource is not complete.");
+            return _completedStorage?.OpenRead() ?? new MemoryStream(Data ?? [], writable: false);
+        }
+    }
 
     /// <summary>The unpacked metadata of a received resource, or null.</summary>
     public object? Metadata { get; private set; }
 
     public Action<Resource>? Concluded { get; set; }
+    internal bool InternalCallback { get; set; }
 
     public Action<Resource>? ProgressChanged
     {
@@ -273,8 +335,20 @@ public sealed class Resource
     internal static Resource CreateOutgoing(Link link, byte[] source, object? metadata, bool autoCompress, Action<Resource>? callback,
         Action<Resource>? progress, double? timeout, int segmentIndex = 1, byte[]? originalHash = null, byte[]? requestId = null,
         bool isResponse = false, int sentMetadataSize = 0, long autoCompressLimit = AutoCompressMaxSize)
+        => CreateOutgoing(link, new ResourceInput(new MemoryStream(source, writable: false), leaveOpen: false),
+            metadata, autoCompress, callback, progress, timeout, segmentIndex, originalHash, requestId, isResponse,
+            sentMetadataSize, autoCompressLimit);
+
+    internal static Resource CreateOutgoing(Link link, ResourceInput source, object? metadata, bool autoCompress, Action<Resource>? callback,
+        Action<Resource>? progress, double? timeout, int segmentIndex = 1, byte[]? originalHash = null, byte[]? requestId = null,
+        bool isResponse = false, int sentMetadataSize = 0, long autoCompressLimit = AutoCompressMaxSize,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
+        link.ResourcePolicy.Validate();
+        cancellationToken.ThrowIfCancellationRequested();
+        if (source.Length < 0 || source.Length > link.ResourcePolicy.MaxDataSize)
+            throw new InvalidDataException("Resource input exceeds the configured size limit.");
         if (segmentIndex == 1 && callback is { } concluded)
         {
             var completionPosted = 0;
@@ -300,7 +374,7 @@ public sealed class Resource
         if (metadata is not null)
         {
             var packed = MsgPack.Pack(metadata);
-            if (packed.Length > MetadataMaxSize)
+            if (packed.Length > Math.Min(link.ResourcePolicy.MaxMetadataSize, MaxEfficientSize - 4))
             {
                 throw new InvalidOperationException("Resource metadata size exceeded");
             }
@@ -317,13 +391,13 @@ public sealed class Resource
 
         long dataSize = source.Length;
         r.TotalSize = dataSize + metadataSize;
-        ReadOnlySpan<byte> slice;
+        byte[] slice;
         if (r.TotalSize <= MaxEfficientSize)
         {
             r.TotalSegments = 1;
             r.SegmentIndex = 1;
             r.Split = false;
-            slice = source;
+            slice = source.Read(0, checked((int)dataSize), cancellationToken);
         }
         else
         {
@@ -333,32 +407,27 @@ public sealed class Resource
             long firstRead = MaxEfficientSize - metadataSize;
             if (segmentIndex == 1)
             {
-                slice = source.AsSpan(0, (int)Math.Min(firstRead, dataSize));
+                slice = source.Read(0, (int)Math.Min(firstRead, dataSize), cancellationToken);
             }
             else
             {
                 var seek = firstRead + ((segmentIndex - 2L) * MaxEfficientSize);
-                slice = source.AsSpan((int)seek, (int)Math.Min(MaxEfficientSize, dataSize - seek));
+                slice = source.Read(seek, (int)Math.Min(MaxEfficientSize, dataSize - seek), cancellationToken);
             }
         }
 
-        var data = r.HasMetadata ? [.. r._metadataBlock, .. slice] : slice.ToArray();
+        if (r.TotalSize > link.ResourcePolicy.MaxDataSize || r.TotalSegments > link.ResourcePolicy.MaxSegments)
+            throw new InvalidDataException("Resource exceeds the configured multipart limit.");
+        var data = r.HasMetadata ? [.. r._metadataBlock, .. slice] : slice;
+        if (data.LongLength > link.ResourcePolicy.MaxSegmentSize)
+            throw new InvalidDataException("Resource segment exceeds the configured size limit.");
         var timeoutValue = timeout ?? ((link.Rtt ?? 0) * Link.TrafficTimeoutFactor);
         r.Timeout = timeoutValue;
 
         byte[] stream;
         if (autoCompress && dataSize <= autoCompressLimit)
         {
-            byte[] compressed;
-            try
-            {
-                compressed = Bz2.Compress(data);
-            }
-            catch (Exception ex)
-            {
-                link.Log("Resource compression failed; sending uncompressed: " + ex);
-                compressed = data;
-            }
+            var compressed = Bz2.Compress(data);
 
             if (compressed.Length < data.Length)
             {
@@ -379,9 +448,12 @@ public sealed class Resource
         r.Encrypted = true;
         r.Size = encrypted.Length;
         r.TotalParts = (int)Math.Ceiling(encrypted.Length / (double)r._sdu);
+        if (r.TotalParts > link.ResourcePolicy.MaxParts)
+            throw new InvalidDataException("Resource exceeds the configured part limit.");
 
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             r.RandomHash = RandomNumberGenerator.GetBytes(RandomHashSize);
             r.Hash = SHA256.HashData([.. data, .. r.RandomHash]);
             r._expectedProof = SHA256.HashData([.. data, .. r.Hash]);
@@ -393,6 +465,7 @@ public sealed class Resource
             var collision = false;
             for (var i = 0; i < r.TotalParts; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var partData = encrypted.AsSpan(i * r._sdu, Math.Min(r._sdu, encrypted.Length - (i * r._sdu))).ToArray();
                 var mapHash = r.MapHash(partData);
                 if (guard.Any(g => g.AsSpan().SequenceEqual(mapHash)))
@@ -407,7 +480,7 @@ public sealed class Resource
                     guard.RemoveAt(0);
                 }
 
-                packets[i] = Packet.Create(PacketType.Data, DestinationType.Link, link.LinkId, partData, LinkContext.Resource);
+                packets[i] = Packet.Create(PacketType.Data, DestinationType.Link, link.LinkId, partData, LinkContext.Resource, mtu: link.Mtu);
                 hashes[i] = mapHash;
             }
 
@@ -453,6 +526,7 @@ public sealed class Resource
     /// <summary>Advertises the resource, or queues it behind the link's current outgoing resource.</summary>
     internal void Advertise()
     {
+        if (Status >= ResourceStatus.Complete) return;
         if (_link.HasOutgoingResource)
         {
             Status = ResourceStatus.Queued;
@@ -461,14 +535,17 @@ public sealed class Resource
         }
 
         SendAdvertisement(first: true);
-        if (SegmentIndex < TotalSegments)
-        {
-            _nextSegment = Task.Run(() => CreateOutgoing(_link, _source, null, _autoCompressOption, Concluded, _progressCallback, null,
-                SegmentIndex + 1, OriginalHash, RequestId, IsResponse, _sentMetadataSize, _autoCompressLimit));
-        }
     }
 
-    internal void StartQueued() => SendAdvertisement(first: true);
+    internal void StartQueued()
+    {
+        if (Status == ResourceStatus.Queued) SendAdvertisement(first: true);
+    }
+
+    internal void RegisterCancellation(CancellationToken cancellationToken)
+    {
+        lock (_link.Gate) _source?.RegisterCancellation(cancellationToken, this);
+    }
 
     private void SendAdvertisement(bool first)
     {
@@ -503,8 +580,23 @@ public sealed class Resource
     /// <summary>Upstream <c>Resource.request</c>: the receiver asked for more parts (and possibly a hashmap update).</summary>
     internal void HandleRequest(byte[] request)
     {
-        if (Status == ResourceStatus.Failed)
+        if (Status >= ResourceStatus.Complete)
         {
+            return;
+        }
+
+        if (request.Length < 33 || request[0] is not (HashmapNotExhausted or HashmapExhausted))
+        {
+            CancelLocked();
+            return;
+        }
+
+        var requestOffset = request[0] == HashmapExhausted ? 37 : 33;
+        if (request.Length < requestOffset || (request.Length - requestOffset) % MapHashLength != 0 ||
+            (request.Length - requestOffset) / MapHashLength > WindowMax ||
+            !request.AsSpan(requestOffset - 32, 32).SequenceEqual(Hash))
+        {
+            CancelLocked();
             return;
         }
 
@@ -560,17 +652,19 @@ public sealed class Resource
         {
             var lastMapHash = request.AsSpan(1, MapHashLength);
             var partIndex = _receiverMinConsecutiveHeight;
+            var found = false;
             for (var i = searchStart; i < searchEnd; i++)
             {
                 partIndex++;
                 if (_partMapHashes[i].AsSpan().SequenceEqual(lastMapHash))
                 {
+                    found = true;
                     break;
                 }
             }
 
             _receiverMinConsecutiveHeight = Math.Max(partIndex - 1 - WindowMax, 0);
-            if (partIndex % ResourceAdvertisement.HashmapMaxLength != 0)
+            if (!found || partIndex % ResourceAdvertisement.HashmapMaxLength != 0)
             {
                 _link.Log("Resource sequencing error, cancelling transfer!");
                 CancelLocked();
@@ -602,7 +696,15 @@ public sealed class Resource
         PostProgress();
     }
 
-    internal bool HandleRequestPacketOnce(string packetHash) => _requestHashes.Add(packetHash);
+    internal bool HandleRequestPacketOnce(string packetHash)
+    {
+        if (_requestHashes.Count >= (long)_link.ResourcePolicy.MaxParts * (MaxRetries + 1))
+        {
+            CancelLocked();
+            return false;
+        }
+        return _requestHashes.Add(packetHash);
+    }
 
     /// <summary>Upstream <c>validate_proof</c>.</summary>
     internal void ValidateProof(ReadOnlySpan<byte> proof)
@@ -613,39 +715,36 @@ public sealed class Resource
         }
 
         Status = ResourceStatus.Complete;
+        _partPackets = [];
+        _partMapHashes = [];
+        _partSent = [];
+        _hashmapFlat = [];
+        _metadataBlock = [];
+        _requestHashes.Clear();
         if (SegmentIndex == TotalSegments)
         {
             _link.ResourceConcluded(this);
-            var callback = Concluded;
-            if (callback is not null)
-            {
-                _link.Post(() => callback(this));
-            }
-
+            ReleaseSource();
+            PostTerminal();
             return;
         }
 
-        var next = _nextSegment ?? Task.Run(() => CreateOutgoing(_link, _source, null, _autoCompressOption, Concluded, _progressCallback, null,
-            SegmentIndex + 1, OriginalHash, RequestId, IsResponse, _sentMetadataSize, _autoCompressLimit));
-        _ = next.ContinueWith(t =>
+        try
         {
-            if (t.IsFaulted)
-            {
-                lock (_link.Gate) CancelLocked();
-                _link.Log("Preparing the next resource segment failed: " + t.Exception?.GetBaseException().Message);
-                return;
-            }
-
-            lock (_link.Gate)
-            {
-                _link.ResourceConcluded(this);
-                if (_link.Status == LinkStatus.Active && Status == ResourceStatus.Complete)
-                {
-                    t.Result.Advertise();
-                }
-                else t.Result.CancelLocked();
-            }
-        }, TaskScheduler.Default);
+            // Bounded preparation is synchronous: no detached prefetch worker can
+            // outlive cancellation, close the shared input, or fault unobserved.
+            _nextSegment = CreateOutgoing(_link, _source!, null, _autoCompressOption, Concluded, _progressCallback, null,
+                SegmentIndex + 1, OriginalHash, RequestId, IsResponse, _sentMetadataSize, _autoCompressLimit,
+                _workCancellation.Token);
+            _nextSegment.InternalCallback = InternalCallback;
+            _link.ResourceConcluded(this);
+            _nextSegment.Advertise();
+        }
+        catch (Exception ex)
+        {
+            _link.Log("Preparing the next resource segment failed: " + ex.Message);
+            CancelLocked();
+        }
     }
 
     /// <summary>Upstream <c>_rejected</c>: the receiver refused the advertisement.</summary>
@@ -657,13 +756,15 @@ public sealed class Resource
         }
 
         Status = ResourceStatus.Rejected;
-        _link.CancelOutgoing(this);
         _link.ResourceConcluded(this);
-        var cb = Concluded;
-        if (cb is not null)
-        {
-            _link.Post(() => cb(this));
-        }
+        _workCancellation.Cancel();
+        ReleaseSource();
+        _partPackets = [];
+        _partMapHashes = [];
+        _partSent = [];
+        _hashmapFlat = [];
+        _metadataBlock = [];
+        PostTerminal();
     }
 
     // ---------------------------------------------------------------- receiver
@@ -675,18 +776,31 @@ public sealed class Resource
     }
 
     /// <summary>Upstream <c>Resource.accept</c>: starts receiving an advertised resource. Returns null when it is a duplicate or invalid.</summary>
-    internal static Resource? Accept(Link link, ResourceAdvertisement adv, Action<Resource>? callback, Action<Resource>? progress, byte[]? requestId)
+    internal static Resource? Accept(Link link, ResourceAdvertisement adv, Action<Resource>? callback, Action<Resource>? progress, byte[]? requestId,
+        bool internalCallback = false)
     {
+        Resource? resource = null;
         try
         {
-            var r = new Resource(link)
+            if (link.HasIncomingResource(adv.Hash)) return null;
+            var policy = link.ResourcePolicy;
+            policy.Validate();
+            if (adv.DataSize > policy.MaxDataSize || adv.TransferSize <= 0 || adv.Parts > policy.MaxParts ||
+                adv.TotalSegments > policy.MaxSegments || adv.TotalSegments != Math.Max(1L, ((adv.DataSize - 1) / MaxEfficientSize) + 1) ||
+                !link.CanAcceptResource(adv))
+            {
+                Reject(link, adv);
+                return null;
+            }
+
+            var r = resource = new Resource(link)
             {
                 Status = ResourceStatus.Transferring,
                 IsInitiator = false,
                 Concluded = callback,
+                InternalCallback = internalCallback,
                 _progressCallback = progress,
-                RequestId = requestId,
-                _advertisement = adv,
+                RequestId = requestId ?? adv.RequestId,
                 Size = adv.TransferSize,
                 TotalSize = adv.DataSize,
                 Hash = adv.Hash,
@@ -724,7 +838,16 @@ public sealed class Resource
 
             if (r.TotalSegments > 1)
             {
-                r._accumulator = link.SegmentAccumulatorFor(r.OriginalHash);
+                r._accumulator = link.SegmentAccumulatorFor(adv);
+                if (r._accumulator.NextSegment != r.SegmentIndex || r._accumulator.TotalSegments != r.TotalSegments ||
+                    r._accumulator.TotalSize != r.TotalSize || r._accumulator.Flags != (adv.Flags & ~0x02) ||
+                    !(r._accumulator.RequestId ?? []).AsSpan().SequenceEqual(adv.RequestId ?? []))
+                {
+                    Reject(link, adv);
+                    return null;
+                }
+                r._accumulator.LastActivity = link.Now;
+                r._accumulator.LastResource = r;
             }
 
             link.RegisterIncoming(r);
@@ -732,53 +855,66 @@ public sealed class Resource
             r.HashmapUpdate(0, adv.Hashmap);
             return r;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is InvalidDataException or IOException or InvalidOperationException or ArgumentException or OverflowException or FormatException)
         {
             link.Log($"Could not decode resource advertisement, dropping resource: {ex.Message}");
+            resource?.CancelLocked();
             return null;
         }
     }
 
     internal void HashmapUpdatePacket(ReadOnlySpan<byte> plaintext)
     {
-        if (Status == ResourceStatus.Failed || !_waitingForHmu)
+        if (Status >= ResourceStatus.Assembling || !_waitingForHmu)
         {
             return;
         }
 
+        if (plaintext.Length <= 32 || !plaintext[..32].SequenceEqual(Hash) ||
+            MsgPack.Unpack(plaintext[32..]) is not object?[] { Length: 2 } update ||
+            update[0] is not (byte or sbyte or short or ushort or int or uint or long or ulong) ||
+            update[1] is not byte[] hashmap)
+        {
+            throw new InvalidDataException("Invalid resource hashmap update.");
+        }
+
+        HashmapUpdate(checked((int)MsgPack.ToInt64(update[0])), hashmap);
         _lastActivity = _link.Now;
         _retriesLeft = MaxRetries;
-        if (MsgPack.Unpack(plaintext[32..]) is object?[] { Length: >= 2 } update && update[1] is byte[] hashmap)
-        {
-            HashmapUpdate((int)MsgPack.ToInt64(update[0]), hashmap);
-        }
     }
 
     private void HashmapUpdate(int segment, byte[] hashmap)
     {
-        if (Status == ResourceStatus.Failed)
+        if (Status >= ResourceStatus.Assembling)
         {
             return;
         }
 
         Status = ResourceStatus.Transferring;
         var hashes = hashmap.Length / MapHashLength;
-        if (hashes < 1 || ((long)segment * ResourceAdvertisement.HashmapMaxLength) + hashes > _hashmap.Length)
+        var start = (long)segment * ResourceAdvertisement.HashmapMaxLength;
+        if (segment < 0 || hashes < 1 || hashmap.Length % MapHashLength != 0 ||
+            start != _hashmapHeight || hashes != Math.Min(ResourceAdvertisement.HashmapMaxLength, _hashmap.Length - start))
         {
-            _link.Log("Invalid HMU received, cancelling transfer");
-            CancelLocked();
-            return;
+            throw new InvalidDataException("Noncontiguous or incorrectly sized resource hashmap update.");
         }
 
         for (var i = 0; i < hashes; i++)
         {
             var index = i + (segment * ResourceAdvertisement.HashmapMaxLength);
+            var hash = hashmap.AsSpan(i * MapHashLength, MapHashLength);
+            var guardStart = Math.Max(0, index - ResourceAdvertisement.CollisionGuardSize);
+            for (var previous = guardStart; previous < index; previous++)
+            {
+                if (_hashmap[previous] is { } earlier && earlier.AsSpan().SequenceEqual(hash))
+                    throw new InvalidDataException("Resource hashmap collision in the active guard window.");
+            }
             if (_hashmap[index] is null)
             {
                 _hashmapHeight++;
             }
 
-            _hashmap[index] = hashmap.AsSpan(i * MapHashLength, MapHashLength).ToArray();
+            _hashmap[index] = hash.ToArray();
         }
 
         _waitingForHmu = false;
@@ -814,9 +950,8 @@ public sealed class Resource
             return;
         }
 
+        if (packet.Payload.Length == 0 || packet.Payload.Length > _sdu) return;
         var now = _link.Now;
-        _lastActivity = now;
-        _retriesLeft = MaxRetries;
         if (_reqResp is null)
         {
             _reqResp = now;
@@ -858,7 +993,16 @@ public sealed class Resource
         {
             if (_hashmap[i] is { } h && h.AsSpan().SequenceEqual(partHash) && _parts[i] is null)
             {
+                var expectedLength = i == TotalParts - 1 ? Size - ((long)i * _sdu) : _sdu;
+                if (partData.Length != expectedLength)
+                {
+                    CancelLocked();
+                    return;
+                }
                 _parts[i] = partData;
+                _lastActivity = now;
+                _retriesLeft = MaxRetries;
+                if (_accumulator is { } accumulator) accumulator.LastActivity = now;
                 _rttRxdBytes += partData.Length;
                 _receivedCount++;
                 _outstanding--;
@@ -877,7 +1021,8 @@ public sealed class Resource
         {
             _assembling = true;
             Status = ResourceStatus.Assembling;
-            _ = Task.Run(Assemble);
+            _assemblyWork = Task.Run(Assemble);
+            _link.TrackResourceWork(_assemblyWork);
         }
         else if (_outstanding == 0)
         {
@@ -986,128 +1131,131 @@ public sealed class Resource
     private void Assemble()
     {
         byte[]? result = null;
-        var corrupt = false;
-        var oversize = false;
+        byte[]? payload = null;
+        byte[]? packedMetadata = null;
+        object? metadata = null;
         try
         {
-            var stream = new byte[Size];
+            var parts = _parts;
+            var cancellationToken = _workCancellation.Token;
+            cancellationToken.ThrowIfCancellationRequested();
+            var stream = new byte[checked((int)Size)];
             var offset = 0;
-            foreach (var p in _parts)
+            foreach (var p in parts)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 p!.CopyTo(stream, offset);
                 offset += p.Length;
             }
 
+            if (offset != Size) throw new InvalidDataException("Resource parts do not match the advertised size.");
             var plain = Encrypted ? _link.Decrypt(stream) : stream;
             if (plain is null || plain.Length < RandomHashSize)
             {
-                corrupt = true;
+                throw new InvalidDataException("Resource decryption failed.");
             }
-            else
-            {
-                var body = plain.AsSpan(RandomHashSize).ToArray();
-                if (Compressed)
-                {
-                    try
-                    {
-                        body = Bz2.Decompress(body, AutoCompressMaxSize);
-                    }
-                    catch (InvalidDataException)
-                    {
-                        oversize = true;
-                    }
-                }
 
-                if (!oversize)
-                {
-                    if (SHA256.HashData([.. body, .. RandomHash]).AsSpan().SequenceEqual(Hash))
-                    {
-                        result = body;
-                    }
-                    else
-                    {
-                        corrupt = true;
-                    }
-                }
+            var body = plain.AsSpan(RandomHashSize).ToArray();
+            var segmentLimit = Math.Min(_link.ResourcePolicy.MaxSegmentSize,
+                Math.Min(MaxEfficientSize, TotalSize - ((SegmentIndex - 1L) * MaxEfficientSize)));
+            if (Compressed)
+            {
+                body = Bz2.Decompress(body, segmentLimit, cancellationToken);
             }
+
+            if (body.LongLength != segmentLimit || !ComputeHash(body, RandomHash).AsSpan().SequenceEqual(Hash))
+                throw new InvalidDataException("Resource size or hash differs from its advertisement.");
+            result = body;
+            payload = result;
+            if (HasMetadata && SegmentIndex == 1)
+            {
+                if (result.Length < 3) throw new InvalidDataException("Truncated resource metadata header.");
+                var metadataSize = (result[0] << 16) | (result[1] << 8) | result[2];
+                if (metadataSize > _link.ResourcePolicy.MaxMetadataSize || metadataSize > result.Length - 3)
+                    throw new InvalidDataException("Invalid resource metadata length.");
+                packedMetadata = result.AsSpan(3, metadataSize).ToArray();
+                metadata = MsgPack.Unpack(packedMetadata);
+                payload = result.AsSpan(3 + metadataSize).ToArray();
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException) when (_workCancellation.IsCancellationRequested)
+        {
+            return;
         }
         catch (Exception ex)
         {
             _link.Log("Error while assembling received resource: " + ex.Message);
-            corrupt = true;
+            lock (_link.Gate)
+            {
+                if (Status < ResourceStatus.Complete)
+                {
+                    Status = ResourceStatus.Corrupt;
+                    CancelLocked();
+                }
+            }
+            return;
         }
 
         lock (_link.Gate)
         {
-            if (Status == ResourceStatus.Failed)
+            if (_workCancellation.IsCancellationRequested || Status != ResourceStatus.Assembling)
             {
                 return;
             }
 
-            if (oversize || corrupt || result is null)
+            try
             {
-                Status = ResourceStatus.Corrupt;
-                if (oversize)
+                if (_accumulator is { } accumulator)
                 {
-                    CancelLocked();
-                    return;
-                }
-            }
-            else
-            {
-                byte[] payload = result;
-                if (HasMetadata && SegmentIndex == 1)
-                {
-                    var metadataSize = (result[0] << 16) | (result[1] << 8) | result[2];
-                    var packed = result.AsSpan(3, metadataSize).ToArray();
-                    if (_accumulator is not null)
-                    {
-                        _accumulator.PackedMetadata = packed;
-                    }
-                    else
-                    {
-                        Metadata = MsgPack.Unpack(packed);
-                    }
-
-                    payload = result.AsSpan(3 + metadataSize).ToArray();
-                }
-
-                Status = ResourceStatus.Complete;
-                byte[] proof = [.. Hash, .. SHA256.HashData([.. result, .. Hash])];
-                _link.SendResourceProof(Packet.Create(PacketType.Proof, DestinationType.Link, _link.LinkId, proof, LinkContext.ResourcePrf));
-
-                if (_accumulator is not null)
-                {
-                    _accumulator.Data.Write(payload);
+                    accumulator.Data.Write(payload!);
+                    accumulator.ReceivedSize += result!.Length;
+                    accumulator.NextSegment++;
+                    accumulator.LastActivity = _link.Now;
+                    if (packedMetadata is not null) accumulator.PackedMetadata = packedMetadata;
                     if (SegmentIndex == TotalSegments)
                     {
-                        Data = _accumulator.Data.ToArray();
-                        if (_accumulator.PackedMetadata is { } pm)
+                        if (accumulator.ReceivedSize != TotalSize)
+                            throw new InvalidDataException("Multipart resource length mismatch.");
+                        Metadata = accumulator.PackedMetadata is { } packed ? MsgPack.Unpack(packed) : null;
+                        _completedStorage = accumulator.Data;
+                        Data = _completedStorage.ToMemory();
+                        if (_data is not null)
                         {
-                            Metadata = MsgPack.Unpack(pm);
+                            _completedStorage.Dispose();
+                            _completedStorage = null;
                         }
-
-                        _link.ForgetSegments(OriginalHash);
+                        _link.DetachSegments(OriginalHash);
+                        _accumulator = null;
                     }
                 }
                 else
                 {
-                    Data = payload;
+                    _completedStorage = new ResourceStorage(_link.ResourcePolicy);
+                    _completedStorage.Write(payload!);
+                    Data = _completedStorage.ToMemory();
+                    if (_data is not null)
+                    {
+                        _completedStorage.Dispose();
+                        _completedStorage = null;
+                    }
+                    Metadata = metadata;
                 }
-            }
 
-            _link.ResourceConcluded(this);
-            if (SegmentIndex == TotalSegments || Status == ResourceStatus.Corrupt)
-            {
-                var cb = Concluded;
-                if (cb is not null)
-                {
-                    _link.Post(() => cb(this));
-                }
+                byte[] proof = [.. Hash, .. ComputeExpectedProof(result!, Hash)];
+                _link.SendResourceProof(Packet.Create(PacketType.Proof, DestinationType.Link, _link.LinkId, proof,
+                    LinkContext.ResourcePrf, mtu: _link.Mtu));
+                Status = ResourceStatus.Complete;
+                _parts = [];
+                _hashmap = [];
+                _link.ResourceConcluded(this);
+                if (SegmentIndex == TotalSegments) PostTerminal();
             }
-            else
+            catch (Exception ex)
             {
-                _link.Log($"Resource segment {SegmentIndex} of {TotalSegments} received, waiting for next segment");
+                _link.Log("Completing received resource failed: " + ex.Message);
+                Status = ResourceStatus.Corrupt;
+                CancelLocked();
             }
         }
     }
@@ -1122,55 +1270,105 @@ public sealed class Resource
 
     internal void CancelLocked()
     {
-        if (_nextSegment is { } next)
+        if (_accumulator?.LastResource is { } current && !ReferenceEquals(current, this))
         {
-            _nextSegment = null;
-            if (next.IsCompletedSuccessfully) next.Result.CancelLocked();
-            else _ = next.ContinueWith(t =>
-            {
-                if (t.IsCompletedSuccessfully) t.Result.Cancel();
-                else if (t.IsFaulted) _ = t.Exception;
-            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            current.CancelLocked();
+            if (current.Status is ResourceStatus.Failed or ResourceStatus.Corrupt or ResourceStatus.Rejected)
+                Status = current.Status;
+            return;
         }
-        if (Status == ResourceStatus.Corrupt)
+        if (_nextSegment is { } next && Status == ResourceStatus.Complete)
         {
-            _link.CancelIncoming(this);
-            if (_advertisement is not null && _link.Status == LinkStatus.Active)
-            {
-                Reject(_link, _advertisement);
-            }
+            next.CancelLocked();
+            if (next.Status is ResourceStatus.Failed or ResourceStatus.Corrupt or ResourceStatus.Rejected)
+                Status = next.Status;
+            return;
+        }
+        if (Volatile.Read(ref _terminalPosted) != 0 || Status is ResourceStatus.Failed or ResourceStatus.Rejected ||
+            Status == ResourceStatus.Complete && SegmentIndex == TotalSegments)
+        {
+            return;
+        }
 
-            _link.Teardown();
-        }
-        else if (Status < ResourceStatus.Complete || (IsInitiator && Status == ResourceStatus.Complete && SegmentIndex < TotalSegments))
+        var wasQueued = Status is ResourceStatus.Queued or ResourceStatus.None;
+        if (Status != ResourceStatus.Corrupt) Status = ResourceStatus.Failed;
+        _workCancellation.Cancel();
+        ReleaseSource();
+        _partPackets = [];
+        _partMapHashes = [];
+        _partSent = [];
+        _hashmapFlat = [];
+        _metadataBlock = [];
+        _parts = [];
+        _hashmap = [];
+        _requestHashes.Clear();
+        ReleaseReceiveStorage();
+        try
         {
-            Status = ResourceStatus.Failed;
-            if (_accumulator is not null)
-            {
-                _link.ForgetSegments(OriginalHash);
-                _accumulator = null;
-            }
-            if (_link.Status == LinkStatus.Active)
+            if (!wasQueued && _link.Status == LinkStatus.Active && Hash.Length == 32)
             {
                 _link.SendWithContext(Hash, IsInitiator ? LinkContext.ResourceIcl : LinkContext.ResourceRcl, createReceipt: false, encrypt: true);
             }
-
-            if (IsInitiator)
-            {
-                _link.CancelOutgoing(this);
-            }
-            else
-            {
-                _link.CancelIncoming(this);
-            }
-
-            _link.ResourceConcluded(this);
-            var cb = Concluded;
-            if (cb is not null)
-            {
-                _link.Post(() => cb(this));
-            }
         }
+        catch (Exception ex)
+        {
+            _link.Log("Sending resource cancellation failed: " + ex.Message);
+        }
+        finally
+        {
+            _link.ResourceConcluded(this);
+            PostTerminal();
+        }
+    }
+
+    private void PostTerminal()
+    {
+        if (Interlocked.Exchange(ref _terminalPosted, 1) == 0 && Concluded is { } callback)
+        {
+            if (InternalCallback) callback(this);
+            else _link.Post(() => callback(this));
+        }
+    }
+
+    private void ReleaseSource()
+    {
+        try { _source?.Dispose(); }
+        catch (Exception ex) { _link.Log("Disposing resource input failed: " + ex.Message); }
+    }
+
+    private void ReleaseReceiveStorage()
+    {
+        if (_accumulator is not null)
+        {
+            try { _link.ForgetSegments(OriginalHash); }
+            catch (Exception ex) { _link.Log("Disposing multipart resource storage failed: " + ex.Message); }
+            finally { _accumulator = null; }
+        }
+        if (_completedStorage is { } storage)
+        {
+            try { storage.Dispose(); }
+            catch (Exception ex) { _link.Log("Disposing completed resource storage failed: " + ex.Message); }
+            finally { _completedStorage = null; }
+        }
+    }
+
+    public void Dispose()
+    {
+        lock (_link.Gate)
+        {
+            if (_disposed) return;
+            CancelLocked();
+            ReleaseReceiveStorage();
+            _link.ForgetCompletedResource(this);
+            _disposed = true;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Dispose();
+        await _assemblyWork.ConfigureAwait(false);
+        if (_nextSegment is { } next) await next.DisposeAsync().ConfigureAwait(false);
     }
 
     /// <summary>The sender cancelled; the receiver echoes a reject like upstream.</summary>
@@ -1275,7 +1473,8 @@ public sealed class Resource
         var cb = _progressCallback;
         if (cb is not null)
         {
-            _link.Post(() => cb(this));
+            if (InternalCallback) cb(this);
+            else _link.Post(() => cb(this));
         }
     }
 

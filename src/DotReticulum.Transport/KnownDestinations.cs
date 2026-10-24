@@ -36,6 +36,7 @@ public sealed class KnownDestinations
 
     private readonly object _gate = new();
     private readonly Dictionary<string, KnownDestination> _entries = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, byte[]> _locals = new(StringComparer.Ordinal);
     private readonly TimeProvider _time;
 
     public KnownDestinations(int capacity = DefaultCapacity, TimeProvider? timeProvider = null)
@@ -55,6 +56,26 @@ public sealed class KnownDestinations
     private long NowUnix => _time.GetUtcNow().ToUnixTimeSeconds();
 
     private static string Key(ReadOnlySpan<byte> hash) => Convert.ToHexStringLower(hash);
+
+    /// <summary>Registers a public-only local fallback, kept separate from persisted remote announcements.
+    /// Registration ownership belongs to the router; duplicate local hashes are rejected.</summary>
+    public void RegisterLocal(ReadOnlySpan<byte> destinationHash, Identity identity)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        if (destinationHash.Length != Destination.HashLength) throw new ArgumentException("Destination hash must be 16 bytes.", nameof(destinationHash));
+        var publicKey = identity.ExportPublicKey();
+        lock (_gate)
+        {
+            if (_locals.ContainsKey(Key(destinationHash))) throw new InvalidOperationException("A local destination with this hash is already registered.");
+            if (_locals.Count >= Capacity) throw new InvalidOperationException("Local destination capacity is exhausted.");
+            _locals.Add(Key(destinationHash), publicKey);
+        }
+    }
+
+    public bool UnregisterLocal(ReadOnlySpan<byte> destinationHash)
+    {
+        lock (_gate) return _locals.Remove(Key(destinationHash));
+    }
 
     /// <summary>Upstream <c>Identity.remember</c> (+ <c>_remember_ratchet</c> when a ratchet was announced).</summary>
     public void Remember(ReadOnlySpan<byte> destinationHash, ReadOnlySpan<byte> packetHash, ReadOnlySpan<byte> publicKey, byte[]? appData, byte[]? ratchet = null)
@@ -98,6 +119,7 @@ public sealed class KnownDestinations
     public Identity? Recall(ReadOnlySpan<byte> targetHash, bool fromIdentityHash = false, bool markUsed = true)
     {
         byte[]? publicKey = null;
+        byte[]? appData = null;
         lock (_gate)
         {
             if (fromIdentityHash)
@@ -107,6 +129,7 @@ public sealed class KnownDestinations
                     if (Identity.TruncatedHash(entry.PublicKey).AsSpan().SequenceEqual(targetHash))
                     {
                         publicKey = entry.PublicKey;
+                        appData = entry.AppData?.ToArray();
                         if (markUsed) MarkUsed(hash, entry);
                         break;
                     }
@@ -115,11 +138,17 @@ public sealed class KnownDestinations
             else if (_entries.TryGetValue(Key(targetHash), out var e))
             {
                 publicKey = e.PublicKey;
+                appData = e.AppData?.ToArray();
                 if (markUsed) MarkUsed(Key(targetHash), e);
             }
+            else if (_locals.TryGetValue(Key(targetHash), out var localKey))
+                publicKey = localKey;
         }
 
-        return publicKey is null ? null : Identity.FromPublicKey(publicKey);
+        if (publicKey is null) return null;
+        var recalled = Identity.FromPublicKey(publicKey);
+        recalled.AppData = appData;
+        return recalled;
     }
 
     /// <summary>Upstream <c>Identity.recall_app_data</c>.</summary>

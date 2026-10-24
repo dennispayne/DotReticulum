@@ -24,6 +24,7 @@ public sealed partial class RnsdHost : IAsyncDisposable
     private readonly BlackholeStore _blackholes;
     private readonly RuntimeStateStore _stateStore;
     private readonly string _storageDirectory;
+    private readonly string _resourceStorageDirectory;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _lifecycleGate = new();
     private Task? _startTask;
@@ -56,6 +57,11 @@ public sealed partial class RnsdHost : IAsyncDisposable
         _shared = shared;
         _blackholes = blackholes;
         _storageDirectory = storageDirectory;
+        _resourceStorageDirectory = Path.Combine(storageDirectory, "resources");
+        Router.Links.DefaultResourcePolicy = Router.Links.DefaultResourcePolicy with
+        {
+            StorageDirectory = _resourceStorageDirectory,
+        };
         _stateStore = new RuntimeStateStore(storageDirectory);
         _executionPolicy = executionPolicy;
         _timeProvider = timeProvider;

@@ -20,7 +20,7 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
     }
 
     // One read/write at a time per direction; no unbounded task or byte queue.
-    private sealed class ImpairedBridge(int targetPort) : IAsyncDisposable
+    internal sealed class ImpairedBridge(int targetPort, int bitrate = 64_000, int latencyMilliseconds = 20) : IAsyncDisposable
     {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
         private readonly CancellationTokenSource _stop = new();
@@ -31,6 +31,8 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
         private int _sessions;
         private int _dropFrames;
         private int _dropped;
+        private int _dropChannelUp, _dropChannelDown;
+        private int _dropAllChannels;
         public int Sessions => Volatile.Read(ref _sessions);
         public int Dropped => Volatile.Read(ref _dropped);
         public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
@@ -42,6 +44,8 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
         }
 
         public void DropNextFrame() => Interlocked.Exchange(ref _dropFrames, 1);
+        public void DropNextChannel(bool fromPython) => Interlocked.Exchange(ref (fromPython ? ref _dropChannelUp : ref _dropChannelDown), 1);
+        public void DropAllChannels(bool enabled) => Volatile.Write(ref _dropAllChannels, enabled ? 1 : 0);
 
         public void Disconnect()
         {
@@ -85,16 +89,17 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
                 {
                     var value = input[index];
                     frame.Add(value);
-                    if (frame.Count > 65_536) throw new InvalidDataException("Test bridge received an unbounded HDLC frame.");
+                    if (frame.Count > (InterfaceAccessCode.MaximumPacketSize + 64) * 2 + 2)
+                        throw new InvalidDataException("Test bridge received an unbounded HDLC frame.");
                     if (value != 0x7e) continue;
                     if (frame.Count > 2)
                     {
-                        if (impair && Interlocked.Exchange(ref _dropFrames, 0) != 0)
+                        if ((impair && Interlocked.Exchange(ref _dropFrames, 0) != 0) || DropChannel(frame, impair))
                             Interlocked.Increment(ref _dropped);
                         else
                         {
                             // 20 ms one-way latency plus a 64 kbit/s serialization delay.
-                            await Task.Delay(TimeSpan.FromMilliseconds(20 + frame.Count * 8.0 / 64), token);
+                            await Task.Delay(TimeSpan.FromMilliseconds(latencyMilliseconds + frame.Count * 8_000.0 / bitrate), token);
                             await to.WriteAsync(frame.ToArray(), token);
                         }
                     }
@@ -102,6 +107,23 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
                     frame.Add(0x7e);
                 }
             }
+        }
+
+        private bool DropChannel(List<byte> frame, bool fromPython)
+        {
+            var decoded = new List<byte>(frame.Count);
+            var escape = false;
+            foreach (var value in frame)
+            {
+                if (value == 0x7e) continue;
+                if (escape) { decoded.Add((byte)(value ^ 0x20)); escape = false; }
+                else if (value == 0x7d) escape = true;
+                else decoded.Add(value);
+            }
+            if (!Packet.TryParse(decoded.ToArray(), out var packet, InterfaceAccessCode.MaximumPacketSize)
+                || packet.Context != DotReticulum.Transport.LinkContext.Channel) return false;
+            return Volatile.Read(ref _dropAllChannels) != 0
+                || Interlocked.Exchange(ref (fromPython ? ref _dropChannelUp : ref _dropChannelDown), 0) != 0;
         }
 
         public async ValueTask DisposeAsync()

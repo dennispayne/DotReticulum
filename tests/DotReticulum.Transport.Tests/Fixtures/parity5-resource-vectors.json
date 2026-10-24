@@ -1,0 +1,78 @@
+{
+  "pinned": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "resourceSourceSha256": "9e4543ee19255ab7269d8861a2d977587319968b7986f4846d75ee7dba453699",
+  "module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "payloadSha256": "5705022bf17cab1da4d05fa6d453da49bcce6ba76dd080d16c00c57eced3f6cc",
+  "segments": [
+    {
+      "index": 1,
+      "segments": 3,
+      "totalSize": 2097207,
+      "bodySize": 1048575,
+      "bodySha256": "da8222d84eca9cabebc3939810943f21a8d3642e33b533033518a755d0d59498",
+      "metadataSize": 20,
+      "hasMetadata": true
+    },
+    {
+      "index": 2,
+      "segments": 3,
+      "totalSize": 2097207,
+      "bodySize": 1048575,
+      "bodySha256": "e8c38735b568290017c26f5400a714fbe64aad42edf0d88155b70ce4cb232562",
+      "metadataSize": 20,
+      "hasMetadata": true
+    },
+    {
+      "index": 3,
+      "segments": 3,
+      "totalSize": 2097207,
+      "bodySize": 57,
+      "bodySha256": "2620f5feb57a1f4dd379db4e24ed753f8e02b8f4e5d4670b0ce1bea90b1189ed",
+      "metadataSize": 20,
+      "hasMetadata": true
+    }
+  ],
+  "compressedExpansion": "425a6839314159265359bcd1c974000081020090000008200030802a6950059807177245385090bcd1c974",
+  "compressionLimits": [
+    {
+      "limit": 0,
+      "length": 0,
+      "eof": false
+    },
+    {
+      "limit": 65536,
+      "length": 65536,
+      "eof": false
+    },
+    {
+      "limit": 65537,
+      "length": 65537,
+      "eof": true
+    }
+  ],
+  "truncatedCompressionEof": false,
+  "reticulumSourceSha256": "c655675a799413d9bb11d44ab90d56bc1f4fe339fee1ee5d108754dc8bf812d7",
+  "resourceCacheAge": 86400,
+  "resourceCacheCleanup": [
+    {
+      "label": "expired",
+      "age": 86401,
+      "retained": false
+    },
+    {
+      "label": "boundary",
+      "age": 86400,
+      "retained": true
+    },
+    {
+      "label": "fresh",
+      "age": 86399,
+      "retained": true
+    },
+    {
+      "label": "unrelated",
+      "age": 86401,
+      "retained": true
+    }
+  ]
+}

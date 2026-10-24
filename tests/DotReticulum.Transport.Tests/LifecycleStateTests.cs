@@ -152,7 +152,7 @@ public class LifecycleStateTests
         await using var manager = new PacketInterfaceManager([iface]);
         using var identity = Identity.Generate();
         var destination = Destination.Create(DestinationType.Single, "lifecycle", ["dedup"], identity);
-        var packet = Packet.Create(PacketType.Data, DestinationType.Single, destination.Hash, new byte[] { 1 });
+        var packet = Packet.Create(PacketType.Data, DestinationType.Single, destination.Hash, identity.Encrypt(new byte[] { 1 }));
         await using var source = new TransportRouter(manager);
         await source.HandleAsync(new ReceivedPacket(packet.ToArray(), packet, iface));
         var state = source.ExportState(_ => InterfaceHash);
@@ -162,13 +162,14 @@ public class LifecycleStateTests
         var deliveries = 0;
         restarted.RegisterLocalDestination(new LocalDestination(identity, destination)
         {
-            PacketReceived = _ => { deliveries++; return ValueTask.CompletedTask; },
+            PacketReceived = _ => { Interlocked.Increment(ref deliveries); return ValueTask.CompletedTask; },
         });
         restarted.ImportState(state, _ => iface);
         await restarted.HandleAsync(new ReceivedPacket(packet.ToArray(), packet, iface));
         Assert.Equal(0, deliveries);
-        var unseen = Packet.Create(PacketType.Data, DestinationType.Single, destination.Hash, new byte[] { 2 });
+        var unseen = Packet.Create(PacketType.Data, DestinationType.Single, destination.Hash, identity.Encrypt(new byte[] { 2 }));
         await restarted.HandleAsync(new ReceivedPacket(unseen.ToArray(), unseen, iface));
+        await LinkTests.Until(() => Volatile.Read(ref deliveries) == 1);
         Assert.Equal(1, deliveries);
     }
 }

@@ -65,21 +65,42 @@ public sealed class TransportRouterOptions
 }
 
 /// <summary>A destination hosted by this node. Delivery of packets addressed to it goes to <see cref="PacketReceived"/>.</summary>
-public sealed class LocalDestination(Identity identity, Destination destination)
+public sealed class LocalDestination(Identity identity, Destination destination,
+    DestinationDirection direction = DestinationDirection.In, TimeProvider? timeProvider = null) : IDisposable
 {
+    private readonly DestinationEndpoint _endpoint = new(destination.Type == DestinationType.Plain ? null : identity,
+        destination, direction, timeProvider);
     public Identity Identity { get; } = identity;
     public Destination Destination { get; } = destination;
-    public byte[]? AppData { get; init; }
-    public DestinationRatchets? Ratchets { get; init; }
+    public DestinationDirection Direction => _endpoint.Direction;
+    private byte[]? _appData;
+    public byte[]? AppData
+    {
+        get => _appData?.ToArray();
+        init { _appData = value?.ToArray(); _endpoint.SetDefaultAppData(value); }
+    }
+    public DestinationRatchets? Ratchets { get => _endpoint.Ratchets; init => _endpoint.Ratchets = value; }
+    public void SetDefaultAppData(byte[]? data) => _endpoint.SetDefaultAppData(data);
+    public void SetDefaultAppDataProvider(Func<byte[]?>? provider) => _endpoint.SetDefaultAppDataProvider(provider);
+    public Packet CreateAnnounce(byte[]? appData = null, bool pathResponse = false, byte[]? tag = null) =>
+        _endpoint.CreateAnnounce(appData, pathResponse, tag);
+    public void CreateGroupKey() => _endpoint.CreateGroupKey();
+    public void LoadGroupKey(ReadOnlySpan<byte> key) => _endpoint.LoadGroupKey(key);
+    public byte[] ExportGroupKey() => _endpoint.ExportGroupKey();
+    public byte[] Encrypt(ReadOnlySpan<byte> plaintext) => _endpoint.Encrypt(plaintext);
+    public void Dispose() => _endpoint.Dispose();
 
     /// <summary>Receives non-announce packets whose destination hash is this destination (payload still encrypted).</summary>
     public Func<ReceivedPacket, ValueTask>? PacketReceived { get; set; }
+    /// <summary>Receives authenticated plaintext after core decryption, independently of raw packet observers.</summary>
+    public Func<byte[], ReceivedPacket, ValueTask>? PacketDecrypted { get; set; }
 
     /// <summary>Decrypts a token addressed to this destination, honouring ratchets (null when it cannot be decrypted).</summary>
-    public byte[]? Decrypt(ReadOnlySpan<byte> token) => Ratchets is { } ratchets ? ratchets.Decrypt(Identity, token) : Identity.Decrypt(token);
+    public byte[]? Decrypt(ReadOnlySpan<byte> token) => _endpoint.Decrypt(token);
+    public IdentityDecryptionResult? DecryptWithMetadata(ReadOnlySpan<byte> token) => _endpoint.DecryptWithMetadata(token);
 
     /// <summary>Upstream <c>accepts_links</c>: whether incoming link requests to this destination are accepted.</summary>
-    public bool AcceptLinks { get; set; }
+    public bool AcceptLinks { get => _endpoint.AcceptLinks; set => _endpoint.AcceptLinks = value; }
 
     /// <summary>Called once an incoming link is established (after the initiator's RTT packet).</summary>
     public Action<Link>? LinkEstablished { get; set; }
@@ -97,11 +118,22 @@ public sealed class LocalDestination(Identity identity, Destination destination)
 
     /// <summary>Upstream <c>register_request_handler</c>.</summary>
     public void RegisterRequestHandler(string path, Func<RequestContext, object?> generator, RequestPolicy allow = RequestPolicy.None,
-        IReadOnlyCollection<byte[]>? allowedList = null, bool autoCompress = true)
+        IReadOnlyCollection<byte[]>? allowedList = null, bool autoCompress = true, bool useApplicationValues = false)
+    {
+        ArgumentNullException.ThrowIfNull(generator);
+        RegisterAsyncRequestHandler(path, (context, _) => ValueTask.FromResult(generator(context)), allow, allowedList, autoCompress, useApplicationValues);
+    }
+
+    /// <summary>Registers owned asynchronous request work, cancelled when its link closes or the manager stops.</summary>
+    public void RegisterAsyncRequestHandler(string path, Func<RequestContext, CancellationToken, ValueTask<object?>> generator,
+        RequestPolicy allow = RequestPolicy.None, IReadOnlyCollection<byte[]>? allowedList = null, bool autoCompress = true, bool useApplicationValues = false)
     {
         if (string.IsNullOrEmpty(path)) throw new ArgumentException("Invalid path specified", nameof(path));
         ArgumentNullException.ThrowIfNull(generator);
-        lock (_requestHandlers) _requestHandlers[PathKey(path)] = new RequestHandler(path, generator, allow, allowedList, autoCompress);
+        if (!Enum.IsDefined(allow)) throw new ArgumentOutOfRangeException(nameof(allow));
+        if (allowedList is not null && allowedList.Any(hash => hash is not { Length: Destination.HashLength }))
+            throw new ArgumentException("Allowed identities must be 16-byte hashes.", nameof(allowedList));
+        lock (_requestHandlers) _requestHandlers[PathKey(path)] = new RequestHandler(path, generator, allow, allowedList, autoCompress, useApplicationValues);
     }
 
     public bool DeregisterRequestHandler(string path)
@@ -243,15 +275,38 @@ public sealed partial class TransportRouter : IAsyncDisposable
     public void RegisterLocalDestination(LocalDestination destination)
     {
         ArgumentNullException.ThrowIfNull(destination);
-        lock (_gate) _locals[Convert.ToHexStringLower(destination.Destination.Hash)] = destination;
-        Engine.RegisterLocalDestination(destination.Destination.Hash);
+        if (destination.Direction != DestinationDirection.In)
+            throw new ArgumentException("Only incoming endpoints can be registered locally.", nameof(destination));
+        lock (_gate)
+        {
+            var key = Convert.ToHexStringLower(destination.Destination.Hash);
+            if (_locals.ContainsKey(key)) throw new InvalidOperationException("A local destination with this hash is already registered.");
+            if (destination.Destination.Type != DestinationType.Plain) Engine.Known.RegisterLocal(destination.Destination.Hash, destination.Identity);
+            try
+            {
+                _locals.Add(key, destination);
+                Engine.RegisterLocalDestination(destination.Destination.Hash);
+            }
+            catch
+            {
+                _locals.Remove(key);
+                Engine.Known.UnregisterLocal(destination.Destination.Hash);
+                throw;
+            }
+        }
     }
 
     public void DeregisterLocalDestination(LocalDestination destination)
     {
         ArgumentNullException.ThrowIfNull(destination);
-        lock (_gate) _locals.Remove(Convert.ToHexStringLower(destination.Destination.Hash));
-        Engine.DeregisterLocalDestination(destination.Destination.Hash);
+        lock (_gate)
+        {
+            var key = Convert.ToHexStringLower(destination.Destination.Hash);
+            if (!_locals.TryGetValue(key, out var current) || !ReferenceEquals(current, destination)) return;
+            _locals.Remove(key);
+            Engine.Known.UnregisterLocal(destination.Destination.Hash);
+            Engine.DeregisterLocalDestination(destination.Destination.Hash);
+        }
     }
 
     public bool HasPath(ReadOnlySpan<byte> destinationHash) => Engine.GetPath(destinationHash) is not null;
@@ -485,11 +540,12 @@ public sealed partial class TransportRouter : IAsyncDisposable
     }
 
     /// <summary>Announces a local destination on every interface (or only <paramref name="onlyOn"/>), optionally as a path response.</summary>
-    public async ValueTask AnnounceAsync(LocalDestination destination, IPacketInterface? onlyOn = null, bool pathResponse = false, CancellationToken cancellationToken = default)
+    public async ValueTask AnnounceAsync(LocalDestination destination, IPacketInterface? onlyOn = null, bool pathResponse = false,
+        CancellationToken cancellationToken = default, byte[]? appData = null, byte[]? tag = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(destination);
-        var packet = Announce.Create(destination.Identity, destination.Destination, destination.AppData, destination.Ratchets, pathResponse);
+        var packet = destination.CreateAnnounce(appData, pathResponse, tag);
         await SendAnnounceControlledAsync(packet, null, onlyOn, cancellationToken).ConfigureAwait(false);
     }
 
@@ -694,7 +750,7 @@ public sealed partial class TransportRouter : IAsyncDisposable
         if (raw.Length - headerSize != Link.EcPubSize + Link.SignallingSize) return raw;
         if (!outbound.SupportsMtuDiscovery) return raw[..^Link.SignallingSize];
         var signalling = raw.AsSpan(raw.Length - Link.SignallingSize);
-        var mtu = Math.Min(Packet.Mtu, Math.Min(Math.Max(Packet.Mtu, ingress.HardwareMtu), Math.Max(Packet.Mtu, outbound.HardwareMtu)));
+        var mtu = Math.Min(Link.MaximumOperationalMtu, Math.Min(Link.InterfaceMtu(ingress), Link.InterfaceMtu(outbound)));
         if (Link.MtuFromSignalling(signalling) <= mtu) return raw;
         Link.SignallingBytes(mtu, Link.ModeFromSignalling(signalling)).CopyTo(signalling);
         return raw;
@@ -815,13 +871,39 @@ public sealed partial class TransportRouter : IAsyncDisposable
         lock (_gate) _locals.TryGetValue(Convert.ToHexStringLower(received.Packet.DestinationHash.Span), out local);
         if (local is not null && local.Destination.Type == received.Packet.DestinationType)
         {
-            if (received.Packet.PacketType == PacketType.Data) await ProveIfRequiredAsync(local, received).ConfigureAwait(false);
+            if (received.Packet.PacketType == PacketType.Data)
+            {
+                IdentityDecryptionResult? decryption;
+                try { decryption = local.DecryptWithMetadata(received.Packet.Payload.Span); }
+                catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException
+                    or InvalidOperationException or CryptographicException)
+                {
+                    Log?.Invoke($"Local decryption/reload failed for {Convert.ToHexStringLower(local.Destination.Hash)}: {exception.Message}");
+                    return;
+                }
+                if (decryption is null)
+                {
+                    Log?.Invoke($"Rejected undecryptable packet for {Convert.ToHexStringLower(local.Destination.Hash)}");
+                    return;
+                }
+                var plaintext = decryption.Plaintext;
+                received = received with { RatchetId = decryption.RatchetId };
+                await ProveIfRequiredAsync(local, received).ConfigureAwait(false);
+                if (local.PacketDecrypted is { } decryptedHandlers)
+                    foreach (Func<byte[], ReceivedPacket, ValueTask> handler in decryptedHandlers.GetInvocationList())
+                        Links.DispatchAsync(async () =>
+                        {
+                            try { await handler(plaintext, received).ConfigureAwait(false); }
+                            catch (Exception ex) { Engine.ReportCallbackError(nameof(local.PacketDecrypted), received.Packet.DestinationHash.Span, ex); }
+                        });
+            }
             if (local.PacketReceived is { } handlers)
                 foreach (Func<ReceivedPacket, ValueTask> handler in handlers.GetInvocationList())
-                {
-                    try { await handler(received).ConfigureAwait(false); }
-                    catch (Exception ex) { Engine.ReportCallbackError(nameof(local.PacketReceived), received.Packet.DestinationHash.Span, ex); }
-                }
+                    Links.DispatchAsync(async () =>
+                    {
+                        try { await handler(received).ConfigureAwait(false); }
+                        catch (Exception ex) { Engine.ReportCallbackError(nameof(local.PacketReceived), received.Packet.DestinationHash.Span, ex); }
+                    });
         }
     }
 
@@ -858,7 +940,7 @@ public sealed partial class TransportRouter : IAsyncDisposable
         lock (_gate) _locals.TryGetValue(key, out local);
         if (local is not null)
         {
-            await AnnounceAsync(local, attached, pathResponse: true, cancellationToken).ConfigureAwait(false);
+            await AnnounceAsync(local, attached, pathResponse: true, cancellationToken, tag: tag).ConfigureAwait(false);
             return;
         }
 

@@ -159,7 +159,7 @@ BeforeAll {
     $fixtureTool = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\Interop\CreateRngitFixture.cs')).Path
     function Invoke-FixtureTool {
         param([string[]] $Arguments)
-        $result = Invoke-GitRemoteProcess 'dotnet' (@('run', '--file', $fixtureTool, '--verbosity', 'quiet', '--') + $Arguments) `
+        $result = Invoke-GitRemoteProcess 'dotnet' (@('run', '--disable-build-servers', '--file', $fixtureTool, '--verbosity', 'quiet', '--') + $Arguments) `
             -Environment $environment -TimeoutSeconds 120
         if ($result.Code -ne 0) { throw "C# Git fixture failed: $($result.Error)$($result.Output)" }
         $result.Output | ConvertFrom-Json

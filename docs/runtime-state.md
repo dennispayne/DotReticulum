@@ -137,6 +137,13 @@ a borrowed snapshot valid during the call; the ring zeroes/disposes it on succes
 Callbacks may inspect but must not mutate or dispose the ring; reentrant mutation is rejected.
 Snapshot imports intentionally create independent **unbound** rings, not duplicate persistence owners.
 
+Decryption failure reloads authenticated keys and retries, without replacing live
+rotation/retention/enforcement policy or binding later reads to the opening token.
+Missing or corrupt reload files fail explicitly while preserving usable in-memory
+keys. Selected-ratchet IDs are detached per-delivery metadata, not shared mutable
+identity state. See [endpoint ownership](endpoints.md) for signed upstream-format
+file interchange and intentional recovery differences.
+
 Every write stages an exclusively created same-directory file, flushes its contents, and atomically
 renames it into place. Cancellation before publication preserves the preceding generation.
 Files are created owner-readable/writable only on Unix; Windows inherits the directory ACL,
@@ -154,3 +161,9 @@ entries. Capture validates before replacing the committed generation.
 `DestinationRatchetSnapshot` owns its cloned secrets and must be disposed; persistence zeroes its
 owned secret snapshots and serialized secret buffers on success, failure and cancellation.
 Ratchet decrypt/rotate/trim/dispose share one lock so a private key cannot be zeroed while in use.
+
+New streamed resource storage defaults to `<config>/storage/resources` for daemon
+and application nodes. Startup and 15-minute maintenance perform bounded,
+owner-marked 24-hour scavenging; active native files, unrelated names and other
+configuration directories are not deleted. Resource files are ephemeral, not a
+cross-restart transfer-resume format. See [resource storage](resources.md).

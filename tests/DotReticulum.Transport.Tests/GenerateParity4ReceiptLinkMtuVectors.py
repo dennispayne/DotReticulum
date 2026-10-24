@@ -66,7 +66,7 @@ link_module = sys.modules["RNS.Link"]
 original_key = link_module.X25519PrivateKey
 link_module.X25519PrivateKey = SimpleNamespace(
     generate=lambda: X25519PrivateKey.from_private_bytes(RESP_X))
-for mtu in (None, 0, 500, 1024, 16384, 262144, 2097151):
+for mtu in (None, 0, 500, 1024, 16384, 262144, 524288, 2097151):
     signalling = b"" if mtu is None else RNS.Link.signalling_bytes(mtu, RNS.Link.MODE_AES256_CBC)
     packet = RNS.Packet(remote, pub + sigpub + signalling, packet_type=RNS.Packet.LINKREQUEST)
     packet.pack()

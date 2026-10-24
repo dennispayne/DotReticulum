@@ -16,6 +16,7 @@ public sealed class Identity : IDisposable
     private const int HalfKey = 32;
 
     private readonly byte[] _publicKey;
+    private readonly object _gate = new();
     private byte[]? _privateKey;
     private bool _disposed;
 
@@ -33,15 +34,25 @@ public sealed class Identity : IDisposable
 
     public bool HasPrivateKey => _privateKey is not null;
 
+    /// <summary>Last announced application data when recalled from a destination cache.</summary>
+    public byte[]? AppData { get; set; }
+
     public static Identity Generate()
     {
         var x = X25519.GeneratePrivateKey();
         var ed = Ed25519.GenerateSeed();
-        try { return FromPrivateKey(x.Concat(ed).ToArray()); }
+        var privateKey = new byte[KeySize];
+        try
+        {
+            x.CopyTo(privateKey, 0);
+            ed.CopyTo(privateKey, HalfKey);
+            return FromPrivateKey(privateKey);
+        }
         finally
         {
             CryptographicOperations.ZeroMemory(x);
             CryptographicOperations.ZeroMemory(ed);
+            CryptographicOperations.ZeroMemory(privateKey);
         }
     }
 
@@ -76,15 +87,21 @@ public sealed class Identity : IDisposable
 
     public byte[] ExportPrivateKey()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return (_privateKey ?? throw new InvalidOperationException("Identity does not hold a private key.")).ToArray();
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return (_privateKey ?? throw new InvalidOperationException("Identity does not hold a private key.")).ToArray();
+        }
     }
 
     public byte[] Sign(ReadOnlySpan<byte> message)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        var key = _privateKey ?? throw new InvalidOperationException("Signing failed because identity does not hold a private key.");
-        return Ed25519.Sign(key.AsSpan(HalfKey), message);
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var key = _privateKey ?? throw new InvalidOperationException("Signing failed because identity does not hold a private key.");
+            return Ed25519.Sign(key.AsSpan(HalfKey), message);
+        }
     }
 
     public bool Verify(ReadOnlySpan<byte> signature, ReadOnlySpan<byte> message)
@@ -129,6 +146,17 @@ public sealed class Identity : IDisposable
     /// throws if the identity has no private key.
     /// </summary>
     public byte[]? Decrypt(ReadOnlySpan<byte> token, IReadOnlyList<byte[]>? ratchets = null, bool enforceRatchets = false)
+        => DecryptWithMetadata(token, ratchets, enforceRatchets)?.Plaintext;
+
+    /// <summary>Decrypts and reports the actual selected ratchet, including an older retained key.
+    /// Base-key fallback has a null ratchet ID. Failure returns null, so stale metadata cannot escape from a previous call.</summary>
+    public IdentityDecryptionResult? DecryptWithMetadata(ReadOnlySpan<byte> token, IReadOnlyList<byte[]>? ratchets = null,
+        bool enforceRatchets = false)
+    {
+        lock (_gate) return DecryptCore(token, ratchets, enforceRatchets);
+    }
+
+    private IdentityDecryptionResult? DecryptCore(ReadOnlySpan<byte> token, IReadOnlyList<byte[]>? ratchets, bool enforceRatchets)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         var key = _privateKey ?? throw new InvalidOperationException("Decryption failed because identity does not hold a private key.");
@@ -143,12 +171,14 @@ public sealed class Identity : IDisposable
             {
                 if (ratchet is null || ratchet.Length != RatchetSize) continue;
                 var plaintext = TryDecryptWith(ratchet, peer, body);
-                if (plaintext is not null) return plaintext;
+                if (plaintext is not null)
+                    return new IdentityDecryptionResult(plaintext, DestinationRatchets.GetRatchetId(X25519.GetPublicKey(ratchet)));
             }
         }
 
         if (enforceRatchets) return null;
-        return TryDecryptWith(key.AsSpan(0, HalfKey), peer, body);
+        var fallback = TryDecryptWith(key.AsSpan(0, HalfKey), peer, body);
+        return fallback is null ? null : new IdentityDecryptionResult(fallback, null);
     }
 
     private byte[]? TryDecryptWith(ReadOnlySpan<byte> x25519Private, ReadOnlySpan<byte> peer, ReadOnlySpan<byte> body)
@@ -172,9 +202,12 @@ public sealed class Identity : IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
-        if (_privateKey is not null) CryptographicOperations.ZeroMemory(_privateKey);
-        _privateKey = null;
+        lock (_gate)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            if (_privateKey is not null) CryptographicOperations.ZeroMemory(_privateKey);
+            _privateKey = null;
+        }
     }
 }

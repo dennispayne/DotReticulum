@@ -6,6 +6,220 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
+### Parity 5 endpoint and transfer implementation (2026-10-24)
+
+Resumed the requested remaining-roadmap scope from `07c977d`; Parity 4's
+documentation clarification was committed/pushed as `6da44c4`. The independent
+repository-skill commit `3728dfd` was preserved. The resumed Release baseline
+was warning-free with **1,350 passed, 65 explicitly skipped, zero failed**
+before final integration tests were added. Builds, tests, coverage and native
+publication sharing output directories were coordinator-serialized. Four
+bounded implementation workstreams owned application values, endpoint/ratchet
+state, resources, and Channel/Buffer; the coordinator integrated request/link/
+runtime ownership and actual mixed-node/process acceptance.
+
+The reference remains the authoritative .NET-fetched checkout at
+`a29bfb51c468945c96a1ee22cae0114e993e2391`, RNS 1.5.7, with isolated LXMF
+1.2.1. `reference_environment.py` verifies the actual imported paths, versions,
+revision and clean tracked reference source. New `GenerateMsgPackApplicationVectors.py`,
+`GenerateParity5EndpointVectors.py`, `GenerateParity5RequestVectors.py`,
+`GenerateParity5ResourceVectors.py`, `GenerateParity5ChannelVectors.py` and
+`GenerateParity5ChannelRetryCryptoVectors.py` execute that reference and retain
+method/source provenance beside their tests. Older `e40191...` fixtures were
+not relabeled. The existing explicitly `a29bfb51...` link-MTU generator/fixture
+was extended for operational negotiation, not presented as older evidence.
+
+| Pinned source | SHA-256 |
+| --- | --- |
+| `Identity.py` | `ac336bb2b7217278d3a962b6945212313fed0ee9cc10d666e8ac17faca17ea2f` |
+| `Destination.py` | `e1117e5ff9c4baeda53f9117ae52c4cd0e1e2a4f4167de628e4afb8b4506b8ae` |
+| `vendor/umsgpack.py` | `0710f48f495193a764048c883b27b51cc7e7f7ae12486d4aad859994271cba50` |
+| `Link.py` | `4267ab1c5b11d9c415693298376f2a984aa9bca13a6245e9bc3dce3236365a7c` |
+| `Resource.py` | `9e4543ee19255ab7269d8861a2d977587319968b7986f4846d75ee7dba453699` |
+| `Channel.py` | `5ab5cf0bfd2c0fd3574d53b405f48e08756c2105bba72d9bc530b652f985bdd7` |
+| `Buffer.py` | `7f2269b25ada8e81b20f01692517e790bd3264dfdb461295570bcfd7b39b8db6` |
+
+Acceptance was established from the endpoint/identity import, encryption,
+announce, proof and ratchet branches; the vendor MessagePack numeric, extension,
+timestamp, string/map and malformed-input branches; `Link.py` request/response,
+identification, timing and MTU paths; `Resource.py` advertisement, metadata,
+segmentation, hash-map, compression, proof, retry and cancellation paths; and
+`Channel.py:113-148,175-245,303-544,547-608` /
+`Buffer.py:44-98,101-198,201-294`. Detailed API boundaries, source references,
+limits, acceptance mappings and intentional restrictions are in
+[application values](../docs/application-values.md),
+[endpoints](../docs/endpoints.md), [resources](../docs/resources.md) and
+[Channel/Buffer](../docs/channel-buffer.md).
+
+Implementation adds lossless bounded AOT-safe application values, signed
+ratchet reload and detached selected-key metadata, endpoint direction/type/key
+ownership, local recall and subscriber-independent authenticated delivery/proofs.
+Dynamic announce defaults and tagged signed-payload caching retain context
+flags; duplicate registration is explicit rather than replacing owned endpoint
+state. Plain/group state and secrets have explicit lifecycle. Requests install
+response limits before transmission, couple proof/response completion correctly
+and settle once under cancellation, resource rejection and callback failure.
+Lossless application-value requests/handlers are opt-in; legacy tool views keep
+binary-key hexadecimal projection and diagnose projection collisions.
+
+Link managers bound links, request/callback/outbound queues and worker slots.
+Protocol state advances independently of optional observers. Noncooperative
+synchronous application code cannot be forcibly stopped: shutdown diagnoses
+remaining optional invocations after one second and retains their ownership/
+occupied slot. Required resource cleanup is separate and fully joined, not
+abandoned after that observer timeout. Owned stream cancellation callbacks run
+off protocol locks; failures are diagnosed and cleanup joins their execution.
+Caller streams and callbacks must cooperate; no bounded-shutdown claim is made
+for arbitrarily blocked caller code.
+
+Resources support seekable input streams, bounded forward-only disk proxies,
+file-backed multipart reception and streamed file responses. rncp now sends
+segment-by-segment and saves through `OpenRead()` rather than materializing a
+spilled transfer. Ownership covers queued, rejected, cancelled, failed and
+successful work; `LeaveOpen` remains caller ownership. Validation rejects
+malformed metadata/advertisements/HMU/segments and excessive decompression.
+Defaults include a 1-GiB logical limit, 64-MiB receive-memory threshold and
+bounded parts/segments/queues/results. Upstream does not support arbitrary-offset
+cross-link/restart resume; active-part retry and multipart continuation are the
+supported contract, not an invented restart protocol.
+
+Runtime resource storage is `<config>/storage/resources`, with startup and
+15-minute bounded scavenging of strictly older-than-24-hour, exact owned
+resource/input names in marked directories. Active native files hold sharing
+leases. Unrelated names, other configurations, reparse targets and fresh files
+are preserved. Library-only default storage remains `.reticulum/resources`.
+Unix creation requests owner-only access; Windows inherits directory ACLs.
+No Unix filesystem execution is claimed by Windows tests.
+
+Operational link offers now follow the discovery-capable path bottleneck,
+up to the native 524,288-byte frame ceiling. Non-discovery paths remain at
+500-byte MTU / 431-byte MDU; larger signed-field vectors alone do not prove
+operational acceptance. Actual mixed Python transport + .NET transport tests
+exercise MTUs 1,024 and 16,384, 40-ms bridge RTT, selective Channel loss in
+both directions, Buffer traffic, multi-megabyte file-backed multipart transfers,
+retry exhaustion, teardown and fresh-link recovery. Direct pinned-peer tests
+exercise both upgraded link roles and a streamed 2,200,037-byte response.
+Other bottleneck placements, sequence wrap, RTT threshold windows, slow
+consumers, callback races and malformed-input limits have deterministic tests;
+this is not an all-MTU/bearer live sweep or prolonged production soak.
+
+A preliminary synthetic-outlet retry assumption was corrected before commit.
+Actual `Channel.py:561-564` calls `Packet.resend()`, `Packet.py:319-337`
+repacks, and `Packet.py:221-224` encrypts Channel data again. Thus retries keep
+the plaintext envelope/sequence but obtain fresh IV/ciphertext/hash/receipt.
+The new retry-crypto generator executes the unmodified Channel/outlet/Packet/
+Link/Token/Transport path with a synthetic installed session key and a capture
+interface only; it does not establish handshake/network interoperability.
+Its three-attempt fixture SHA-256 is
+`59e2486a903a85a566dd539e522e4e547d53b44f3949a7fb06cb14edca46f9bd`.
+Genuine RNG means regeneration changes sampled ciphertext, not the asserted
+semantics. Native tests verify fresh hashes, sequence 65535-to-zero, latest
+proof acceptance and stale-proof rejection. Establishment-rate accounting was
+also corrected to count LR request/proof bytes only, not later packet proofs.
+
+Strict malformed-key, authenticated-padding and RFC-HKDF boundaries remain
+intentional differences, not compatibility regressions for valid traffic.
+The signed upstream-format ratchet-file API leases cooperating native writers;
+simultaneous Python/.NET writers are not supported. Versioned runtime ratchets
+reload authenticated keys without replacing live policy or borrowing a disposed
+caller identity/opening token. Missing/corrupt files fail explicitly and preserve
+usable in-memory keys instead of upstream's missing-file reinitialization.
+
+Focused acceptance completed before the final all-suite gate: Core **155 passed**;
+Transport endpoint/request/resource/channel/lifecycle selection **171 passed,
+4 skipped**; final request/retry selection **14 passed**; direct upgraded and
+streamed-response live cases **3 passed**; mixed-transfer/rncp live selection
+**11 passed**. Full managed Pester initially passed **107**, skipped **2**.
+The last two broad runs preceded final retry-crypto integration and therefore
+are not substitutes for the final gate.
+
+`dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj
+-c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true
+-p:IlcTreatWarningsAsErrors=true -o artifacts\native-parity5 --nologo -v minimal`
+completed warning-free using MSVC in the publishing process. The published
+binary ran `--help` and the separate-process resource acceptance passed
+**1 test, zero skipped/failed**: two isolated configurations each received
+**73,400,357 bytes**, spilled above 64 MiB, saved identical hashes, removed
+expired owned files and preserved unrelated/fresh/CWD files.
+
+The first full live/native collection passed **1,462**, skipped **10** and failed
+**3**; the runner correctly refused to call it a completed gate or proceed to
+Pester. Discovery's live test registered the same destination again for its
+encrypted-advertisement pass; it now reuses one owned endpoint with per-announce
+data, preserving both directions and plain/encrypted assertions. Both mixed
+transfer cases asserted an empty spool directory after disposal; the ownership
+marker now correctly remains, and the assertion requires exactly that marker
+and no other file. The thin Python observation callback now filters its text
+message type before accessing `.text`, avoiding misleading callback exceptions
+on valid Buffer messages without modifying upstream code.
+
+`dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
+-c Release --filter "FullyQualifiedName~DiscoveryLiveTests.PlainAndEncryptedAdvertisementsCrossRealTcpBothDirections|FullyQualifiedName~Parity5TransferLiveTests"
+--nologo -v minimal` then passed **3**, skipped/failed **zero**, including
+both complete impaired mixed-transfer cases with final retry behavior.
+`pwsh -NoProfile -File tests\run-pester.ps1 -GitHosting -GitRemote` with the
+verified reference environment passed **108**, skipped **2**, failed **zero**
+in 127.56 seconds, including the new managed large-file storage case.
+
+A second full collection passed **1,464**, skipped **10** and failed **1**:
+the native initiator could finish before the Python responder's application
+callback installed its current link, so an immediate harness `stat` command
+observed `None`. Tests now await the actual Python `link_up` event as well as
+native establishment in both roles, not a sleep, retry or weakened assertion.
+`dotnet test tests\DotReticulum.Transport.Tests\DotReticulum.Transport.Tests.csproj
+-c Release --filter "FullyQualifiedName~LiveLinkTests" --nologo -v minimal`
+then passed **11**, skipped/failed **zero**, in 57 seconds.
+
+Final full Release live/native collection:
+`pwsh -NoProfile -File tests\run-tests.ps1 -Live -NativeExe
+C:\Git\dennispayne\DotReticulum\artifacts\native-parity5\DotReticulum.Applications.exe
+-Coverage -Pester -ResultsDirectory
+C:\Git\dennispayne\DotReticulum\TestResults\coverage-parity5-accepted-37181771113d46f8a1f4430870b10106`.
+All six projects built without warnings/errors and passed **1,465**,
+explicitly skipped **10**, failed **zero**: Applications **612/8**, Core
+**155/0**, Crypto **47/0**, Interfaces **81/0**, LXMF **35/0**, Transport
+**535/2** (passed/skipped). Live and native opt-ins were enabled, including
+the published encrypted/compressed 2,200,017-byte resource roundtrip.
+Skips are explicit Windows/Unix/Backbone platform cases and the separately
+opt-in real FFmpeg case, not hidden successful returns.
+
+Fresh production-only OpenCover reports were merged by source line/branch
+identity across projects, without averaging or double-counting assemblies:
+
+| Project | Lines | Branches |
+| --- | --- | --- |
+| Applications | 7,838/9,441 (83.02%) | 6,736/10,061 (66.95%) |
+| Core | 1,641/1,692 (96.99%) | 1,001/1,090 (91.83%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 794/903 (87.93%) | 329/420 (78.33%) |
+| LXMF | 389/430 (90.47%) | 194/272 (71.32%) |
+| Transport | 4,904/5,364 (91.42%) | 3,222/3,924 (82.11%) |
+| **Overall** | **15,676/17,946 (87.35%)** | **11,529/15,817 (72.89%)** |
+
+That combined command's native Pester tests all passed, but its container
+correctly failed cleanup because a file-based C# fixture had launched a
+persistent compiler holding an analyzer DLL under its owned scratch directory.
+`GitRemote.Tests.ps1` now passes `dotnet run --disable-build-servers` for that
+fixture rather than killing shared build servers or suppressing cleanup errors.
+After this test-tooling-only correction, complete process suites were rerun:
+
+* `pwsh -NoProfile -File tests\run-pester.ps1 -Application
+  C:\Git\dennispayne\DotReticulum\artifacts\native-parity5\DotReticulum.Applications.exe
+  -GitHosting -GitRemote`: **108 passed, 2 skipped, zero failed**, including
+  container cleanup, in **97.89 seconds**.
+* `pwsh -NoProfile -File tests\run-pester.ps1 -GitHosting -GitRemote`:
+  **108 passed, 2 skipped, zero failed**, including cleanup, in **129.02 seconds**.
+
+Pester skips are Unix SIGTERM execution and separately opt-in real FFmpeg.
+Managed/native process coverage includes the new per-configuration 70-MiB
+resource flow and existing Git/runtime/discovery/receiver-disposal regressions.
+The source code was unchanged after native publication and successful full
+coverage; later corrections were observation synchronization and fixture process
+ownership, not production fallback behavior. Parity 5's defined acceptance is
+complete on Windows x64. Linux/macOS/other platform execution, real interfaces/
+hardware, utility gaps and repository workflows remain later roadmap work;
+this milestone does not claim complete upstream or platform parity.
+
 ### Parity 4 status clarification and remaining-roadmap resume (2026-10-24)
 
 Resumed clean `main` at `07c977d4f5f3376d824b209143de561f8a94ef36`,

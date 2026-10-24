@@ -129,7 +129,7 @@ internal sealed partial class RngitSession : IDisposable
     private async Task<(byte[] Data, object? Metadata)> RequestAsync(string path, object data, long sizeLimit, CancellationToken stop)
     {
         var lastProgress = 0L;
-        var receipt = link.Request(path, data, timeout: timeout.TotalSeconds, progressCallback: receipt =>
+        var receipt = link.Request(path, data, timeout: timeout.TotalSeconds, maxResponseSize: sizeLimit, cancellationToken: stop, progressCallback: receipt =>
         {
             var now = Stopwatch.GetTimestamp();
             if (Stopwatch.GetElapsedTime(lastProgress, now) >= TimeSpan.FromSeconds(2))
@@ -138,7 +138,6 @@ internal sealed partial class RngitSession : IDisposable
                 progress?.Invoke($"{path}: {receipt.Progress:P1}");
             }
         }) ?? throw new IOException("Link closed before " + path);
-        receipt.MaxResponseSize = sizeLimit;
         var response = await receipt.ResponseTask.WaitAsync(stop).ConfigureAwait(false);
         if (response is not byte[] bytes || bytes.LongLength > sizeLimit) throw new InvalidDataException("Invalid or oversized response to " + path);
         return (bytes, receipt.Metadata);

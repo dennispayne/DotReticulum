@@ -158,9 +158,8 @@ public sealed class BlackholeService
             await up.Task.WaitAsync(SourceTimeout, token).ConfigureAwait(false);
             if (link.Status != LinkStatus.Active || link.RemoteIdentity is not { } remote || !remote.Hash.AsSpan().SequenceEqual(source))
                 throw new UnauthorizedAccessException("Blackhole source link identity mismatch.");
-            var request = link.Request(RequestPath, timeout: SourceTimeout.TotalSeconds)
+            var request = link.Request(RequestPath, timeout: SourceTimeout.TotalSeconds, maxResponseSize: BlackholeWire.MaximumBytes + 32, cancellationToken: token)
                 ?? throw new IOException("Blackhole source rejected the list request.");
-            request.MaxResponseSize = BlackholeWire.MaximumBytes + 32;
             await request.ResponseTask.WaitAsync(SourceTimeout, token).ConfigureAwait(false);
             var raw = request.RawResponse ?? throw new FormatException("Blackhole source returned no raw response envelope.");
             return new BlackholeFetchResponse(remote.Hash.ToArray(), BlackholeWire.ExtractResponse(raw, request.RequestId));

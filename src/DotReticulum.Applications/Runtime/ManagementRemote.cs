@@ -86,8 +86,8 @@ public sealed class ManagementRemoteClient : IDisposable
     {
         if (path is not ("/status" or "/path")) throw new ArgumentException("Unsupported remote management path.", nameof(path));
         token.ThrowIfCancellationRequested();
-        var receipt = link.Request(path, data, timeout: timeout.TotalSeconds) ?? throw new IOException("Remote management link is closed.");
-        receipt.MaxResponseSize = ManagementConnection.MaximumMessageBytes;
+        var receipt = link.Request(path, data, timeout: timeout.TotalSeconds, maxResponseSize: ManagementConnection.MaximumMessageBytes, cancellationToken: token)
+            ?? throw new IOException("Remote management link is closed.");
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(timeout);
         return await receipt.ResponseTask.WaitAsync(deadline.Token).ConfigureAwait(false);

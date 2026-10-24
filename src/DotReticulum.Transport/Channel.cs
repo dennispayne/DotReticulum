@@ -61,7 +61,7 @@ public sealed class Envelope
     {
         PacketReceiptStatus.Delivered => MessageState.Delivered,
         PacketReceiptStatus.Sent => MessageState.Sent,
-        PacketReceiptStatus.Failed => MessageState.Failed,
+        PacketReceiptStatus.Failed or PacketReceiptStatus.Culled => MessageState.Failed,
         _ => MessageState.New,
     };
 }
@@ -88,30 +88,53 @@ public sealed class Channel
     public const int WindowFlexibility = 4;
     public const int SeqMax = 0xFFFF;
     public const int SeqModulus = SeqMax + 1;
+    public const int MaximumPendingMessages = 256;
+    public const int MaximumMessageHandlers = 64;
     private const int MaxTries = 5;
     private const int EnvelopeOverhead = 6;
 
-    private readonly Link _link;
+    private readonly IChannelOutlet _outlet;
     private readonly object _lock = new();
     private readonly object _sendLock = new();
+    private readonly object _receiveLock = new();
     private readonly List<Envelope> _txRing = [];
-    private readonly List<Envelope> _rxRing = [];
+    private readonly Dictionary<int, Envelope> _rxRing = [];
     private readonly List<Func<MessageBase, bool>> _handlers = [];
+    private readonly List<Func<MessageBase, bool>> _systemHandlers = [];
+    private readonly Queue<MessageBase> _pendingMessages = [];
+    private Task _handlerTask = Task.CompletedTask;
+    private bool _handlerRunning;
     private readonly Dictionary<ushort, Func<MessageBase>> _factories = [];
     private int _nextSequence;
     private int _nextRxSequence;
     private int _fastRateRounds;
     private int _mediumRateRounds;
     private bool _shutdown;
+    private readonly CancellationTokenSource _closed = new();
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private TaskCompletionSource _sendReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    /// <summary>Completes when the owning link closes and channel work has been released.</summary>
+    /// <summary>Completes when the owning link closes and pending channel work has been released.</summary>
     public Task Completion => _completion.Task;
+    internal CancellationToken Closed => _closed.Token;
 
-    internal Channel(Link link)
+    /// <summary>Current bounded handler work. Shutdown discards queued messages; an executing user handler must return itself.</summary>
+    public Task HandlerCompletion
     {
-        _link = link;
-        if ((link.Rtt ?? 0) > RttSlow)
+        get
+        {
+            lock (_lock) return _handlerTask;
+        }
+    }
+
+    internal Channel(Link link) : this(new LinkChannelOutlet(link))
+    {
+    }
+
+    internal Channel(IChannelOutlet outlet)
+    {
+        _outlet = outlet;
+        if (outlet.Rtt > RttSlow)
         {
             WindowSize = 1;
             WindowMaxSize = 1;
@@ -136,9 +159,9 @@ public sealed class Channel
     public int WindowMinSize { get; private set; }
 
     /// <summary>Bytes available to a single message (link MDU minus the 6 byte envelope header).</summary>
-    public int Mdu => Math.Min(_link.Mdu - EnvelopeOverhead, 0xFFFF);
+    public int Mdu => Math.Min(_outlet.Mdu - EnvelopeOverhead, 0xFFFF);
 
-    public Link Link => _link;
+    public Link Link => _outlet.Link ?? throw new InvalidOperationException("This channel has no link outlet.");
 
     public void RegisterMessageType<T>() where T : MessageBase, new() => RegisterMessageType(() => new T(), false);
 
@@ -170,10 +193,14 @@ public sealed class Channel
     /// <summary>Handlers run in registration order; the first returning true stops processing of that message.</summary>
     public void AddMessageHandler(Func<MessageBase, bool> handler)
     {
+        ArgumentNullException.ThrowIfNull(handler);
         lock (_lock)
         {
+            if (_shutdown) throw new ObjectDisposedException(nameof(Channel));
             if (!_handlers.Contains(handler))
             {
+                if (_handlers.Count == MaximumMessageHandlers)
+                    throw new InvalidOperationException("The channel message-handler limit has been reached.");
                 _handlers.Add(handler);
             }
         }
@@ -185,6 +212,22 @@ public sealed class Channel
         {
             _handlers.Remove(handler);
         }
+    }
+
+    internal void AddSystemMessageHandler(Func<MessageBase, bool> handler)
+    {
+        lock (_lock)
+        {
+            if (_shutdown) throw new ObjectDisposedException(nameof(Channel));
+            if (_systemHandlers.Count == MaximumMessageHandlers)
+                throw new InvalidOperationException("The channel stream-reader limit has been reached.");
+            _systemHandlers.Add(handler);
+        }
+    }
+
+    internal void RemoveSystemMessageHandler(Func<MessageBase, bool> handler)
+    {
+        lock (_lock) _systemHandlers.Remove(handler);
     }
 
     public bool IsReadyToSend
@@ -200,7 +243,14 @@ public sealed class Channel
 
     private bool IsReadyLocked()
     {
-        if (_shutdown || _link.Status == LinkStatus.Closed) return false;
+        if (_shutdown || !_outlet.IsUsable) return false;
+        // Proof state can settle before the receipt callback is dispatched.
+        for (var i = _txRing.Count - 1; i >= 0; i--)
+        {
+            var envelope = _txRing[i];
+            if (envelope.Receipt?.Status == PacketReceiptStatus.Delivered) PacketDelivered(envelope);
+        }
+
         var outstanding = 0;
         foreach (var e in _txRing)
         {
@@ -211,6 +261,29 @@ public sealed class Channel
         }
 
         return outstanding < WindowSize;
+    }
+
+    internal async Task WaitForSendAsync(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            Task wait;
+            lock (_lock)
+            {
+                if (_shutdown || !_outlet.IsUsable) throw new IOException("The channel is closed.");
+                if (IsReadyLocked()) return;
+                wait = _sendReady.Task;
+            }
+
+            await wait.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private void SignalSendReady()
+    {
+        var signal = _sendReady;
+        _sendReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        signal.TrySetResult();
     }
 
     /// <summary>Sends a message; throws <see cref="ChannelException"/> when the window is full, the message is too big or the link cannot transmit.</summary>
@@ -232,28 +305,38 @@ public sealed class Channel
                 reserved = _nextSequence;
                 envelope = new Envelope(message, null, reserved);
                 envelope.Raw = PackEnvelope(message, reserved);
-                if (envelope.Raw.Length > _link.Mdu)
+                if (envelope.Raw.Length > _outlet.Mdu)
                 {
-                    throw new ChannelException(ChannelExceptionType.TooBig, $"Packed message too big for packet: {envelope.Raw.Length} > {_link.Mdu}");
+                    throw new ChannelException(ChannelExceptionType.TooBig, $"Packed message too big for packet: {envelope.Raw.Length} > {_outlet.Mdu}");
                 }
 
                 _nextSequence = (reserved + 1) % SeqModulus;
+                _txRing.Add(envelope);
             }
 
-            var receipt = _link.SendWithContext(envelope.Raw, LinkContext.Channel, createReceipt: true, encrypt: true);
-            if (receipt is null)
+            PacketReceipt? receipt;
+            try
+            {
+                receipt = _outlet.Send(envelope.Raw);
+                if (receipt is null)
+                    throw new ChannelException(ChannelExceptionType.LinkNotReady, "Outlet did not transmit packet");
+            }
+            catch
             {
                 lock (_lock)
                 {
+                    _txRing.Remove(envelope);
                     _nextSequence = reserved;
+                    SignalSendReady();
                 }
 
-                throw new ChannelException(ChannelExceptionType.LinkNotReady, "Outlet did not transmit packet");
+                throw;
             }
 
             lock (_lock)
             {
-                EmplaceEnvelope(envelope, _txRing);
+                if (_shutdown)
+                    throw new ChannelException(ChannelExceptionType.LinkNotReady, "Channel closed during transmission");
                 envelope.Tries++;
                 Track(envelope, receipt);
                 UpdatePacketTimeouts();
@@ -265,6 +348,10 @@ public sealed class Channel
         {
             PacketDelivered(envelope);
         }
+        else if (envelope.State == MessageState.Failed)
+        {
+            PacketTimeout(envelope, envelope.Receipt!);
+        }
 
         return envelope;
     }
@@ -272,6 +359,8 @@ public sealed class Channel
     private static byte[] PackEnvelope(MessageBase message, int sequence)
     {
         var data = message.Pack();
+        if (data.Length > ushort.MaxValue)
+            throw new ChannelException(ChannelExceptionType.TooBig, "Channel message length exceeds 65535 bytes.");
         var raw = new byte[EnvelopeOverhead + data.Length];
         BinaryPrimitives.WriteUInt16BigEndian(raw, message.MsgType);
         BinaryPrimitives.WriteUInt16BigEndian(raw.AsSpan(2), (ushort)sequence);
@@ -283,13 +372,13 @@ public sealed class Channel
     private void Track(Envelope envelope, PacketReceipt receipt)
     {
         envelope.Receipt = receipt;
-        receipt.Delivered = _ => PacketDelivered(envelope);
-        receipt.TimedOut = _ => PacketTimeout(envelope);
+        receipt.Delivered = r => PacketDelivered(envelope, r);
+        receipt.TimedOut = r => PacketTimeout(envelope, r);
         receipt.Timeout = PacketTimeoutTime(envelope.Tries);
     }
 
     private double PacketTimeoutTime(int tries) =>
-        Math.Pow(1.5, tries - 1) * Math.Max((_link.Rtt ?? 0) * 2.5, 0.025) * (_txRing.Count + 1.5);
+        Math.Pow(1.5, tries - 1) * Math.Max(_outlet.Rtt * 2.5, 0.025) * (_txRing.Count + 1.5);
 
     private void UpdatePacketTimeouts()
     {
@@ -303,21 +392,23 @@ public sealed class Channel
         }
     }
 
-    private void PacketDelivered(Envelope envelope)
+    private void PacketDelivered(Envelope envelope, PacketReceipt? receipt = null)
     {
         lock (_lock)
         {
-            if (!_txRing.Remove(envelope))
+            if (_shutdown || (receipt is not null && !ReferenceEquals(receipt, envelope.Receipt)) || !_txRing.Remove(envelope))
             {
                 return;
             }
 
+            Disconnect(envelope.Receipt);
+            SignalSendReady();
             if (WindowSize < WindowMaxSize)
             {
                 WindowSize++;
             }
 
-            var rtt = _link.Rtt ?? 0;
+            var rtt = _outlet.Rtt;
             if (rtt == 0)
             {
                 return;
@@ -352,65 +443,94 @@ public sealed class Channel
         }
     }
 
-    private void PacketTimeout(Envelope envelope)
+    private void PacketTimeout(Envelope envelope, PacketReceipt expired)
     {
-        if (envelope.State == MessageState.Delivered)
+        lock (_sendLock)
         {
-            return;
-        }
+            var teardown = false;
+            lock (_lock)
+            {
+                if (_shutdown || !ReferenceEquals(expired, envelope.Receipt)
+                    || envelope.State == MessageState.Delivered || !_txRing.Contains(envelope)) return;
 
-        var teardown = false;
-        lock (_lock)
-        {
-            if (!_txRing.Contains(envelope))
-            {
-                return;
-            }
-
-            if (envelope.Tries >= MaxTries)
-            {
-                teardown = true;
-            }
-            else
-            {
-                envelope.Tries++;
-                if (WindowSize > WindowMinSize)
+                if (envelope.Tries >= MaxTries)
                 {
-                    WindowSize--;
-                    if (WindowMaxSize > WindowMinSize + _windowFlexibility)
+                    teardown = true;
+                }
+                else
+                {
+                    envelope.Tries++;
+                    if (WindowSize > WindowMinSize)
                     {
-                        WindowMaxSize--;
+                        WindowSize--;
+                        if (WindowMaxSize > WindowMinSize + _windowFlexibility) WindowMaxSize--;
                     }
                 }
             }
-        }
 
-        if (teardown)
-        {
-            _link.Log("Channel retry count exceeded, tearing down link " + _link.LinkIdHex);
-            Shutdown();
-            _link.Teardown();
-            return;
-        }
+            if (teardown)
+            {
+                Abort("Channel retry count exceeded");
+                return;
+            }
 
-        var receipt = _link.SendWithContext(envelope.Raw!, LinkContext.Channel, createReceipt: true, encrypt: true);
-        if (receipt is null)
-        {
-            return;
-        }
+            PacketReceipt? receipt;
+            try
+            {
+                receipt = _outlet.Resend(expired, envelope.Raw!);
+            }
+            catch (Exception ex)
+            {
+                Abort("Channel retransmission failed: " + ex.Message);
+                return;
+            }
 
-        bool delivered;
-        lock (_lock)
-        {
-            Track(envelope, receipt);
-            UpdatePacketTimeouts();
-            delivered = receipt.Status == PacketReceiptStatus.Delivered;
-        }
+            if (receipt is null)
+            {
+                Abort("Channel outlet did not retransmit packet");
+                return;
+            }
 
-        if (delivered)
-        {
-            PacketDelivered(envelope);
+            bool delivered;
+            lock (_lock)
+            {
+                if (_shutdown || !_txRing.Contains(envelope)) return;
+                Disconnect(expired);
+                Track(envelope, receipt);
+                UpdatePacketTimeouts();
+                delivered = receipt.Status == PacketReceiptStatus.Delivered;
+            }
+
+            if (delivered) PacketDelivered(envelope, receipt);
+            else if (receipt.Status is PacketReceiptStatus.Failed or PacketReceiptStatus.Culled)
+                PacketTimeout(envelope, receipt);
         }
+    }
+
+    internal void Log(string message)
+    {
+        try
+        {
+            _outlet.Log(message);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.TraceError("{0}; channel logging failed: {1}", message, ex);
+        }
+    }
+
+    internal void Abort(string reason)
+    {
+        Log(reason);
+        Shutdown();
+        _outlet.Teardown();
+    }
+
+    private static void Disconnect(PacketReceipt? receipt)
+    {
+        if (receipt is null) return;
+        receipt.Delivered = null;
+        receipt.TimedOut = null;
     }
 
     internal void Shutdown()
@@ -420,40 +540,20 @@ public sealed class Channel
             if (_shutdown) return;
             _shutdown = true;
             _handlers.Clear();
+            _systemHandlers.Clear();
             foreach (var e in _txRing)
             {
-                if (e.Receipt is { } r)
-                {
-                    r.Delivered = null;
-                    r.TimedOut = null;
-                }
+                Disconnect(e.Receipt);
             }
 
             _txRing.Clear();
             _rxRing.Clear();
+            _pendingMessages.Clear();
+            SignalSendReady();
             _completion.TrySetResult();
         }
-    }
 
-    private bool EmplaceEnvelope(Envelope envelope, List<Envelope> ring)
-    {
-        for (var i = 0; i < ring.Count; i++)
-        {
-            var existing = ring[i];
-            if (envelope.Sequence == existing.Sequence)
-            {
-                return false;
-            }
-
-            if (envelope.Sequence < existing.Sequence && !(_nextRxSequence - envelope.Sequence > SeqMax / 2))
-            {
-                ring.Insert(i, envelope);
-                return true;
-            }
-        }
-
-        ring.Add(envelope);
-        return true;
+        _closed.Cancel();
     }
 
     private MessageBase UnpackEnvelope(Envelope envelope)
@@ -481,74 +581,103 @@ public sealed class Channel
     /// <summary>Handles a decrypted channel packet payload (called by the link).</summary>
     internal void Receive(byte[] raw)
     {
+        lock (_receiveLock) ReceiveSerialized(raw);
+    }
+
+    private void ReceiveSerialized(byte[] raw)
+    {
         try
         {
             var envelope = new Envelope(null, raw, 0);
             List<MessageBase> ready = [];
             lock (_lock)
             {
+                if (_shutdown) return;
+                if (raw.Length > _outlet.Mdu) throw new IOException("Channel envelope exceeds the negotiated MDU.");
                 UnpackEnvelope(envelope);
-                if (envelope.Sequence < _nextRxSequence)
-                {
-                    var windowOverflow = (_nextRxSequence + WindowMax) % SeqModulus;
-                    if (windowOverflow < _nextRxSequence)
-                    {
-                        if (envelope.Sequence > windowOverflow)
-                        {
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        return;
-                    }
-                }
-                else if (envelope.Sequence > _nextRxSequence + WindowMax)
+                var distance = (envelope.Sequence - _nextRxSequence + SeqModulus) % SeqModulus;
+                if (distance > WindowMax || !_rxRing.TryAdd(envelope.Sequence, envelope))
                 {
                     return;
                 }
 
-                if (!EmplaceEnvelope(envelope, _rxRing))
+                while (_rxRing.Remove(_nextRxSequence, out var e))
                 {
-                    return;
-                }
-
-                List<Envelope> contiguous = [];
-                foreach (var e in _rxRing)
-                {
-                    if (e.Sequence == _nextRxSequence)
-                    {
-                        contiguous.Add(e);
-                        _nextRxSequence = (_nextRxSequence + 1) % SeqModulus;
-                        if (_nextRxSequence == 0)
-                        {
-                            foreach (var wrapped in _rxRing)
-                            {
-                                if (wrapped.Sequence == _nextRxSequence)
-                                {
-                                    contiguous.Add(wrapped);
-                                    _nextRxSequence = (_nextRxSequence + 1) % SeqModulus;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                foreach (var e in contiguous)
-                {
-                    _rxRing.Remove(e);
-                    ready.Add(e.Unpacked ? e.Message! : UnpackEnvelope(e));
+                    _nextRxSequence = (_nextRxSequence + 1) % SeqModulus;
+                    ready.Add(e.Message!);
                 }
             }
 
             foreach (var message in ready)
             {
-                RunHandlers(message);
+                // Only library-owned stream readers run on this path. Optional user
+                // observers run on a separate bounded worker and cannot stall it.
+                if (RunSystemHandlers(message)) continue;
+                var overflow = false;
+                lock (_lock)
+                {
+                    if (_shutdown) return;
+                    if (_handlers.Count == 0) continue;
+                    if (_pendingMessages.Count == MaximumPendingMessages)
+                    {
+                        overflow = true;
+                    }
+                    else
+                    {
+                        _pendingMessages.Enqueue(message);
+                        if (!_handlerRunning)
+                        {
+                            _handlerRunning = true;
+                            _handlerTask = Task.Run(DrainHandlers);
+                        }
+                    }
+                }
+
+                if (overflow)
+                {
+                    Abort("Channel pending-message limit exceeded by a stalled consumer.");
+                    return;
+                }
             }
         }
         catch (Exception ex)
         {
-            _link.Log("Error while receiving channel data: " + ex.Message);
+            Log("Error while receiving channel data: " + ex);
+        }
+    }
+
+    private bool RunSystemHandlers(MessageBase message)
+    {
+        Func<MessageBase, bool>[] handlers;
+        lock (_lock)
+        {
+            if (_shutdown) return true;
+            handlers = [.. _systemHandlers];
+        }
+
+        foreach (var handler in handlers)
+        {
+            if (handler(message)) return true;
+        }
+
+        return false;
+    }
+
+    private void DrainHandlers()
+    {
+        while (true)
+        {
+            MessageBase message;
+            lock (_lock)
+            {
+                if (_shutdown || !_pendingMessages.TryDequeue(out message!))
+                {
+                    _handlerRunning = false;
+                    return;
+                }
+            }
+
+            RunHandlers(message);
         }
     }
 
@@ -562,6 +691,11 @@ public sealed class Channel
 
         foreach (var handler in handlers)
         {
+            lock (_lock)
+            {
+                if (_shutdown) return;
+            }
+
             try
             {
                 if (handler(message))
@@ -571,7 +705,7 @@ public sealed class Channel
             }
             catch (Exception ex)
             {
-                _link.Log("Channel message handler failed: " + ex.Message);
+                Log("Channel message handler failed: " + ex);
             }
         }
     }

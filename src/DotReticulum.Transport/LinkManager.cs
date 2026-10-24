@@ -9,6 +9,10 @@ namespace DotReticulum.Transport;
 /// </summary>
 public sealed class LinkManager : IAsyncDisposable
 {
+    public const int WorkQueueCapacity = 256;
+    public const int ObserverConcurrency = 4;
+    public const int RequestConcurrency = 4;
+    public const int MaximumLinks = 1024;
     private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(100);
 
     private readonly TransportRouter _router;
@@ -17,8 +21,26 @@ public sealed class LinkManager : IAsyncDisposable
     private readonly object _gate = new();
     private readonly Dictionary<string, Link> _pending = [];
     private readonly Dictionary<string, Link> _active = [];
-    private readonly Channel<(Packet Packet, IPacketInterface? Interface)> _outbound = System.Threading.Channels.Channel.CreateUnbounded<(Packet, IPacketInterface?)>(new UnboundedChannelOptions { SingleReader = true });
-    private readonly Channel<Action> _callbacks = System.Threading.Channels.Channel.CreateUnbounded<Action>(new UnboundedChannelOptions { SingleReader = true });
+    private readonly Channel<(Packet Packet, IPacketInterface? Interface)> _outbound = System.Threading.Channels.Channel.CreateBounded<(Packet, IPacketInterface?)>(WorkQueueCapacity);
+    private readonly Channel<Func<ValueTask>> _callbacks = System.Threading.Channels.Channel.CreateBounded<Func<ValueTask>>(WorkQueueCapacity);
+    private readonly Channel<Func<ValueTask>> _requests = System.Threading.Channels.Channel.CreateBounded<Func<ValueTask>>(WorkQueueCapacity);
+    private readonly SemaphoreSlim _observerSlots = new(ObserverConcurrency, ObserverConcurrency);
+    private readonly SemaphoreSlim _requestSlots = new(RequestConcurrency, RequestConcurrency);
+    private readonly HashSet<Task> _invocations = [];
+    private readonly HashSet<Task> _requiredCleanup = [];
+    private ResourcePolicy _defaultResourcePolicy = new();
+
+    /// <summary>Defaults for newly created links; existing links keep their policy.</summary>
+    public ResourcePolicy DefaultResourcePolicy
+    {
+        get => Volatile.Read(ref _defaultResourcePolicy);
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            value.Validate();
+            Volatile.Write(ref _defaultResourcePolicy, value);
+        }
+    }
     private CancellationTokenSource? _cts;
     private Task[] _loops = [];
     private bool _stopping;
@@ -41,6 +63,10 @@ public sealed class LinkManager : IAsyncDisposable
     public Action<string>? Log => _router.Log;
 
     public TransportRouter Router => _router;
+    public int QueuedOutboundPackets => _outbound.Reader.Count;
+    public int QueuedCallbacks => _callbacks.Reader.Count;
+    public int QueuedRequests => _requests.Reader.Count;
+    public int ExecutingApplicationWork { get { lock (_gate) return _invocations.Count; } }
 
     public IReadOnlyList<Link> Links
     {
@@ -56,12 +82,14 @@ public sealed class LinkManager : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(destinationIdentity);
         ArgumentNullException.ThrowIfNull(destinationHash);
+        if (destinationHash.Length != Destination.HashLength) throw new ArgumentException("Destination hash must contain 16 bytes.", nameof(destinationHash));
         var hops = _router.HopsTo(destinationHash) ?? Packet.HopLimit;
         var timeout = establishmentTimeout ?? ((Link.EstablishmentTimeoutPerHop * Math.Max(1, hops)) + _router.FirstHopTimeout(destinationHash));
         if (!double.IsFinite(timeout) || timeout <= 0) throw new ArgumentOutOfRangeException(nameof(establishmentTimeout));
         lock (_gate)
         {
             if (_router.IsIdentityBlocked(destinationIdentity.Hash)) throw new InvalidOperationException("The destination identity is blocked.");
+            if (_active.Count + _pending.Count >= MaximumLinks) throw new InvalidOperationException("The link manager's link limit has been reached.");
             EnsureStarted();
             _suspended = false;
             var link = Link.CreateInitiator(this, destinationIdentity, destinationHash, hops, timeout);
@@ -69,7 +97,11 @@ public sealed class LinkManager : IAsyncDisposable
             link.Closed = closed;
             link.RequestTime = Now;
             _pending[link.LinkIdHex] = link;
-            _outbound.Writer.TryWrite((link.RequestPacket!, null));
+            if (!_outbound.Writer.TryWrite((link.RequestPacket!, null)))
+            {
+                Report("Link outbound queue is full; link establishment rejected.");
+                link.FailEstablishment();
+            }
             return link;
         }
     }
@@ -80,33 +112,60 @@ public sealed class LinkManager : IAsyncDisposable
         lock (_gate) return _active.GetValueOrDefault(key) ?? _pending.GetValueOrDefault(key);
     }
 
-    internal void Enqueue(Packet packet, IPacketInterface? iface)
+    internal bool Enqueue(Packet packet, IPacketInterface? iface)
     {
         lock (_gate)
         {
-            if (_stopping || _disposed || _suspended) return;
+            if (_stopping || _disposed || _suspended)
+            {
+                Report("Link packet rejected because the link manager is stopped.");
+                return false;
+            }
             EnsureStarted();
-            _outbound.Writer.TryWrite((packet, iface));
+            if (_outbound.Writer.TryWrite((packet, iface))) return true;
+            Report("Link outbound queue is full; packet rejected.");
+            return false;
         }
     }
 
-    internal void Dispatch(Action action)
+    internal void Dispatch(Action action) => DispatchAsync(() => { action(); return ValueTask.CompletedTask; });
+
+    internal void DispatchAsync(Func<ValueTask> action)
     {
         lock (_gate)
         {
             if (_stopping)
             {
-                _callbacks.Writer.TryWrite(action);
+                if (!_callbacks.Writer.TryWrite(action)) Report("Link callback queue is full; observer notification rejected.");
                 return;
             }
             if (!_disposed && !_suspended)
             {
                 EnsureStarted();
-                _callbacks.Writer.TryWrite(action);
+                if (!_callbacks.Writer.TryWrite(action)) Report("Link callback queue is full; observer notification rejected.");
                 return;
             }
         }
-        InvokeCallback(action);
+        if (!StartInvocation(action, _observerSlots, out _)) Report("Link observer concurrency exhausted after shutdown; notification rejected.");
+    }
+
+    internal bool DispatchRequest(Action action) => DispatchRequestAsync(_ => { action(); return ValueTask.CompletedTask; });
+
+    internal bool DispatchRequestAsync(Func<CancellationToken, ValueTask> action)
+    {
+        lock (_gate)
+        {
+            if (_stopping || _disposed || _suspended)
+            {
+                Report("Link request work rejected because the manager is stopped.");
+                return false;
+            }
+            EnsureStarted();
+            var cancellation = _cts!.Token;
+            if (_requests.Writer.TryWrite(() => action(cancellation))) return true;
+            Report("Link request queue is full; request rejected.");
+            return false;
+        }
     }
 
     internal void Activate(Link link)
@@ -140,6 +199,13 @@ public sealed class LinkManager : IAsyncDisposable
         lock (_gate)
         {
             if (_stopping || _disposed) return;
+            var key = Convert.ToHexStringLower(Link.LinkIdFromRequest(received.Packet));
+            if (_active.ContainsKey(key) || _pending.ContainsKey(key)) return;
+            if (_active.Count + _pending.Count >= MaximumLinks)
+            {
+                Report("Incoming link rejected because the link limit has been reached.");
+                return;
+            }
             EnsureStarted();
             _suspended = false;
             link = Link.ValidateRequest(this, destination, received);
@@ -205,7 +271,10 @@ public sealed class LinkManager : IAsyncDisposable
             }
 
             var cts = new CancellationTokenSource();
-            _loops = [Task.Run(() => PumpAsync(cts.Token)), Task.Run(() => CallbackLoopAsync(cts.Token)), Task.Run(() => TickLoopAsync(cts.Token))];
+            _loops = [Task.Run(() => PumpAsync(cts.Token)),
+                Task.Run(() => WorkLoopAsync(_callbacks.Reader, _observerSlots, cts.Token)),
+                Task.Run(() => WorkLoopAsync(_requests.Reader, _requestSlots, cts.Token)),
+                Task.Run(() => TickLoopAsync(cts.Token))];
             _cts = cts;
         }
     }
@@ -233,7 +302,7 @@ public sealed class LinkManager : IAsyncDisposable
         }
         try
         {
-            if (cts is not null) await cts.CancelAsync().ConfigureAwait(false);
+            if (cts is not null) CancelOwnedWork(cts);
             try { await Task.WhenAll(loops).ConfigureAwait(false); }
             catch (OperationCanceledException) { }
         }
@@ -241,22 +310,29 @@ public sealed class LinkManager : IAsyncDisposable
         {
             foreach (var link in Links) link.Teardown();
             while (_outbound.Reader.TryRead(out _)) { }
-            while (true)
+            while (_requests.Reader.TryRead(out _)) { }
+            Task[] cleanup;
+            lock (_gate) cleanup = [.. _requiredCleanup];
+            await Task.WhenAll(cleanup).ConfigureAwait(false);
+            while (_callbacks.Reader.TryRead(out var callback))
             {
-                Action? callback;
-                lock (_gate)
-                {
-                    if (!_callbacks.Reader.TryRead(out callback))
-                    {
-                        _cts = null;
-                        _loops = [];
-                        _stopping = false;
-                        break;
-                    }
-                }
-                InvokeCallback(callback);
+                if (!StartInvocation(callback, _observerSlots, out _))
+                    Report("Link observer concurrency exhausted during shutdown; notification rejected.");
+            }
+            Task[] executing;
+            lock (_gate) executing = [.. _invocations];
+            try { await Task.WhenAll(executing).WaitAsync(TimeSpan.FromSeconds(1)).ConfigureAwait(false); }
+            catch (TimeoutException)
+            {
+                Report("Application callbacks remain executing after shutdown; their bounded slots remain reserved until they return.");
             }
             cts?.Dispose();
+            lock (_gate)
+            {
+                _cts = null;
+                _loops = [];
+                _stopping = false;
+            }
         }
     }
 
@@ -267,13 +343,71 @@ public sealed class LinkManager : IAsyncDisposable
         await StopAsync().ConfigureAwait(false);
     }
 
-    private void InvokeCallback(Action action)
+    private void Report(string message)
     {
-        try { action(); }
-        catch (Exception ex)
+        try { Log?.Invoke(message); }
+        catch (Exception observer) { System.Diagnostics.Trace.TraceError("Link diagnostic observer failed: {0}; original: {1}", observer, message); }
+    }
+
+    private bool StartInvocation(Func<ValueTask> action, SemaphoreSlim slots, out Task task)
+    {
+        if (!slots.Wait(0))
         {
-            try { Log?.Invoke("Link callback failed: " + ex.Message); }
-            catch { /* A diagnostic observer must not prevent settlement. */ }
+            task = Task.CompletedTask;
+            return false;
+        }
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        task = completion.Task;
+        lock (_gate) _invocations.Add(task);
+        _ = Task.Run(async () =>
+        {
+            try { await action().ConfigureAwait(false); }
+            catch (Exception ex) { Report("Link application work failed: " + ex.Message); }
+            finally
+            {
+                lock (_gate) _invocations.Remove(completion.Task);
+                slots.Release();
+                completion.TrySetResult();
+            }
+        });
+        return true;
+    }
+
+    internal void CancelOwnedWork(CancellationTokenSource cancellation)
+    {
+        var task = cancellation.CancelAsync();
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_gate) _invocations.Add(completion.Task);
+        _ = ObserveCancellationAsync(task, cancellation, completion);
+    }
+
+    internal void ObserveRequiredCleanup(Task work, string description)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_gate) _requiredCleanup.Add(completion.Task);
+        _ = ObserveOwnedWorkAsync(work, description, completion);
+    }
+
+    private async Task ObserveOwnedWorkAsync(Task work, string description, TaskCompletionSource completion)
+    {
+        try { await work.ConfigureAwait(false); }
+        catch (Exception ex) { Report($"Link {description} failed: {ex.Message}"); }
+        finally
+        {
+            lock (_gate) _requiredCleanup.Remove(completion.Task);
+            completion.TrySetResult();
+        }
+    }
+
+    private async Task ObserveCancellationAsync(Task task, CancellationTokenSource cancellation, TaskCompletionSource completion)
+    {
+        try { await task.ConfigureAwait(false); }
+        catch (Exception ex) { Report("Link cancellation callback failed: " + ex.Message); }
+        finally
+        {
+            lock (_gate) _invocations.Remove(completion.Task);
+            cancellation.Dispose();
+            completion.TrySetResult();
         }
     }
 
@@ -315,13 +449,16 @@ public sealed class LinkManager : IAsyncDisposable
         }
     }
 
-    private async Task CallbackLoopAsync(CancellationToken ct)
+    private async Task WorkLoopAsync(ChannelReader<Func<ValueTask>> queue, SemaphoreSlim slots, CancellationToken ct)
     {
         try
         {
-            await foreach (var action in _callbacks.Reader.ReadAllAsync(ct).ConfigureAwait(false))
+            while (await queue.WaitToReadAsync(ct).ConfigureAwait(false))
             {
-                InvokeCallback(action);
+                await slots.WaitAsync(ct).ConfigureAwait(false);
+                slots.Release();
+                if (queue.TryRead(out var action) && !StartInvocation(action, slots, out _))
+                    Report("Application work concurrency exhausted; queued work rejected.");
             }
         }
         catch (OperationCanceledException)

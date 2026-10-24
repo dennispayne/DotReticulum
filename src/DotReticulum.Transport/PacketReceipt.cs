@@ -31,6 +31,9 @@ public sealed class PacketReceipt
 
     public double Timeout { get; internal set; }
     internal double TimeoutOrigin { get; set; }
+    internal Packet? SentPacket { get; init; }
+    internal Link? ChannelOwner { get; init; }
+    internal bool CoreCallbacks { get; set; }
 
     public byte[] TruncatedHash => Hash[..Destination.HashLength];
 

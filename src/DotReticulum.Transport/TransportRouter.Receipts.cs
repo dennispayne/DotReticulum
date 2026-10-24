@@ -87,11 +87,18 @@ public sealed partial class TransportRouter
         var prove = local.ProofStrategy == ProofStrategy.All;
         if (local.ProofStrategy == ProofStrategy.App && local.ProofRequested is { } callback)
         {
-            try { prove = callback(received.Packet); }
-            catch (Exception ex) { LogReceiptFailure("Proof request callback failed: " + ex.Message); }
+            Links.DispatchAsync(async () =>
+            {
+                try
+                {
+                    if (callback(received.Packet)) await ProveAsync(local, received).ConfigureAwait(false);
+                }
+                catch (Exception ex) { LogReceiptFailure("Proof request callback failed: " + ex.Message); }
+            });
+            return;
         }
 
-        if (!prove || local.Decrypt(received.Packet.Payload.Span) is null) return;
+        if (!prove) return;
         try { await ProveAsync(local, received).ConfigureAwait(false); }
         catch (Exception ex) when (ex is not OperationCanceledException) { LogReceiptFailure("Could not send packet proof: " + ex.Message); }
     }

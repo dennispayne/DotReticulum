@@ -42,12 +42,11 @@ public sealed partial class RnsdHost
         if (_announcer is not null) return;
         var identity = _networkIdentity ?? Router.TransportIdentity;
         var destination = Destination.Create(DestinationType.Single, "rnstransport", ["discovery", "interface"], identity);
-        Router.RegisterLocalDestination(new LocalDestination(identity, destination));
+        var local = new LocalDestination(identity, destination);
+        Router.RegisterLocalDestination(local);
         _announcer = new DiscoveryAnnouncer(async (payload, token) =>
         {
-            var local = new LocalDestination(identity, destination) { AppData = payload.ToArray() };
-            Router.RegisterLocalDestination(local);
-            await Router.AnnounceAsync(local, cancellationToken: token).ConfigureAwait(false);
+            await Router.AnnounceAsync(local, cancellationToken: token, appData: payload.ToArray()).ConfigureAwait(false);
         }, _networkIdentity, timeProvider: _timeProvider, diagnostic: message => _log(1, message),
             metadataResolver: (advertisement, location, token) => DiscoveryMetadata.ResolveAsync(advertisement, location,
                 token, _executionPolicy.DiscoveryCommandTimeout, _ => _executionPolicy.AllowDiscoveryCommands));

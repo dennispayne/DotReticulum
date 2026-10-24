@@ -17,8 +17,10 @@ public static class Bz2
     }
 
     /// <summary>Decompresses, throwing InvalidDataException if the result would exceed <paramref name="maxSize"/>.</summary>
-    public static byte[] Decompress(ReadOnlySpan<byte> data, long maxSize)
+    public static byte[] Decompress(ReadOnlySpan<byte> data, long maxSize, CancellationToken cancellationToken = default)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(maxSize);
+        cancellationToken.ThrowIfCancellationRequested();
         using var input = new MemoryStream(data.ToArray());
         using var output = new MemoryStream();
         try
@@ -28,18 +30,21 @@ public static class Bz2
             int n;
             while ((n = bz.Read(buf, 0, buf.Length)) > 0)
             {
-                output.Write(buf, 0, n);
-                if (output.Length > maxSize)
+                cancellationToken.ThrowIfCancellationRequested();
+                if (n > maxSize - output.Length)
                 {
                     throw new InvalidDataException("Decompressed data exceeds the maximum size.");
                 }
+
+                output.Write(buf, 0, n);
             }
         }
-        catch (Exception ex) when (ex is BZip2Exception or EndOfStreamException or IndexOutOfRangeException or ArgumentException)
+        catch (Exception ex) when (ex is ICSharpCode.SharpZipLib.SharpZipBaseException or EndOfStreamException or IndexOutOfRangeException or ArgumentException)
         {
             throw new InvalidDataException("Invalid bz2 data.", ex);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         return output.ToArray();
     }
 }

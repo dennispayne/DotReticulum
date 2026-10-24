@@ -118,6 +118,7 @@ public sealed class RncpListener
         {
             Log?.Invoke("An error occurred while saving received resource: " + ex.Message);
         }
+        finally { resource.Dispose(); }
     }
 
     private object? OnFetch(RequestContext context)
@@ -151,7 +152,7 @@ public sealed class RncpListener
         try
         {
             Log?.Invoke("Sending file " + path + " to client");
-            link.SendResource(File.ReadAllBytes(path), FileSaver.Metadata(Path.GetFileName(path)), _options.AutoCompress);
+            link.SendResourceFile(path, FileSaver.Metadata(Path.GetFileName(path)), _options.AutoCompress);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
@@ -169,7 +170,7 @@ internal static class FileSaver
     /// <summary>Writes a received file resource into <paramref name="directory"/> using its metadata name; null when the resource carries none.</summary>
     public static string? Save(Resource resource, string directory, bool overwrite)
     {
-        if (resource.Data is not { } data) return null;
+        if (resource.Status != ResourceStatus.Complete) return null;
         if (resource.Metadata is not Dictionary<object, object?> metadata || !metadata.TryGetValue("name", out var rawName) || rawName is not byte[] nameBytes) return null;
         var name = Path.GetFileName(System.Text.Encoding.UTF8.GetString(nameBytes).Replace('\\', '/'));
         if (name.Length == 0 || name is "." or "..") return null;
@@ -179,7 +180,15 @@ internal static class FileSaver
         var candidate = target;
         for (var counter = 1; File.Exists(candidate); counter++) candidate = target + "." + counter;
         Directory.CreateDirectory(directory);
-        File.WriteAllBytes(candidate, data);
+        using var input = resource.OpenRead();
+        using var output = new FileStream(candidate, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        try { input.CopyTo(output); }
+        catch
+        {
+            output.Dispose();
+            File.Delete(candidate);
+            throw;
+        }
         return candidate;
     }
 }
@@ -200,14 +209,14 @@ public static class RncpClient
         try
         {
             link.Identify(identity);
-            var data = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+            var size = new FileInfo(path).Length;
             var done = new TaskCompletionSource<ResourceStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
-            link.SendResource(data, FileSaver.Metadata(Path.GetFileName(path)), autoCompress, r => done.TrySetResult(r.Status),
-                r => progress?.Invoke(r.Progress));
+            link.SendResourceFile(path, FileSaver.Metadata(Path.GetFileName(path)), autoCompress, r => done.TrySetResult(r.Status),
+                r => progress?.Invoke(r.Progress), cancellationToken: cancellationToken);
             var status = await done.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
             return status switch
             {
-                ResourceStatus.Complete => new RncpResult(true, path + " copied to " + CliSupport.PrettyHex(destinationHash), Bytes: data.Length),
+                ResourceStatus.Complete => new RncpResult(true, path + " copied to " + CliSupport.PrettyHex(destinationHash), Bytes: size),
                 ResourceStatus.Rejected => new RncpResult(false, "File was not accepted by " + CliSupport.PrettyHex(destinationHash)),
                 _ => new RncpResult(false, "The transfer failed"),
             };
@@ -243,12 +252,13 @@ public static class RncpClient
                     var saved = FileSaver.Save(resource, saveDirectory, allowOverwrite);
                     concluded.TrySetResult(saved is null
                         ? new RncpResult(false, "Invalid data received, ignoring resource")
-                        : new RncpResult(true, file + " fetched from " + CliSupport.PrettyHex(destinationHash), saved, resource.Data?.Length ?? 0));
+                        : new RncpResult(true, file + " fetched from " + CliSupport.PrettyHex(destinationHash), saved, new FileInfo(saved).Length));
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
                     concluded.TrySetResult(new RncpResult(false, "An error occurred while saving received resource: " + ex.Message));
                 }
+                finally { resource.Dispose(); }
             };
             link.Identify(identity);
             var receipt = link.Request(RncpListener.FetchPath, file, timeout: timeout.TotalSeconds);

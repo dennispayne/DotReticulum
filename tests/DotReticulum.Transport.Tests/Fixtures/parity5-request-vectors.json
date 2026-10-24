@@ -1,0 +1,71 @@
+{
+  "pinned": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "rnsFile": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "sourceSha256": {
+    "Link.py": "4267ab1c5b11d9c415693298376f2a984aa9bca13a6245e9bc3dce3236365a7c"
+  },
+  "success": {
+    "events": [
+      "delivered",
+      "progress:1",
+      "response"
+    ],
+    "status": 4,
+    "progress": 1.0,
+    "packetStatus": 2,
+    "proved": true,
+    "response": "616e73776572"
+  },
+  "rejection": {
+    "events": [
+      "failed"
+    ],
+    "status": 0
+  },
+  "timing": {
+    "age": 7.0,
+    "noInboundFor": 7.0,
+    "noOutboundFor": 2.0,
+    "noDataFor": 4.0,
+    "inactiveFor": 2.0,
+    "establishmentRate": 6528.0
+  },
+  "smallResponseSizes": [
+    {
+      "responseHex": "c0",
+      "size": -1
+    },
+    {
+      "responseHex": "00",
+      "size": -1
+    },
+    {
+      "responseHex": "c3",
+      "size": -1
+    },
+    {
+      "responseHex": "a0",
+      "size": -1
+    },
+    {
+      "responseHex": "a161",
+      "size": 0
+    },
+    {
+      "responseHex": "a3616263",
+      "size": 2
+    },
+    {
+      "responseHex": "c400",
+      "size": 0
+    },
+    {
+      "responseHex": "c403616263",
+      "size": 3
+    },
+    {
+      "responseHex": "dc0064000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60616263",
+      "size": 101
+    }
+  ]
+}

@@ -34,7 +34,7 @@ public class Parity4LinkMtuTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (ThrowOnSend) throw new IOException("Owned test bearer failed.");
-            var packet = Packet.Parse(raw);
+            var packet = Packet.Parse(raw, Math.Max(Packet.Mtu, HardwareMtu));
             Sent.Enqueue(packet);
             if (Drop?.Invoke(packet) != true) Peer?._inbound.Writer.TryWrite(raw.ToArray());
             return ValueTask.CompletedTask;
@@ -96,7 +96,7 @@ public class Parity4LinkMtuTests
     }
 
     [Fact]
-    public async Task EveryReferenceMtuHasIdenticalStaticProofCodecWhileLiveEndpointsAdvertiseCodecCeiling()
+    public async Task EveryReferenceMtuHasIdenticalStaticProofCodecAndOperationalEndpointsHonorBoundedBearer()
     {
         foreach (var vector in Vectors.GetProperty("mtus").EnumerateArray())
         {
@@ -112,15 +112,16 @@ public class Parity4LinkMtuTests
             Assert.Equal(referenceProof.ToArray(), Link.BuildProofPacket(Hex(vector, "linkId"), ephemeral, identity, decodedMtu).ToArray());
             var responder = Link.ValidateRequest(node.Router.Links, owner, Received(request, node.Interface), Hex(Vectors, "responderX25519Private"));
             Assert.NotNull(responder);
-            Assert.Equal(500, responder.Mtu);
-            Assert.Equal(431, responder.Mdu);
+            var operationalMtu = Math.Min(mtu, Link.MaximumOperationalMtu);
+            Assert.Equal(operationalMtu, responder.Mtu);
+            Assert.Equal(Link.ComputeMdu(operationalMtu), responder.Mdu);
             Assert.Equal(Hex(vector, "derivedKey"), responder.DerivedKeyForTests);
             await LinkTests.Until(() => node.Interface.Sent.Any(packet => packet.Context == LinkContext.LrProof));
-            Assert.Equal(Hex(MtuVector(500), "proofRaw"), node.Interface.Sent.First(packet => packet.Context == LinkContext.LrProof).ToArray());
+            Assert.Equal(Hex(MtuVector(operationalMtu), "proofRaw"), node.Interface.Sent.First(packet => packet.Context == LinkContext.LrProof).ToArray());
 
             var initiator = FixedInitiator(node);
             Assert.Equal(500, initiator.Mtu);
-            Assert.Equal(responder.Mdu, initiator.Mdu);
+            Assert.Equal(431, initiator.Mdu);
             Assert.Equal(Hex(vector, "derivedKey"), initiator.DerivedKeyForTests);
             responder.Teardown();
         }
@@ -130,7 +131,7 @@ public class Parity4LinkMtuTests
     [InlineData(16384, true, 16384)]
     [InlineData(16384, false, 500)]
     [InlineData(0, true, 500)]
-    public async Task LocalReceiveCodecCeilingDominatesOutgoingBearerCapability(int hardwareMtu, bool enabled, int expected)
+    public async Task OutgoingBearerCapabilityDeterminesOperationalOffer(int hardwareMtu, bool enabled, int expected)
     {
         await using var node = await Harness.Create(new Probe { HardwareMtu = hardwareMtu, SupportsMtuDiscovery = enabled });
         using var identity = Identity.FromPrivateKey(Hex(Vectors, "destinationPrivateKey"));
@@ -139,13 +140,13 @@ public class Parity4LinkMtuTests
         var link = Link.CreateInitiator(node.Router.Links, identity, destination.Hash, 1, 30,
             Hex(Vectors, "initiatorX25519Private"), Hex(Vectors, "initiatorSigSeed"));
         Assert.Equal(expected, Link.InterfaceMtu(node.Interface));
-        Assert.Equal(500, Link.MtuFromSignalling(link.RequestPacket!.Payload.Span[64..]));
-        Assert.Equal(Hex(MtuVector(500), "requestRaw"), link.RequestPacket.ToArray());
+        Assert.Equal(expected, Link.MtuFromSignalling(link.RequestPacket!.Payload.Span[64..]));
+        Assert.Equal(Hex(MtuVector(expected), "requestRaw"), link.RequestPacket.ToArray());
         link.Teardown();
     }
 
     [Theory]
-    [InlineData(true, 1024, 500)]
+    [InlineData(true, 1024, 1024)]
     [InlineData(false, 262144, 500)]
     public async Task ResponderClampsToReceivingBearerBeforeSigning(bool discovery, int hardwareMtu, int expected)
     {
@@ -285,10 +286,10 @@ public class Parity4LinkMtuTests
     }
 
     [Theory]
-    [InlineData(16384, 16384, 16384, true, 500)]
-    [InlineData(16384, 1024, 16384, true, 500)]
-    [InlineData(16384, 16384, 1024, true, 500)]
-    [InlineData(1024, 16384, 16384, true, 500)]
+    [InlineData(16384, 16384, 16384, true, 16384)]
+    [InlineData(16384, 1024, 16384, true, 1024)]
+    [InlineData(16384, 16384, 1024, true, 1024)]
+    [InlineData(1024, 16384, 16384, true, 1024)]
     [InlineData(16384, 16384, 16384, false, 500)]
     public async Task NegotiatedMtuHonorsMixedTransportPathBottleneck(int firstMtu, int transportReceiveMtu,
         int transportSendMtu, bool finalDiscovery, int expected)
@@ -323,8 +324,11 @@ public class Parity4LinkMtuTests
             Assert.Equal(expected, responded.Mtu);
             var received = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
             responded.PacketReceived = (data, _) => received.TrySetResult(data);
-            initiated.Send("negotiated path"u8, createReceipt: false);
-            Assert.Equal("negotiated path"u8.ToArray(), await received.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+            var payload = Enumerable.Range(0, Math.Min(initiated.Mdu, 8193)).Select(i => (byte)i).ToArray();
+            initiated.Send(payload, createReceipt: false);
+            Assert.Equal(payload, await received.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+            if (expected > Packet.Mtu)
+                Assert.Contains(first.Sent, packet => packet.DestinationType == DestinationType.Link && packet.Length > Packet.Mtu);
         }
         finally
         {

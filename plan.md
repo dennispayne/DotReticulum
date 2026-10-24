@@ -90,27 +90,27 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] Full ingress/origin/egress mode matrix, internal/roaming/AP boundaries, per-interface rates and newer-announcement queue replacement
   - [x] Data/announce/path-request/ingress-limited saturation behavior and bounded priority/rejection policy
   - [x] TCP reconnect, disconnect recovery and peer isolation
-  - [x] Interface bitrate/MTU handling and staged link MTU discovery (operational offers capped at 500 bytes, MDU 431; upgraded-payload acceptance remains Parity 5)
-- [ ] Parity 5 - Endpoint and transfer fidelity
-  - [ ] Complete applicable Identity, Destination and Packet behavior beyond existing vectors
-  - [ ] Explicit AOT-safe MessagePack application-value domain, extension/timestamp support or diagnosed intentional restrictions, numeric/UTF-8/map-key and nesting/length failure behavior
-  - [ ] Process/decrypt local packets and automatic proof strategies without event subscribers; isolate observer errors
-  - [ ] Default link acceptance, direction/type validation, duplicate registration and plain/group endpoint encryption/key lifecycle
-  - [ ] Known-destination local recall, use/retention-aware cleanup and signed ratchet persistence/reload/rotation races
-  - [ ] Dynamic/default announce app data, per-call overrides and path-response tag caching
-  - [ ] Record malformed-key/token-padding/HKDF differences explicitly and verify independent provider/boundary cases
-  - [ ] Link policies, callbacks, timing, identification, request/response limits and failure/recovery semantics
-  - [ ] Install request limits before send; enforce small-packet/resource limits, final progress, receipt coupling and integer compression thresholds
-  - [ ] Owned bounded request/callback/outbound work, cancellation and stalled-observer isolation
-  - [ ] File-backed/streamed resources, multipart/resume behavior where supported upstream, compression, limits and cancellation
-  - [ ] Release queued resources on cancellation/rejection as well as success; exactly-once terminal callbacks
-  - [ ] Dispose multipart accumulators and join/cancel preparation/assembly work on failure, cancellation and link teardown
-  - [ ] Malformed metadata/advertisement/HMU/segment/compression-expansion validation and explicit resource policy limits
-  - [ ] Actual upgraded-MTU link/resource/channel packets beyond 500 bytes and mixed-path bottleneck behavior
-  - [ ] Channel/Buffer flow control, retry/window behavior, exhaustion and teardown under impaired mixed-node links
-  - [ ] Sequence wrap/reorder/duplicate and RTT window boundaries; bounded slow-consumer memory
-  - [ ] Complete pending stream reads on disposal/link closure; observe ready-callback failures and concurrent close/write/EOF
-  - [ ] Upstream-exact malformed-input, boundary, concurrent-operation and long-running behavior
+  - [x] Interface bitrate/MTU handling and staged link MTU discovery (Parity 4 originally capped offers at 500 bytes; upgraded-payload acceptance is recorded under Parity 5)
+- [x] Parity 5 - Endpoint and transfer fidelity
+  - [x] Complete applicable Identity, Destination and Packet behavior beyond existing vectors
+  - [x] Explicit AOT-safe MessagePack application-value domain, extension/timestamp support or diagnosed intentional restrictions, numeric/UTF-8/map-key and nesting/length failure behavior
+  - [x] Process/decrypt local packets and automatic proof strategies without event subscribers; isolate observer errors
+  - [x] Default link acceptance, direction/type validation, duplicate registration and plain/group endpoint encryption/key lifecycle
+  - [x] Known-destination local recall, use/retention-aware cleanup and signed ratchet persistence/reload/rotation races
+  - [x] Dynamic/default announce app data, per-call overrides and path-response tag caching
+  - [x] Record malformed-key/token-padding/HKDF differences explicitly and verify independent provider/boundary cases
+  - [x] Link policies, callbacks, timing, identification, request/response limits and failure/recovery semantics
+  - [x] Install request limits before send; enforce small-packet/resource limits, final progress, receipt coupling and integer compression thresholds
+  - [x] Owned bounded request/callback/outbound work, cancellation and stalled-observer isolation
+  - [x] File-backed/streamed resources, multipart/resume behavior where supported upstream, compression, limits and cancellation
+  - [x] Release queued resources on cancellation/rejection as well as success; exactly-once terminal callbacks
+  - [x] Dispose multipart accumulators and join/cancel preparation/assembly work on failure, cancellation and link teardown
+  - [x] Malformed metadata/advertisement/HMU/segment/compression-expansion validation and explicit resource policy limits
+  - [x] Actual upgraded-MTU link/resource/channel packets beyond 500 bytes and mixed-path bottleneck behavior
+  - [x] Channel/Buffer flow control, retry/window behavior, exhaustion and teardown under impaired mixed-node links
+  - [x] Sequence wrap/reorder/duplicate and RTT window boundaries; bounded slow-consumer memory
+  - [x] Complete pending stream reads on disposal/link closure; observe ready-callback failures and concurrent close/write/EOF
+  - [x] Upstream-exact malformed-input, boundary, concurrent-operation and long-running behavior
 - [ ] Parity 6 - Upstream interface coverage
   - [ ] AutoInterface
   - [ ] BackboneInterface and egress-state recovery

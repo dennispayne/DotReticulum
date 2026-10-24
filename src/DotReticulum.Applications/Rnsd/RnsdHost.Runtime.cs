@@ -97,6 +97,9 @@ public sealed partial class RnsdHost
         {
             await _manager.StartAsync(linked.Token).ConfigureAwait(false);
             if (!IsConnectedToSharedInstance) await _stateStore.RestoreAsync(new HostStateProvider(this), linked.Token).ConfigureAwait(false);
+            ResourceStorageScavenger.Initialize(_resourceStorageDirectory);
+            ResourceStorageScavenger.Scavenge(_resourceStorageDirectory,
+                diagnostic: message => _log(1, message), cancellationToken: linked.Token);
             if (_rpcServer is not null) await _rpcServer.StartAsync(linked.Token).ConfigureAwait(false);
             _startedAt = DateTimeOffset.UtcNow;
         }
@@ -169,6 +172,8 @@ public sealed partial class RnsdHost
             {
                 Router.Engine.Known.Cleanup(hash => Router.HasPath(hash));
                 RuntimeHousekeeping.CleanCaches(_storageDirectory, now, message => _log(1, message));
+                ResourceStorageScavenger.Scavenge(_resourceStorageDirectory,
+                    diagnostic: message => _log(1, message), now: now, cancellationToken: token);
                 lastClean = now;
             }
             if (now - lastPersist >= TimeSpan.FromHours(12))

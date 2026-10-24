@@ -90,10 +90,15 @@ Interfaces expose configured bitrate, hardware MTU and discovery capability.
 TCP hardware MTU follows source bitrate thresholds or an explicit `fixed_mtu`;
 UDP does not advertise link MTU discovery. IFAC overhead is allowed at the raw
 frame boundary without accepting oversized decoded packets on fixed-MTU bearers.
-Link request/proof MTU fields are signed and validated; operational offers and
-confirmations are conservatively capped at **500 bytes**, with live MDU **431**.
-Larger signed-field vectors do **not** prove larger packet/resource/channel
-acceptance. That wider payload work remains explicitly in Parity 5.
+Link request/proof MTU fields are signed and validated. Operational offers and
+confirmations follow discovery-capable bearers and the smallest path MTU, capped
+at the native **524,288-byte** frame limit. A non-discovery bearer keeps the
+default **500-byte MTU / 431-byte MDU**. Signed-field vectors additionally cover
+larger encodable values without claiming those values are operational.
+Actual pinned Python transport + .NET transport flows exercise upgraded DATA,
+Channel and multipart resource traffic at **1,024** and **16,384** bytes, including
+selective Channel loss and recovery. In-process tests cover other bearer
+bottleneck positions; they are not physical-radio or all-MTU live evidence.
 
 ## Tunnels and reconnect ownership
 

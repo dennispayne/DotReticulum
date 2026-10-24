@@ -146,7 +146,8 @@ public sealed class RuntimeStateStore
     /// a signed ring and binds mandatory save-before-announce persistence to automatic rotations.
     /// The ring owns an independent signing identity, never the caller's identity. Dispose the returned
     /// ring to zero its keys and signing material. The token applies only to opening/initial persistence;
-    /// subsequent synchronous rotations persist independently of that token's later cancellation.</summary>
+    /// subsequent synchronous rotations and signed reload-on-decryption-failure run independently of that token's
+    /// later cancellation. Reload replaces keys only, preserving the live ring's enforcement/rotation policy.</summary>
     public async Task<DestinationRatchets> OpenPersistentRatchetsAsync(byte[] destinationHash, Identity identity,
         CancellationToken cancellationToken = default)
     {
@@ -164,6 +165,12 @@ public sealed class RuntimeStateStore
             var openingToken = cancellationToken;
             ring.EnablePersistence(snapshot => SaveRatchetSnapshot(path, hash, signer, snapshot, openingToken), signer);
             openingToken = default;
+            ring.EnableReload(() =>
+            {
+                using var reloaded = LoadRatchetsAsync(hash, signer).GetAwaiter().GetResult()
+                    ?? throw new IOException($"Destination ratchet file '{path}' disappeared before reload.");
+                return reloaded.ExportPrivateKeys();
+            });
             return ring;
         }
         catch

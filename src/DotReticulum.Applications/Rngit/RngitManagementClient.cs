@@ -31,8 +31,7 @@ public sealed class RngitManagementClient : IDisposable
 
     public async Task<(byte[] Data, object? Metadata)> RequestAsync(string path, object data, CancellationToken stop = default)
     {
-        var receipt = link.Request(path, data, timeout: timeout) ?? throw new IOException("Management link closed.");
-        receipt.MaxResponseSize = MaxResponseBytes;
+        var receipt = link.Request(path, data, timeout: timeout, maxResponseSize: MaxResponseBytes, cancellationToken: stop) ?? throw new IOException("Management link closed.");
         object? response;
         try { response = await receipt.ResponseTask.WaitAsync(stop).ConfigureAwait(false); }
         catch (TimeoutException ex) when (link.Status == LinkStatus.Closed)

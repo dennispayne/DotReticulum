@@ -45,7 +45,8 @@ public enum RequestPolicy : byte
 /// <summary>Arguments of a request handler (upstream <c>response_generator(path, data, request_id, link_id, remote_identity, requested_at)</c>).</summary>
 public sealed record RequestContext(string Path, object? Data, byte[] RequestId, byte[] LinkId, Identity? RemoteIdentity, double RequestedAt);
 
-public sealed record RequestHandler(string Path, Func<RequestContext, object?> Generator, RequestPolicy Allow, IReadOnlyCollection<byte[]>? AllowedList, bool AutoCompress);
+public sealed record RequestHandler(string Path, Func<RequestContext, CancellationToken, ValueTask<object?>> Generator,
+    RequestPolicy Allow, IReadOnlyCollection<byte[]>? AllowedList, bool AutoCompress, bool UseApplicationValues = false);
 
 /// <summary>Link context bytes (upstream <c>Packet.*</c> context constants).</summary>
 public static class LinkContext

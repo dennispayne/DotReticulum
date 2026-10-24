@@ -106,6 +106,8 @@ public static class Announce
         if (destination.IdentityHash is null || !destination.IdentityHash.AsSpan().SequenceEqual(identity.Hash))
             throw new ArgumentException("The destination is not bound to this identity.", nameof(destination));
         if (!randomHash.IsEmpty && randomHash.Length != RandomHashLength) throw new ArgumentException("Random hash must be 10 bytes.", nameof(randomHash));
+        var maximumAppData = Packet.Mtu - Packet.Header1Size - MinPayloadLength - (ratchets is null ? 0 : Identity.RatchetSize);
+        if (appData.Length > maximumAppData) throw new ArgumentException("Announce application data exceeds the packet MTU.", nameof(appData));
 
         var now = unixSeconds ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var random = randomHash.IsEmpty ? CreateRandomHash(now) : randomHash.ToArray();

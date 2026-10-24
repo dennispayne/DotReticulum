@@ -46,4 +46,14 @@ public interface IReconnectingPacketInterface : IPacketInterface
 /// <param name="Raw">The packet bytes exactly as received.</param>
 /// <param name="Packet">The parsed packet.</param>
 /// <param name="Source">The interface the packet arrived on.</param>
-public sealed record ReceivedPacket(ReadOnlyMemory<byte> Raw, Packet Packet, IPacketInterface Source);
+public sealed record ReceivedPacket(ReadOnlyMemory<byte> Raw, Packet Packet, IPacketInterface Source)
+{
+    private byte[]? _ratchetId;
+
+    /// <summary>Selected local decryption ratchet, or null for base-key, GROUP/PLAIN and undecrypted packets.</summary>
+    public byte[]? RatchetId
+    {
+        get => _ratchetId?.ToArray();
+        init => _ratchetId = value?.ToArray();
+    }
+}
