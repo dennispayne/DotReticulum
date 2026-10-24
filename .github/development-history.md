@@ -6,6 +6,23 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
+### Parity 4 status clarification and remaining-roadmap resume (2026-10-24)
+
+Resumed clean `main` at `07c977d4f5f3376d824b209143de561f8a94ef36`,
+also verified as `origin/main` using `git ls-remote origin refs/heads/main`.
+`dotnet build DotReticulum.slnx -c Release` passed with zero warnings/errors;
+`dotnet test DotReticulum.slnx -c Release --no-build` passed **1,196**,
+explicitly skipped **62**, failed **zero** with live/native opt-ins disabled
+(Applications 579/35, Core 107/0, Crypto 47/0, Interfaces 74/7, LXMF 27/8,
+Transport 362/12, passed/skipped).
+
+README now summarizes the completed Parity 4 scope alongside Parity 3, and the
+plan explicitly labels link MTU discovery as staged. Neither clarification
+changes behavior: operational offers remain 500 bytes, live MDU 431, and larger
+signed-field vectors are not evidence of upgraded link/resource/channel payload
+acceptance. That acceptance remains in Parity 5. No cleanup defect or unrelated
+refactoring was introduced.
+
 ### Parity 4 transport and interface-control implementation (2026-10-23)
 
 Resumed clean pushed `main` at `be71bb8`; no reference-pin change, push or

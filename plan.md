@@ -90,7 +90,7 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] Full ingress/origin/egress mode matrix, internal/roaming/AP boundaries, per-interface rates and newer-announcement queue replacement
   - [x] Data/announce/path-request/ingress-limited saturation behavior and bounded priority/rejection policy
   - [x] TCP reconnect, disconnect recovery and peer isolation
-  - [x] Interface bitrate/MTU handling and link MTU discovery
+  - [x] Interface bitrate/MTU handling and staged link MTU discovery (operational offers capped at 500 bytes, MDU 431; upgraded-payload acceptance remains Parity 5)
 - [ ] Parity 5 - Endpoint and transfer fidelity
   - [ ] Complete applicable Identity, Destination and Packet behavior beyond existing vectors
   - [ ] Explicit AOT-safe MessagePack application-value domain, extension/timestamp support or diagnosed intentional restrictions, numeric/UTF-8/map-key and nesting/length failure behavior

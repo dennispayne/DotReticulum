@@ -63,8 +63,12 @@ Identity files hold 64 raw private-key bytes (X25519 then Ed25519). Generation r
 These are bounded verified slices, not complete module parity. Parity 3 adds
 source-backed runtime configuration, shared instances, management, durable state,
 discovery/blackhole services and terminal-host cleanup, including no-subscriber
-processing and pending resource/stream settlement. The source-backed inventory
-and remaining transport, interface, utility and platform acceptance work remain in
+processing and pending resource/stream settlement. Parity 4 adds transport
+mode/path selection, receipt/proof/cache behavior, IFAC, authenticated tunnel
+restoration, bounded traffic controls and reconnect/peer isolation. Link MTU
+discovery is staged: operational offers remain capped at 500 bytes (MDU 431);
+larger signed-field vectors do not establish upgraded-payload acceptance.
+The source-backed inventory and remaining endpoint, interface, utility and platform acceptance work remain in
 [plan.md](plan.md), with source references and acceptance criteria in the
 [development history](.github/development-history.md).
 
