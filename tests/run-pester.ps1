@@ -5,12 +5,13 @@ param(
     [switch] $ToolingOnly,
     [switch] $GitRemote,
     [switch] $GitHosting,
+    [switch] $NativePackaging,
     [string] $Python = $env:DOTRETICULUM_PYTHON,
     [string] $Upstream = $env:DOTRETICULUM_UPSTREAM
 )
 
 $ErrorActionPreference = 'Stop'
-if (($GitRemote -or $GitHosting) -and $ToolingOnly) { throw 'Git suites cannot be combined with -ToolingOnly.' }
+if (($GitRemote -or $GitHosting -or $NativePackaging) -and $ToolingOnly) { throw 'Application suites cannot be combined with -ToolingOnly.' }
 if ($GitRemote -and ([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullOrWhiteSpace($Upstream))) {
     throw '-GitRemote requires -Python and -Upstream, or their DOTRETICULUM_* environment variables.'
 }
@@ -18,6 +19,14 @@ Import-Module Pester -MinimumVersion 5.7.1 -ErrorAction Stop
 $containers = @(New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Coverage.Tests.ps1'))
 if (!$ToolingOnly) {
     $resolved = (Resolve-Path -LiteralPath $Application).Path
+    if ($NativePackaging) {
+        if ([IO.Path]::GetExtension($resolved) -eq '.dll') {
+            throw '-NativePackaging requires a published native application, not a managed DLL.'
+        }
+        $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity8Packaging.Tests.ps1') -Data @{
+            Application = $resolved
+        }
+    }
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Cli.Tests.ps1') -Data @{ Application = $resolved }
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity3Configuration.Tests.ps1') -Data @{ Application = $resolved }
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity4Interfaces.Tests.ps1') -Data @{ Application = $resolved }
