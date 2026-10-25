@@ -29,6 +29,8 @@ public static class DiscoveryMetadata
             var coordinates = ParseLocation(output);
             result = result with { Latitude = coordinates.Latitude, Longitude = coordinates.Longitude, Height = coordinates.Height };
         }
+        if (result.InterfaceType is not ("TCPServerInterface" or "BackboneInterface"))
+            return result;
         var endpointPath = ExpandPath(result.ReachableOn);
         if (File.Exists(endpointPath))
         {

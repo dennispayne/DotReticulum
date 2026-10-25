@@ -9,7 +9,7 @@ namespace DotReticulum.Applications.Runtime;
 
 public static class RuntimeStatistics
 {
-    private sealed record Sample(long ReceivedBytes, long SentBytes, long SentPackets, long AcceptedPackets,
+    private sealed record Sample(long? ReceivedBytes, long? SentBytes, long SentPackets, long AcceptedPackets,
         long ReceivedAnnounceBytes, long SentAnnounceBytes, long ReceivedPathRequestBytes, long SentPathRequestBytes);
 
     private sealed record Rates(double? ReceiveBitsPerSecond, double? SendBitsPerSecond,
@@ -36,7 +36,8 @@ public static class RuntimeStatistics
                 foreach (var counter in counters)
                 {
                     var control = traffic.GetValueOrDefault(counter.Interface);
-                    var sample = new Sample(counter.ReceivedBytes, counter.SentBytes, counter.SentPackets,
+                    var diagnostics = (counter.Interface as IPacketInterfaceDiagnostics)?.GetDiagnostics();
+                    var sample = new Sample(BearerBytes(diagnostics, "rxb"), BearerBytes(diagnostics, "txb"), counter.SentPackets,
                         counter.AcceptedPackets, control?.ReceivedAnnounceBytes ?? counter.ReceivedAnnounceBytes,
                         control?.SentAnnounceBytes ?? counter.SentAnnounceBytes, control?.ReceivedPathRequestBytes ?? 0,
                         control?.SentPathRequestBytes ?? 0);
@@ -44,9 +45,11 @@ public static class RuntimeStatistics
                     if (elapsed <= 0 || !_previous.TryGetValue(counter.Interface, out var old)) continue;
                     static double Rate(long current, long previous, double seconds) =>
                         Math.Max(0, current - previous) * 8d / seconds;
+                    static double? BearerRate(long? current, long? previous, double seconds) =>
+                        current.HasValue && previous.HasValue ? Rate(current.Value, previous.Value, seconds) : null;
                     measured[counter.Interface] = new Rates(
-                        Rate(sample.ReceivedBytes, old.ReceivedBytes, elapsed),
-                        Rate(sample.SentBytes, old.SentBytes, elapsed),
+                        BearerRate(sample.ReceivedBytes, old.ReceivedBytes, elapsed),
+                        BearerRate(sample.SentBytes, old.SentBytes, elapsed),
                         Math.Max(0, sample.AcceptedPackets - old.AcceptedPackets) / elapsed,
                         Math.Max(0, sample.SentPackets - old.SentPackets) / elapsed,
                         Rate(sample.ReceivedAnnounceBytes, old.ReceivedAnnounceBytes, elapsed),
@@ -62,6 +65,9 @@ public static class RuntimeStatistics
     }
 
     private static readonly ConditionalWeakTable<PacketInterfaceManager, TrafficSampler> TrafficSamplers = new();
+
+    private static long? BearerBytes(IReadOnlyDictionary<string, object?>? diagnostics, string key) =>
+        diagnostics?.GetValueOrDefault(key) is { } value ? MsgPack.ToInt64(value) : null;
 
     public static byte[] InterfaceHash(IPacketInterface iface, string name) =>
         SHA256.HashData(Encoding.UTF8.GetBytes($"{iface.GetType().Name}[{name}]"));
@@ -89,6 +95,7 @@ public static class RuntimeStatistics
         }
         long rxb = 0, txb = 0, arxb = 0, atxb = 0, prxb = 0, ptxb = 0, prxc = 0, ptxc = 0;
         long rxPackets = 0, txPackets = 0, malformed = 0;
+        long? bearerRx = 0, bearerTx = 0;
         double? rxSpeed = 0, txSpeed = 0;
         double arxSpeed = 0, atxSpeed = 0, prxSpeed = 0, ptxSpeed = 0;
         double arxFrequency = 0, atxFrequency = 0, prxFrequency = 0, ptxFrequency = 0;
@@ -107,8 +114,8 @@ public static class RuntimeStatistics
                 ["outgoing"] = counter.Outgoing,
                 ["hash"] = InterfaceHash(counter.Interface, name),
                 ["type"] = counter.Interface.GetType().Name,
-                ["rxb"] = counter.ReceivedBytes,
-                ["txb"] = counter.SentBytes,
+                ["rxb"] = BearerBytes(device, "rxb"),
+                ["txb"] = BearerBytes(device, "txb"),
                 ["arxb"] = counter.ReceivedAnnounceBytes,
                 ["atxb"] = counter.SentAnnounceBytes,
                 ["arxc"] = counter.ReceivedAnnounces,
@@ -239,6 +246,8 @@ public static class RuntimeStatistics
             }
             entries.Add(entry);
             if (counter.Parent is not null) continue;
+            bearerRx += BearerBytes(device, "rxb");
+            bearerTx += BearerBytes(device, "txb");
             rxPackets += counter.AcceptedPackets;
             txPackets += counter.SentPackets;
             rxb += counter.ReceivedBytes;
@@ -258,8 +267,8 @@ public static class RuntimeStatistics
         var stats = new Dictionary<object, object?>
         {
             ["interfaces"] = entries.ToArray(),
-            ["rxb"] = rxb,
-            ["txb"] = txb,
+            ["rxb"] = bearerRx,
+            ["txb"] = bearerTx,
             ["dotreticulum_decoded_rxb"] = rxb,
             ["dotreticulum_decoded_txb"] = txb,
             ["arxb"] = arxb,

@@ -115,7 +115,68 @@ public sealed class DiscoveryTests
         var honest = Advertisement(identity) with { Implementation = "DotReticulum" };
         Assert.False(DiscoveryCodec.CanAutoConnect(DiscoveryCodec.Decode(DiscoveryCodec.Create(honest), identity, 0, 8), false));
         Assert.Equal("DotReticulum", new DiscoveryAdvertisement { TransportIdentity = identity.Hash, Name = "x", ReachableOn = "x.example" }.Implementation);
-        Assert.Throws<NotSupportedException>(() => DiscoveryCodec.PackAdvertisement(honest with { InterfaceType = "I2PInterface" }));
+        Assert.Throws<NotSupportedException>(() => DiscoveryCodec.PackAdvertisement(honest with { InterfaceType = "UnsupportedInterface" }));
+    }
+
+    [Theory]
+    [InlineData("I2PInterface")]
+    [InlineData("RNodeInterface")]
+    [InlineData("WeaveInterface")]
+    [InlineData("KISSInterface")]
+    [InlineData("TCPClientInterface")]
+    public async Task BearerPublicationMatchesExecutedReferenceAndMetadataDoesNotTreatRadioAsTcp(string type)
+    {
+        using var vectors = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "DiscoveryBearerVectors.json")));
+        var expected = vectors.RootElement.GetProperty("cases").EnumerateArray().Single(entry => entry.GetProperty("type").GetString() == type);
+        using var identity = ReferenceIdentity();
+        var config = RnsdConfigParser.Parse($"""
+            [reticulum]
+            share_instance=no
+            [interfaces]
+            [[Published]]
+            type={type}
+            enabled=yes
+            discoverable=yes
+            {(type == "I2PInterface" ? "connectable=yes" : type == "TCPClientInterface" ? "kiss_framing=yes\ntarget_host=localhost\ntarget_port=4242" : "port=owned-simulator")}
+            {(type == "RNodeInterface" ? "frequency=868000000\nbandwidth=125000\nspreadingfactor=7\ncodingrate=5" : "")}
+            discovery_name=Reference TCP
+            latitude=51.5
+            longitude=-0.1
+            publish_ifac=yes
+            networkname=public
+            passphrase=test-only
+            discovery_lxmf_address=000102030405060708090a0b0c0d0e0f
+            {(type is "KISSInterface" or "TCPClientInterface" ? "discovery_frequency=144800000\ndiscovery_bandwidth=12000" : "")}
+            """).Interfaces.Single();
+        var advertisement = DiscoveryAdvertisementFactory.Create(config, identity, true, i2pAddress: "reference.b32.i2p") with
+        {
+            Implementation = "RNS", Version = "1.5.7", StampValue = 1,
+        };
+        Assert.Equal(Hex(expected, "packed"), DiscoveryCodec.PackAdvertisement(advertisement));
+        Assert.Equal(advertisement, await DiscoveryMetadata.ResolveAsync(advertisement));
+        var decoded = DiscoveryCodec.Decode(DiscoveryCodec.Create(advertisement), identity, 1, 1);
+        Assert.Equal(type == "TCPClientInterface" ? "KISSInterface" : type, decoded.InterfaceType);
+        Assert.Null(decoded.Port);
+    }
+
+    [Fact]
+    public void PublicationRejectsNonconnectableI2pAndUnframedTcpAndDiagnosesPinnedKissModulationDefect()
+    {
+        using var vectors = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "DiscoveryBearerVectors.json")));
+        Assert.Equal("AttributeError", Assert.Single(vectors.RootElement.GetProperty("failures").EnumerateArray()).GetProperty("error").GetString());
+        using var identity = ReferenceIdentity();
+        var configuration = new RnsdInterfaceConfig("test", RnsdInterfaceType.I2p, true, DotReticulum.Transport.InterfaceMode.Full,
+            new Dictionary<string, string>()) { Discovery = new() { Enabled = true } };
+        Assert.Throws<NotSupportedException>(() => DiscoveryAdvertisementFactory.Create(configuration, identity, true));
+        Assert.Throws<NotSupportedException>(() => DiscoveryAdvertisementFactory.Create(configuration with { Type = RnsdInterfaceType.TcpClient }, identity, true));
+        Assert.Throws<NotSupportedException>(() => DiscoveryCodec.PackAdvertisement(Advertisement(identity) with
+        {
+            InterfaceType = "KISSInterface", Modulation = 1,
+        }));
+        Assert.Throws<InvalidOperationException>(() => DiscoveryAdvertisementFactory.Create(configuration with
+        {
+            Options = new Dictionary<string, string> { ["connectable"] = "yes" },
+        }, identity, true));
     }
 
     [Fact]
@@ -406,7 +467,7 @@ public sealed class DiscoveryTests
             return ValueTask.CompletedTask;
         }, identity, clock, diagnostics.Add);
         announcer.Register("unsupported", TimeSpan.FromMinutes(60), _ =>
-            ValueTask.FromResult(Advertisement(identity) with { InterfaceType = "I2PInterface" }));
+            ValueTask.FromResult(Advertisement(identity) with { InterfaceType = "UnsupportedInterface" }));
         announcer.Register("tcp", TimeSpan.FromMinutes(60), _ =>
             ValueTask.FromResult(Advertisement(identity) with { Encrypt = true }));
         await announcer.TickAsync();

@@ -19,8 +19,7 @@ public sealed partial class RnsdHost
     private void ValidateAdvertisement(RnsdInterfaceConfig settings)
     {
         if (!settings.Enabled || !settings.Discovery.Enabled) return;
-        if (settings.Type is not (RnsdInterfaceType.TcpServer or RnsdInterfaceType.Backbone) || settings.Get("target_host") is not null)
-            throw new NotSupportedException($"Interface '{settings.Name}': discovery publication requires a native listening TCP or Backbone bearer.");
+        DiscoveryAdvertisementFactory.ValidateBearer(settings);
         if (settings.Discovery.Encrypt && _networkIdentity is null)
             throw new InvalidOperationException($"Interface '{settings.Name}': encrypted discovery requires network_identity.");
         if (settings.Discovery.LocationCommand is not null && !_executionPolicy.AllowDiscoveryCommands)
@@ -66,10 +65,12 @@ public sealed partial class RnsdHost
             BackbonePacketInterface { LocalEndpoint: { } endpoint } => endpoint.Port,
             _ => (int?)null,
         };
-        if (port is null)
+        if (iface is null || (settings.Type is RnsdInterfaceType.TcpServer or RnsdInterfaceType.Backbone && port is null))
             throw new InvalidOperationException($"Discoverable interface '{settings.Name}' is not online.");
+        var i2pAddress = settings.Type == RnsdInterfaceType.I2p
+            ? (iface as IPacketInterfaceDiagnostics)?.GetDiagnostics().GetValueOrDefault("i2p_b32") as string : null;
         return ValueTask.FromResult(DiscoveryAdvertisementFactory.Create(settings, Router.TransportIdentity,
-            Router.TransportEnabled, port) with
+            Router.TransportEnabled, port, i2pAddress) with
         {
             Version = typeof(RnsdHost).Assembly.GetName().Version?.ToString() ?? "unknown",
         });

@@ -24,7 +24,8 @@ the reference behavior and emits the unfiltered snapshot. Discovered-interface
 config templates are reconstructed from the validated packed announcement;
 they do not start the advertised interface.
 
-Native status reports actual decoded packet-boundary byte totals and sampled
+Native status reports actual bearer byte totals, separately named decoded
+packet-boundary totals, and sampled
 per-interface/transport bit rates, announce and path-request rates and counts,
 accepted-packet/send packet rates, queue depth/drop/pressure, and packet-filter
 rejections. With announce statistics enabled it also reports observed queued
@@ -32,7 +33,9 @@ and held announces; positive packet-filter, protocol, IFAC, blocked-IP, and
 bearer TX queue/drop measurements are shown when present. Aggregate control
 traffic includes spawned-peer observations, while byte and packet totals use
 the manager's parent-rolled counters once. Bit-rate samples are measured over consecutive status snapshots;
-the first snapshot establishes a baseline and has no rate value. Path and
+the first snapshot establishes a baseline and has no rate value. Bearer totals
+and bit rates stay null when an extension supplies no measured diagnostics;
+decoded packet totals are not substituted for TCP framing bytes. Path and
 announce frequency samples use the bounded router observation windows.
 Ingress-burst active state and activation timestamps are sourced from the
 runtime controls; spawned-peer aggregates include currently active child

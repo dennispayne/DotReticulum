@@ -82,9 +82,10 @@ named `dotreticulum_decoded_rxb` and `dotreticulum_decoded_txb`.
 
 Malformed decoded packets, failed sends and their attempted bytes, pending
 sends and actual backpressure waits have separate counters. Failed sends are
-not labeled physical drops. The bounded inbound queue uses wait-on-full
-backpressure, not reference priority queues; its capacity, current depth and
-pressure are exposed without inventing per-priority queue measurements.
+not labeled physical drops. The manager's bounded inbound queue uses wait-on-full backpressure. The router
+also exposes its actual data/announce/path-request/ingress-limited queue
+depths, rejections and capacity pressure; these are distinct from manager
+backpressure, not invented per-priority queue measurements.
 Malformed HDLC frames discarded before the packet boundary are not included
 in the decoded-packet violation counter.
 
@@ -159,6 +160,20 @@ bearer can initialize publication even if none was configured at startup.
 Explicit named attach retains its existing ability to open a disabled
 configuration entry, but that entry is not advertised. Likewise, clearing
 `discoverable` on reload leaves the replacement bearer unadvertised.
+
+Connectable I2P advertises its live b32 endpoint; RNode advertises configured
+frequency/bandwidth/spreading factor/coding rate. Weave and KISS advertise
+the pinned discovery metadata fields; a KISS-framed TCP client publishes the
+upstream canonical `KISSInterface` type rather than a TCP listener endpoint.
+Nonconnectable I2P and non-KISS TCP clients are rejected explicitly. Radio
+advertisements need no TCP host/port, and endpoint providers do not run for
+them. These map/field contracts have independently executed pinned-source
+vectors; they do not prove RF reception or physical peer discovery. The
+pinned runtime parses `discovery_modulation` as an integer, but its KISS
+publisher calls string sanitization on it and fails. Native publication
+diagnoses that combination rather than inventing a wire value; omitted
+KISS modulation remains null. Weave's unconfigured channel remains null,
+matching the actual pinned defaults.
 
 Detach unregisters and waits for any in-flight advertisement before returning;
 reload does not leave a callback to the removed listener or its old metadata.

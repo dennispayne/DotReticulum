@@ -35,6 +35,12 @@ public sealed record DiscoveryAdvertisement
     public double? Height { get; init; }
     public required string ReachableOn { get; init; }
     public int Port { get; init; }
+    public int? Frequency { get; init; }
+    public int? Bandwidth { get; init; }
+    public int? SpreadingFactor { get; init; }
+    public int? CodingRate { get; init; }
+    public int? Channel { get; init; }
+    public int? Modulation { get; init; }
     public byte[]? OperatorAddress { get; init; }
     public string? NetworkName { get; init; }
     public string? Passphrase { get; init; }
@@ -71,10 +77,17 @@ public static partial class DiscoveryCodec
 
     public static byte[] PackAdvertisement(DiscoveryAdvertisement value)
     {
-        if (value.InterfaceType is not ("TCPServerInterface" or "BackboneInterface"))
+        if (!DiscoverableTypes.Contains(value.InterfaceType))
             throw new NotSupportedException($"Discovery advertisement for {value.InterfaceType} is unsupported; no bearer implementation is implied.");
-        if (value.TransportIdentity.Length != 16 || !IsHost(value.ReachableOn) || value.Port is < 1 or > 65535)
-            throw new ArgumentException("Invalid discovery identity or TCP endpoint.");
+        if (value.TransportIdentity.Length != 16)
+            throw new ArgumentException("Invalid discovery identity.");
+        var tcp = value.InterfaceType is "TCPServerInterface" or "BackboneInterface";
+        if (tcp && (!IsHost(value.ReachableOn) || value.Port is < 1 or > 65535))
+            throw new ArgumentException("Invalid discovery TCP endpoint.");
+        if (value.InterfaceType == "I2PInterface" && !IsHost(value.ReachableOn))
+            throw new ArgumentException("Invalid discovery I2P endpoint.");
+        if (value.InterfaceType == "KISSInterface" && value.Modulation is not null)
+            throw new NotSupportedException("Pinned upstream discovery cannot sanitize a numeric KISS discovery_modulation; omit this setting.");
         var map = new Dictionary<object, object?>
         {
             [0L] = value.InterfaceType, [1L] = value.Transport, [254L] = value.TransportIdentity,
@@ -86,8 +99,24 @@ public static partial class DiscoveryCodec
             if (value.OperatorAddress.Length != 16) throw new ArgumentException("Operator address must be 16 bytes.");
             map[240L] = value.OperatorAddress;
         }
-        map[2L] = SanitizePublished(value.ReachableOn);
-        map[6L] = value.Port;
+        if (tcp || value.InterfaceType == "I2PInterface") map[2L] = SanitizePublished(value.ReachableOn);
+        if (tcp) map[6L] = value.Port;
+        if (value.InterfaceType is "RNodeInterface" or "WeaveInterface" or "KISSInterface")
+        {
+            map[9L] = value.Frequency;
+            map[10L] = value.Bandwidth;
+        }
+        if (value.InterfaceType == "RNodeInterface")
+        {
+            map[11L] = value.SpreadingFactor;
+            map[12L] = value.CodingRate;
+        }
+        if (value.InterfaceType == "WeaveInterface")
+        {
+            map[14L] = value.Channel;
+            map[13L] = value.Modulation;
+        }
+        if (value.InterfaceType == "KISSInterface") map[13L] = null;
         if (value.PublishIfac)
         {
             if (!string.IsNullOrEmpty(value.NetworkName)) map[7L] = SanitizePublished(value.NetworkName);

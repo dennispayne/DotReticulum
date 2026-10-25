@@ -21,6 +21,7 @@ from RNS.vendor import umsgpack as mp
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True)
+    parser.add_argument("--bearer-output")
     args = parser.parse_args()
     verify_reference(require_lxmf=True)
     RNS.loglevel = -1
@@ -110,6 +111,43 @@ def main():
     finally:
         RNS.Transport.identity = transport_identity
     assert advertised
+    if args.bearer_output:
+        bearer_cases = []
+        bearer_failures = []
+        RNS.Transport.identity = identity
+        try:
+            for kind, attributes in [
+                ("I2PInterface", {"connectable": True, "b32": "reference.b32.i2p"}),
+                ("RNodeInterface", {"frequency": 868000000, "bandwidth": 125000, "sf": 7, "cr": 5}),
+                ("WeaveInterface", {"discovery_frequency": None, "discovery_bandwidth": None,
+                                    "discovery_channel": None, "discovery_modulation": None}),
+                ("KISSInterface", {"discovery_frequency": 144800000, "discovery_bandwidth": 12000,
+                                   "discovery_modulation": None}),
+                ("TCPClientInterface", {"kiss_framing": True, "discovery_frequency": 144800000,
+                                        "discovery_bandwidth": 12000, "discovery_modulation": None}),
+            ]:
+                bearer = type(kind, (), {})()
+                bearer.__dict__.update(interface.__dict__)
+                bearer.__dict__.update(attributes)
+                data = advertiser.get_interface_announce_data(bearer)
+                assert data
+                bearer_cases.append({"type": kind, "packed": data[1:-32].hex()})
+            bearer.discovery_modulation = 1
+            try:
+                advertiser.get_interface_announce_data(bearer)
+            except AttributeError as error:
+                bearer_failures.append({"type": "TCPClientInterface", "modulation": 1,
+                                        "error": type(error).__name__})
+            else:
+                raise AssertionError("Expected pinned numeric KISS modulation failure")
+        finally:
+            RNS.Transport.identity = transport_identity
+        Path(args.bearer_output).write_text(json.dumps({
+            "revision": PINNED_RNS_SHA,
+            "discovery_source_sha256": hashlib.sha256(Path(discovery.__file__).read_bytes()).hexdigest(),
+            "cases": bearer_cases,
+            "failures": bearer_failures,
+        }, indent=2) + "\n", encoding="utf-8")
     result = {"revision": PINNED_RNS_SHA,
               "discovery_source_sha256": hashlib.sha256(Path(discovery.__file__).read_bytes()).hexdigest(),
               "stamper_source_sha256": hashlib.sha256(Path(LXStamper.__file__).read_bytes()).hexdigest(),

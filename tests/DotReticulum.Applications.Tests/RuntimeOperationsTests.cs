@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using DotReticulum.Applications.Rnsd;
 using DotReticulum.Applications.Runtime;
 using DotReticulum.Core;
+using DotReticulum.Interfaces;
 using TransportRouter = DotReticulum.Transport.TransportRouter;
 using TransportRouterOptions = DotReticulum.Transport.TransportRouterOptions;
 
@@ -114,7 +115,8 @@ public sealed class RuntimeOperationsTests
         var stats = RuntimeStatistics.Collect(manager, [("Memory", iface)]);
         var entries = Assert.IsType<object?[]>(stats["interfaces"]);
         var entry = Assert.IsType<Dictionary<object, object?>>(Assert.Single(entries));
-        Assert.Equal(20L, entry["txb"]);
+        Assert.Null(entry["txb"]);
+        Assert.Null(stats["txb"]);
         Assert.Equal(20L, entry["dotreticulum_decoded_txb"]);
         Assert.False(entry.ContainsKey("rssi"));
         Assert.False(entry.ContainsKey("snr"));
@@ -130,7 +132,7 @@ public sealed class RuntimeOperationsTests
     }
 
     [Fact]
-    public async Task StatisticsSampleActualBitRatesPacketRatesAndTransportPacketFilterHits()
+    public async Task StatisticsSamplePacketRatesAndTransportPacketFilterHitsWithoutInventingExtensionBitRates()
     {
         var clock = new StatisticsClock();
         var iface = new MemoryInterface();
@@ -150,15 +152,55 @@ public sealed class RuntimeOperationsTests
         var stats = RuntimeStatistics.Collect(manager, [("Memory", iface)], router: router, timeProvider: clock);
         var entry = Assert.IsType<Dictionary<object, object?>>(Assert.Single(Assert.IsType<object?[]>(stats["interfaces"])));
 
-        Assert.Equal(160d, entry["txs"]);
+        Assert.Null(entry["txs"]);
         Assert.Equal(1L, entry["packet_filter_hits"]);
         Assert.Equal(1L, entry["protocol_violations"]);
-        Assert.Equal(160d, stats["txs"]);
+        Assert.Null(stats["txs"]);
         Assert.Equal(1d, stats["rxpps"]);
         Assert.Equal(1d, stats["txpps"]);
         Assert.Equal(2L, stats["rx_packets"]);
         Assert.Equal(2L, stats["tx_packets"]);
         Assert.False(entry.ContainsKey("txbuffered"));
+    }
+
+    [Fact]
+    public async Task StatisticsPreserveActualFramedTcpBytesAndSampleBearerRatherThanDecodedBitRates()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            var clock = new StatisticsClock();
+            var iface = new TcpClientPacketInterface("127.0.0.1", ((IPEndPoint)listener.LocalEndpoint).Port);
+            await using var manager = new PacketInterfaceManager([iface]);
+            await manager.StartAsync(timeout.Token);
+            using var peer = await listener.AcceptTcpClientAsync(timeout.Token);
+            _ = RuntimeStatistics.Collect(manager, [("TCP", iface)], timeProvider: clock);
+            var packet = Packet.Create(PacketType.Data, DestinationType.Plain, new byte[16], new byte[] { 0x7e, 0x7d });
+            await manager.SendAsync(packet, cancellationToken: timeout.Token);
+            var frame = new List<byte>();
+            var octet = new byte[1];
+            do
+            {
+                await peer.GetStream().ReadExactlyAsync(octet, timeout.Token);
+                frame.Add(octet[0]);
+                Assert.True(frame.Count <= Packet.Mtu * 2 + 2);
+            } while (frame.Count == 1 || octet[0] != 0x7e);
+            Assert.Equal(0x7e, frame[0]);
+            Assert.True(frame.Count > packet.ToArray().Length);
+            clock.Advance(TimeSpan.FromSeconds(2));
+
+            var stats = RuntimeStatistics.Collect(manager, [("TCP", iface)], timeProvider: clock);
+            var row = Assert.IsType<Dictionary<object, object?>>(Assert.Single(Assert.IsType<object?[]>(stats["interfaces"])));
+            Assert.Equal((long)frame.Count, row["txb"]);
+            Assert.Equal((long)frame.Count, stats["txb"]);
+            Assert.Equal((long)packet.ToArray().Length, stats["dotreticulum_decoded_txb"]);
+            Assert.Equal(frame.Count * 4d, row["txs"]);
+            Assert.Equal(frame.Count * 4d, stats["txs"]);
+            Assert.IsType<Dictionary<object, object?>>(MsgPack.Unpack(MsgPack.Pack(stats)));
+        }
+        finally { listener.Stop(); }
     }
 
     [Fact]
@@ -226,7 +268,11 @@ public sealed class RuntimeOperationsTests
         Assert.Equal(rootRow["rxb"], stats["rxb"]);
         Assert.Equal(rootRow["txb"], stats["txb"]);
         Assert.Equal(rootRow["rxb"], childRow["rxb"]);
-        Assert.True(Assert.IsType<long>(stats["rxb"]) > 0);
+        Assert.Null(stats["rxb"]);
+        Assert.Null(stats["txb"]);
+        Assert.Equal(rootRow["dotreticulum_decoded_rxb"], childRow["dotreticulum_decoded_rxb"]);
+        Assert.Equal(rootRow["dotreticulum_decoded_rxb"], stats["dotreticulum_decoded_rxb"]);
+        Assert.True(Assert.IsType<long>(stats["dotreticulum_decoded_rxb"]) > 0);
     }
 
     private static ReceivedPacket PathRequest(IPacketInterface source, byte marker)

@@ -6,6 +6,74 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
+### Parity 8 compatibility acceptance, in progress (2026-10-25)
+
+Scope starts from clean `d4eac24`: source-backed classification, impaired
+mixed transport recovery, native installation/discovery and available-platform
+acceptance. CI/CD remains a separate phase. The user will provide macOS
+execution through GitHub Actions later; no local Mac is available. That
+deferral does not implement or verify the currently missing Darwin rnsh
+terminal backend, and no macOS support claim is made.
+
+The warning-free Release baseline initially had one intermittent failure in
+`ConcurrentDefaultCreationPublishesOneWholeConfiguration` (**1819 passed,
+86 skipped, one failed**). The configuration class selection then passed
+**52**, and **30** separate focused repetitions passed. A fresh full serialized
+run with TRX diagnostics passed **1820, skipped 86**, zero failed:
+`dotnet test DotReticulum.slnx -c Release --no-build -m:1 --nologo -v quiet
+--logger trx --results-directory TestResults\parity8-baseline-trx
+-- xUnit.MaxParallelThreads=1`. The initial failure is not attributed to
+Windows Firewall or claimed fixed without a reproducible cause; no
+configuration production change was made on that evidence.
+
+The source audit discovered applicable software gaps hidden by earlier broad
+family checkboxes: non-TCP discovery publication, packet/link/shared PHY
+attribution, desktop RNode BLE providers and Darwin rnsh terminal handling.
+Android host/provider and physical acceptance limitations also remain.
+`docs/compatibility-contracts.md` classifies these separately from intentional
+.NET differences and actual upstream placeholders. Inventory completion is
+not implementation completion.
+
+The user conditionally authorized necessary COM8 RAK reflashing. The current
+native `rnodeconf COM8 --info` successfully queried the physical RAK4631/SX1262,
+firmware **1.86**, nRF52 platform/MCU/board **70/71/51**, Normal host-controlled
+mode. EEPROM information decoded; device signature remains **Unverified**,
+not an authenticated manufacturer claim. `rnodeconf COM8 --eeprom-backup
+--backup-file <session-files>\rnode-com8-pre-parity8.eeprom` then saved the
+actual **200-byte** EEPROM in the session artifact directory outside source
+control. No EEPROM bytes, credentials or private identity were committed.
+Both operations exited zero, without starting RF, resetting, flashing or
+mutating EEPROM. The functioning board currently supplies no reason for a
+gratuitous reflash. One radio cannot establish peer-to-peer RF acceptance.
+
+The first verified software slice restores a statistics boundary accidentally
+regressed in Parity 7: `rxb`/`txb` and sampled bit rates again use actual
+bearer diagnostics, including HDLC framing/escaping on transmit. Extensions
+without diagnostics stay null; separately named decoded totals remain
+available. A real TCP socket observes the actual framed bytes and checks
+both the status counters and sampled rate against those bytes.
+
+Discovery publication now implements the pinned I2P/RNode/Weave/KISS and
+KISS-framed TCP-client branches rather than only TCP/Backbone servers.
+Factory/host validation, radio metadata fields, canonical KISS type and
+non-TCP provider handling are covered. `GenerateDiscoveryVectors.py
+--output TestResults\parity8-discovery-unused.json --bearer-output
+tests\DotReticulum.Applications.Tests\Fixtures\DiscoveryBearerVectors.json`
+executed the unchanged pinned upstream builder in the verified RNS/LXMF
+environment. Existing `DiscoveryVectors.json` was not regenerated or
+relabeled. The new fixture records the revision/source hash and actual
+numeric-KISS-modulation `AttributeError`; native publication diagnoses this
+reference defect instead of inventing a successful value.
+
+`dotnet test
+tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
+-c Release --no-restore --filter
+"FullyQualifiedName~DiscoveryTests|FullyQualifiedName~DiscoveryMetadataTests|FullyQualifiedName~RuntimeDiscoveryHostTests|FullyQualifiedName~RuntimeOperationsTests|FullyQualifiedName~SharedHostIntegrationTests"
+--nologo --logger "console;verbosity=normal"` passed **70, skipped 1**, zero
+failed and no build warnings. The skip is the Unix metadata executable case
+on Windows; the actual Windows-native provider case passed. This verifies
+software field mapping/lifecycle, not actual RF or I2P network discovery.
+
 ### Parity 7 utility software acceptance; physical acceptance outstanding (2026-10-24)
 
 The intermediate checkpoints below are chronological investigation evidence.
