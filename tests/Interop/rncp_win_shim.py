@@ -7,6 +7,10 @@ wire behaviour untouched. Usage: python rncp_win_shim.py <module name, e.g. rncp
 import runpy
 import shutil
 import sys
+import os
+from reference_environment import verify_reference
+
+verify_reference(require_lxmf=True)
 
 
 def _copy_instead_of_move(src, dst, *args, **kwargs):
@@ -14,6 +18,7 @@ def _copy_instead_of_move(src, dst, *args, **kwargs):
     return dst
 
 
-shutil.move = _copy_instead_of_move
+if os.name == "nt":
+    shutil.move = _copy_instead_of_move
 module = sys.argv.pop(1)
 runpy.run_module("RNS.Utilities." + module, run_name="__main__", alter_sys=True)

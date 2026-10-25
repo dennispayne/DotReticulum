@@ -30,19 +30,33 @@ internal static class CliSupport
         return result;
     }
 
-    /// <summary>Default allowed_identities locations of an upstream-style tool: <c>~/.&lt;tool&gt;/allowed_identities</c> and <c>~/.config/&lt;tool&gt;/allowed_identities</c>.</summary>
+    /// <summary>Default allowed_identities locations in system, user-config, then legacy-user precedence.</summary>
     public static IEnumerable<string> DefaultAllowedFiles(string tool)
     {
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        yield return Path.Combine(Path.DirectorySeparatorChar.ToString(), "etc", tool, "allowed_identities");
         yield return Path.Combine(home, ".config", tool, "allowed_identities");
         yield return Path.Combine(home, "." + tool, "allowed_identities");
+    }
+
+    public static string ExpandHome(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        if (path == "~") return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (path.StartsWith("~/", StringComparison.Ordinal) ||
+            OperatingSystem.IsWindows() && path.StartsWith("~\\", StringComparison.Ordinal))
+        {
+            var suffix = OperatingSystem.IsWindows() ? path[1..].Replace('/', '\\') : path[1..];
+            return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).TrimEnd(Path.DirectorySeparatorChar) + suffix;
+        }
+        return path;
     }
 
     /// <summary>Loads the identity at <paramref name="path"/>, creating it when missing; without a path uses <c>storage/identities/&lt;name&gt;</c> of the node.</summary>
     public static Identity LoadOrCreateIdentity(ReticulumNode node, string? path, string name)
     {
         if (path is null) return node.LoadOrCreateIdentity(Path.Combine("identities", name));
-        path = Path.GetFullPath(path);
+        path = Path.GetFullPath(ExpandHome(path));
         return Runtime.RuntimeStateStore.LoadOrCreateIdentity(path);
     }
 

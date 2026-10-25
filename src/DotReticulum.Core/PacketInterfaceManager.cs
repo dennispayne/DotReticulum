@@ -118,6 +118,45 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         lock (_gate) return _states.Values.Select(s => s.Snapshot()).ToArray();
     }
 
+    /// <summary>Records a parsed packet rejected by transport packet filtering.</summary>
+    public void RecordPacketFilterHit(IPacketInterface source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        InterfaceState state;
+        lock (_gate)
+        {
+            if (!_states.TryGetValue(source, out state!))
+                throw new ArgumentException("The source interface is not owned by this manager.", nameof(source));
+        }
+        state.Filtered();
+    }
+
+    /// <summary>Records a parsed packet accepted by transport packet filtering.</summary>
+    public void RecordAcceptedPacket(IPacketInterface source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        InterfaceState state;
+        lock (_gate)
+        {
+            if (!_states.TryGetValue(source, out state!))
+                throw new ArgumentException("The source interface is not owned by this manager.", nameof(source));
+        }
+        state.Accepted();
+    }
+
+    /// <summary>Records a malformed or otherwise protocol-invalid packet at the transport boundary.</summary>
+    public void RecordProtocolViolation(IPacketInterface source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        InterfaceState state;
+        lock (_gate)
+        {
+            if (!_states.TryGetValue(source, out state!))
+                throw new ArgumentException("The source interface is not owned by this manager.", nameof(source));
+        }
+        state.ProtocolViolation();
+    }
+
     private sealed class InterfaceState(IPacketInterface iface, InterfaceState? parent, CancellationToken lifetime, bool isolateFailure = false)
     {
         public IPacketInterface Interface { get; } = iface;
@@ -131,7 +170,8 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
             iface is IPacketInterfaceChildPolicy { InheritParentAccessCode: false } ? null : parent?.AccessCode;
         public CancellationTokenSource Cancellation { get; } = CancellationTokenSource.CreateLinkedTokenSource(lifetime);
         public Task Receiver { get; set; } = Task.CompletedTask;
-        public long Rxb, Txb, RxPackets, TxPackets, Arxb, Atxb, Arxc, Atxc, Malformed, SendFailures, FailedBytes, Waits, IfacViolations;
+        public long Rxb, Txb, RxPackets, TxPackets, Arxb, Atxb, Arxc, Atxc, Malformed, FilteredPackets, AcceptedPackets;
+        public long ProtocolViolations, SendFailures, FailedBytes, Waits, IfacViolations;
         public int Pending;
         public PacketInterfaceStatistics Snapshot() => new(Interface, Parent?.Interface,
             Interlocked.Read(ref Rxb), Interlocked.Read(ref Txb), Interlocked.Read(ref RxPackets), Interlocked.Read(ref TxPackets),
@@ -140,6 +180,9 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
             Interlocked.Read(ref Waits), Volatile.Read(ref Pending))
         {
             IfacViolations = Interlocked.Read(ref IfacViolations),
+            FilteredPackets = Interlocked.Read(ref FilteredPackets),
+            AcceptedPackets = Interlocked.Read(ref AcceptedPackets),
+            ProtocolViolations = Interlocked.Read(ref ProtocolViolations),
             IfacSize = AccessCode?.Size,
             IfacNetworkName = AccessCode?.NetworkName,
             IfacSignature = AccessCode?.Signature.ToArray(),
@@ -150,6 +193,24 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         {
             Interlocked.Increment(ref IfacViolations);
             if (CountParentTraffic) Parent?.RejectedAccessCode();
+        }
+
+        public void ProtocolViolation()
+        {
+            Interlocked.Increment(ref ProtocolViolations);
+            if (CountParentTraffic) Parent?.ProtocolViolation();
+        }
+
+        public void Filtered()
+        {
+            Interlocked.Increment(ref FilteredPackets);
+            if (CountParentTraffic) Parent?.Filtered();
+        }
+
+        public void Accepted()
+        {
+            Interlocked.Increment(ref AcceptedPackets);
+            if (CountParentTraffic) Parent?.Accepted();
         }
 
         public void Received(int length, Packet? packet)
@@ -628,7 +689,13 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
                 ReadOnlyMemory<byte> decoded = raw;
                 if (state.AccessCode is { } code)
                 {
-                    if (raw.Length > iface.HardwareMtu + code.Size || !code.TryUnprotect(raw.Span, out var authenticated))
+                    if (raw.Length > iface.HardwareMtu + code.Size)
+                    {
+                        state.ProtocolViolation();
+                        state.Received(raw.Length, null);
+                        continue;
+                    }
+                    if (!code.TryUnprotect(raw.Span, out var authenticated))
                     {
                         state.RejectedAccessCode();
                         state.Received(raw.Length, null);
@@ -636,7 +703,13 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
                     }
                     decoded = authenticated!;
                 }
-                else if (raw.Length < 3 || (raw.Span[0] & 0x80) != 0)
+                else if (raw.Length < 3)
+                {
+                    state.ProtocolViolation();
+                    state.Received(raw.Length, null);
+                    continue;
+                }
+                else if ((raw.Span[0] & 0x80) != 0)
                 {
                     state.RejectedAccessCode();
                     state.Received(raw.Length, null);
@@ -644,6 +717,7 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
                 }
                 if (!Packet.TryParse(decoded, out var packet, PacketMtu(iface)))
                 {
+                    state.ProtocolViolation();
                     state.Received(raw.Length, null);
                     continue;
                 }

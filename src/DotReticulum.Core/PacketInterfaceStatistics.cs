@@ -19,6 +19,9 @@ public sealed record PacketInterfaceStatistics(
     int PendingSends)
 {
     public bool Outgoing { get; init; } = true;
+    public long FilteredPackets { get; init; }
+    public long AcceptedPackets { get; init; }
+    public long ProtocolViolations { get; init; }
     public long IfacViolations { get; init; }
     public int? IfacSize { get; init; }
     public string? IfacNetworkName { get; init; }

@@ -1,0 +1,205 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "rnsModule": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "sourceSha256": {
+    "rncp": "e50ab246208d91d60e2bf357a9883552fb4b25495476769d4733354a738ba817",
+    "rnx": "1d08d8be8750ca187437fd23bd465799185ce5eeedd2117d5fece577fd0143ee",
+    "rnsd": "e8920d1acde17e09b0aad57651348e86aabc84fbb29a531c340b7365d220e748"
+  },
+  "cases": [
+    {
+      "limit": null,
+      "timeout": 10,
+      "executed": true,
+      "returnCode": 7,
+      "stdout": "00ff41424344",
+      "stderr": "fe004546",
+      "stdoutLength": 6,
+      "stderrLength": 4,
+      "concluded": true
+    },
+    {
+      "limit": 0,
+      "timeout": 10,
+      "executed": true,
+      "returnCode": 7,
+      "stdout": "",
+      "stderr": "",
+      "stdoutLength": 6,
+      "stderrLength": 4,
+      "concluded": true
+    },
+    {
+      "limit": 3,
+      "timeout": 10,
+      "executed": true,
+      "returnCode": 7,
+      "stdout": "00ff41",
+      "stderr": "fe0045",
+      "stdoutLength": 6,
+      "stderrLength": 4,
+      "concluded": true
+    },
+    {
+      "limit": -1,
+      "timeout": 10,
+      "executed": true,
+      "returnCode": 7,
+      "stdout": "00ff414243",
+      "stderr": "fe0045",
+      "stdoutLength": 6,
+      "stderrLength": 4,
+      "concluded": true
+    },
+    {
+      "limit": -20,
+      "timeout": 10,
+      "executed": true,
+      "returnCode": 7,
+      "stdout": "",
+      "stderr": "",
+      "stdoutLength": 6,
+      "stderrLength": 4,
+      "concluded": true
+    },
+    {
+      "limit": null,
+      "timeout": null,
+      "executed": true,
+      "returnCode": 7,
+      "stdout": "00ff41424344",
+      "stderr": "fe004546",
+      "stdoutLength": 6,
+      "stderrLength": 4,
+      "concluded": false
+    }
+  ],
+  "failedSpawn": [
+    false,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "cli": [
+    {
+      "tool": "rncp",
+      "args": [
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "rncp 1.5.7\n",
+      "stderr": ""
+    },
+    {
+      "tool": "rncp",
+      "args": [
+        "--not-a-parity7-option"
+      ],
+      "exitCode": 2,
+      "stdout": "",
+      "stderr": "usage: rncp [-h] [--config path] [-v] [-q] [-S] [-l] [-C] [-F] [-f] [-j path]\n            [-s path] [-O] [-b seconds] [-a allowed_hash] [-n] [-p]\n            [-i identity] [-w seconds] [-P] [--version]\n            [file] [destination]\nrncp: error: unrecognized arguments: --not-a-parity7-option\n"
+    },
+    {
+      "tool": "rncp",
+      "args": [
+        "--config"
+      ],
+      "exitCode": 2,
+      "stdout": "",
+      "stderr": "usage: rncp [-h] [--config path] [-v] [-q] [-S] [-l] [-C] [-F] [-f] [-j path]\n            [-s path] [-O] [-b seconds] [-a allowed_hash] [-n] [-p]\n            [-i identity] [-w seconds] [-P] [--version]\n            [file] [destination]\nrncp: error: argument --config: expected one argument\n"
+    },
+    {
+      "tool": "rncp",
+      "args": [],
+      "exitCode": 0,
+      "stdout": "\nusage: rncp [-h] [--config path] [-v] [-q] [-S] [-l] [-C] [-F] [-f] [-j path]\n            [-s path] [-O] [-b seconds] [-a allowed_hash] [-n] [-p]\n            [-i identity] [-w seconds] [-P] [--version]\n            [file] [destination]\n\nReticulum File Transfer Utility\n\npositional arguments:\n  file                  file to be transferred\n  destination           hexadecimal hash of the receiver\n\noptions:\n  -h, --help            show this help message and exit\n  --config path         path to alternative Reticulum config directory\n  -v, --verbose         increase verbosity\n  -q, --quiet           decrease verbosity\n  -S, --silent          disable transfer progress output\n  -l, --listen          listen for incoming transfer requests\n  -C, --no-compress     disable automatic compression\n  -F, --allow-fetch     allow authenticated clients to fetch files\n  -f, --fetch           fetch file from remote listener instead of sending\n  -j path, --jail path  restrict fetch requests to specified path\n  -s path, --save path  save received files in specified path\n  -O, --overwrite       Allow overwriting received files, instead of adding\n                        postfix\n  -b seconds            announce interval, 0 to only announce at startup\n  -a allowed_hash       allow this identity (or add in\n                        ~/.rncp/allowed_identities)\n  -n, --no-auth         accept requests from anyone\n  -p, --print-identity  print identity and destination info and exit\n  -i identity           path to identity to use\n  -w seconds            sender timeout before giving up\n  -P, --phy-rates       display physical layer transfer rates\n  --version             show program's version number and exit\n\n",
+      "stderr": ""
+    },
+    {
+      "tool": "rncp",
+      "args": [
+        "orphan"
+      ],
+      "exitCode": 0,
+      "stdout": "\nusage: rncp [-h] [--config path] [-v] [-q] [-S] [-l] [-C] [-F] [-f] [-j path]\n            [-s path] [-O] [-b seconds] [-a allowed_hash] [-n] [-p]\n            [-i identity] [-w seconds] [-P] [--version]\n            [file] [destination]\n\nReticulum File Transfer Utility\n\npositional arguments:\n  file                  file to be transferred\n  destination           hexadecimal hash of the receiver\n\noptions:\n  -h, --help            show this help message and exit\n  --config path         path to alternative Reticulum config directory\n  -v, --verbose         increase verbosity\n  -q, --quiet           decrease verbosity\n  -S, --silent          disable transfer progress output\n  -l, --listen          listen for incoming transfer requests\n  -C, --no-compress     disable automatic compression\n  -F, --allow-fetch     allow authenticated clients to fetch files\n  -f, --fetch           fetch file from remote listener instead of sending\n  -j path, --jail path  restrict fetch requests to specified path\n  -s path, --save path  save received files in specified path\n  -O, --overwrite       Allow overwriting received files, instead of adding\n                        postfix\n  -b seconds            announce interval, 0 to only announce at startup\n  -a allowed_hash       allow this identity (or add in\n                        ~/.rncp/allowed_identities)\n  -n, --no-auth         accept requests from anyone\n  -p, --print-identity  print identity and destination info and exit\n  -i identity           path to identity to use\n  -w seconds            sender timeout before giving up\n  -P, --phy-rates       display physical layer transfer rates\n  --version             show program's version number and exit\n\n",
+      "stderr": ""
+    },
+    {
+      "tool": "rnx",
+      "args": [
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "rnx 1.5.7\n",
+      "stderr": ""
+    },
+    {
+      "tool": "rnx",
+      "args": [
+        "--not-a-parity7-option"
+      ],
+      "exitCode": 2,
+      "stdout": "",
+      "stderr": "usage: rnx [-h] [--config path] [-v] [-q] [-p] [-l] [-i identity] [-x] [-b]\n           [-a allowed_hash] [-n] [-N] [-d] [-m] [-w seconds] [-W seconds]\n           [--stdin STDIN] [--stdout STDOUT] [--stderr STDERR] [--version]\n           [destination] [command]\nrnx: error: unrecognized arguments: --not-a-parity7-option\n"
+    },
+    {
+      "tool": "rnx",
+      "args": [
+        "--config"
+      ],
+      "exitCode": 2,
+      "stdout": "",
+      "stderr": "usage: rnx [-h] [--config path] [-v] [-q] [-p] [-l] [-i identity] [-x] [-b]\n           [-a allowed_hash] [-n] [-N] [-d] [-m] [-w seconds] [-W seconds]\n           [--stdin STDIN] [--stdout STDOUT] [--stderr STDERR] [--version]\n           [destination] [command]\nrnx: error: argument --config: expected one argument\n"
+    },
+    {
+      "tool": "rnx",
+      "args": [],
+      "exitCode": 0,
+      "stdout": "\nusage: rnx [-h] [--config path] [-v] [-q] [-p] [-l] [-i identity] [-x] [-b]\n           [-a allowed_hash] [-n] [-N] [-d] [-m] [-w seconds] [-W seconds]\n           [--stdin STDIN] [--stdout STDOUT] [--stderr STDERR] [--version]\n           [destination] [command]\n\nReticulum Remote Execution Utility\n\npositional arguments:\n  destination           hexadecimal hash of the listener\n  command               command to be execute\n\noptions:\n  -h, --help            show this help message and exit\n  --config path         path to alternative Reticulum config directory\n  -v, --verbose         increase verbosity\n  -q, --quiet           decrease verbosity\n  -p, --print-identity  print identity and destination info and exit\n  -l, --listen          listen for incoming commands\n  -i identity           path to identity to use\n  -x, --interactive     enter interactive mode\n  -b, --no-announce     don't announce at program start\n  -a allowed_hash       accept from this identity\n  -n, --noauth          accept commands from anyone\n  -N, --noid            don't identify to listener\n  -d, --detailed        show detailed result output\n  -m                    mirror exit code of remote command\n  -w seconds            connect and request timeout before giving up\n  -W seconds            max result download time\n  --stdin STDIN         pass input to stdin\n  --stdout STDOUT       max size in bytes of returned stdout\n  --stderr STDERR       max size in bytes of returned stderr\n  --version             show program's version number and exit\n\n",
+      "stderr": ""
+    },
+    {
+      "tool": "rnx",
+      "args": [
+        "orphan"
+      ],
+      "exitCode": 0,
+      "stdout": "\nusage: rnx [-h] [--config path] [-v] [-q] [-p] [-l] [-i identity] [-x] [-b]\n           [-a allowed_hash] [-n] [-N] [-d] [-m] [-w seconds] [-W seconds]\n           [--stdin STDIN] [--stdout STDOUT] [--stderr STDERR] [--version]\n           [destination] [command]\n\nReticulum Remote Execution Utility\n\npositional arguments:\n  destination           hexadecimal hash of the listener\n  command               command to be execute\n\noptions:\n  -h, --help            show this help message and exit\n  --config path         path to alternative Reticulum config directory\n  -v, --verbose         increase verbosity\n  -q, --quiet           decrease verbosity\n  -p, --print-identity  print identity and destination info and exit\n  -l, --listen          listen for incoming commands\n  -i identity           path to identity to use\n  -x, --interactive     enter interactive mode\n  -b, --no-announce     don't announce at program start\n  -a allowed_hash       accept from this identity\n  -n, --noauth          accept commands from anyone\n  -N, --noid            don't identify to listener\n  -d, --detailed        show detailed result output\n  -m                    mirror exit code of remote command\n  -w seconds            connect and request timeout before giving up\n  -W seconds            max result download time\n  --stdin STDIN         pass input to stdin\n  --stdout STDOUT       max size in bytes of returned stdout\n  --stderr STDERR       max size in bytes of returned stderr\n  --version             show program's version number and exit\n\n",
+      "stderr": ""
+    },
+    {
+      "tool": "rnsd",
+      "args": [
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "rnsd 1.5.7\n",
+      "stderr": ""
+    },
+    {
+      "tool": "rnsd",
+      "args": [
+        "--not-a-parity7-option"
+      ],
+      "exitCode": 2,
+      "stdout": "",
+      "stderr": "usage: rnsd [-h] [--config CONFIG] [-v] [-q] [-s] [-i] [--exampleconfig]\n            [--version]\nrnsd: error: unrecognized arguments: --not-a-parity7-option\n"
+    },
+    {
+      "tool": "rnsd",
+      "args": [
+        "--config"
+      ],
+      "exitCode": 2,
+      "stdout": "",
+      "stderr": "usage: rnsd [-h] [--config CONFIG] [-v] [-q] [-s] [-i] [--exampleconfig]\n            [--version]\nrnsd: error: argument --config: expected one argument\n"
+    }
+  ],
+  "attachedValues": {
+    "stdin": "-v",
+    "stdout": -1,
+    "stderr": 0
+  }
+}

@@ -21,6 +21,17 @@ Describe 'DotReticulum CLI end-to-end' -Tag E2E {
         $result.Output | Should -Not -Match 'Read-only bare Git clone'
     }
 
+    It 'advertises and dispatches the upstream utility commands' {
+        $rootHelp = Invoke-Cli @('--help')
+        $rootHelp.Code | Should -Be 0 -Because $rootHelp.Error
+        foreach ($tool in 'rnid', 'rnstatus', 'rnpath', 'rnprobe', 'rnsh', 'rnodeconf') {
+            $rootHelp.Output | Should -Match "\b$tool\b"
+            $help = Invoke-Cli @($tool, '--help')
+            $help.Code | Should -Be 0 -Because $help.Error
+            $help.Output | Should -Match "\b$tool\b"
+        }
+    }
+
     It 'persists identity generation, preserves it on overwrite refusal and reloads the same public identity' {
         $path = Join-Path $TestDrive 'private identity'
         $created = Invoke-Cli @('rnid', '--generate', $path)
@@ -32,6 +43,19 @@ Describe 'DotReticulum CLI end-to-end' -Tag E2E {
         $refused.Error | Should -Not -BeNullOrEmpty
         (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash | Should -Be $before
         $loaded = Invoke-Cli @('rnid', '--show', $path)
+        $loaded.Code | Should -Be 0 -Because $loaded.Error
+        $loaded.Output | Should -Be $created.Output
+    }
+
+    It 'dispatches a renamed utility executable without a repeated subcommand' {
+        $directory = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'identity-alias')
+        $helper = Install-TestGitHelper $cli $directory.FullName
+        $alias = Join-Path $directory.FullName $(if ($IsWindows) { 'rnid.exe' } else { 'rnid' })
+        Move-Item -LiteralPath $helper -Destination $alias
+        $identity = Join-Path $TestDrive 'alias-identity'
+        $created = Invoke-TestProcess $alias @('--generate', $identity)
+        $created.Code | Should -Be 0 -Because $created.Error
+        $loaded = Invoke-Cli @('rnid', '--show', $identity)
         $loaded.Code | Should -Be 0 -Because $loaded.Error
         $loaded.Output | Should -Be $created.Output
     }

@@ -40,6 +40,8 @@ public sealed partial class TransportRouter
         }
     }
 
+    public IReadOnlyList<int> InboundQueueCapacities => _inboundCapacities.ToArray();
+
     /// <summary>Nonblocking bounded ingress, ordered DATA, ANNOUNCE, PATH_REQUEST, INGRESS_LIMITED as upstream.</summary>
     public bool TryQueueInbound(ReceivedPacket received)
     {

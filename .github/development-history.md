@@ -6,6 +6,345 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
+### Parity 7 utility software acceptance; physical acceptance outstanding (2026-10-24)
+
+The intermediate checkpoints below are chronological investigation evidence.
+The final software acceptance record at the end of this section supersedes
+their pending software gates; physical-device limitations remain current.
+
+Scope starts from `1984d92`: complete the utility contracts in Parity 7,
+without starting compatibility/release acceptance or CI/CD. The user accepted
+the previously recorded Parity 6 limitations; they remain unverified, not
+silently converted to support claims.
+
+Before utility changes, `dotnet build DotReticulum.slnx -c Release --nologo
+-v quiet` passed with zero warnings/errors. `dotnet test DotReticulum.slnx
+-c Release --no-build -m:1 --nologo -v quiet -- xUnit.MaxParallelThreads=1`
+passed **1687, skipped 84**, zero failed. Live, NativeAOT executable and
+physical-device opt-ins were disabled for this baseline. Serial collections
+avoid the previously observed unrelated Windows executable-fixture races.
+Executing `verify_reference(require_lxmf=True)` from
+`tests\Interop\reference_environment.py` also passed against the existing
+isolated environment, confirming the actual RNS 1.5.7 checkout import,
+unchanged reference revision/source and LXMF 1.2.1 distribution import before
+new utility fixture generation.
+
+Independent workstreams cover identity operations, network inspection,
+interactive shell, device configuration/placeholder classification and
+transfer/execution CLI fidelity. Each must establish options/defaults,
+successful and failing outcomes, persistence/process effects and applicable
+wire behavior against the unchanged hosted
+`a29bfb51c468945c96a1ee22cae0114e993e2391` reference before claiming completion.
+Protocol fixtures must come from executed reference code. Process acceptance
+uses separate applications and persisted/output/exit results; terminal,
+firmware, RF and platform requirements must retain their actual evidence
+boundaries. Shared dispatch and full gates are integrated centrally.
+`pwsh -NoProfile -File tests\run-pester.ps1 -ToolingOnly` passed **5,
+skipped 0** after registering the utility process suites.
+
+The first integrated utility checkpoint is not acceptance: focused xUnit
+execution found a mixed-list metadata validator regression and a parser
+expectation inconsistent with upstream dispatch. Both were corrected; the
+next focused run passed **87, skipped 4**, with one outstanding Windows
+ConPTY assertion failure. Compilation of newly integrated device work also
+exposed accidentally nested methods, corrected before those cases ran.
+
+Separate-process `Parity7Identity.Tests.ps1`, using the verified reference
+checkout/venv, passed **11, skipped 0**. This includes independent detached
+signatures, legacy/embedded/wrapped messages, authorized editor success,
+failure and deadline, binary stdout, actual Python file encryption in both
+directions across the 16 MiB boundary, network identity lookup, cache
+retention across restart and an authenticated reverse announce. Explicit
+UTF-8 console input/output fixes Windows redirected Unicode text without
+altering binary stream handling.
+
+At that checkpoint, device/placeholder and basic shell Pester cases passed
+**13, skipped 0**. An initial actual Python `rncp` fetch timed out: a cached
+identity was mistaken for an available route after client restart. Shared
+`ClientLinks` now waits for a path before establishing the link and tears
+down pending links on cancellation/error. A cached-identity/no-route
+regression passes. The subsequent root CLI and transfer Pester run passed
+**12, skipped 0**, including both actual Python listener roles for file
+transfer and authorized execution, raw binary output, writable-directory
+failure, renamed utility discovery and preserved legacy identity stderr.
+Windows home expansion also normalizes its separator.
+
+Neither these counts nor simulator results establish firmware flashing,
+physical RF, interactive terminal recovery or completed Parity 7 support.
+Full gates, coverage and native execution remain pending.
+
+The subsequent rebuilt utility checkpoint passed **110, skipped 4** with
+three outstanding assertions (ConPTY capture and two network-utility
+checks). All rnid parser vectors, transfer timeout/concurrency/cancellation
+cases and current device firmware/recovery simulations passed. A managed
+Pester run of identity, device, transfer and network utility suites passed
+**33, skipped 0**, using the verified Python environment where applicable.
+The network suite at this point covers dispatch/invalid input, not yet core
+statistics/path/probe acceptance.
+
+Actual POSIX Python rnsh runs through WSL do not yet pass: the peer accepts
+and authenticates the link, negotiates the protocol and executes the child,
+but then remains running after its pipe-close observations until the test's
+150-second deadline. Retained upstream diagnostics distinguish this from a
+network-connectivity failure. This remains an investigation, not a waived
+interop test or an undisclosed reference shim.
+
+The next coherent focused command,
+`dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
+-c Release --filter "FullyQualifiedName~RnshTests|FullyQualifiedName~Parity7|FullyQualifiedName~Rnodeconf|FullyQualifiedName~RncpRnxTests|FullyQualifiedName~RnsdTests|FullyQualifiedName~ReticulumNodeTests"
+--nologo -v quiet --logger trx --results-directory TestResults\parity7-ninth-focused
+-- xUnit.MaxParallelThreads=1`, passed **119, skipped 4**. ConPTY now captures
+the child through explicitly null startup standard handles instead of
+leaking output to the parent console. Maintenance serial ownership tests
+also passed **2, skipped 0**.
+
+Windows NativeAOT publish with both `ILLinkTreatWarningsAsErrors=true` and
+`IlcTreatWarningsAsErrors=true` passed, followed by native `--help`.
+`pwsh -NoProfile -File tests\run-pester.ps1 -Application
+artifacts\native-parity7\DotReticulum.Applications.exe -Python <verified-venv>
+-Upstream <verified-checkout>` passed **70, skipped 2**, with three failing
+new network-utility test setup assertions. Native rnid's **11** process
+cases, transfer/execution's **6**, device/placeholder safety's **13** and
+root CLI's **6** all passed, including renamed utility dispatch, actual
+Python identity lookup/retention, both-direction >16 MiB RFE and actual
+Python rncp/rnx in both listener roles. Existing native encrypted multi-MB
+rncp and resource process flows also ran; this is not publish-only evidence.
+Network setup failures and full gates remain open. The leaked daemon from
+failed setup was explicitly stopped by its owned PID.
+
+The rnsh investigation independently executes unmodified upstream
+`CallbackSubprocess`: without EOF it reports the child exit; with EOF its
+`close_stdin` termination waiter consumes the exit before the polling
+callback, leaving a null return code. Successful self-terminating sessions
+and bounded negative EOF/recovery acceptance are being separated, not
+papered over with a reference-side shim.
+
+`DOTRETICULUM_NATIVE_EXE=artifacts\native-parity7\DotReticulum.Applications.exe`
+with `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
+-c Release --no-build --filter "FullyQualifiedName~NativeResourceTests"
+--nologo -v quiet -- xUnit.MaxParallelThreads=1` passed **1, skipped 0**,
+executing the encrypted/compressed multi-megabyte native resource flow.
+The network process rerun passes actual local daemon management/path/drop/
+blackhole behavior and a probe path request, but remote setup still needs
+correction. No remote utility completion claim is based on these results.
+
+Actual terminal-mode restoration now passes inside ConPTY: the probe
+captures original modes, enters raw mode, observes changed flags and
+asserts exact restoration on disposal. The focused shell/network command
+passed **20, skipped 0**. With verified Windows Python imports and the
+unmodified Linux reference via the explicit WSL interpreter/checkout
+overrides, `RnshLiveTests|RnshNativeTests` passed **2, skipped 0**.
+This exercises both Python roles, binary streams, at least two dropped
+Channel messages across the impaired bridge, resize, cancelled-child
+cleanup and fresh sessions. It also observes the actual pinned EOF defect
+under a bounded deadline before teardown/recovery. A published-native
+initiator runs inside an actual terminal and completes a remote session.
+This is not a claim that upstream EOF completion was repaired or shimmed.
+Linux native-backend validation and the final source audit remain pending.
+
+The full Windows regression run,
+`dotnet test DotReticulum.slnx -c Release --no-build -m:1 --nologo -v quiet
+-- xUnit.MaxParallelThreads=1`, passed **1800, skipped 86**, zero failed,
+before the final expanded endpoint/statistics changes. Live/native opt-ins
+were disabled for that run; the separate live/native evidence above remains
+distinct. Later changes require fresh targeted and full milestone gates.
+
+All eight Windows child pipe/terminal combinations pass through actual
+child redirection probes; the expanded shell/network focused run passed
+**28, skipped 0**. The corresponding Linux snapshot passed **20** shell
+cases, with one terminal-mode restoration probe failure still under
+investigation. Linux-x64 NativeAOT publish with both warning gates and
+`--help` passed. Published Linux terminal-hosted rnsh and encrypted resource
+tests passed **2**; the mixed-Python shell case reached failed-spawn
+verification but failed a Windows-specific error-text assertion. These
+remaining Linux assertions are not recorded as platform acceptance yet.
+Native remote status/path requests now pass against both native and actual
+Python nodes; the probe callback observation remains under investigation.
+
+The Linux restoration failure was fixed by applying .NET's control-C
+terminal state before the native termios snapshot, so exact native
+restoration is last. The rebuilt Linux selection passed **23, skipped 0**:
+all eight endpoint combinations, exact mode restoration, both Python roles
+with impairment/recovery and the native terminal-hosted initiator. After
+republishing the corrected Linux production code with both warning gates,
+native terminal-hosted rnsh plus encrypted resource tests passed **2,
+skipped 0**. Failed-spawn assertions now verify the appropriate Windows or
+Linux error text rather than requiring a Windows API name on Linux.
+
+Published Windows network utilities Pester passed **7, skipped 0** after
+correcting the thin Python callback's use of a nonexistent Packet property.
+Actual callbacks now verify both proof-producing and no-proof destinations.
+Local management/path/drop/blackhole behavior, native remote status/path and
+actual pinned Python remote status/path plus probe reply/loss all execute
+through separate processes. Empty remote tables are valid results, not
+authentication failures. Final measured-statistics tests and integrated
+coverage are still pending.
+
+Measured-statistics behavior now passes: the test drives actual path-request
+ingress and outbound requests and verifies counters plus queued depth/
+pressure. The final Windows network/terminal/runtime focused selection
+passed **41, skipped 0**, covering no-argument usage, repeated verbosity,
+blackhole-list output, announce sorting and table/rate precedence. One
+test-analyzer argument-order warning is being corrected before the full
+milestone coverage gate.
+
+Device software acceptance is separated in `plan.md` from physical
+flashing/reset/re-enumeration/EEPROM persistence and RF. Only read-only COM8
+identification was authorized; no real firmware or EEPROM operation was
+performed. The Parity 7 parent remains unchecked while physical acceptance
+is unavailable, even after all scoped software gates pass.
+
+Full serialized coverage checkpoint:
+`dotnet test DotReticulum.slnx -c Release --settings tests\coverage.runsettings
+--collect:"XPlat Code Coverage" --results-directory
+TestResults\coverage-parity7-final-73d8d59a -m:1 --nologo -v quiet
+-- xUnit.MaxParallelThreads=1` passed **1814, skipped 86**, zero failed.
+Live/native opt-ins were disabled for this collection. The existing
+`tests\coverage_summary.ps1` merged all six reports by production line/branch
+identity without double-counting:
+
+| Project | Lines | Branches |
+| --- | ---: | ---: |
+| Applications | 75.80% | 62.47% |
+| Core | 96.96% | 91.90% |
+| Crypto | 94.83% | 94.00% |
+| Interfaces | 85.39% | 78.13% |
+| LXMF | 90.23% | 70.96% |
+| Transport | 90.95% | 81.50% |
+| Overall | 82.48% (21874/26521) | 69.24% (16675/24083) |
+
+The complete published-native Pester entry point with the verified Python
+environment then passed **73, skipped 2**, zero failed, including all seven
+network-utility process cases. Conditional skips were Unix SIGTERM and
+abstract-socket cases on Windows, not successful stand-ins.
+The final source audit subsequently identified additional software-maintained
+rnstatus totals/speed/burst/TX/filter fields required by accepted options;
+they are not hardware-only omissions. Their implementation and regression
+gate remain required, so this coverage checkpoint is not final acceptance
+of complete rnstatus parity.
+
+The same complete Pester entry point against the managed Release DLL also
+passed **73, skipped 2**, zero failed, with the verified Python environment.
+A bounded integration review identified a concurrent rncp same-name save
+race: two completed resources could select the same non-overwriting target
+before either move. The collision fix and a focused concurrent regression
+are required before final transfer acceptance; earlier passing healthy
+transfer cases did not cover this race.
+
+The receive-save review also identified a .NET Unix publication limitation:
+non-overwriting `File.Move` can use a check followed by rename. Concurrent
+in-process publications therefore require bounded shared serialization in
+addition to collision retry; a failure-free Windows test alone would not
+establish Linux preservation.
+
+The receive-save fix now coordinates final publication with a fixed bounded
+set of locks, leaving payload copy/staging outside the lock. It rechecks
+targets before publication and retries only real collision errors, preserving
+staged data. A deterministic barrier forces both receives to select the same
+target before either stages its payload; both original payloads survive with
+distinct names. This and non-file-error/cancellation cleanup regressions
+passed on Windows and Linux (**2** Linux targeted cases, zero skipped).
+Coordination is process-local; the documented Unix race against unrelated
+external writers is not claimed eliminated by these locks.
+
+The next full collection correctly rejected the expanded statistics batch:
+two existing shared-host integration tests failed because a newly exposed
+boxed byte was unsupported by the management MessagePack boundary.
+The separate shared-host reproduction fails both tests with the explicit
+`Unsupported management MessagePack type Byte` diagnostic. This is a real
+regression to fix, not firewall interference or an acceptable flaky gate.
+The failed collection is not used as final coverage acceptance.
+Child aggregate accounting and Local-interface reporting differences also
+remain under source-backed review.
+
+#### Final integrated software acceptance
+
+The shared-management regression is resolved at the statistics boundary:
+interface mode is emitted as a supported integer rather than a boxed byte.
+Existing real shared-owner/reconnect tests and added row-serialization
+assertions now pass. Aggregate announce/path observations include spawned
+children exactly once; byte/packet totals use parent-rolled manager counters.
+Local TCP reports measured pending write bytes, explicitly not invented
+upstream buffer, drop or stall measurements. Status renders configured
+gravity, announce-rate limits and IFAC information. The focused
+`RuntimeOperationsTests|Parity7NetworkUtilitiesTests|SharedHostIntegrationTests`
+selection passed **26**, zero failed/skipped.
+
+Final `dotnet build DotReticulum.slnx -c Release --nologo -v quiet` passed
+with **zero warnings/errors**.
+`dotnet test DotReticulum.slnx -c Release --settings tests\coverage.runsettings
+--collect:"XPlat Code Coverage" --results-directory
+TestResults\coverage-parity7-complete-73d8d59a -m:1 --nologo -v quiet
+-- xUnit.MaxParallelThreads=1` passed **1820, skipped 86**, zero failed.
+Live/native opt-ins were disabled for this full collection, not silently
+counted as live successes.
+`pwsh -NoProfile -File tests\coverage_summary.ps1
+TestResults\coverage-parity7-complete-73d8d59a` merged six reports:
+
+| Project | Lines | Branches |
+| --- | ---: | ---: |
+| Applications | 76.46% (10578/13834) | 63.17% (9924/15711) |
+| Core | 96.58% (1725/1786) | 91.42% (1055/1154) |
+| Crypto | 94.83% (110/116) | 94.00% (47/50) |
+| Interfaces | 85.43% (4499/5266) | 78.25% (2533/3237) |
+| LXMF | 90.23% (388/430) | 70.96% (193/272) |
+| Transport | 91.04% (4920/5404) | 81.71% (3229/3952) |
+| Overall | 82.80% (22220/26836) | 69.66% (16981/24376) |
+
+Latest Windows native publication used the MSVC environment in the same
+process as `dotnet publish
+src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release
+-r win-x64 -p:ILLinkTreatWarningsAsErrors=true
+-p:IlcTreatWarningsAsErrors=true -o artifacts\native-parity7 --nologo -v quiet`;
+publish and native `--help` passed. The complete
+`pwsh -NoProfile -File tests\run-pester.ps1 -Application
+artifacts\native-parity7\DotReticulum.Applications.exe -Python <verified-venv>
+-Upstream <verified-checkout>` passed **73, skipped 2**. The same entry point
+without `-Application` passed **73, skipped 2** against the managed Release
+DLL. Both skips are Windows-inapplicable Unix SIGTERM/abstract-socket cases.
+These include actual pinned Python peers, not only native loopback.
+
+With `DOTRETICULUM_LIVE=1`, the verified Python paths and explicit unmodified
+WSL rnsh interpreter/checkout overrides, plus `DOTRETICULUM_NATIVE_EXE` set
+to the latest publication, `dotnet test
+tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
+-c Release --no-build --filter
+"FullyQualifiedName~RnshLiveTests|FullyQualifiedName~RnshNativeTests|FullyQualifiedName~NativeResourceTests"
+--nologo -v quiet -- xUnit.MaxParallelThreads=1` passed **3**, zero skipped.
+This reruns both actual Python shell roles with impairment/recovery, an
+actual terminal-hosted native initiator and encrypted/compressed multi-MB
+native resource transfer after the final production changes.
+
+The refreshed owned Ubuntu snapshot also passed a warning-free Release
+build, Linux-x64 publish with both warning gates and native `--help`.
+With the verified Linux reference/venv and native executable opt-ins, the
+same Applications test command selecting
+`RnshTests|RnshLiveTests|RnshNativeTests|NativeResourceTests|RuntimeOperationsTests|SharedHostIntegrationTests|Parity7NetworkUtilitiesTests|FileSaver`
+passed **50**, zero skipped. This includes the concurrent save regression,
+all pipe/terminal combinations, actual Python sessions, exact terminal
+restoration, native resource/session flows and shared-management regressions.
+
+The Linux native `tests/run-pester.ps1` entry point initially lacked Pester;
+the existing explicit Pester **5.7.1** module was supplied to that owned
+snapshot. It then passed **74** with one failed jail test: the test sent a
+literal Windows backslash on Unix and therefore requested a nonexistent
+filename rather than an outside path. The test now constructs the traversal
+with `Path.Combine`, preserving the actual jail rejection requirement.
+The complete affected `Parity7Transfer.Tests.ps1` container subsequently
+passed **6**, zero failed/skipped, on both Linux and Windows native binaries.
+All other Linux process cases had already passed, including Unix-only
+SIGTERM/abstract sockets; the whole entry point was not rerun after this
+test-only portability correction.
+
+All scoped Parity 7 software items are accepted with the documented safety,
+platform and upstream-defect differences; this is not full Reticulum parity.
+The Parity 7 parent remains unchecked solely for explicitly authorized real
+rnodeconf flashing/reset/re-enumeration/EEPROM persistence and RF acceptance.
+No such physical mutation was performed: only earlier read-only COM8
+identification was authorized, and only one radio is available.
+macOS/broader topology/release acceptance remains Parity 8. No Parity 8
+implementation or CI/CD workflows were added.
+
 ### Parity 6 software recovery and authorized RNode identification, partial (2026-10-24)
 
 This continues `9bc0b02`, not Parity 7 or CI/CD. The owner confirmed that only

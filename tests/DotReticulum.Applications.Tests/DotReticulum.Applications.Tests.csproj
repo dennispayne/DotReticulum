@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Fixtures\RngitPresentationBackend\RngitPresentationBackend.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Fixtures\RnshTerminalProbe\RnshTerminalProbe.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\src\DotReticulum.Applications\DotReticulum.Applications.csproj" />
     <ProjectReference Include="..\..\src\DotReticulum.Core\DotReticulum.Core.csproj" />
     <ProjectReference Include="..\..\src\DotReticulum.Transport\DotReticulum.Transport.csproj" />

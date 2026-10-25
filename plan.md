@@ -132,20 +132,21 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] Local decoded-frame accounting, source-backed Android pause/keepalive policy and Linux abstract-socket equivalents; Android execution tracked above
   - [ ] Actual I2P stream delivery after persisted bearer restart (fails on i2pd and Java I2P); SAM readiness alone is insufficient
   - [ ] Authorized physical serial/TNC/RNode/Multi/Weave and Android USB/Bluetooth/RF acceptance (COM8 RNode USB/firmware identification verified; one radio only, RF acceptance explicitly retained as unverified; remaining devices/platform access/settings unavailable; see development history)
-- [ ] Parity 7 - Upstream utility coverage
-  - [ ] rnid import/export, encryption/decryption, signing/verification, metadata, announcements and network lookup options
-  - [ ] rnid recursive/stdin/file/current/legacy/wrapped/embedded RSG/RSM and explicitly authorized bounded editor flows; CLI formatting/base256 and boundary output fidelity
-  - [ ] rnstatus statistics and management options
-  - [ ] rnpath inspection, request and path-management options
-  - [ ] rnprobe request/reply and reporting options
-  - [ ] rnsh interactive sessions, terminal/process handling and recovery
-  - [ ] rnodeconf device configuration/update operations and hardware validation
-  - [ ] Complete rnsd, rncp and rnx CLI/configuration/error/exit-code behavior
-  - [ ] rncp/rnx allow-file precedence, home expansion, version/PHY options, writable-output errors and bounded file/process I/O
-  - [ ] rnx binary stdout/stderr, negative/zero output limits, failed spawn, timeout termination/results and authorized cancellation
-  - [ ] rnsh Channel/PTY/window/stream protocol and platform terminal/process recovery, distinct from rnx interactive mode
-  - [ ] rnodeconf read-only/device-simulator behavior before explicitly authorized owned-device firmware/EEPROM/trust operations
-  - [ ] Track Resolver/rnir/rnpkg placeholders without inventing functionality absent from the pinned upstream
+- [ ] Parity 7 - Upstream utility coverage (software accepted; physical device acceptance outstanding)
+  - [x] rnid import/export, encryption/decryption, signing/verification, metadata, announcements and network lookup options
+  - [x] rnid recursive/stdin/file/current/legacy/wrapped/embedded RSG/RSM and explicitly authorized bounded editor flows; CLI formatting/base256 and boundary output fidelity
+  - [x] rnstatus statistics and management options, measured totals/rates/filter/burst observations, child aggregation and explicitly distinguished bearer TX diagnostics
+  - [x] rnpath inspection, request and path-management options
+  - [x] rnprobe request/reply and reporting options
+  - [x] rnsh interactive sessions, terminal/process handling and recovery (pinned upstream EOF defect explicitly recorded)
+  - [x] rnodeconf device configuration/update software operations, independent plans and bounded firmware/provisioning/recovery simulators
+  - [ ] Explicitly authorized physical rnodeconf flashing/reset/re-enumeration/EEPROM persistence and RF acceptance (not performed; only read-only COM8 identification authorized)
+  - [x] Complete rnsd, rncp and rnx CLI/configuration/error/exit-code behavior
+  - [x] rncp/rnx allow-file precedence, home expansion, version/PHY options, writable-output errors and bounded file/process I/O
+  - [x] rnx binary stdout/stderr, negative/zero output limits, failed spawn, timeout termination/results and authorized cancellation
+  - [x] rnsh Channel/PTY/window/stream protocol and Windows/Linux terminal/process recovery, distinct from rnx interactive mode; broader platform/topology acceptance remains Parity 8
+  - [x] rnodeconf read-only/device-simulator behavior before explicitly authorized owned-device firmware/EEPROM/trust operations
+  - [x] Track Resolver/rnir/rnpkg placeholders without inventing functionality absent from the pinned upstream
 - [ ] Parity 8 - Compatibility and release acceptance
   - [ ] Close the source-backed inventory: no unclassified features or unacknowledged parity gaps
   - [ ] Mixed Python/.NET leaf and transport topologies with loss, latency, reconnects, restarts and constrained resources

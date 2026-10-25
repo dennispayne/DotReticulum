@@ -42,6 +42,9 @@ public sealed class ReticulumNode : IAsyncDisposable
     public SharedInstanceRole SharedRole => _host.SharedRole;
     public bool IsConnectedToSharedInstance => _host.IsConnectedToSharedInstance;
 
+    /// <summary>Returns native runtime measurements; profiling adds .NET process counters without inventing RNS profiler data.</summary>
+    public Dictionary<object, object?> GetStatistics(bool profiling = false) => _host.GetStatistics(profiling);
+
     public ValueTask<object?> CallManagementAsync(Dictionary<object, object?> call, CancellationToken cancellationToken = default) =>
         _host.CallManagementAsync(call, cancellationToken);
 

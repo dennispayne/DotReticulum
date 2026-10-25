@@ -7,6 +7,61 @@ namespace DotReticulum.Applications.Tests;
 public class RncpRnxTests
 {
     [Fact]
+    public async Task ConcurrentSameNameReceivesRetryAtomicMoveCollisionWithoutLosingEitherFile()
+    {
+        var directory = Path.Combine(Environment.CurrentDirectory, ".artifacts", "rncp-collision-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        using var selected = new Barrier(2);
+        try
+        {
+            var target = Path.Combine(directory, "same.bin");
+            var payloads = new[] { "first received payload"u8.ToArray(), "second received payload"u8.ToArray() };
+            var saves = payloads.Select(data => Task.Factory.StartNew(() =>
+            {
+                using var input = new SynchronizedIncomingStream(data, selected);
+                return FileSaver.SaveStream(input, target, overwrite: false);
+            }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
+            var paths = await Task.WhenAll(saves).WaitAsync(TimeSpan.FromSeconds(15));
+            Assert.Equal(new[] { target, target + ".1" }, paths.Order().ToArray());
+            var received = paths.Select(File.ReadAllBytes).Select(Convert.ToHexString).Order().ToArray();
+            Assert.Equal(payloads.Select(Convert.ToHexString).Order().ToArray(), received);
+            Assert.Equal(2, Directory.GetFiles(directory).Length);
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    private sealed class SynchronizedIncomingStream(byte[] data, Barrier selected) : MemoryStream(data)
+    {
+        public override void CopyTo(Stream destination, int bufferSize)
+        {
+            if (!selected.SignalAndWait(TimeSpan.FromSeconds(10))) throw new TimeoutException("Both receives must select their destination before either stages its payload.");
+            base.CopyTo(destination, bufferSize);
+        }
+    }
+
+    [Fact]
+    public void ReceiveSaveDoesNotRetryNonFileCollisionOrIgnoreCancellation()
+    {
+        var directory = Path.Combine(Environment.CurrentDirectory, ".artifacts", "rncp-save-failure-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var target = Directory.CreateDirectory(Path.Combine(directory, "directory.bin")).FullName;
+            using var input = new MemoryStream("payload"u8.ToArray());
+            var error = Record.Exception(() => FileSaver.SaveStream(input, target, overwrite: false));
+            Assert.True(error is IOException or UnauthorizedAccessException, error?.ToString());
+            Assert.Empty(Directory.GetFiles(directory));
+            using var cancelled = new CancellationTokenSource();
+            cancelled.Cancel();
+            input.Position = 0;
+            Assert.ThrowsAny<OperationCanceledException>(() =>
+                FileSaver.SaveStream(input, Path.Combine(directory, "cancelled.bin"), false, cancelled.Token));
+            Assert.Empty(Directory.GetFiles(directory));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
     public void ShellSplit_FollowsPosixQuoting()
     {
         Assert.Equal(["a", "b c", "d e", "f"], CliSupport.ShellSplit("a 'b c' \"d e\" f"));

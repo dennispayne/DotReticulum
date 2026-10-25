@@ -1,0 +1,51 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "source_sha256": "6e6039579ba80e8eb46406f53a6aff44997d713f324e75072515b668100fdb0f",
+  "vectors": [
+    {
+      "name": "NoopMessage",
+      "type": 44032,
+      "hex": ""
+    },
+    {
+      "name": "VersionInfoMessage",
+      "type": 44037,
+      "hex": "92a5302e302e3001"
+    },
+    {
+      "name": "WindowSizeMessage",
+      "type": 44034,
+      "hex": "941850cd0280cd01e0"
+    },
+    {
+      "name": "ExecuteCommandMesssage",
+      "type": 44035,
+      "hex": "9a92a46563686fa8736e6f7720e29883c3c3c3c0a5787465726d18500000"
+    },
+    {
+      "name": "StreamDataMessage",
+      "type": 44036,
+      "hex": "000000ff737464696e"
+    },
+    {
+      "name": "StreamDataMessage",
+      "type": 44036,
+      "hex": "8001"
+    },
+    {
+      "name": "StreamDataMessage",
+      "type": 44036,
+      "hex": "8002737464657272"
+    },
+    {
+      "name": "ErrorMessage",
+      "type": 44038,
+      "hex": "93b7556e61626c6520746f2073746172742070726f63657373c381a6726561736f6ea5737061776e"
+    },
+    {
+      "name": "CommandExitedMessage",
+      "type": 44039,
+      "hex": "f1"
+    }
+  ]
+}

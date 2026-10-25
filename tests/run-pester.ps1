@@ -23,6 +23,13 @@ if (!$ToolingOnly) {
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity4Interfaces.Tests.ps1') -Data @{ Application = $resolved }
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity5Resources.Tests.ps1') -Data @{ Application = $resolved }
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity6Interfaces.Tests.ps1') -Data @{ Application = $resolved }
+    foreach ($suite in 'Identity', 'NetworkUtilities', 'Shell', 'Device', 'Transfer') {
+        $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot "Pester\Parity7$suite.Tests.ps1") -Data @{
+            Application = $resolved
+            Python = $Python
+            Upstream = $Upstream
+        }
+    }
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\SharedRuntime.Tests.ps1') -Data @{
         Application = $resolved
         Python = $Python

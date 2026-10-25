@@ -85,7 +85,8 @@ public sealed partial class RnsdHost : IAsyncDisposable
 
     public Dictionary<object, object?> GetStatistics(bool profiling = false)
     {
-        var stats = RuntimeStatistics.Collect(_manager, Interfaces, Router.TransportEnabled ? Router.TransportId : null, profiling);
+        var stats = RuntimeStatistics.Collect(_manager, Interfaces, Router.TransportEnabled ? Router.TransportId : null,
+            profiling, Router);
         if (Router.TransportEnabled)
         {
             stats["transport_uptime"] = _startedAt == default ? 0d : (DateTimeOffset.UtcNow - _startedAt).TotalSeconds;

@@ -108,6 +108,27 @@ public class ReticulumNodeTests
     }
 
     [Fact]
+    public async Task CachedIdentityWithoutRouteDoesNotStartLinkEstablishment()
+    {
+        var directory = TempDir();
+        try
+        {
+            await using var node = ReticulumNode.Create(RnsdConfigParser.Parse("[reticulum]\nshare_instance=no"), directory);
+            using var identity = Identity.Generate();
+            var destination = Destination.Create(DestinationType.Single, "cached-peer", ["echo"], identity);
+            node.Router.Engine.Known.Remember(destination.Hash, new byte[32], identity.ExportPublicKey(), null);
+            await node.StartAsync();
+
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            var result = await ClientLinks.ConnectAsync(node, destination.Hash, TimeSpan.FromMilliseconds(150), deadline.Token);
+
+            Assert.False(result.Ok);
+            Assert.Equal("Path not found", result.Error);
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
     public async Task RestartRestoresValidatedPathOnStableConfiguredBearerWithoutNewAnnounce()
     {
         var (server, client, directory) = Pair();

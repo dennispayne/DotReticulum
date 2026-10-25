@@ -23,7 +23,7 @@ P0's hosted-upstream gate is complete: our NativeAOT .NET client fetched missing
 | `src/DotReticulum.Transport` | Announces, routing, links, resources |
 | `src/DotReticulum.Interfaces` | `IPacketInterface` bearers: UDP, TCP client/server (HDLC), serial (HDLC); bounded `PacketInterfaceManager` lives in Core |
 | `src/DotReticulum.Lxmf` | LXMF messages, stamps and a router-lite (opportunistic/direct/Resource delivery, receipts, retry queue); see [docs/lxmf.md](docs/lxmf.md) |
-| `src/DotReticulum.Applications` | `ReticulumNode` client runtime and CLI tools (`rnid`, `rnsd`, `rncp`, `rnx`, `telemetry`, `rngit`, `git-remote-rns`, `rngcs`) |
+| `src/DotReticulum.Applications` | `ReticulumNode` client runtime, RNS utility implementations (physical device acceptance outstanding), telemetry and Git tools |
 
 Production projects enable trimming and NativeAOT analysis. Raw Curve25519 uses Bouncy Castle because .NET has no portable raw Ed25519/X25519 API; AES, HMAC, SHA and HKDF use `System.Security.Cryptography`. Reticulum tokens are binary `IV || ciphertext || HMAC`, not standard Fernet tokens.
 
@@ -55,6 +55,12 @@ dotnet run --project src/DotReticulum.Applications -- telemetry daemon --config 
 ```
 
 See [docs/rnsd.md](docs/rnsd.md) for daemon configuration, [runtime operations](docs/runtime-operations.md) for shared instances, management, discovery and blackholes, [runtime state](docs/runtime-state.md) for persistence, [docs/rncp-rnx.md](docs/rncp-rnx.md) for rncp/rnx, [docs/telemetry.md](docs/telemetry.md) for telemetry and [docs/rngit.md](docs/rngit.md) for Git transfers, hosting, collaboration, presentation and signing.
+
+Parity 7 utility contracts and current limitations are documented separately for
+[rnid](docs/rnid.md), [network inspection](docs/network-utilities.md),
+[rnsh](docs/rnsh.md), [rnodeconf](docs/rnodeconf.md) and
+[upstream placeholders](docs/upstream-placeholders.md). Implementation is in
+progress; these documents do not establish completed utility parity.
 
 Identity files hold 64 raw private-key bytes (X25519 then Ed25519). Generation refuses to overwrite. Protect and back up keys; never commit them.
 
@@ -104,7 +110,10 @@ Required hardware/platform acceptance and actual I2P restart recovery remain ope
 | Git releases and work documents | Release drafts/artifacts/publication/latest/deletion, signed manifests, fetch/offline verification and scoped signed documents/comments/administration. Actual pinned clients and servers exercise both roles over native .NET links; separate-process managed/native CLI tests cover persisted state and failure paths. Embedded signer keys do not establish publisher trust. The actual Python management client's Windows file-retention shim is disclosed in [docs/rngit.md](docs/rngit.md). |
 | NomadNet Git pages, templates and media | Repository/tree/blob/history/commit/ref/statistics/release/work pages and downloads; source-generated default Markdown/Micron/rendering cases and native-host page/download flows. Static templates and explicitly authorized bounded executable/editor processes; real FFmpeg/WebP conversion on Windows. Optional Pygments/wcwidth-enhanced rendering and other installed encoder families are not claimed. |
 | `rngcs` Git signing | Source-generated SSHSIG/RSG signatures, principal discovery, structural checks, cryptographic verification and author/tagger matching. Real native Git commit/tag signing and bidirectional pinned-reference signature checks; malformed/tampered/wrong-principal cases. This is not an allowed-signers trust database or authenticated publisher discovery. |
-| `rnid` (generate/show) | Implemented; NativeAOT build verified. Upstream loads its identity files |
+| `rnid` | Pinned-reference import/export, detached/current/legacy/embedded signatures, metadata, base256/wrapping and parser vectors. Managed and Windows NativeAOT separate processes exchange >16 MiB encrypted files with actual Python in both directions, request/retain identities across restart and send authenticated announces. Explicitly authorized bounded editor flows, binary streams and legacy generate/show persist/refuse overwrite. Strict key and resource limits are documented in [rnid](docs/rnid.md). |
+| Network utilities | Separate Windows/Linux published-native processes exercise local statistics/path/drop/blackhole management, authenticated remote status/path against native and actual Python nodes, and Python probe replies/loss. Statistics use measured counters, child aggregates and queue depth/pressure; unavailable PHY data is not fabricated, and Local TCP pending writes are distinguished from upstream TX buffers. Integrated software gates pass; see [network utilities](docs/network-utilities.md) and the [verification history](.github/development-history.md). |
+| `rnsh` | Actual Python listener and initiator sessions exercise binary streams, deliberate loss, PTY resize, failed spawn, cancellation and fresh-session recovery. Windows/Linux test all eight pipe/terminal combinations and exact terminal-mode restoration; published-native initiators run inside actual terminals. The pinned Python EOF completion defect is independently reproduced and explicitly bounded in tests, not shimmed. Broader topology/macOS acceptance remains open. See [rnsh](docs/rnsh.md). |
+| Device and transfer utilities | Windows native rncp/rnx process tests cover both actual Python listener roles, raw binary output/limits, timeout/spawn/authorization errors and writable-output failures. RNode firmware plans/provisioning/recovery use independent reference vectors and device simulators; published-native safety/signing/placeholder processes run without real firmware or EEPROM mutation. Physical validation remains unverified; see [rnodeconf](docs/rnodeconf.md). |
 | Everything else | Not yet implemented; see [plan.md](plan.md) |
 
 ## License

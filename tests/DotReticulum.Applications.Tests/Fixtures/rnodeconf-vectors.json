@@ -1,0 +1,103 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "source_sha256": "f8b43da8b25802dada7e437011f6282a25697365db94511d7451c1b64e993d0f",
+  "adapter": "Capture serial writes; sleep suppressed; EEPROM parser suppressed for read-command capture only.",
+  "cases": {
+    "detect": [
+      "c00873c05000c04800c04900c04700c05601c06001c06002c0"
+    ],
+    "normal": [
+      "c05400c0"
+    ],
+    "display": [
+      "c045c0c0"
+    ],
+    "timeout": [
+      "c064dbc0"
+    ],
+    "rotation": [
+      "c06703c0"
+    ],
+    "display-address": [
+      "c0633cc0"
+    ],
+    "recondition": [
+      "c06801c0"
+    ],
+    "neopixel": [
+      "c065ffc0"
+    ],
+    "ia-on": [
+      "c06900c0"
+    ],
+    "ia-off": [
+      "c06901c0"
+    ],
+    "bluetooth-on": [
+      "c04601c0"
+    ],
+    "bluetooth-off": [
+      "c04600c0"
+    ],
+    "bluetooth-pair": [
+      "c04602c0"
+    ],
+    "wifi-ap": [
+      "c06a02c0"
+    ],
+    "wifi-channel": [
+      "c06e0ec0"
+    ],
+    "ssid": [
+      "c06b54c3a9737400c0"
+    ],
+    "ssid-delete": [
+      "c06b00c0"
+    ],
+    "psk": [
+      "c06c746573742d6f6e6c792d70617373776f726400c0"
+    ],
+    "psk-delete": [
+      "c06c00c0"
+    ],
+    "ip": [
+      "c084dbdca801dbddc0"
+    ],
+    "ip-dhcp": [
+      "c08400000000c0"
+    ],
+    "netmask": [
+      "c085ffffff00c0"
+    ],
+    "reset": [
+      "c055f8c0"
+    ],
+    "wipe": [
+      "c059f8c0"
+    ],
+    "eeprom-write": [
+      "c052dbdcdbddc0"
+    ],
+    "hash-write": [
+      "c058000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1fc0"
+    ],
+    "update-indicator": [
+      "c06101c0"
+    ],
+    "tnc": [
+      "c00133bca100c0",
+      "c0020001e848c0",
+      "c00300c0",
+      "c00407c0",
+      "c00505c0",
+      "c00601c0",
+      "c05300c0"
+    ],
+    "eeprom-read": [
+      "c05100c0"
+    ],
+    "config-read": [
+      "c06d00c0"
+    ]
+  }
+}

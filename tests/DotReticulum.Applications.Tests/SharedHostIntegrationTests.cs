@@ -58,6 +58,18 @@ public sealed class SharedHostIntegrationTests
 
             var stats = await mesh.A.CallManagementAsync(new() { ["get"] = "interface_stats" });
             Assert.Equal(2, LocalClients(stats));
+            var statistics = Assert.IsType<Dictionary<object, object?>>(stats);
+            var localRows = Assert.IsType<object?[]>(statistics["interfaces"])
+                .OfType<Dictionary<object, object?>>()
+                .Where(row => Equals(row.GetValueOrDefault("type"), nameof(LocalSharedPacketInterface)))
+                .ToArray();
+            Assert.Equal(2, localRows.Length);
+            Assert.All(localRows, row =>
+            {
+                Assert.IsType<long>(row["mode"]);
+                Assert.IsType<long>(row["tx_write_pending_bytes"]);
+                Assert.False(row.ContainsKey("txbuffered"));
+            });
             Assert.False(mesh.A.Completion.IsCompleted);
             Assert.False(mesh.B.Completion.IsCompleted);
             Assert.False(mesh.External.Completion.IsCompleted);

@@ -241,6 +241,19 @@ public sealed class LiveRncpRnxTests
             var withInput = await client.ExecuteAsync($"\"{python}\" -c \"import sys; sys.stdout.write(sys.stdin.read().upper())\"", TimeSpan.FromSeconds(30), stdin: "hello rnx"u8.ToArray());
             Assert.True(withInput.Ok, withInput.Error);
             Assert.Equal("HELLO RNX", Encoding.UTF8.GetString(withInput.Stdout));
+            var binary = $"\"{python}\" -c \"import sys;sys.stdout.buffer.write(bytes([0,255,65,66]));sys.stderr.buffer.write(bytes([254,0,69]));sys.exit(7)\"";
+            foreach (var limit in new long?[] { null, 0, -1 })
+            {
+                var bytes = await client.ExecuteAsync(binary, TimeSpan.FromSeconds(30), limit, limit);
+                Assert.True(bytes.Ok, bytes.Error);
+                Assert.Equal(7, bytes.ReturnCode);
+                byte[] expectedOut = limit switch { 0 => [], -1 => [0, 255, 65], _ => [0, 255, 65, 66] };
+                byte[] expectedError = limit switch { 0 => [], -1 => [254, 0], _ => [254, 0, 69] };
+                Assert.Equal(expectedOut, bytes.Stdout);
+                Assert.Equal(expectedError, bytes.Stderr);
+                Assert.Equal(4, bytes.StdoutLength);
+                Assert.Equal(3, bytes.StderrLength);
+            }
             await client.CloseAsync();
         }
         finally
@@ -259,7 +272,7 @@ public sealed class LiveRncpRnxTests
             var cfg = PyTool.WriteConfig(Path.Combine(dir, "py"), port);
             var (pyIdentity, _) = PyTool.PrintIdentity("rnx", cfg);
             var identity = server.LoadOrCreateIdentity("rnx");
-            var listener = new RnxListener(server.Router, identity, new RnxListenerOptions { AllowedIdentities = [Convert.FromHexString(pyIdentity)] });
+            using var listener = new RnxListener(server.Router, identity, new RnxListenerOptions { AllowedIdentities = [Convert.FromHexString(pyIdentity)] });
             await server.StartAsync();
 
             using var client = PyTool.Start("rnx", "--config", cfg, listener.DestinationHashHex, "dotnet --version", "-w", "60", "-m");

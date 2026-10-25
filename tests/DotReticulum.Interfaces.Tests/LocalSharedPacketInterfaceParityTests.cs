@@ -64,6 +64,7 @@ public sealed class LocalSharedPacketInterfaceParityTests
             var encodedLength = HdlcPacketFraming.Encode(packet).Length;
             Assert.Equal(packet.Length, peer.ReceivedBytes);
             Assert.Equal((long)encodedLength, client.SentBytes);
+            Assert.Equal(0L, client.GetDiagnostics()["tx_write_pending_bytes"]);
 
             clock.Advance(TimeSpan.FromSeconds(13));
             Assert.True(peer.IsTransmitPaused);
@@ -83,6 +84,8 @@ public sealed class LocalSharedPacketInterfaceParityTests
             Assert.Equal(packet.Length * 2L, peer.ReceivedBytes);
             Assert.Equal(0L, sentBeforePause);
             Assert.Equal((long)encodedLength, peer.SentBytes);
+            Assert.Equal(0L, peer.GetDiagnostics()["tx_write_pending_bytes"]);
+            Assert.Equal(0L, server.GetDiagnostics()["tx_write_pending_bytes"]);
         }
     }
 

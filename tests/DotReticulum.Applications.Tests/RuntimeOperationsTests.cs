@@ -5,14 +5,21 @@ using System.Net.Sockets;
 using DotReticulum.Applications.Rnsd;
 using DotReticulum.Applications.Runtime;
 using DotReticulum.Core;
+using TransportRouter = DotReticulum.Transport.TransportRouter;
+using TransportRouterOptions = DotReticulum.Transport.TransportRouterOptions;
 
 namespace DotReticulum.Applications.Tests;
 
 public sealed class RuntimeOperationsTests
 {
-    private sealed class MemoryInterface : IPacketInterface
+    private sealed class MemoryInterface : IPacketInterface, ISpawningPacketInterface
     {
         private readonly Channel<ReadOnlyMemory<byte>> _received = Channel.CreateUnbounded<ReadOnlyMemory<byte>>();
+        public List<byte[]> SentPackets { get; } = [];
+        public bool SendsThroughChildren => false;
+        public event Action<IPacketInterface>? ChildConnected;
+        public void AddChild(IPacketInterface child) => ChildConnected?.Invoke(child);
+        public void Inject(ReadOnlyMemory<byte> packet) => _received.Writer.TryWrite(packet);
         public bool Started { get; private set; }
         public bool Disposed { get; private set; }
         public void Fail() => _received.Writer.TryComplete(new IOException("owned root failed"));
@@ -26,13 +33,27 @@ public sealed class RuntimeOperationsTests
         {
             await foreach (var packet in _received.Reader.ReadAllAsync(cancellationToken)) yield return packet;
         }
-        public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            SentPackets.Add(packet.ToArray());
+            return ValueTask.CompletedTask;
+        }
         public ValueTask DisposeAsync()
         {
             Disposed = true;
             _received.Writer.TryComplete();
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class StatisticsClock : TimeProvider
+    {
+        private long _ticks;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => Interlocked.Read(ref _ticks);
+        public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch.AddTicks(GetTimestamp());
+        public void Advance(TimeSpan amount) => Interlocked.Add(ref _ticks, amount.Ticks);
     }
 
     [Fact]
@@ -93,17 +114,130 @@ public sealed class RuntimeOperationsTests
         var stats = RuntimeStatistics.Collect(manager, [("Memory", iface)]);
         var entries = Assert.IsType<object?[]>(stats["interfaces"]);
         var entry = Assert.IsType<Dictionary<object, object?>>(Assert.Single(entries));
+        Assert.Equal(20L, entry["txb"]);
         Assert.Equal(20L, entry["dotreticulum_decoded_txb"]);
-        Assert.Null(entry["txb"]);
         Assert.False(entry.ContainsKey("rssi"));
         Assert.False(entry.ContainsKey("snr"));
+        Assert.False(entry.ContainsKey("txbuffered"));
+        Assert.False(entry.ContainsKey("txdrp"));
         Assert.Equal(0L, entry["ifac_violations"]);
-        Assert.Null(stats["rss"]);
+        Assert.True(Assert.IsType<long>(stats["rss"]) > 0);
         Assert.Equal(0.0, stats["tqpressure"]);
         var profiled = RuntimeStatistics.Collect(manager, [("Memory", iface)], profiling: true);
         Assert.True(Assert.IsType<long>(profiled["rss"]) > 0);
         Assert.IsType<Dictionary<object, object?>>(profiled["dotreticulum_profile"]);
         Assert.IsType<Dictionary<object, object?>>(MsgPack.Unpack(MsgPack.Pack(profiled)));
+    }
+
+    [Fact]
+    public async Task StatisticsSampleActualBitRatesPacketRatesAndTransportPacketFilterHits()
+    {
+        var clock = new StatisticsClock();
+        var iface = new MemoryInterface();
+        await using var manager = new PacketInterfaceManager([iface]);
+        await manager.StartAsync();
+        await using var router = new TransportRouter(manager, new TransportRouterOptions { TimeProvider = clock });
+        _ = RuntimeStatistics.Collect(manager, [("Memory", iface)], router: router, timeProvider: clock);
+
+        manager.RecordAcceptedPacket(iface);
+        manager.RecordAcceptedPacket(iface);
+        manager.RecordPacketFilterHit(iface);
+        manager.RecordProtocolViolation(iface);
+        await manager.SendAsync(Packet.Create(PacketType.Data, DestinationType.Plain, new byte[16], new byte[] { 1 }));
+        await manager.SendAsync(Packet.Create(PacketType.Data, DestinationType.Plain, new byte[16], new byte[] { 2 }));
+        clock.Advance(TimeSpan.FromSeconds(2));
+
+        var stats = RuntimeStatistics.Collect(manager, [("Memory", iface)], router: router, timeProvider: clock);
+        var entry = Assert.IsType<Dictionary<object, object?>>(Assert.Single(Assert.IsType<object?[]>(stats["interfaces"])));
+
+        Assert.Equal(160d, entry["txs"]);
+        Assert.Equal(1L, entry["packet_filter_hits"]);
+        Assert.Equal(1L, entry["protocol_violations"]);
+        Assert.Equal(160d, stats["txs"]);
+        Assert.Equal(1d, stats["rxpps"]);
+        Assert.Equal(1d, stats["txpps"]);
+        Assert.Equal(2L, stats["rx_packets"]);
+        Assert.Equal(2L, stats["tx_packets"]);
+        Assert.False(entry.ContainsKey("txbuffered"));
+    }
+
+    [Fact]
+    public async Task StatisticsReportObservedPathRequestsAndActualInboundQueueDepthAndPressure()
+    {
+        var iface = new MemoryInterface();
+        await using var manager = new PacketInterfaceManager([iface]);
+        await manager.StartAsync();
+        await using var router = new TransportRouter(manager, new TransportRouterOptions
+        {
+            InboundDataCapacity = 1,
+            InboundAnnounceCapacity = 1,
+            InboundPathRequestCapacity = 1,
+            InboundIngressLimitedCapacity = 1,
+        });
+
+        Assert.True(router.TryQueueInbound(PathRequest(iface, 1)));
+        var sentDestination = Enumerable.Repeat((byte)2, 16).ToArray();
+        await router.RequestPathAsync(sentDestination, iface);
+
+        var stats = RuntimeStatistics.Collect(manager, [("Memory", iface)], router: router);
+        var interfaces = Assert.IsType<object?[]>(stats["interfaces"]);
+        var entry = Assert.IsType<Dictionary<object, object?>>(Assert.Single(interfaces));
+        Assert.Equal(1L, entry["prxc"]);
+        Assert.True(Assert.IsType<long>(entry["prxb"]) > 0);
+        Assert.Equal(1L, entry["ptxc"]);
+        Assert.True(Assert.IsType<long>(entry["ptxb"]) > 0);
+        Assert.Single(iface.SentPackets);
+        Assert.Equal(1L, stats["prxc"]);
+        Assert.True(Assert.IsType<long>(stats["prxb"]) > 0);
+        Assert.Equal(1L, stats["ptxc"]);
+        Assert.True(Assert.IsType<long>(stats["ptxb"]) > 0);
+        Assert.Equal(1, Assert.IsType<int>(stats["rxqp"]));
+        Assert.Equal(1, Assert.IsType<int>(stats["rxqt"]));
+        Assert.Equal(1.0, stats["pqpressure"]);
+        Assert.Equal(0L, stats["rxqtd"]);
+    }
+
+    [Fact]
+    public async Task StatisticsAggregateChildPathRequestTrafficWithoutRepeatingParentByteTotals()
+    {
+        var root = new MemoryInterface();
+        var child = new MemoryInterface();
+        await using var manager = new PacketInterfaceManager([root]);
+        await manager.StartAsync();
+        root.AddChild(child);
+        await using var router = new TransportRouter(manager);
+
+        var incomingPacket = PathRequest(child, 3);
+        child.Inject(incomingPacket.Raw);
+        await using var received = manager.ReceiveWithSourceAsync().GetAsyncEnumerator();
+        Assert.True(await received.MoveNextAsync());
+        Assert.True(router.TryQueueInbound(received.Current));
+        await router.RequestPathAsync(Enumerable.Repeat((byte)4, Destination.HashLength).ToArray(), child);
+
+        var stats = RuntimeStatistics.Collect(manager, [("Root", root), ("Child", child)], router: router);
+        var rows = Assert.IsType<object?[]>(stats["interfaces"]).OfType<Dictionary<object, object?>>().ToArray();
+        var rootRow = Assert.Single(rows, row => Equals(row["name"], "Root"));
+        var childRow = Assert.Single(rows, row => Equals(row["name"], "Child"));
+
+        Assert.Equal(1L, childRow["prxc"]);
+        Assert.Equal(1L, childRow["ptxc"]);
+        Assert.Equal(1L, stats["prxc"]);
+        Assert.Equal(1L, stats["ptxc"]);
+        Assert.Equal(rootRow["rxb"], stats["rxb"]);
+        Assert.Equal(rootRow["txb"], stats["txb"]);
+        Assert.Equal(rootRow["rxb"], childRow["rxb"]);
+        Assert.True(Assert.IsType<long>(stats["rxb"]) > 0);
+    }
+
+    private static ReceivedPacket PathRequest(IPacketInterface source, byte marker)
+    {
+        var destination = Enumerable.Repeat(marker, 16).ToArray();
+        var tag = Enumerable.Repeat((byte)(marker + 1), 16).ToArray();
+        var payload = new byte[Destination.HashLength * 2];
+        destination.CopyTo(payload, 0);
+        tag.CopyTo(payload, Destination.HashLength);
+        var packet = Packet.Create(PacketType.Data, DestinationType.Plain, TransportRouter.PathRequestHash, payload);
+        return new ReceivedPacket(packet.ToArray(), packet, source);
     }
 
     [Fact]

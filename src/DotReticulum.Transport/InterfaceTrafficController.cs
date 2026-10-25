@@ -20,7 +20,12 @@ public sealed record InterfaceTrafficControlInfo(long ReceivedAnnounces, long Re
     long SentAnnounces, long SentAnnounceBytes, long ReceivedPathRequests, long ReceivedPathRequestBytes,
     long SentPathRequests, long SentPathRequestBytes, bool AnnounceBurstActive, bool PathRequestBurstActive,
     double IncomingAnnounceFrequency, double IncomingPathRequestFrequency, double OutgoingPathRequestFrequency,
-    int AnnounceSamples, int PathRequestSamples, int OutgoingPathRequestSamples);
+    int AnnounceSamples, int PathRequestSamples, int OutgoingPathRequestSamples)
+{
+    public double OutgoingAnnounceFrequency { get; init; }
+    public double? AnnounceBurstActivated { get; init; }
+    public double? PathRequestBurstActivated { get; init; }
+}
 
 internal sealed class InterfaceTrafficController(TimeProvider time, InterfaceIngressOptions options)
 {
@@ -155,6 +160,11 @@ internal sealed class InterfaceTrafficController(TimeProvider time, InterfaceIng
             _sentAnnounceBytes, _receivedRequests, _receivedRequestBytes, _sentRequests, _sentRequestBytes,
             _announceBurst, _requestBurst, Frequency(_incomingAnnounces, Now, incoming: true),
             Frequency(_incomingRequests, Now, incoming: true), Frequency(_outgoingRequests, Now, incoming: false),
-            _incomingAnnounces.Count, _incomingRequests.Count, _outgoingRequests.Count);
+            _incomingAnnounces.Count, _incomingRequests.Count, _outgoingRequests.Count)
+        {
+            OutgoingAnnounceFrequency = Frequency(_outgoingAnnounces, Now, incoming: false),
+            AnnounceBurstActivated = _announceActivated > 0 ? _announceActivated : null,
+            PathRequestBurstActivated = _requestActivated > 0 ? _requestActivated : null,
+        };
     }
 }

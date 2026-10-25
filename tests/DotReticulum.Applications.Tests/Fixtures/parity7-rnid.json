@@ -1,0 +1,271 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "rnid_sha256": "faee0d8acb4263f10812fa378085f2653b2453f584b4a33f2018c7797885f8c8",
+  "public": "8f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7",
+  "hash": "aca31af0441d81dbec71e82da0b4b5f5",
+  "base32": "R5AMLLNWR4SWESXFWIKOU5T2N3EU3AU5HV5V4GWRXJXT4IJYFBPSTLF24FA3ZSXQWIXBVFGTJUF4ONQ6KJWQX7QSZCLZJPETEKLG3VY=",
+  "base64": "j0DFrbaPJWJK5bIU6nZ6bslNgp09e14a0bpvPiE4KF8prLrhQbzK8LIuGpTTTQvHNh5SbQv-EsiXlLyTIpZt1w==",
+  "base256_alphabet": "abcdefghijklmnopqrstuvxyzæø01234ABCDEFGHIJKLMNOPQRSTUWXYZÆØ56789αβγδεζηθικλμνξπρστφχψωΓΔΘΛΞΠΣΦΨΩБДЖЗИЛПЦЧШЩЪЫЭЮЯбджзилпцчшщъыэюяԱԲԳԴԵԶԷԸԹԺԻԽԾԿՀՁՂՃՄՅՆՇՈՉՊՋՎՐՑՒՔՖᚠᚢᚦᚱᚹᚺᚾᛈᛇᛉᛊᛏᛒᛖᛗᛟｲｳｵｶｷｹｻｼｽｾﾀﾁﾃﾄﾅﾇﾈﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾗﾘﾙﾚﾜ𐑐𐑑𐑒𐑔𐑕𐑗𐑙𐑳𐑶𐑸𐑹𐑺𐑻𐑽𐑾𐑿᱑᱕᱘᱙ᱚᱝᱟᱣᱦᱨᱬᱭᱰᱳᱶᱷ𐌳𐌸𐌾𐐀𐐁𐐂𐐆𐐇𐐈𐐉𐐊𐐋𐐌𐐍𐐎𐐏",
+  "message": "5061726974792037207369676e6564206d65737361676520e2809420cebb0a",
+  "raw": "e4b90220f9430c2e6a524308e4b0f08c16f0aa4d9f2f065bd8a7e8e5f17f876964d71c6ac99a9df4c711a1a7c793a8af4ba551a0ff6cc032f122e7096b95b605",
+  "encrypted": "69783e08bb1469d6bd936d68ec812e189fa3d0fba266057ecfae010f2136777218a5959184ed36ade65a3117985f4635e7fd98b51ac17155dc9b6234544e59d11496c9690609697123fb03d4c72144ab25f1c66b38149510447fec0fd6a5c86b7e23b265017735e526cf2b03fcc8c9f1",
+  "destination": "2bf16e91acdee2bb0afabeaedd0f30b4",
+  "metadata": {
+    "title": "Example",
+    "count": "3",
+    "nested": {
+      "value": "yes"
+    }
+  },
+  "metadata_cases": [
+    {
+      "text": "root = Example\n[child]\nvalue = %(root)s suffix\n",
+      "spec": null,
+      "result": {
+        "root": "Example",
+        "child": {
+          "value": "Example suffix"
+        }
+      }
+    },
+    {
+      "text": "[DEFAULT]\nname=Example\n[child]\nvalue=%(name)s\n",
+      "spec": null,
+      "result": {
+        "DEFAULT": {
+          "name": "Example"
+        },
+        "child": {
+          "value": "Example"
+        }
+      }
+    },
+    {
+      "text": "x=3,4\nb=yes,no\nips=127.0.0.1,10.1.1.1\n",
+      "spec": "x=\"int_list(1,3)\"\nb=bool_list()\nips=ip_addr_list()\n",
+      "result": {
+        "x": [
+          3,
+          4
+        ],
+        "b": [
+          true,
+          false
+        ],
+        "ips": [
+          "127.0.0.1",
+          "10.1.1.1"
+        ]
+      }
+    },
+    {
+      "text": "mixed=3, yes, sample\n",
+      "spec": "mixed=\"mixed_list(integer, boolean, string)\"\n",
+      "result": {
+        "mixed": [
+          3,
+          true,
+          "sample"
+        ]
+      }
+    },
+    {
+      "text": "",
+      "spec": "count=integer(default=3)\nitems=\"string_list(default=list(a,b))\"\n",
+      "result": {
+        "count": 3,
+        "items": [
+          "a",
+          "b"
+        ]
+      }
+    }
+  ],
+  "cli_cases": [
+    {
+      "arguments": [
+        "-m",
+        "8f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7",
+        "-p"
+      ],
+      "stdout": "Reticulum Identity imported from hex input\nIdentity Hash : <aca31af0441d81dbec71e82da0b4b5f5>\nPublic Key    : 8f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7\n",
+      "stderr": "",
+      "code": 0
+    },
+    {
+      "arguments": [
+        "-M",
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+        "-p",
+        "-P",
+        "-B"
+      ],
+      "stdout": "Reticulum Identity imported from hex input\nIdentity Hash : <aca31af0441d81dbec71e82da0b4b5f5>\nPublic Key    : R5AMLLNWR4SWESXFWIKOU5T2N3EU3AU5HV5V4GWRXJXT4IJYFBPSTLF24FA3ZSXQWIXBVFGTJUF4ONQ6KJWQX7QSZCLZJPETEKLG3VY=\nPrivate Key   : AAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAIJCEMSCKJRHFAUSUKZMFUXC6MBRGIZTINJWG44DSOR3HQ6T4PY=\n",
+      "stderr": "",
+      "code": 0
+    },
+    {
+      "arguments": [
+        "-m",
+        "j0DFrbaPJWJK5bIU6nZ6bslNgp09e14a0bpvPiE4KF8prLrhQbzK8LIuGpTTTQvHNh5SbQv-EsiXlLyTIpZt1w==",
+        "-x",
+        "-b"
+      ],
+      "stdout": "Reticulum Identity imported from base64 input\nPublic Identity Keys  : j0DFrbaPJWJK5bIU6nZ6bslNgp09e14a0bpvPiE4KF8prLrhQbzK8LIuGpTTTQvHNh5SbQv-EsiXlLyTIpZt1w==\n",
+      "stderr": "",
+      "code": 0
+    },
+    {
+      "arguments": [
+        "-M",
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+        "-X",
+        "-B"
+      ],
+      "stdout": "Reticulum Identity imported from hex input\nPrivate Identity Keys : AAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAIJCEMSCKJRHFAUSUKZMFUXC6MBRGIZTINJWG44DSOR3HQ6T4PY=\n",
+      "stderr": "",
+      "code": 0
+    },
+    {
+      "arguments": [
+        "-M",
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+        "-H",
+        "rns.id"
+      ],
+      "stdout": "Reticulum Identity imported from hex input\nThe rns.id destination for this Identity is <2bf16e91acdee2bb0afabeaedd0f30b4>\nThe full destination specifier is <rns.id.aca31af0441d81dbec71e82da0b4b5f5:2bf16e91acdee2bb0afabeaedd0f30b4>\n",
+      "stderr": "",
+      "code": 0
+    },
+    {
+      "arguments": [
+        "-i",
+        "aca31af0441d81dbec71e82da0b4b5f5",
+        "-N",
+        "-H",
+        "rns.id"
+      ],
+      "stdout": "The rns.id destination for this Identity is <2bf16e91acdee2bb0afabeaedd0f30b4>\n",
+      "stderr": "",
+      "code": 0
+    },
+    {
+      "arguments": [
+        "-b",
+        "-B"
+      ],
+      "stdout": "The -b, -B, --hex and --base256 args are mutually exclusive\n",
+      "stderr": "",
+      "code": 1
+    },
+    {
+      "arguments": [
+        "-s",
+        "fixture",
+        "-e",
+        "fixture"
+      ],
+      "stdout": "This utility currently only supports one of the encrypt, decrypt, sign or verify operations per invocation\n",
+      "stderr": "",
+      "code": 1
+    },
+    {
+      "arguments": [
+        "--version"
+      ],
+      "stdout": "rnid 1.5.7\n",
+      "stderr": "",
+      "code": 0
+    },
+    {
+      "arguments": [
+        "-vm8f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7",
+        "-xp"
+      ],
+      "stdout": "Reticulum Identity imported from hex input\nIdentity Hash : <aca31af0441d81dbec71e82da0b4b5f5>\nPublic Key    : 8f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7\nPublic Identity Keys  : 8f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7\n",
+      "stderr": "",
+      "code": 0
+    },
+    {
+      "arguments": [
+        "-M000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+        "-pPB"
+      ],
+      "stdout": "Reticulum Identity imported from hex input\nIdentity Hash : <aca31af0441d81dbec71e82da0b4b5f5>\nPublic Key    : R5AMLLNWR4SWESXFWIKOU5T2N3EU3AU5HV5V4GWRXJXT4IJYFBPSTLF24FA3ZSXQWIXBVFGTJUF4ONQ6KJWQX7QSZCLZJPETEKLG3VY=\nPrivate Key   : AAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAIJCEMSCKJRHFAUSUKZMFUXC6MBRGIZTINJWG44DSOR3HQ6T4PY=\n",
+      "stderr": "",
+      "code": 0
+    },
+    {
+      "arguments": [
+        "--import-pub=8f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7",
+        "--print-i"
+      ],
+      "stdout": "Reticulum Identity imported from hex input\nIdentity Hash : <aca31af0441d81dbec71e82da0b4b5f5>\nPublic Key    : 8f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7\n",
+      "stderr": "",
+      "code": 0
+    },
+    {
+      "arguments": [
+        "--import-pub",
+        "8f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7",
+        "--export-pu",
+        "--base3"
+      ],
+      "stdout": "Reticulum Identity imported from hex input\nPublic Identity Keys  : R5AMLLNWR4SWESXFWIKOU5T2N3EU3AU5HV5V4GWRXJXT4IJYFBPSTLF24FA3ZSXQWIXBVFGTJUF4ONQ6KJWQX7QSZCLZJPETEKLG3VY=\n",
+      "stderr": "",
+      "code": 0
+    },
+    {
+      "arguments": [
+        "-M000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+        "-Scluster message",
+        "-b"
+      ],
+      "stdout": "Reticulum Identity imported from hex input\n\n#### Start of rsg data #########################################\nzKR-S3D2Ce5Rng58522xGrHvjYuwZoXIdkSqz3Z9zwOFJGN2llhUYgAUbs5oaRHW\n7fGg0V5giHPFhntdI1lMAoSoaGFzaHR5cGWmc2hhMjU2pGhhc2jEIM9H-NVY_Cro\n9x4DFNZDWAq_cFyyBA0382mKwFQ4ZDOcpG1ldGGCpnNpZ25lcsQQrKMa8EQdgdvs\ncegtoLS19aZwdWJrZXnEQI9Axa22jyViSuWyFOp2em7JTYKdPXteGtG6bz4hOChf\nKay64UG8yvCyLhqU000LxzYeUm0L_hLIl5S8kyKWbdenbWVzc2FnZcQPY2x1c3Rl\nciBtZXNzYWdl====================================================\n########################################### End of rsg data ####\n\nMessage signed with <aca31af0441d81dbec71e82da0b4b5f5>\n",
+      "stderr": "",
+      "code": 0
+    }
+  ],
+  "rsg": "11124d1439382580fd0bf495bf6440125ae9546d4f497f2e32fd8b0cc75daa772664727f137fc7c561b0986c362d5cfb628a76cd2d89a3624b69b16ac740c80283a86861736874797065a6736861323536a468617368c420223c0d1ec1fb800cfb75ae579e0d06028ecfa50d8c599b9e3fe2bdc0c99f2024a46d65746182a67369676e6572c410aca31af0441d81dbec71e82da0b4b5f5a67075626b6579c4408f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7",
+  "rsm": "7afde5ad1f8faad9e1911f906f46e8bf243a7226ec82485d3dd314008736c2980d0ee1ca6f078fe4103c7232f51bcb2372eb38c036770211e9fd3ed2b1b44a0e84a86861736874797065a6736861323536a468617368c420223c0d1ec1fb800cfb75ae579e0d06028ecfa50d8c599b9e3fe2bdc0c99f2024a46d65746185a67369676e6572c410aca31af0441d81dbec71e82da0b4b5f5a67075626b6579c4408f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7a57469746c65a74578616d706c65a5636f756e74a133a66e657374656481a576616c7565a3796573a76d657373616765c41f5061726974792037207369676e6564206d65737361676520e2809420cebb0a",
+  "wrapped": {
+    "hex": "#### Start of rsg data #########################################\n053423ad78122bf33564ab4d6cc31e0626c4859b188029ee6002318c93182c15\n9bdd2b666cf796bf34df1c98726c5c30440e53ad3b5bc08cc28c07d4d8295800\n84a86861736874797065a6736861323536a468617368c420223c0d1ec1fb800c\nfb75ae579e0d06028ecfa50d8c599b9e3fe2bdc0c99f2024a46d65746182a673\n69676e6572c410aca31af0441d81dbec71e82da0b4b5f5a67075626b6579c440\n8f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f\n29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7\na76d657373616765c41f5061726974792037207369676e6564206d6573736167\n6520e2809420cebb0a==============================================\n########################################### End of rsg data ####",
+    "base32": "#### Start of rsg data #########################################\nAU2CHLLYCIV7GNLEVNGWZQY6AYTMJBM3DCACT3TAAIYYZEYYFQKZXXJLMZWPPFV7\nGTPRZGDSNRODARAOKOWTWW6ARTBIYB6U3AUVQAEEVBUGC43IOR4XAZNGONUGCMRV\nG2SGQYLTNDCCAIR4BUPMD64ABT5XLLSXTYGQMAUOZ6SQ3DCZTOPD7YV5YDEZ6IBE\nURWWK5DBQKTHG2LHNZSXFRAQVSRRV4CEDWA5X3DR5AW2BNFV6WTHA5LCNNSXTRCA\nR5AMLLNWR4SWESXFWIKOU5T2N3EU3AU5HV5V4GWRXJXT4IJYFBPSTLF24FA3ZSXQ\nWIXBVFGTJUF4ONQ6KJWQX7QSZCLZJPETEKLG3V5HNVSXG43BM5S4IH2QMFZGS5DZ\nEA3SA43JM5XGKZBANVSXG43BM5SSBYUASQQM5OYK========================\n########################################### End of rsg data ####",
+    "base64": "#### Start of rsg data #########################################\nBTQjrXgSK_M1ZKtNbMMeBibEhZsYgCnuYAIxjJMYLBWb3StmbPeWvzTfHJhybFww\nRA5TrTtbwIzCjAfU2ClYAISoaGFzaHR5cGWmc2hhMjU2pGhhc2jEICI8DR7B-4AM\n-3WuV54NBgKOz6UNjFmbnj_ivcDJnyAkpG1ldGGCpnNpZ25lcsQQrKMa8EQdgdvs\ncegtoLS19aZwdWJrZXnEQI9Axa22jyViSuWyFOp2em7JTYKdPXteGtG6bz4hOChf\nKay64UG8yvCyLhqU000LxzYeUm0L_hLIl5S8kyKWbdenbWVzc2FnZcQfUGFyaXR5\nIDcgc2lnbmVkIG1lc3NhZ2Ug4oCUIM67Cg==============================\n########################################### End of rsg data ####",
+    "base256": "#### Start of rsg data #########################################\nfUDᛖчsL𐐀WИᛏξЫﾍ3gGﾎԶՐzԱJᱶБcRԾՅzMvՐ𐑽LПЫ𐐇ՈﾇU𐑿1ՊжЫΣQεoχᛖ5ΠﾈԾﾌԾh𐑕𐑶JΘa\nԵᛇЧДзЧишбЛᚾзЧДSWXᚹЧДзЧﾎAC6n3ﾋ𐐋Աm𐐋лᛗΔՔngcՀﾜᚺnԾΛՐՔ9᱘ﾄﾈﾓՖAEᚹЭЛиДԳᚾз\nШЦЮЛжﾎqᛒᚱø𐌳ε2Բ𐑺ᱰдᱦNᚠｷｹ𐐂ᚾблЖЪЛшﾎαՁαﾏᛖｻՁFЖλᱝｵuᱬпщЮﾓξԳՒ7ъΨø𐑑ﾀЯ8BZIΩ\nJᛒﾀ᱕βﾃﾔ𐌳ｵOøՆ𐑔ξlﾑX3φЭl𐐎sﾒՉՆﾃՅCՈЭ𐑳ᛈЭЛззДЦЛﾎ4σДжШишAYAзШЦЮЛИAЭЛззДЦ\nЛA᱘ԱՆAﾚﾁk=======================================================\n########################################### End of rsg data ####"
+  },
+  "explicit_identity_override_rsg": "24c33b19206cc76d7c53df56b70a476c819964ebd697a0f9c1aec9a51a3edbb15ac473d09c0c699e031897eb0277ae68e914fd65d42fca5576ce05655909bf0783a86861736874797065a6736861323536a468617368c420223c0d1ec1fb800cfb75ae579e0d06028ecfa50d8c599b9e3fe2bdc0c99f2024a46d65746182a67369676e6572c410aca31af0441d81dbec71e82da0b4b5f5a67075626b6579c4196e6f74206120757361626c6520656d626564646564206b6579",
+  "explicit_identity_override_valid": true,
+  "parser_errors": [
+    {
+      "arguments": [
+        "--base"
+      ],
+      "code": 2,
+      "diagnostic": "ambiguous option: --base could match --base32, --base64, --base256"
+    },
+    {
+      "arguments": [
+        "--import-"
+      ],
+      "code": 2,
+      "diagnostic": "ambiguous option: --import- could match --import-pub, --import-prv"
+    },
+    {
+      "arguments": [
+        "-xp=invalid"
+      ],
+      "code": 2,
+      "diagnostic": "argument -p/--print-identity: ignored explicit argument 'invalid'"
+    },
+    {
+      "arguments": [
+        "-i",
+        "-p"
+      ],
+      "code": 2,
+      "diagnostic": "argument -i/--identity: expected one argument"
+    }
+  ]
+}

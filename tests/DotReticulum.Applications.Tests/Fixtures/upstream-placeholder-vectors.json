@@ -1,0 +1,152 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "adapter": "Reticulum constructor captured, so no real node startup, configuration persistence or network evidence.",
+  "sources": {
+    "rnir.py": "7be43d7df4a0262c6b6261099d3e1c6993116dc59ef227999d540ab5b26ba9f3",
+    "rnpkg.py": "28257df41b72a651fa476c31a341db6a8793906a3b4a0334ed32a648a28c8302",
+    "Resolver.py": "61c952116ce5be6c9962da19b626a1ce4aa0be302c48a07410820331ffdd2ea1"
+  },
+  "resolver_result": null,
+  "cases": [
+    {
+      "tool": "rnir",
+      "args": [],
+      "code": 0,
+      "stdout": "",
+      "stderr": "",
+      "initialization": [
+        {
+          "configdir": null,
+          "verbosity": 0,
+          "logdest": 145
+        }
+      ]
+    },
+    {
+      "tool": "rnir",
+      "args": [
+        "--version"
+      ],
+      "code": 0,
+      "stdout": "rnir 1.5.7\n",
+      "stderr": "",
+      "initialization": []
+    },
+    {
+      "tool": "rnir",
+      "args": [
+        "--help"
+      ],
+      "code": 0,
+      "stdout": "usage: rnir [-h] [--config CONFIG] [-v] [-q] [--version]\n\nReticulum Distributed Identity Resolver\n\noptions:\n  -h, --help       show this help message and exit\n  --config CONFIG  path to alternative Reticulum config directory\n  -v, --verbose\n  -q, --quiet\n  --version        show program's version number and exit\n",
+      "stderr": "",
+      "initialization": []
+    },
+    {
+      "tool": "rnir",
+      "args": [
+        "--config",
+        "captured-config",
+        "-v",
+        "-q",
+        "-v"
+      ],
+      "code": 0,
+      "stdout": "",
+      "stderr": "",
+      "initialization": [
+        {
+          "configdir": "captured-config",
+          "verbosity": 1,
+          "logdest": 145
+        }
+      ]
+    },
+    {
+      "tool": "rnir",
+      "args": [
+        "install",
+        "example"
+      ],
+      "code": 2,
+      "stdout": "",
+      "stderr": "usage: rnir [-h] [--config CONFIG] [-v] [-q] [--version]\nrnir: error: unrecognized arguments: install example\n",
+      "initialization": []
+    },
+    {
+      "tool": "rnpkg",
+      "args": [],
+      "code": 0,
+      "stdout": "",
+      "stderr": "",
+      "initialization": [
+        {
+          "configdir": null,
+          "verbosity": 0,
+          "logdest": 145
+        }
+      ]
+    },
+    {
+      "tool": "rnpkg",
+      "args": [
+        "--version"
+      ],
+      "code": 0,
+      "stdout": "rnpkg 1.5.7\n",
+      "stderr": "",
+      "initialization": []
+    },
+    {
+      "tool": "rnpkg",
+      "args": [
+        "--help"
+      ],
+      "code": 0,
+      "stdout": "usage: rnpkg [-h] [--config CONFIG] [-v] [-q] [--exampleconfig] [--version]\n\nReticulum Meta Package Manager\n\noptions:\n  -h, --help       show this help message and exit\n  --config CONFIG  path to alternative Reticulum config directory\n  -v, --verbose\n  -q, --quiet\n  --exampleconfig  print verbose configuration example to stdout and exit\n  --version        show program's version number and exit\n",
+      "stderr": "",
+      "initialization": []
+    },
+    {
+      "tool": "rnpkg",
+      "args": [
+        "--config",
+        "captured-config",
+        "-v",
+        "-q",
+        "-v"
+      ],
+      "code": 0,
+      "stdout": "",
+      "stderr": "",
+      "initialization": [
+        {
+          "configdir": "captured-config",
+          "verbosity": 1,
+          "logdest": 145
+        }
+      ]
+    },
+    {
+      "tool": "rnpkg",
+      "args": [
+        "install",
+        "example"
+      ],
+      "code": 2,
+      "stdout": "",
+      "stderr": "usage: rnpkg [-h] [--config CONFIG] [-v] [-q] [--exampleconfig] [--version]\nrnpkg: error: unrecognized arguments: install example\n",
+      "initialization": []
+    },
+    {
+      "tool": "rnpkg",
+      "args": [
+        "--exampleconfig"
+      ],
+      "code": 0,
+      "stdout": "# This is an example package manager configuration file.\n\n",
+      "stderr": "",
+      "initialization": []
+    }
+  ]
+}

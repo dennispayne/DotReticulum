@@ -342,7 +342,12 @@ public sealed partial class TransportRouter
     {
         var validation = Announce.Validate(received.Packet);
         using var identity = validation.Identity;
-        if (!validation.IsValid || identity is null || IsIdentityBlocked(identity.Hash)) return false;
+        if (!validation.IsValid || identity is null)
+        {
+            _manager.RecordProtocolViolation(received.Source);
+            return false;
+        }
+        if (IsIdentityBlocked(identity.Hash)) return false;
         TrafficController(received.Source).ReceivedAnnounce(received.Raw.Length);
         return !TryHoldIngressAnnounce(received);
     }

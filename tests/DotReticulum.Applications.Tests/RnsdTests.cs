@@ -130,9 +130,9 @@ public class RnsdAppTests : IDisposable
     public async Task UnknownArgumentAndMissingConfigPath_FailWithoutCreatingConfiguration()
     {
         var error = new StringWriter();
-        Assert.Equal(1, await RnsdApp.RunAsync(["--bogus"], new StringWriter(), error, CancellationToken.None));
+        Assert.Equal(2, await RnsdApp.RunAsync(["--bogus"], new StringWriter(), error, CancellationToken.None));
         var missing = Path.Combine(_dir, "missing");
-        Assert.Equal(1, await RnsdApp.RunAsync(["--config"], new StringWriter(), error, CancellationToken.None));
+        Assert.Equal(2, await RnsdApp.RunAsync(["--config"], new StringWriter(), error, CancellationToken.None));
         Assert.False(Directory.Exists(missing));
         Assert.NotEqual("", error.ToString());
     }

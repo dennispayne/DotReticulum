@@ -153,6 +153,22 @@ process working directory (not the config directory), and load/create the identi
 
 ## Logging and CLI
 
+The CLI contract is audited against `RNS/Utilities/rnsd.py` (`main`,
+`program_setup`) at RNS 1.5.7 revision
+`a29bfb51c468945c96a1ee22cae0114e993e2391`. Pinned options are
+`--config`, repeatable `-v`/`--verbose`, `-q`/`--quiet`,
+`-s`/`--service`, `-i`/`--interactive`, `--exampleconfig`,
+`--version` and argparse help. Unknown arguments and missing option values
+return 2 (parser failure), configuration/startup/runtime failures return 1,
+and help, example, version and graceful cancellation return 0.
+The native `-c`, `-?`, config-file-path support and
+`--allow-discovery-commands` are explicit extensions.
+Version output identifies DotReticulum and its pinned reference; it does not
+impersonate upstream. The example is a supported native configuration rather
+than a verbatim claim that every upstream example directive is implemented.
+The interactive native management shell intentionally replaces upstream's
+arbitrary Python REPL; see the documented commands below.
+
 `-v`/`--verbose` and `-q`/`--quiet` are repeatable, including `-vvv`, `-qq`, and mixed short
 clusters. The difference is added to a configured `loglevel` **before** clamping to 0–8.
 As in the pinned reference, if there is no `loglevel` setting, these adjustments do not change

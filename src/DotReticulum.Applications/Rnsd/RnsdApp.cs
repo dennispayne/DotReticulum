@@ -113,8 +113,8 @@ public static class RnsdApp
                     allowDiscoveryCommands = true;
                     break;
                 case "-c" or "--config":
-                    if (i + 1 >= args.Length) return Fail(error, $"{args[i]} requires a path.");
-                    if (args[i + 1].StartsWith('-')) return Fail(error, $"{args[i]} requires a path.");
+                    if (i + 1 >= args.Length) return ParseFail(error, $"{args[i]} requires a path.");
+                    if (args[i + 1].StartsWith('-')) return ParseFail(error, $"{args[i]} requires a path.");
                     configArg = args[++i];
                     break;
                 case "-v" or "--verbose":
@@ -127,7 +127,7 @@ public static class RnsdApp
                     if (args[i].StartsWith("--config=", StringComparison.Ordinal))
                     {
                         configArg = args[i]["--config=".Length..];
-                        if (configArg.Length == 0) return Fail(error, "--config requires a path.");
+                        if (configArg.Length == 0) return ParseFail(error, "--config requires a path.");
                         break;
                     }
                     if (args[i].Length > 2 && args[i][0] == '-' && args[i][1..].All(c => c is 'v' or 'q'))
@@ -136,7 +136,7 @@ public static class RnsdApp
                         break;
                     }
                     error.WriteLine(Usage);
-                    return Fail(error, $"unknown argument '{args[i]}'.");
+                    return ParseFail(error, $"unknown argument '{args[i]}'.");
             }
         }
 
@@ -235,5 +235,11 @@ public static class RnsdApp
     {
         error.WriteLine($"rnsd: {message}");
         return 1;
+    }
+
+    private static int ParseFail(TextWriter error, string message)
+    {
+        error.WriteLine($"rnsd: {message}");
+        return 2;
     }
 }

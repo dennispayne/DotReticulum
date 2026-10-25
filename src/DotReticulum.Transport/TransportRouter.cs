@@ -425,9 +425,15 @@ public sealed partial class TransportRouter : IAsyncDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
         var packet = received.Packet;
-        if (await HandleResourceCacheRequestAsync(received, cancellationToken).ConfigureAwait(false)) return;
+        if (!Filter(packet, out var protocolViolation))
+        {
+            _manager.RecordPacketFilterHit(received.Source);
+            if (protocolViolation) _manager.RecordProtocolViolation(received.Source);
+            return;
+        }
+        _manager.RecordAcceptedPacket(received.Source);
         if (!ingressPrepared && packet.PacketType == PacketType.Announce && !PrepareAnnounceIngress(received)) return;
-        if (!Filter(packet)) return;
+        if (await HandleResourceCacheRequestAsync(received, cancellationToken).ConfigureAwait(false)) return;
         if (TryHandleTunnelSynthesis(received)) return;
         var fromLocalClient = IsLocalClientInterface(received.Source);
         var canRelayLinks = _options.TransportEnabled || HasLocalClients;
@@ -583,8 +589,9 @@ public sealed partial class TransportRouter : IAsyncDisposable
         }
     }
 
-    private bool Filter(Packet packet)
+    private bool Filter(Packet packet, out bool protocolViolation)
     {
+        protocolViolation = false;
         if (!IsSharedClient && packet.HeaderType == HeaderType.Header2 && packet.PacketType != PacketType.Announce
             && !packet.TransportId.Span.SequenceEqual(TransportId)) return false;
 
@@ -592,12 +599,19 @@ public sealed partial class TransportRouter : IAsyncDisposable
 
         if (packet.DestinationType is DestinationType.Plain or DestinationType.Group)
         {
-            if (packet.PacketType == PacketType.Announce) return false;
+            if (packet.PacketType == PacketType.Announce)
+            {
+                protocolViolation = true;
+                return false;
+            }
+            if (packet.Hops > 1) protocolViolation = true;
             return packet.Hops <= 1;
         }
 
         if (!Seen(packet)) return true;
-        return packet.PacketType == PacketType.Announce && packet.DestinationType == DestinationType.Single;
+        if (packet.PacketType == PacketType.Announce && packet.DestinationType == DestinationType.Single) return true;
+        if (packet.PacketType == PacketType.Announce) protocolViolation = true;
+        return false;
     }
 
     private bool Seen(Packet packet)
@@ -644,7 +658,11 @@ public sealed partial class TransportRouter : IAsyncDisposable
             queueRebroadcast: !fromLocalClient && !IsSharedClient);
         if (result.Outcome is not (AnnounceOutcome.Accepted or AnnounceOutcome.AcceptedRateLimited))
         {
-            if (result.Outcome == AnnounceOutcome.Invalid) Log?.Invoke($"Dropped invalid announce from {Describe(received.Source)}");
+            if (result.Outcome == AnnounceOutcome.Invalid)
+            {
+                _manager.RecordProtocolViolation(received.Source);
+                Log?.Invoke($"Dropped invalid announce from {Describe(received.Source)}");
+            }
             return false;
         }
 
@@ -916,7 +934,11 @@ public sealed partial class TransportRouter : IAsyncDisposable
         bool registeredPathRequest = false, bool? ingressLimited = null)
     {
         var data = received.Packet.Payload.ToArray();
-        if (data.Length < Destination.HashLength) return;
+        if (data.Length < Destination.HashLength)
+        {
+            _manager.RecordProtocolViolation(received.Source);
+            return;
+        }
         var destination = data[..Destination.HashLength].ToArray();
         byte[]? requestor = null;
         byte[] tag = [];
@@ -930,8 +952,16 @@ public sealed partial class TransportRouter : IAsyncDisposable
             tag = data[Destination.HashLength..];
         }
 
-        if (tag.Length == 0) return;
-        if (tag.Length > Destination.HashLength) tag = tag[..Destination.HashLength];
+        if (tag.Length == 0)
+        {
+            _manager.RecordProtocolViolation(received.Source);
+            return;
+        }
+        if (tag.Length > Destination.HashLength)
+        {
+            _manager.RecordProtocolViolation(received.Source);
+            tag = tag[..Destination.HashLength];
+        }
         if (!registeredPathRequest && !RememberTag(Convert.ToHexStringLower(destination) + Convert.ToHexStringLower(tag))) return;
         if (!registeredPathRequest) TrafficController(received.Source).ReceivedPathRequest(received.Raw.Length);
         var limitPathRequests = ingressLimited ?? ShouldIngressLimitPathRequests(received.Source);

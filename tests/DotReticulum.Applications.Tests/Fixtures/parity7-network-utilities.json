@@ -1,0 +1,75 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "tools": {
+    "rnstatus": {
+      "source_sha256": "259b187e6184c4a62fd824c83a6e0fa798bfcd0c165ec7c2f185751aeced3efd",
+      "help": "usage: rnstatus.py [-h] [--config CONFIG] [--version] [--attach name]\n                   [--detach name] [--reload name] [-a] [-A] [-P] [-l] [-B]\n                   [-b] [-t] [-p] [-q] [-z] [-s SORT] [-r] [-j] [-R hash]\n                   [-i path] [-w seconds] [-d] [-D] [--show-stale]\n                   [--show-unknown] [-m] [-I seconds] [-v]\n                   [filter]\n\nReticulum Network Stack Status\n\npositional arguments:\n  filter                only display interfaces with names including filter\n\noptions:\n  -h, --help            show this help message and exit\n  --config CONFIG       path to alternative Reticulum config directory\n  --version             show program's version number and exit\n  --attach name         Attach interface by name\n  --detach name         Detach interface by name\n  --reload name         Reload interface by name\n  -a, --all             show all interfaces\n  -A, --announce-stats  show announce stats\n  -P, --pr-stats        show path request stats\n  -l, --link-stats      show link stats\n  -B, --burst           only show interfaces with active bursts\n  -b, --blocked-ips     show blocked IPs per interface\n  -t, --totals          display traffic totals\n  -p, --pps             display packets per second in totals\n  -q, --queues          display queue stats\n  -z, --profiling       display live profiling results\n  -s SORT, --sort SORT  sort interfaces by [rate, traffic, rx, tx, rxs, txs,\n                        anns, arx, atx, arxc, atxc, held, prx, ptx, prxc,\n                        ptxc, pvs, ivs, flt, txdrp, txdrb, txbuf]\n  -r, --reverse         reverse sorting\n  -j, --json            output in JSON format\n  -R hash               transport identity hash of remote instance to get\n                        status from\n  -i path               path to identity used for remote management\n  -w seconds            timeout before giving up on remote queries\n  -d, --discovered      list discovered interfaces\n  -D                    show details and config entries for discovered\n                        interfaces\n  --show-stale          show stale discovery entries\n  --show-unknown        show discovery entries without version info\n  -m, --monitor         continuously monitor status\n  -I seconds, --monitor-interval seconds\n                        refresh interval for monitor mode (default: 1)\n  -v, --verbose\n"
+    },
+    "rnpath": {
+      "source_sha256": "9674bdea46ed8c34fee3f4aafa9b675de51aa9e04bbee7cd27eb1f06f2c1ea2b",
+      "help": "usage: rnpath.py [-h] [--config CONFIG] [--version] [-t] [-m hops] [-r] [-d]\n                 [-D] [-x] [-w seconds] [-R hash] [-i path] [-W seconds] [-b]\n                 [-B] [-U] [--duration DURATION] [--reason REASON] [-p] [-j]\n                 [-v]\n                 [destination] [list_filter]\n\nReticulum Path Management Utility\n\npositional arguments:\n  destination           hexadecimal hash of the destination\n  list_filter           filter for remote blackhole list view\n\noptions:\n  -h, --help            show this help message and exit\n  --config CONFIG       path to alternative Reticulum config directory\n  --version             show program's version number and exit\n  -t, --table           show all known paths\n  -m hops, --max hops   maximum hops to filter path table by\n  -r, --rates           show announce rate info\n  -d, --drop            remove the path to a destination\n  -D, --drop-announces  drop all queued announces\n  -x, --drop-via        drop all paths via specified transport instance\n  -w seconds            timeout before giving up\n  -R hash               transport identity hash of remote instance to manage\n  -i path               path to identity used for remote management\n  -W seconds            timeout before giving up on remote queries\n  -b, --blackholed      list blackholed identities\n  -B, --blackhole       blackhole identity\n  -U, --unblackhole     unblackhole identity\n  --duration DURATION   duration of blackhole enforcement in hours\n  --reason REASON       reason for blackholing identity\n  -p, --blackholed-list\n                        view published blackhole list for remote transport\n                        instance\n  -j, --json            output in JSON format\n  -v, --verbose\n"
+    },
+    "rnprobe": {
+      "source_sha256": "adfba42a976f7e85152b815f2b87b7602fa15500351b87e33b48ab17a0cdef34",
+      "help": "usage: rnprobe.py [-h] [--config CONFIG] [-s SIZE] [-n PROBES] [-t seconds]\n                  [-w seconds] [--version] [-v]\n                  [full_name] [destination_hash]\n\nReticulum Probe Utility\n\npositional arguments:\n  full_name             full destination name in dotted notation\n  destination_hash      hexadecimal hash of the destination\n\noptions:\n  -h, --help            show this help message and exit\n  --config CONFIG       path to alternative Reticulum config directory\n  -s SIZE, --size SIZE  size of probe packet payload in bytes\n  -n PROBES, --probes PROBES\n                        number of probes to send\n  -t seconds, --timeout seconds\n                        timeout before giving up\n  -w seconds, --wait seconds\n                        time between each probe\n  --version             show program's version number and exit\n  -v, --verbose\n"
+    }
+  },
+  "rnpath_reference_json": {
+    "path_rows": [
+      {
+        "hash": "000102030405060708090a0b0c0d0e0f",
+        "timestamp": 1700000000.0,
+        "via": "101112131415161718191a1b1c1d1e1f",
+        "hops": 2,
+        "expires": 1700003600.0,
+        "interface": "test-interface"
+      }
+    ],
+    "path_output": [
+      {
+        "hash": "000102030405060708090a0b0c0d0e0f",
+        "timestamp": 1700000000.0,
+        "via": "101112131415161718191a1b1c1d1e1f",
+        "hops": 2,
+        "expires": 1700003600.0,
+        "interface": "test-interface"
+      }
+    ],
+    "rate_rows": [
+      {
+        "hash": "101112131415161718191a1b1c1d1e1f",
+        "last": 1700000000.0,
+        "rate_violations": 2,
+        "blocked_until": 1700000123.0,
+        "timestamps": [
+          1699996400.0,
+          1700000000.0
+        ]
+      }
+    ],
+    "rate_output": [
+      {
+        "hash": "101112131415161718191a1b1c1d1e1f",
+        "last": 1700000000.0,
+        "rate_violations": 2,
+        "blocked_until": 1700000123.0,
+        "timestamps": [
+          1699996400.0,
+          1700000000.0
+        ]
+      }
+    ]
+  },
+  "rnpath_blackhole_json_branch": {
+    "hash": "000102030405060708090a0b0c0d0e0f",
+    "source": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+    "reason": "pinned blackhole output",
+    "output": "<000102030405060708090a0b0c0d0e0f> blackholed indefinitely (pinned blackhole output) by <a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0>"
+  },
+  "rnprobe_no_hash_contract": {
+    "exit_code": 0,
+    "has_usage": true,
+    "has_full_name": true,
+    "has_destination_hash": true
+  }
+}

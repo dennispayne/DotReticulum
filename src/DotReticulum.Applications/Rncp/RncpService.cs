@@ -46,8 +46,8 @@ public sealed class RncpListener
     {
         _router = router;
         _options = options;
-        _saveDirectory = Path.GetFullPath(options.SaveDirectory ?? Directory.GetCurrentDirectory());
-        _jail = options.FetchJail is null ? null : Path.GetFullPath(options.FetchJail);
+        _saveDirectory = Path.GetFullPath(CliSupport.ExpandHome(options.SaveDirectory ?? Directory.GetCurrentDirectory()));
+        _jail = options.FetchJail is null ? null : Path.GetFullPath(CliSupport.ExpandHome(options.FetchJail));
         var destination = Destination.Create(DestinationType.Single, AppName, [Aspect], identity);
         _local = new LocalDestination(identity, destination) { AcceptLinks = true, LinkEstablished = OnLinkEstablished };
         if (options.AllowFetch)
@@ -99,6 +99,7 @@ public sealed class RncpListener
         if (resource.Status != ResourceStatus.Complete)
         {
             Log?.Invoke("Resource failed");
+            resource.Dispose();
             return;
         }
 
@@ -128,10 +129,11 @@ public sealed class RncpListener
         if (_jail is not null)
         {
             var relative = requested;
-            var prefix = _jail + Path.DirectorySeparatorChar;
-            if (relative.StartsWith(prefix, StringComparison.Ordinal)) relative = relative[prefix.Length..];
+            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            var prefix = Path.TrimEndingDirectorySeparator(_jail) + Path.DirectorySeparatorChar;
+            if (relative.StartsWith(prefix, comparison)) relative = relative[prefix.Length..];
             path = Path.GetFullPath(Path.Combine(_jail, relative.TrimStart('/', '\\')));
-            if (!path.StartsWith(prefix, StringComparison.Ordinal))
+            if (!path.StartsWith(prefix, comparison))
             {
                 Log?.Invoke($"Disallowing fetch request for {path} outside of fetch jail {_jail}");
                 return FetchNotAllowed;
@@ -139,7 +141,7 @@ public sealed class RncpListener
         }
         else
         {
-            path = Path.GetFullPath(requested);
+            path = Path.GetFullPath(CliSupport.ExpandHome(requested));
         }
 
         if (!File.Exists(path))
@@ -165,6 +167,8 @@ public sealed class RncpListener
 
 internal static class FileSaver
 {
+    private static readonly System.Text.UTF8Encoding FilenameEncoding = new(false, true);
+    private static readonly object[] PublicationGates = Enumerable.Range(0, 64).Select(_ => new object()).ToArray();
     public static Dictionary<object, object?> Metadata(string name) => new() { ["name"] = System.Text.Encoding.UTF8.GetBytes(name) };
 
     /// <summary>Writes a received file resource into <paramref name="directory"/> using its metadata name; null when the resource carries none.</summary>
@@ -172,28 +176,69 @@ internal static class FileSaver
     {
         if (resource.Status != ResourceStatus.Complete) return null;
         if (resource.Metadata is not Dictionary<object, object?> metadata || !metadata.TryGetValue("name", out var rawName) || rawName is not byte[] nameBytes) return null;
-        var name = Path.GetFileName(System.Text.Encoding.UTF8.GetString(nameBytes).Replace('\\', '/'));
+        string name;
+        try { name = Path.GetFileName(FilenameEncoding.GetString(nameBytes).Replace('\\', '/')); }
+        catch (System.Text.DecoderFallbackException) { return null; }
         if (name.Length == 0 || name is "." or "..") return null;
+        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return null;
         var target = Path.GetFullPath(Path.Combine(directory, name));
-        if (!target.StartsWith(Path.GetFullPath(directory) + Path.DirectorySeparatorChar, StringComparison.Ordinal)) return null;
-        if (overwrite && File.Exists(target)) File.Delete(target);
-        var candidate = target;
-        for (var counter = 1; File.Exists(candidate); counter++) candidate = target + "." + counter;
+        if (!target.StartsWith(Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)) + Path.DirectorySeparatorChar,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)) return null;
         Directory.CreateDirectory(directory);
         using var input = resource.OpenRead();
-        using var output = new FileStream(candidate, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-        try { input.CopyTo(output); }
-        catch
+        return SaveStream(input, target, overwrite);
+    }
+
+    internal static string SaveStream(Stream input, string target, bool overwrite, CancellationToken cancellationToken = default)
+    {
+        var directory = Path.GetDirectoryName(target)!;
+        var candidate = target;
+        var counter = 0;
+        if (!overwrite)
+            while (File.Exists(candidate))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                candidate = target + "." + checked(++counter);
+            }
+        var staged = Path.Combine(directory, ".rncp-" + Guid.NewGuid().ToString("N"));
+        try
         {
-            output.Dispose();
-            File.Delete(candidate);
-            throw;
+            using (var output = new FileStream(staged, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                input.CopyTo(output);
+            var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+            var publicationGate = PublicationGates[(int)((uint)comparer.GetHashCode(target) % (uint)PublicationGates.Length)];
+            lock (publicationGate)
+            {
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (!overwrite && File.Exists(candidate))
+                    {
+                        candidate = target + "." + checked(++counter);
+                        continue;
+                    }
+                    try { File.Move(staged, candidate, overwrite); break; }
+                    catch (IOException ex) when (!overwrite && IsFileCollision(ex, candidate))
+                    {
+                        candidate = target + "." + checked(++counter);
+                    }
+                    catch (Exception ex) when (overwrite && File.Exists(candidate) && ex is IOException or UnauthorizedAccessException)
+                    {
+                        overwrite = false;
+                        candidate = target + "." + checked(++counter);
+                    }
+                }
+            }
         }
+        finally { if (File.Exists(staged)) File.Delete(staged); }
         return candidate;
     }
+
+    private static bool IsFileCollision(IOException error, string candidate) =>
+        (error.HResult & 0xffff) is 17 or 80 or 183 && File.Exists(candidate);
 }
 
-public sealed record RncpResult(bool Success, string Message, string? SavedPath = null, long Bytes = 0);
+public sealed record RncpResult(bool Success, string Message, string? SavedPath = null, long Bytes = 0, long PhysicalBytes = 0);
 
 /// <summary>Client side of rncp: send a file to a listener, or fetch one from it.</summary>
 public static class RncpClient
@@ -201,7 +246,7 @@ public static class RncpClient
     public static async Task<RncpResult> SendAsync(ReticulumNode node, Identity identity, byte[] destinationHash, string file, TimeSpan timeout,
         bool autoCompress = true, Action<double>? progress = null, CancellationToken cancellationToken = default)
     {
-        var path = Path.GetFullPath(file);
+        var path = Path.GetFullPath(CliSupport.ExpandHome(file));
         if (!File.Exists(path)) return new RncpResult(false, "File not found");
         var connected = await ClientLinks.ConnectAsync(node, destinationHash, timeout, cancellationToken).ConfigureAwait(false);
         if (connected.Link is not { } link) return new RncpResult(false, connected.Error!);
@@ -210,13 +255,16 @@ public static class RncpClient
         {
             link.Identify(identity);
             var size = new FileInfo(path).Length;
+            var segments = new System.Collections.Concurrent.ConcurrentDictionary<int, long>();
             var done = new TaskCompletionSource<ResourceStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+            link.Closed = _ => done.TrySetResult(ResourceStatus.Failed);
             link.SendResourceFile(path, FileSaver.Metadata(Path.GetFileName(path)), autoCompress, r => done.TrySetResult(r.Status),
-                r => progress?.Invoke(r.Progress), cancellationToken: cancellationToken);
+                r => { segments[r.SegmentIndex] = r.Size; progress?.Invoke(r.Progress); }, cancellationToken: cancellationToken);
             var status = await done.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
             return status switch
             {
-                ResourceStatus.Complete => new RncpResult(true, path + " copied to " + CliSupport.PrettyHex(destinationHash), Bytes: size),
+                ResourceStatus.Complete => new RncpResult(true, path + " copied to " + CliSupport.PrettyHex(destinationHash), Bytes: size,
+                    PhysicalBytes: segments.Values.Sum()),
                 ResourceStatus.Rejected => new RncpResult(false, "File was not accepted by " + CliSupport.PrettyHex(destinationHash)),
                 _ => new RncpResult(false, "The transfer failed"),
             };
@@ -235,15 +283,19 @@ public static class RncpClient
         if (connected.Link is not { } link) return new RncpResult(false, connected.Error!);
 
         var concluded = new TaskCompletionSource<RncpResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var segments = new System.Collections.Concurrent.ConcurrentDictionary<int, long>();
+        var transferStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         try
         {
             link.ResourceStrategy = ResourceStrategy.AcceptAll;
-            link.ResourceStarted = _ => progress?.Invoke(0);
+            link.Closed = _ => concluded.TrySetResult(new RncpResult(false, "The transfer failed"));
+            link.ResourceStarted = r => { segments[r.SegmentIndex] = r.Size; transferStarted.TrySetResult(); progress?.Invoke(0); };
             link.ResourceReceived = resource =>
             {
                 if (resource.Status != ResourceStatus.Complete)
                 {
                     concluded.TrySetResult(new RncpResult(false, "Resource failed"));
+                    resource.Dispose();
                     return;
                 }
 
@@ -252,7 +304,8 @@ public static class RncpClient
                     var saved = FileSaver.Save(resource, saveDirectory, allowOverwrite);
                     concluded.TrySetResult(saved is null
                         ? new RncpResult(false, "Invalid data received, ignoring resource")
-                        : new RncpResult(true, file + " fetched from " + CliSupport.PrettyHex(destinationHash), saved, new FileInfo(saved).Length));
+                        : new RncpResult(true, file + " fetched from " + CliSupport.PrettyHex(destinationHash), saved,
+                            new FileInfo(saved).Length, segments.Values.Sum()));
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
@@ -261,7 +314,7 @@ public static class RncpClient
                 finally { resource.Dispose(); }
             };
             link.Identify(identity);
-            var receipt = link.Request(RncpListener.FetchPath, file, timeout: timeout.TotalSeconds);
+            var receipt = link.Request(RncpListener.FetchPath, file, timeout: timeout.TotalSeconds, cancellationToken: cancellationToken);
             if (receipt is null) return new RncpResult(false, "Fetch request failed due to an unknown error (probably not authorised)");
             object? response;
             try { response = await receipt.ResponseTask.WaitAsync(cancellationToken).ConfigureAwait(false); }
@@ -277,6 +330,11 @@ public static class RncpClient
                     return new RncpResult(false, "Fetch request failed due to an error on the remote system");
             }
 
+            try
+            {
+                await Task.WhenAny(transferStarted.Task, concluded.Task).WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
+            }
+            catch (TimeoutException) { return new RncpResult(false, "The transfer failed"); }
             return await concluded.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         finally

@@ -68,6 +68,7 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
     private int receiving;
     private long receivedBytes;
     private long sentBytes;
+    private long pendingWriteBytes;
 
     public LocalSharedPacketInterface(EndPoint endpoint, TimeSpan? reconnectDelay = null, TimeSpan? connectTimeout = null,
         Action<Exception>? diagnostic = null)
@@ -116,16 +117,19 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
     public bool IsConnected { get { lock (gate) return connection is not null; } }
     internal long ReceivedBytes => Interlocked.Read(ref receivedBytes);
     internal long SentBytes => Interlocked.Read(ref sentBytes);
+    internal long PendingWriteBytes => Interlocked.Read(ref pendingWriteBytes);
     internal bool IsTransmitPaused => sleepPause?.IsPaused == true;
     public event Action<bool>? ConnectionChanged;
     public override string ToString() => $"LocalInterface[{endpoint}]";
     public IReadOnlyDictionary<string, object?> GetDiagnostics() => new Dictionary<string, object?>
     {
         ["rxb"] = ReceivedBytes, ["txb"] = SentBytes, ["status"] = IsConnected,
+        ["tx_write_pending_bytes"] = PendingWriteBytes,
         ["peer"] = endpoint.ToString(), ["bitrate"] = 1_000_000_000L, ["mtu"] = HardwareMtu,
     };
     private Connection NewConnection(Socket socket) => new(socket,
         count => Interlocked.Add(ref receivedBytes, count), count => Interlocked.Add(ref sentBytes, count),
+        count => Interlocked.Add(ref pendingWriteBytes, count),
         count => { if (count > 0) sleepPause?.RecordActivity(); });
 
     /// <summary>Reserves a connection during election; StartAsync still belongs to the interface manager.</summary>
@@ -316,12 +320,14 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
         public bool IsDisposed => Volatile.Read(ref disposed) != 0;
         private readonly Action<int> received;
         private readonly Action<int> sent;
+        private readonly Action<int> pendingWrite;
         private readonly Action<int> activity;
-        public Connection(Socket socket, Action<int> received, Action<int> sent, Action<int> activity)
+        public Connection(Socket socket, Action<int> received, Action<int> sent, Action<int> pendingWrite, Action<int> activity)
         {
             stream = new NetworkStream(socket, ownsSocket: true);
             this.received = received;
             this.sent = sent;
+            this.pendingWrite = pendingWrite;
             this.activity = activity;
         }
         public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync([EnumeratorCancellation] CancellationToken token)
@@ -356,8 +362,13 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
             {
                 linked.Token.ThrowIfCancellationRequested();
                 if (framePacket) data = EncodePacket(data);
-                await stream.WriteAsync(data, linked.Token).ConfigureAwait(false);
-                if (countSent) sent(data.Length);
+                pendingWrite(data.Length);
+                try
+                {
+                    await stream.WriteAsync(data, linked.Token).ConfigureAwait(false);
+                    if (countSent) sent(data.Length);
+                }
+                finally { pendingWrite(-data.Length); }
             }
             finally { writes.Release(); }
         }
@@ -439,6 +450,7 @@ public sealed class LocalSharedServerInterface : ISpawningPacketInterface, IPack
         {
             ["rxb"] = closedReceivedBytes + clients.Sum(client => client.ReceivedBytes),
             ["txb"] = closedSentBytes + clients.Sum(client => client.SentBytes),
+            ["tx_write_pending_bytes"] = clients.Sum(client => client.PendingWriteBytes),
             ["status"] = listener is not null && !stop.IsCancellationRequested,
             ["clients"] = clients.Count, ["bitrate"] = 1_000_000_000L, ["mtu"] = LocalSharedPacketInterface.HardwareMtu,
         };
