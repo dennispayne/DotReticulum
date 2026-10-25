@@ -6,7 +6,7 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
-### Parity 8 compatibility acceptance, in progress (2026-10-25)
+### Parity 8 Windows/Linux acceptance; broader acceptance outstanding (2026-10-25)
 
 Scope starts from clean `d4eac24`: source-backed classification, impaired
 mixed transport recovery, native installation/discovery and available-platform
@@ -99,6 +99,199 @@ duplicate/sparse/evicted cache values, reconnect/reset, no-subscriber receipts,
 tracking gates, ciphertext rejection, transit separation, management hash/key
 validation and a real authenticated shared-owner Link lookup. These are
 reference-vector/simulated/loopback software results, not physical RF.
+
+#### Integrated portability and native-process corrections
+
+The first full Linux run exposed eleven failures rather than a firewall-only
+verification problem. Each was investigated, without converting failures to
+skips or relaxing protocol assertions:
+
+- Unix resource scavenging used `FileShare.Delete`, which permits a shared
+  flock and could unlink an active reader/writer's file. Unix now requires an
+  exclusive `FileShare.None` lease; Windows retains delete sharing. Active
+  files remain usable, then become reclaimable after release. Focused resource
+  tests passed **86 / 2 skipped** on Windows and **88 / 0 skipped** on Linux.
+- Competing Unix configuration creators reproduced **seven winners**:
+  .NET 10 `File.Move(overwrite: false)` checks existence before rename.
+  `AtomicFilePublication` now links a closed same-filesystem staging file with
+  `CreateHardLinkW`/POSIX `link`, then callers remove staging. Existing files
+  are never replaced; unexpected failures propagate. Configuration, runtime/
+  Git/I2P identities, initial Git statistics and non-overwriting rncp saves
+  share this boundary. Regressions exercise competing distinct complete
+  candidates, an existing reader, missing sources and directory collisions.
+  Windows **NTFS** and Linux **ext4** were verified; hard-link-incapable
+  filesystems fail explicitly. This reproducible Unix defect does not
+  establish the cause of the initial intermittent Windows baseline failure.
+- Closing child stdin could throw after write-error handling and turn
+  `InputWriteFailed` (**-4**) into a generic **-1**. Close failures now retain
+  the explicit input diagnostic. Descendant tests distinguish non-executing
+  Linux zombies from live processes. Release tests normalize artifact order
+  and unlink dangling directory symlinks correctly. The Git process/release
+  selection passed **27** Windows cases and **26 / 1 skipped** Linux cases.
+- The unreachable-owner fixture now uses a bound, unlistening abstract Unix
+  socket on Linux, where this WSL TCP stack permits a second exclusive bind
+  before listen. It verifies actual ownership after releasing that endpoint.
+  The `rngcs` missing-path fixture is normalized for the host separator,
+  without regenerating or relabeling its reference data.
+
+Broader Windows published-native terminal execution then reproduced a real
+rnsh failure: `Unable to find constructor for Channel MSGTYPE 0xac05`.
+An early version envelope could be proved while the asynchronous listener
+callback was still registering decoders, then permanently discarded.
+`Link.GetChannel(Action<Channel>)` initializes types/handlers synchronously
+under the ingress gate before publishing a newly created channel. The existing
+parameterless API is unchanged; rnsh uses the new first-creation overload.
+A controlled regression verifies proof is withheld until initialization and
+the envelope is delivered afterward. Channel/rnsh selection:
+**47 passed, zero skipped** on each platform. Diagnostic native test output
+now retains child and host/session errors instead of hiding the failure.
+Republished native terminal/resource/tunnel selections subsequently passed.
+
+The additional actual Git process matrix exposed another production defect on
+Linux **Git 2.53.0**: strict fsck rejected ordinary clone's Git-owned temporary
+`HEAD -> refs/heads/.invalid`. Import verification now creates its own bare
+view, borrows the original object store through `objects/info/alternates`,
+and runs **full strict fsck**, including requested roots, without reading or
+changing caller refs. Cleanup removes only that owned view on success/failure.
+Two actual-Git regressions preserve the placeholder HEAD, accept valid objects,
+reject corrupt loose objects and require cleanup. A subsequent full Windows
+run exposed nested verification `commit-graph-chain` **Filename too long**;
+Git commands now enable `core.longpaths`. Both regression cases use a long
+directory containing spaces; those two plus the previously failing native-host
+clone test passed **3** on Windows. Full suites below include these fixes.
+
+Linux Git process fixtures also needed `Select-Object -First 1` because
+`Get-Command git` returned both `/usr/bin/git` and `/bin/git`. This was a test
+executable-selection bug, distinct from the Git 2.53 production failure.
+Native packaging tests similarly invoke `$PSHOME/pwsh.dll` when PowerShell is
+dotnet-hosted, instead of treating the `dotnet` process path as `pwsh`.
+
+#### Mixed transports and native installation
+
+The new live mesh runs Python leaf -> Python transport -> impaired TCP ->
+.NET transport -> Python leaf. Both 2.2 MB incompressible directions lose and
+retransmit three selected resource parts, followed by another three after a
+persisted .NET-router restart: **9/9 retransmissions**. Repeated Windows runs
+observed **208** and **196** capacity-one bearer waits, actual TCP reconnect,
+fresh links and proved packets both ways. The selected Windows and Linux
+integration runs also pass this topology. `docs/compatibility-mesh.md` records
+the public `PROVE_ALL` leaf policy, unchanged reference and precise limits.
+The router is managed/in-process, not a published-native impaired mesh;
+separate published-native daemon tunnel-restart execution also passes.
+
+`tools/dotreticulum-packaging.ps1` packages the application, **14** actual
+dispatcher aliases and byte-for-byte Reticulum `LICENSE` (**16** owned files).
+Separate native processes test installation, all executable aliases, Git
+discovery, telemetry's subcommand, integrity/RID/collision refusals, identical
+reinstall, rejected nontransactional upgrades and owned-file-only uninstall.
+No PATH, service, system configuration or device mutation is performed.
+The RID schema accepts macOS ARM64 but no Mac package/execution was verified.
+`docs/installation.md` documents these ownership and support boundaries.
+
+#### Accepted integrated commands and results
+
+Both platforms passed warning-free
+`dotnet build DotReticulum.slnx -c Release --nologo -v quiet`.
+The final non-live solution run passed **1847 / 87 skipped** on Windows x64
+and **1856 / 78 skipped** on Ubuntu WSL Linux x64, zero failed. Live/native/
+physical opt-ins were disabled; these skips are not interoperability claims.
+The Windows coverage destination was verified absent before collection:
+
+```powershell
+dotnet test DotReticulum.slnx -c Release --no-build -m:1 --settings tests\coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults\parity8-coverage-4dc1448fbd5847f7bbd82fb59be49cdf --logger trx --nologo -v quiet -- xUnit.MaxParallelThreads=1
+pwsh -NoProfile -File tests\coverage_summary.ps1 TestResults\parity8-coverage-4dc1448fbd5847f7bbd82fb59be49cdf
+```
+
+Both commands exited zero. Six suite reports and their TRX attachment copies
+merged as **12** reports, counting each production source line/branch once.
+A reused earlier `parity8-coverage-final` directory was detected and its
+mixed-run aggregate discarded, not accepted as current coverage.
+
+| Production project | Lines | Branches |
+| --- | ---: | ---: |
+| Applications | 10669/13922 (76.63%) | 10057/15815 (63.59%) |
+| Core | 1785/1846 (96.70%) | 1102/1206 (91.38%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 4528/5291 (85.58%) | 2552/3263 (78.21%) |
+| Lxmf | 388/430 (90.23%) | 193/272 (70.96%) |
+| Transport | 4972/5459 (91.08%) | 3257/3988 (81.67%) |
+| **Overall** | **22452/27064 (82.96%)** | **17208/24594 (69.97%)** |
+
+Linux's final full-suite command also exited zero:
+
+```sh
+dotnet test DotReticulum.slnx -c Release --no-build -m:1 --nologo -v quiet --logger trx --results-directory TestResults/parity8-linux-final -- xUnit.MaxParallelThreads=1
+```
+
+Both NativeAOT publications exited zero with linker/compiler warnings as
+errors, then ran `--help` successfully:
+
+```powershell
+dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o artifacts\native-parity8 --nologo -v quiet
+```
+
+```sh
+dotnet publish src/DotReticulum.Applications/DotReticulum.Applications.csproj -c Release -r linux-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o artifacts/native-parity8 --nologo -v quiet
+```
+
+Windows used `vcvars64.bat` and publish in the same `cmd.exe` process, with
+the Visual Studio Installer directory on PATH. Linux used the owned ext4
+snapshot and SDK/PowerShell tools, not Windows-mounted build outputs.
+
+With verified `DOTRETICULUM_PYTHON`/`DOTRETICULUM_UPSTREAM` configured,
+`pwsh -NoProfile -File tests\run-pester.ps1 -Application
+artifacts\native-parity8\DotReticulum.Applications.exe -NativePackaging`
+passed **79 / 2 skipped** on Windows; the Linux entry point with its native
+executable passed **81 / 0 skipped**. Neither command enabled the additional
+Git-hosting/helper opt-ins. Their earlier Linux packaging failure is resolved
+by the dotnet-hosted PowerShell fix above.
+
+With `DOTRETICULUM_LIVE=1`, `DOTRETICULUM_NATIVE_EXE` pointing to the
+published host binary and the verified reference variables, this selection
+passed **4 / 0 skipped** on Windows:
+
+```powershell
+dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --filter "FullyQualifiedName~NativeResourceTests|FullyQualifiedName~RnshNativeTests|FullyQualifiedName~Parity4NativeTransportTests|FullyQualifiedName~Parity8CompatibilityLiveTests" --nologo -v quiet --logger trx --results-directory TestResults\parity8-windows-live-release -- xUnit.MaxParallelThreads=1
+```
+
+Linux's equivalent selected run additionally included `Parity8PhyTests` and
+`DiscoveryTests`: **42 / 0 skipped** in
+`TestResults/parity8-linux-live-release`. These runs executed actual
+terminal-hosted shell, encrypted multi-megabyte resources, native daemon
+tunnel restart and the separately managed mixed mesh. They preceded the
+final Git-only correction; the following actual Git process gate ran on both
+republished final native binaries:
+
+```powershell
+Import-Module Pester -MinimumVersion 5.7.1
+$data = @{ Application = $native; Python = $env:DOTRETICULUM_PYTHON; Upstream = $env:DOTRETICULUM_UPSTREAM }
+$c = New-PesterConfiguration
+$c.Run.Container = @('RngitHosting', 'Rngcs', 'GitRemote') | ForEach-Object {
+    New-PesterContainer -Path "tests\Pester\$_.Tests.ps1" -Data $data
+}
+$c.Run.PassThru = $true
+$c.Output.Verbosity = 'Detailed'
+$r = Invoke-Pester -Configuration $c
+if ($r.FailedCount -gt 0 -or $r.Result -ne 'Passed') { exit 1 }
+```
+
+`$native` was the respective resolved `artifacts/native-parity8` executable.
+Result: **82 passed / 0 skipped** per platform, both invocations exited zero.
+These separate processes exercise native hosting, signing, actual ordinary
+Git clone/fetch/push/deletion, permissions/failures, concurrent distinct refs
+and persisted client/server restart against owned pinned Python peers.
+No public repository was pushed or mutated. Earlier Windows Git tests also
+passed 82 cases but a wrapper redirected the PassThru object and falsely
+exited one; that wrapper result was not mistaken for a production failure.
+
+The source-backed ledger now classifies reviewed families without converting
+inventory completion into feature completion. Remaining acceptance includes
+Python-router/crash restart, alternate routes, prolonged Channel/resource
+soak, impaired published-native/per-bearer matrices, macOS and broader
+platforms, physical serial/TNC/RNode/Multi/Weave/RF, Android and actual I2P
+stream delivery after restart. Desktop RNode BLE, Darwin rnsh terminal and
+Android host/providers are applicable missing software, not merely unavailable
+devices. Parity 8 and the project remain incomplete; CI/CD has not started.
 
 ### Parity 7 utility software acceptance; physical acceptance outstanding (2026-10-24)
 

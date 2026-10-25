@@ -142,7 +142,7 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] rnprobe request/reply and reporting options
   - [x] rnsh interactive sessions, terminal/process handling and recovery (pinned upstream EOF defect explicitly recorded)
   - [x] rnodeconf device configuration/update software operations, independent plans and bounded firmware/provisioning/recovery simulators
-  - [ ] Explicitly authorized physical rnodeconf flashing/reset/re-enumeration/EEPROM persistence and RF acceptance (not performed; only read-only COM8 identification authorized)
+  - [ ] Explicitly authorized physical rnodeconf flashing/reset/re-enumeration/EEPROM persistence and RF acceptance (necessary COM8 reflashing conditionally approved; native info/backup verified, no mutation needed/performed; one radio cannot establish RF interoperability)
   - [x] Complete rnsd, rncp and rnx CLI/configuration/error/exit-code behavior
   - [x] rncp/rnx allow-file precedence, home expansion, version/PHY options, writable-output errors and bounded file/process I/O
   - [x] rnx binary stdout/stderr, negative/zero output limits, failed spawn, timeout termination/results and authorized cancellation
@@ -150,16 +150,21 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] rnodeconf read-only/device-simulator behavior before explicitly authorized owned-device firmware/EEPROM/trust operations
   - [x] Track Resolver/rnir/rnpkg placeholders without inventing functionality absent from the pinned upstream
 - [ ] Parity 8 - Compatibility and release acceptance
-  - [ ] Close the source-backed inventory: no unclassified features or unacknowledged parity gaps
+  - [x] Close the source-backed inventory: classify reviewed public source families, placeholders, differences and explicitly acknowledged parity gaps in docs/compatibility-contracts.md
   - [x] Independently generated non-TCP discovery publication schemas, native factory/lifecycle integration and explicit pinned KISS modulation defect
   - [x] Restore actual framed bearer statistics and null unknown-extension boundaries, distinct from decoded counters
   - [x] Packet-specific RNode/Multi PHY snapshots, bounded owner/shared caches, receipts and opt-in Link attribution
-  - [ ] Mixed Python/.NET leaf and transport topologies with loss, latency, reconnects, restarts and constrained resources
+  - [x] Mixed Python/.NET leaf and actual transport topology with bidirectional resource-part loss/retransmission, latency, observed bounded-bearer pressure, reconnects and persisted .NET-router restart
+  - [x] Correct cross-platform create-only publication, active resource leases, process stdin failures and rnsh Channel-initialization races with regressions
+  - [x] Actual Windows/Linux native Git hosting/signing/helper flows, Git 2.53 placeholder-HEAD integrity isolation and Windows long-path regressions
+  - [ ] Broader mesh acceptance: Python-router/crash restart, alternate routes, sustained Channel/resource soak and impaired native-binary/per-bearer matrices
   - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
+  - [x] Available Windows/Linux full managed suites, warning-as-error NativeAOT, separate native CLI/installation processes, native terminal/resources/tunnel restart and impaired managed-router Python mesh
   - [ ] Darwin rnsh terminal backend and actual macOS feature acceptance (user plans macOS access via GitHub Actions later)
+  - [ ] Android host/providers, desktop RNode BLE and other missing/partial applicable software identified in the compatibility ledger
   - [ ] Per-interface interoperability and hardware evidence; untested platforms/devices remain unverified
-  - [ ] Native utility packaging, executable discovery, installation and user documentation
-  - [ ] Record behavioral differences, production coverage and reproducible reference provenance without claiming Python API identity
+  - [x] Windows/Linux native utility packaging, exact license preservation, executable discovery, integrity-checked install/uninstall and user documentation; macOS execution remains above
+  - [x] Record behavioral differences, production coverage and reproducible reference provenance without claiming Python API identity
 - [ ] Final phase - CI/CD (last)
   - [ ] `ci-build-test.yml`
   - [ ] `interop-test.yml`
