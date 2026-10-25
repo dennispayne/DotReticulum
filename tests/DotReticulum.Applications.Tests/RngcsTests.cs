@@ -107,7 +107,9 @@ public sealed class RngcsTests
                     continue;
                 }
                 Assert.True(Normalize(vector.GetProperty("output").GetString()!.Replace("{root}", root, StringComparison.Ordinal)) == Normalize(result.Output), $"{name}: {result}");
-                var upstreamError = Normalize(vector.GetProperty("error").GetString()!.Replace("{root}", root, StringComparison.Ordinal));
+                var upstreamError = Normalize(vector.GetProperty("error").GetString()!
+                    .Replace("{root}\\", root + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                    .Replace("{root}", root, StringComparison.Ordinal));
                 // Upstream leaks Python exceptions for malformed envelopes and empty-message verify.
                 // This implementation reports a bounded, deterministic failure instead of a traceback.
                 if (upstreamError.StartsWith("UPSTREAM_EXCEPTION:", StringComparison.Ordinal))

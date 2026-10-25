@@ -129,6 +129,10 @@ public sealed class RngitReleaseTests
         if (value is Dictionary<object, object?> map)
         {
             if (map.ContainsKey("created")) map["created"] = 0;
+            // Upstream enumerates artifact files with os.listdir; their order is filesystem-dependent.
+            if (map.GetValueOrDefault("artifacts") is object[] artifacts)
+                map["artifacts"] = artifacts.OrderBy(item => (string)((Dictionary<object, object?>)item!)["name"]!,
+                    StringComparer.Ordinal).ToArray();
             foreach (var item in map.Values) Normalize(item);
         }
         else if (value is object[] list) foreach (var item in list) Normalize(item);
@@ -291,7 +295,11 @@ public sealed class RngitReleaseTests
             Directory.Move(outside, outside + "-moved");
             Assert.Equal(255, Assert.IsType<byte[]>(await service.HandleAsync(Request("list"), fixture.Identity, CancellationToken.None))[0]);
         }
-        finally { Directory.Delete(linked); }
+        finally
+        {
+            if (OperatingSystem.IsWindows()) Directory.Delete(linked);
+            else File.Delete(linked);
+        }
     }
 
     [Fact]
@@ -357,9 +365,7 @@ public sealed class RngitReleaseTests
 
     private static string RepoRoot()
     {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (!File.Exists(Path.Combine(current.FullName, "DotReticulum.slnx"))) current = current.Parent ?? throw new IOException("Repository root not found.");
-        return current.FullName;
+        return PresentationProcessFixture.RepositoryRoot();
     }
 
     private sealed class Fixture : IAsyncDisposable

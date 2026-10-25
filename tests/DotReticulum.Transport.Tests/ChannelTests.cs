@@ -35,6 +35,35 @@ public class ChannelTests
     }
 
     [Fact]
+    public async Task ChannelInitializationCannotProveAnEnvelopeBeforeItsTypesAndHandlerExist()
+    {
+        await using var topo = await BuildAsync(false);
+        var (initiator, responder) = await ConnectAsync(topo);
+        var configuring = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        var initialization = Task.Run(() => responder.GetChannel(channel =>
+        {
+            configuring.SetResult();
+            if (!release.Wait(TimeSpan.FromSeconds(5))) throw new TimeoutException("Channel initialization was not released.");
+            channel.RegisterMessageType<TextMessage>();
+            channel.AddMessageHandler(message => received.TrySetResult(((TextMessage)message).Text));
+        }));
+        try
+        {
+            await configuring.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var sender = initiator.GetChannel();
+            sender.RegisterMessageType<TextMessage>();
+            var envelope = sender.Send(new TextMessage { Text = "first version" });
+            await Task.Delay(100);
+            Assert.NotEqual(MessageState.Delivered, envelope.State);
+        }
+        finally { release.Set(); }
+        await initialization.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("first version", await received.Task.WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
     public void StreamDataMessage_PacksLikeUpstream()
     {
         Assert.Equal("8005616263", Convert.ToHexStringLower(new StreamDataMessage(5, "abc"u8.ToArray(), eof: true).Pack()));

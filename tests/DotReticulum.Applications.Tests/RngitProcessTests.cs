@@ -75,10 +75,26 @@ public sealed class RngitProcessTests : IDisposable
         try
         {
             using var child = Process.GetProcessById(pid);
-            Assert.True(child.HasExited, "The owned descendant survived its parent's timeout.");
+            for (var attempt = 0; attempt < 100 && !HasTerminated(child); attempt++) await Task.Delay(20);
+            Assert.True(HasTerminated(child), "The owned descendant survived its parent's timeout.");
         }
 
         catch (ArgumentException) { /* Reaped processes no longer have an OS process entry. */ }
+    }
+
+    private static bool HasTerminated(Process child)
+    {
+        if (child.HasExited) return true;
+        if (!OperatingSystem.IsLinux()) return false;
+        try
+        {
+            // Orphaned zombies may remain until PID 1 reaps them, but cannot execute or hold pipes.
+            var status = File.ReadAllText($"/proc/{child.Id}/stat");
+            return status[(status.LastIndexOf(')') + 2)..].StartsWith("Z ", StringComparison.Ordinal)
+                || status[(status.LastIndexOf(')') + 2)..].StartsWith("X ", StringComparison.Ordinal);
+        }
+        catch (FileNotFoundException) { return true; }
+        catch (DirectoryNotFoundException) { return true; }
     }
 
     [Fact]
@@ -86,7 +102,7 @@ public sealed class RngitProcessTests : IDisposable
     {
         fixture.BackendMode("early");
         var result = await RngitProcess.RunAsync(fixture.Backend, [], stdin: new byte[16 * 1024 * 1024]);
-        Assert.Equal(RngitProcess.InputWriteFailed, result.Code);
+        Assert.True(result.Code == RngitProcess.InputWriteFailed, $"Expected stdin failure, got {result.Code}: {result.Error}");
         Assert.Contains("did not accept all stdin", result.Error);
     }
 
@@ -142,12 +158,13 @@ internal sealed class PresentationProcessFixture : IDisposable
 
     public PresentationProcessFixture()
     {
-        var root = AppContext.BaseDirectory;
-        while (!File.Exists(Path.Combine(root, "DotReticulum.slnx")))
-            root = Path.GetDirectoryName(root) ?? throw new InvalidOperationException("Repository root not found.");
+        var root = RepositoryRoot();
         Directory = Path.Combine(root, "TestResults", "presentation-" + Guid.NewGuid().ToString("N"));
         System.IO.Directory.CreateDirectory(Directory);
         var backendOutput = Path.Combine(root, "tests", "Fixtures", "RngitPresentationBackend", "bin", "Release", "net10.0");
+        var isolatedBackend = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..",
+            "RngitPresentationBackend", new DirectoryInfo(AppContext.BaseDirectory).Name));
+        if (System.IO.Directory.Exists(isolatedBackend)) backendOutput = isolatedBackend;
         if (!System.IO.Directory.Exists(backendOutput))
             throw new InvalidOperationException("First build tests\\Fixtures\\RngitPresentationBackend\\RngitPresentationBackend.csproj -c Release.");
         foreach (var file in System.IO.Directory.GetFiles(backendOutput)) File.Copy(file, Path.Combine(Directory, Path.GetFileName(file)));
@@ -183,6 +200,14 @@ internal sealed class PresentationProcessFixture : IDisposable
                 'editor-link' { Remove-Item -LiteralPath $Value; New-Item -ItemType SymbolicLink -Path $Value -Target (Join-Path $PSScriptRoot 'external.txt') | Out-Null }
             }
             """, new UTF8Encoding(false));
+    }
+
+    internal static string RepositoryRoot([System.Runtime.CompilerServices.CallerFilePath] string source = "")
+    {
+        foreach (var start in new[] { AppContext.BaseDirectory, Path.GetDirectoryName(source)! })
+            for (var current = new DirectoryInfo(start); current is not null; current = current.Parent)
+                if (File.Exists(Path.Combine(current.FullName, "DotReticulum.slnx"))) return current.FullName;
+        throw new InvalidOperationException("Repository root not found.");
     }
 
     public string[] Arguments(string mode, IReadOnlyList<string>? extra = null) =>

@@ -9,7 +9,7 @@ BeforeAll {
     $null = New-Item -ItemType Directory -Path $root -Force
     $root = (Resolve-Path -LiteralPath $root).Path
     $cli = (Resolve-Path -LiteralPath $Application).Path
-    $git = (Get-Command git -CommandType Application -ErrorAction Stop).Source
+    $git = (Get-Command git -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
     $executable = if ([IO.Path]::GetExtension($cli) -eq '.dll') { 'dotnet' } else { $cli }
     $prefix = @(if ($executable -eq 'dotnet') { $cli })
     $bin = Join-Path $root 'program with spaces'

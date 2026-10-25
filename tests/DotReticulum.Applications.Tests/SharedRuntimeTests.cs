@@ -305,12 +305,23 @@ public sealed class SharedRuntimeTests
     [Fact]
     public async Task UnreachableOccupiedEndpointFallsBackWithoutLeakingReservation()
     {
-        using var occupied = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        occupied.ExclusiveAddressUse = true;
-        occupied.Bind(Loopback); // Deliberately bound but not listening.
-        var port = ((IPEndPoint)occupied.LocalEndPoint!).Port;
-        await using var session = await SharedInstanceSession.OpenAsync(new SharedInstanceOptions { InstancePort = port, OperationTimeout = TimeSpan.FromMilliseconds(100) });
+        var unix = LocalSharedPlatformPolicy.SupportsAbstractUnixSockets;
+        var options = new SharedInstanceOptions
+        {
+            SocketPath = unix ? "unreachable-" + Guid.NewGuid().ToString("N") : null,
+            OperationTimeout = TimeSpan.FromMilliseconds(100),
+        };
+        using var occupied = new Socket(unix ? AddressFamily.Unix : AddressFamily.InterNetwork,
+            SocketType.Stream, unix ? ProtocolType.Unspecified : ProtocolType.Tcp);
+        if (!unix) occupied.ExclusiveAddressUse = true;
+        // Abstract Unix names reserve the endpoint even when not listening; some Linux TCP stacks do not.
+        occupied.Bind(unix ? options.BearerEndpoint : Loopback);
+        if (!unix) options = options with { InstancePort = ((IPEndPoint)occupied.LocalEndPoint!).Port };
+        await using var session = await SharedInstanceSession.OpenAsync(options);
         Assert.Equal(SharedInstanceRole.Standalone, session.Role);
+        occupied.Dispose();
+        await using var recovered = await SharedInstanceSession.OpenAsync(options);
+        Assert.Equal(SharedInstanceRole.Host, recovered.Role);
     }
 
     [Fact]

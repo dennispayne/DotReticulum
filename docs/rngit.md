@@ -208,8 +208,9 @@ git clone --bare rns://DESTINATION/GROUP/REPOSITORY C:\Repos\bare.git
 
 On Unix publish for the host RID, copy the executable as `git-remote-rns`
 (no extension), preserve its executable permission, and put its directory on
-`PATH`. Windows is the currently exercised native platform; publishing alone
-does not establish support on other systems. Do not install two different
+`PATH`. Published-native Windows x64 and Ubuntu WSL Linux x64 execution is
+recorded in the development history; publishing alone does not establish
+support on other systems. Do not install two different
 helpers with that name earlier on `PATH`/Git's exec path.
 
 `DOTRETICULUM_RNS_CONFIG` selects our Reticulum configuration; `RNS_CONFIG`
@@ -333,8 +334,17 @@ SHA-256 listings and local SHA-256 transfers fail with a diagnostic; no Git
 object-format negotiation is advertised. An empty remote does not expose its
 object format in the upstream protocol: it is assumed SHA-1 and an incompatible
 server must reject the bundle. The separate direct bare client retains its
-SHA-1/SHA-256 behavior. Native feature evidence is Windows x64 only; other
-platforms remain unverified.
+SHA-1/SHA-256 behavior. Native hosting/signing/helper process selections pass
+82 cases on each of Windows x64 and Ubuntu WSL Linux x64; other platforms
+remain unverified.
+
+Imported objects undergo `fsck --full --strict --no-reflogs` in an owned,
+temporary bare verification view borrowing the caller's object store through
+an alternate. This still scans all objects, rejects corruption and checks the
+requested roots, without validating or rewriting Git's transient clone
+`HEAD -> refs/heads/.invalid` (rejected by Git 2.53's ref checks). The view is
+removed on success or failure. Local Git commands enable `core.longpaths` so
+nested verification metadata does not introduce Windows MAX_PATH failures.
 
 ### Direct bare-repository client
 

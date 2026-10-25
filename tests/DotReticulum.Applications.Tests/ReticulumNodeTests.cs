@@ -19,7 +19,8 @@ public class ReticulumNodeTests
 
     internal static (ReticulumNode Server, ReticulumNode Client, string Dir) Pair() => Pair(out _);
 
-    internal static (ReticulumNode Server, ReticulumNode Client, string Dir) Pair(out int port)
+    internal static (ReticulumNode Server, ReticulumNode Client, string Dir) Pair(out int port,
+        Action<int, string>? log = null)
     {
         port = FreePort();
         var dir = TempDir();
@@ -33,7 +34,7 @@ public class ReticulumNodeTests
                 enabled = yes
                 listen_ip = 127.0.0.1
                 listen_port = {port}
-            """), Path.Combine(dir, "server"));
+            """), Path.Combine(dir, "server"), log);
         var client = ReticulumNode.Create(RnsdConfigParser.Parse($"""
             [reticulum]
               share_instance = no
@@ -43,7 +44,7 @@ public class ReticulumNodeTests
                 enabled = yes
                 target_host = 127.0.0.1
                 target_port = {port}
-            """), Path.Combine(dir, "client"));
+            """), Path.Combine(dir, "client"), log);
         return (server, client, dir);
     }
 

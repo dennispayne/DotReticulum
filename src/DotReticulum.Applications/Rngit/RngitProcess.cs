@@ -103,7 +103,11 @@ public static class RngitProcess
                     await process.StandardInput.BaseStream.WriteAsync(stdin, operation.Token).ConfigureAwait(false);
             }
             catch (IOException error) { inputFailure = $"Process did not accept all stdin bytes: {error.Message}"; }
-            finally { process.StandardInput.Close(); }
+            finally
+            {
+                try { process.StandardInput.Close(); }
+                catch (IOException error) { inputFailure ??= $"Process did not accept all stdin bytes: {error.Message}"; }
+            }
         }
 
         var tasks = Task.WhenAll(ReadAsync(process.StandardOutput.BaseStream, output),

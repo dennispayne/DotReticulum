@@ -46,8 +46,7 @@ public sealed class RuntimeStateStore
                     file.Write(key);
                     file.Flush(flushToDisk: true);
                 }
-                try { File.Move(staging, path, overwrite: false); }
-                catch (IOException) when (File.Exists(path)) { }
+                AtomicFilePublication.TryPublishNew(staging, path);
             }
             finally
             {

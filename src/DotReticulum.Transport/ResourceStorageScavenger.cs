@@ -107,9 +107,11 @@ public static class ResourceStorageScavenger
                         fresh++;
                         continue;
                     }
-                    // Native writers/readers do not share write access. This lease
-                    // excludes active native jobs, including jobs in other processes.
-                    using var lease = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Delete);
+                    // Windows needs delete sharing to unlink through this handle. Unix
+                    // requires an exclusive flock (FileShare.None): delete sharing only
+                    // takes a shared lock there and cannot exclude active native jobs.
+                    using var lease = new FileStream(path, FileMode.Open, FileAccess.ReadWrite,
+                        OperatingSystem.IsWindows() ? FileShare.Delete : FileShare.None);
                     if (File.GetLastWriteTimeUtc(path) >= cutoff)
                     {
                         fresh++;

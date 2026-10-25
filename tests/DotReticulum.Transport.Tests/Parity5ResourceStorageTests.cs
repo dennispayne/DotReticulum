@@ -82,9 +82,11 @@ public class Parity5ResourceStorageTests
     }
 
     [Theory]
-    [InlineData("resource-")]
-    [InlineData("input-")]
-    public void ActiveNativeFile_IsLeasedNotDeleted_ThenScavengedAfterItsHandleCloses(string prefix)
+    [InlineData("resource-", FileAccess.Read)]
+    [InlineData("resource-", FileAccess.ReadWrite)]
+    [InlineData("input-", FileAccess.Read)]
+    [InlineData("input-", FileAccess.ReadWrite)]
+    public void ActiveNativeFile_IsLeasedNotDeleted_ThenScavengedAfterItsHandleCloses(string prefix, FileAccess access)
     {
         var directory = DirectoryPath();
         try
@@ -93,13 +95,14 @@ public class Parity5ResourceStorageTests
             var path = NativePath(directory, prefix);
             WriteAged(path, 86401);
             var logs = new List<string>();
-            using (var active = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+            using (var active = new FileStream(path, FileMode.Open, access, FileShare.Read))
             {
                 var result = ResourceStorageScavenger.Scavenge(directory, logs.Add, Now);
                 Assert.Equal(0, result.Deleted);
                 Assert.Equal(1, result.Active);
                 Assert.True(File.Exists(path));
                 Assert.Equal(3, active.Length);
+                Assert.Equal(1, active.ReadByte());
             }
             Assert.Equal(1, ResourceStorageScavenger.Scavenge(directory, now: Now).Deleted);
             Assert.False(File.Exists(path));
@@ -138,12 +141,18 @@ public class Parity5ResourceStorageTests
             using var storage = new ResourceStorage(new ResourcePolicy { MemoryThreshold = 0, StorageDirectory = directory });
             storage.Write([1, 2, 3]);
             var path = Assert.Single(Directory.GetFiles(directory, "resource-*.bin"));
+            using var input = storage.OpenRead();
             File.SetLastWriteTimeUtc(path, Now.AddDays(-2).UtcDateTime);
             var result = ResourceStorageScavenger.Scavenge(directory, now: Now);
             Assert.Equal(1, result.Active);
             Assert.Equal(0, result.Deleted);
-            using var input = storage.OpenRead();
+            Assert.True(File.Exists(path));
             Assert.Equal(1, input.ReadByte());
+            storage.Write([4]);
+            using var updated = storage.OpenRead();
+            var data = new byte[4];
+            updated.ReadExactly(data);
+            Assert.Equal(new byte[] { 1, 2, 3, 4 }, data);
         }
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true); }
     }

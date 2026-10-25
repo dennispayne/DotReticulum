@@ -121,8 +121,7 @@ internal sealed partial class RngitSession : IDisposable
             foreach (var sha in batch.Select(r => r.Value).Distinct())
                 await RngitClient.GitAsync(directory, ["cat-file", "-e", sha], stop).ConfigureAwait(false);
         }
-        // During clone Git deliberately uses an invalid placeholder HEAD until it owns the final refs.
-        await RngitClient.GitAsync(directory, ["fsck", "--full", "--strict", "--no-reflogs", .. requested.Values.Distinct()], stop).ConfigureAwait(false);
+        await RngitClient.VerifyImportedObjectsAsync(directory, format, requested.Values, stop).ConfigureAwait(false);
         return bytes;
     }
 

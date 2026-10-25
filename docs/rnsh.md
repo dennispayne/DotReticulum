@@ -29,6 +29,14 @@ existing reliable Channel. Window messages carry rows, columns and pixel
 dimensions. Child output is read incrementally, channel queues are bounded,
 and listener concurrency is limited to 16 sessions.
 
+Session construction registers all message types and the receive handler through
+`Link.GetChannel(initialize)`, which publishes the channel only after synchronous
+initialization. The overload requires a previously uncreated channel; ordinary
+`GetChannel()` remains available. This prevents an early version packet from
+being proven and discarded while the listener's asynchronous establishment
+callback is still registering its decoder. A controlled initialization regression
+and actual Windows/Linux native terminal flows cover this race.
+
 ## Platform and acceptance limits
 
 Redirected pipe processes are implemented for Windows and Unix. Windows
@@ -125,8 +133,10 @@ child-tree cancellation, Channel sessions, actual pinned Python bidirectional
 sessions (including the bounded negative EOF/recovery case) and the published
 native terminal-hosted CLI. Linux NativeAOT publish completed with warnings as
 errors; its executable ran `--help`, the terminal-hosted shell session and an
-encrypted resource flow. The parent owns final republish and repository-wide
-gate evidence.
+encrypted resource flow. The later Parity 8 integration reproduced and fixed
+the early-version registration race above, republished both native binaries,
+and repeated the terminal/resource flows. Final repository-wide evidence is
+in the development history.
 
 The Linux restoration test exposed a real Console PAL ordering issue:
 `Console.TreatControlCAsInput` can change termios, so it must run **before**

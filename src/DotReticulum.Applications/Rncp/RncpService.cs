@@ -217,10 +217,15 @@ internal static class FileSaver
                         candidate = target + "." + checked(++counter);
                         continue;
                     }
-                    try { File.Move(staged, candidate, overwrite); break; }
-                    catch (IOException ex) when (!overwrite && IsFileCollision(ex, candidate))
+                    try
                     {
-                        candidate = target + "." + checked(++counter);
+                        if (overwrite) File.Move(staged, candidate, overwrite: true);
+                        else if (!AtomicFilePublication.TryPublishNew(staged, candidate))
+                        {
+                            candidate = target + "." + checked(++counter);
+                            continue;
+                        }
+                        break;
                     }
                     catch (Exception ex) when (overwrite && File.Exists(candidate) && ex is IOException or UnauthorizedAccessException)
                     {
@@ -233,9 +238,6 @@ internal static class FileSaver
         finally { if (File.Exists(staged)) File.Delete(staged); }
         return candidate;
     }
-
-    private static bool IsFileCollision(IOException error, string candidate) =>
-        (error.HResult & 0xffff) is 17 or 80 or 183 && File.Exists(candidate);
 }
 
 public sealed record RncpResult(bool Success, string Message, string? SavedPath = null, long Bytes = 0, long PhysicalBytes = 0);

@@ -35,8 +35,7 @@ public sealed class RngitHostStatistics
                 try
                 {
                     Write(staging, MsgPack.Pack(statistics));
-                    try { File.Move(staging, configuration.StatisticsPath, overwrite: false); }
-                    catch (IOException) when (File.Exists(configuration.StatisticsPath)) { }
+                    AtomicFilePublication.TryPublishNew(staging, configuration.StatisticsPath);
                 }
                 finally { File.Delete(staging); }
             }

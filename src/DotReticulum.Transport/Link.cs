@@ -83,6 +83,22 @@ public sealed partial class Link
         }
     }
 
+    /// <summary>Creates a channel with synchronous type/handler registration before ingress can acknowledge data.
+    /// Requires that no channel has previously been created.</summary>
+    public Channel GetChannel(Action<Channel> initialize)
+    {
+        ArgumentNullException.ThrowIfNull(initialize);
+        lock (_gate)
+        {
+            if (Status == LinkStatus.Closed) throw new InvalidOperationException("The link is closed.");
+            if (_channel is not null) throw new InvalidOperationException("The channel has already been created.");
+            var channel = new Channel(this);
+            initialize(channel);
+            _channel = channel;
+            return channel;
+        }
+    }
+
 
     internal Link(LinkManager mgr, bool initiator, byte[] linkId, byte[] destinationHash, LocalDestination? owner, Identity? destinationIdentity)
     {

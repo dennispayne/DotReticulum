@@ -131,8 +131,8 @@ public sealed class I2pPacketInterface : ISpawningPacketInterface, IPacketInterf
                 await file.FlushAsync(token).ConfigureAwait(false);
             }
             token.ThrowIfCancellationRequested();
-            try { File.Move(staging, path, overwrite: false); }
-            catch (IOException) when (File.Exists(path)) { return await ReadDestinationAsync(path, token).ConfigureAwait(false); }
+            if (!AtomicFilePublication.TryPublishNew(staging, path))
+                return await ReadDestinationAsync(path, token).ConfigureAwait(false);
             return destination;
         }
         finally { if (File.Exists(staging)) File.Delete(staging); }

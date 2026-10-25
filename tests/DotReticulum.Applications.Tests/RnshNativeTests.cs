@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using DotReticulum.Applications.Rnsh;
 using DotReticulum.Core;
@@ -10,7 +11,9 @@ public sealed class RnshNativeTests
     [NativeFact]
     public async Task PublishedInitiatorRunsInsideActualTerminalAndCompletesRemoteSession()
     {
-        var (server, unused, directory) = ReticulumNodeTests.Pair(out var port);
+        var diagnostics = new ConcurrentQueue<string>();
+        var (server, unused, directory) = ReticulumNodeTests.Pair(out var port,
+            (_, message) => diagnostics.Enqueue(message));
         await unused.DisposeAsync();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
         var sessions = new List<Task>();
@@ -24,7 +27,11 @@ public sealed class RnshNativeTests
                 var session = new RnshSession(link);
                 sessions.Add(Task.Run(async () =>
                 {
-                    await using (session) await session.ServeAsync(new RnshListenerOptions { AllowAll = true }, timeout.Token);
+                    await using (session) await session.ServeAsync(new RnshListenerOptions
+                    {
+                        AllowAll = true,
+                        Log = diagnostics.Enqueue,
+                    }, timeout.Token);
                 }));
             };
             server.Router.RegisterLocalDestination(local);
@@ -45,9 +52,11 @@ public sealed class RnshNativeTests
             var pump = terminal.Stdout.CopyToAsync(output, timeout.Token);
             await Task.Delay(500, timeout.Token);
             await server.Router.AnnounceAsync(local, cancellationToken: timeout.Token);
-            Assert.Equal(0, await terminal.WaitAsync(timeout.Token));
+            var exitCode = await terminal.WaitAsync(timeout.Token);
             await pump;
             var text = Encoding.UTF8.GetString(output.ToArray());
+            Assert.True(exitCode == 0,
+                $"Native terminal exited {exitCode}:{Environment.NewLine}{text}{Environment.NewLine}{string.Join(Environment.NewLine, diagnostics)}");
             Assert.Contains("native-terminal-flow", text);
             await Task.WhenAll(sessions).WaitAsync(TimeSpan.FromSeconds(10), timeout.Token);
         }

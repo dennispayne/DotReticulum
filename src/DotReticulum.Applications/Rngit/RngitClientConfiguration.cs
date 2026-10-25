@@ -79,8 +79,7 @@ public sealed class RngitClientConfiguration
         try
         {
             write(staging);
-            try { File.Move(staging, destination, overwrite: false); }
-            catch (IOException) when (File.Exists(destination)) { }
+            AtomicFilePublication.TryPublishNew(staging, destination);
         }
         finally { File.Delete(staging); }
     }

@@ -204,8 +204,7 @@ public sealed class RngitHostConfiguration
         try
         {
             write(staging);
-            try { File.Move(staging, destination, overwrite: false); }
-            catch (IOException) when (File.Exists(destination)) { }
+            AtomicFilePublication.TryPublishNew(staging, destination);
         }
         finally { File.Delete(staging); }
     }

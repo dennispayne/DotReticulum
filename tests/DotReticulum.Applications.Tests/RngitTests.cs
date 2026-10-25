@@ -8,6 +8,43 @@ namespace DotReticulum.Applications.Tests;
 public sealed class RngitTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ImportedObjectVerificationPreservesGitOwnedPlaceholderHeadAndRejectsCorruption(bool corrupt)
+    {
+        var root = Directory.CreateTempSubdirectory("rngit object verification ").FullName;
+        var directory = Path.Combine(root, new string('p', 96));
+        try
+        {
+            Directory.CreateDirectory(directory);
+            await RngitClient.GitAsync(directory, ["init", "--bare", "--initial-branch=main", "."],
+                CancellationToken.None, isolated: true);
+            var sha = (await RngitClient.GitAsync(directory, ["hash-object", "-w", "--stdin"],
+                CancellationToken.None, input: "owned object", isolated: true)).Trim();
+            const string head = "ref: refs/heads/.invalid\n";
+            await File.WriteAllTextAsync(Path.Combine(directory, "HEAD"), head);
+            if (corrupt)
+            {
+                var path = Path.Combine(directory, "objects", sha[..2], sha[2..]);
+                File.SetAttributes(path, FileAttributes.Normal);
+                await File.WriteAllBytesAsync(path, [0, 1, 2]);
+                await Assert.ThrowsAsync<IOException>(() =>
+                    RngitClient.VerifyImportedObjectsAsync(directory, "sha1", [sha], CancellationToken.None));
+            }
+            else
+                await RngitClient.VerifyImportedObjectsAsync(directory, "sha1", [sha], CancellationToken.None);
+            Assert.Equal(head, await File.ReadAllTextAsync(Path.Combine(directory, "HEAD")));
+            Assert.Empty(Directory.GetDirectories(directory, "rngit-verify-*"));
+        }
+        finally
+        {
+            foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+                File.SetAttributes(file, FileAttributes.Normal);
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
     [InlineData("http://0123456789abcdef0123456789abcdef/group/repo")]
     [InlineData("rns://0123456789abcdef0123456789abcdef/group/repo/extra")]
     [InlineData("rns://0123456789abcdef0123456789abcdef/../repo")]

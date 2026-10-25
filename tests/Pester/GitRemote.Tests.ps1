@@ -13,7 +13,7 @@ BeforeAll {
     $root = Join-Path $PSScriptRoot "..\..\TestResults\git-remote-$([guid]::NewGuid().ToString('N'))"
     $null = New-Item -ItemType Directory -Path $root -Force
     $root = (Resolve-Path -LiteralPath $root).Path
-    $git = (Get-Command git -CommandType Application -ErrorAction Stop).Source
+    $git = (Get-Command git -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
     $cli = (Resolve-Path -LiteralPath $Application).Path
     $pythonExecutable = (Resolve-Path -LiteralPath $Python).Path
     $reference = (Resolve-Path -LiteralPath $Upstream).Path

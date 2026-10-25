@@ -1,3 +1,5 @@
+using DotReticulum.Core;
+
 namespace DotReticulum.Applications.Rnsd;
 
 public static class RnsdConfigurationFiles
@@ -48,10 +50,8 @@ public static class RnsdConfigurationFiles
                 using var writer = new StreamWriter(stream);
                 writer.WriteLine(DefaultConfig);
             }
-            File.Move(staging, configFile, overwrite: false);
-            return true;
+            return AtomicFilePublication.TryPublishNew(staging, configFile);
         }
-        catch (IOException) when (File.Exists(configFile)) { return false; }
         finally { if (File.Exists(staging)) File.Delete(staging); }
     }
 }

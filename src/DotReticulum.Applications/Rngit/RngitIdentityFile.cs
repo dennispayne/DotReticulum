@@ -18,8 +18,7 @@ internal static class RngitIdentityFile
                 try
                 {
                     IdentityFile.SaveNew(generated, staging);
-                    try { File.Move(staging, path, overwrite: false); }
-                    catch (IOException) when (File.Exists(path)) { }
+                    AtomicFilePublication.TryPublishNew(staging, path);
                 }
                 finally { File.Delete(staging); }
             }

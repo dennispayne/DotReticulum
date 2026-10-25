@@ -165,6 +165,26 @@ public sealed class RngitClient(ReticulumNode node, Identity identity, Action<st
         return (refs, head);
     }
 
+    internal static async Task VerifyImportedObjectsAsync(string directory, string format,
+        IEnumerable<string> objects, CancellationToken stop)
+    {
+        var objectPath = (await GitAsync(directory, ["rev-parse", "--git-path", "objects"], stop).ConfigureAwait(false)).Trim();
+        objectPath = Path.GetFullPath(objectPath, directory);
+        var verification = Path.Combine(directory, "rngit-verify-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(verification);
+        try
+        {
+            // Git owns the clone's temporary invalid HEAD. Validate every object without touching its refs.
+            await GitAsync(verification, ["init", "--bare", "--initial-branch=verification",
+                "--object-format=" + format, "."], stop, isolated: true).ConfigureAwait(false);
+            await File.WriteAllTextAsync(Path.Combine(verification, "objects", "info", "alternates"),
+                objectPath + "\n", stop).ConfigureAwait(false);
+            await GitAsync(verification, ["fsck", "--full", "--strict", "--no-reflogs", .. objects.Distinct()],
+                stop, isolated: true).ConfigureAwait(false);
+        }
+        finally { Directory.Delete(verification, recursive: true); }
+    }
+
     internal static async Task<string> GitAsync(string directory, string[] args, CancellationToken stop, string? input = null,
         bool isolated = false)
         => Encoding.UTF8.GetString(await GitBytesAsync(directory, args, stop,
@@ -183,7 +203,8 @@ public sealed class RngitClient(ReticulumNode node, Identity identity, Action<st
                 "GIT_NAMESPACE", "GIT_PREFIX", "GIT_REPLACE_REF_BASE", "GIT_QUARANTINE_PATH",
             }) environment[name] = null;
         }
-        var arguments = new[] { "--no-pager", "--git-dir=" + directory, "-c", "core.hooksPath=", "-c", "protocol.allow=never" }.Concat(args).ToArray();
+        var arguments = new[] { "--no-pager", "--git-dir=" + directory, "-c", "core.hooksPath=",
+            "-c", "core.longpaths=true", "-c", "protocol.allow=never" }.Concat(args).ToArray();
         var result = await RngitProcess.RunAsync("git", arguments, directory,
             stdin: input, timeout: TimeSpan.FromHours(2),
             maxOutputBytes: 64 * 1024 * 1024, stop: stop, environment: environment).ConfigureAwait(false);

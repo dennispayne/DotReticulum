@@ -93,7 +93,14 @@ evicts the oldest saved path. No arbitrary packet cache is inferred from this.
 
 Stable runtime identities retain upstream's raw 64-private-byte format. Atomic create-only
 publication makes competing processes adopt the same complete identity; corrupt existing files
-are not replaced. Local private ratchets use
+are not replaced. Create-only publication uses an atomic hard link from a closed, same-directory
+staging file (`CreateHardLinkW` on Windows, `link` on Unix), followed by staging cleanup.
+This avoids .NET 10 Unix `File.Move(overwrite: false)`'s existence-check/rename race.
+Configuration, runtime/Git/I2P identities, initial Git statistics and non-overwriting received
+files share this boundary. The filesystem must support hard links (verified on Windows NTFS
+and Linux ext4); unsupported filesystems fail explicitly rather than falling back to a racy
+overwrite. Atomic replacement of an intentionally updated state generation is separate.
+Local private ratchets use
 `destination-ratchets/<destination-hash>.v1.msgpack`, a deliberate .NET format:
 `{"payload": binary, "signature": binary}`. The signed payload map holds `version=1`,
 `destination`, `identity`, newest-first `keys`, `rotation`, `retained`, `interval_ticks`,

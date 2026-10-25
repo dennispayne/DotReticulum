@@ -19,8 +19,6 @@ public sealed class RnshSession : IAsyncDisposable
     public RnshSession(Link link)
     {
         _link = link;
-        _channel = link.GetChannel();
-        RnshMessage.Register(_channel);
         _handler = message =>
         {
             if (!_messages.Writer.TryWrite(message))
@@ -30,7 +28,11 @@ public sealed class RnshSession : IAsyncDisposable
             }
             return true;
         };
-        _channel.AddMessageHandler(_handler);
+        _channel = link.GetChannel(channel =>
+        {
+            RnshMessage.Register(channel);
+            channel.AddMessageHandler(_handler);
+        });
         _previousClosed = link.Closed;
         link.Closed = l =>
         {
