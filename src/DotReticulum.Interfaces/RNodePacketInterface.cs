@@ -4,7 +4,7 @@ using DotReticulum.Core;
 namespace DotReticulum.Interfaces;
 
 /// <summary>Single-radio RNode. Opening and all device writes are deferred until explicit start.</summary>
-public sealed class RNodePacketInterface : IReconnectingPacketInterface, IPacketInterfaceDiagnostics
+public sealed class RNodePacketInterface : IReconnectingPacketInterface, IPacketInterfaceDiagnostics, IPacketInterfacePhysicalLayer
 {
     private readonly RNodeDevice _device;
     private RNodeSubinterface Radio => _device.Radios[0];
@@ -37,6 +37,7 @@ public sealed class RNodePacketInterface : IReconnectingPacketInterface, IPacket
     public event Action<Exception>? Faulted { add => _device.Faulted += value; remove => _device.Faulted -= value; }
     public ValueTask StartAsync(CancellationToken cancellationToken) => _device.StartAsync(cancellationToken);
     public IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync(CancellationToken cancellationToken) => Radio.ReceiveAsync(cancellationToken);
+    public IAsyncEnumerable<ReceivedFrame> ReceiveFramesAsync(CancellationToken cancellationToken) => Radio.ReceiveFramesAsync(cancellationToken);
     public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken) => Radio.SendAsync(packet, cancellationToken);
     public ValueTask DisposeAsync() => _device.DisposeAsync();
     public ValueTask ConfigureRadioAsync(RNodeRadioOptions options, CancellationToken cancellationToken = default) =>

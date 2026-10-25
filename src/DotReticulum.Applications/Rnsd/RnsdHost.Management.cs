@@ -5,6 +5,27 @@ namespace DotReticulum.Applications.Rnsd;
 
 public sealed partial class RnsdHost
 {
+    /// <summary>Local packet snapshot with missing values resolved from its authenticated shared owner, if any.</summary>
+    public ValueTask<PacketPhysicalLayer> GetPacketPhysicalLayerAsync(Packet packet, CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        return _manager.ResolvePacketPhysicalLayerAsync(packet, cancellationToken);
+    }
+
+    private async ValueTask<PacketPhysicalLayer> QuerySharedPhysicalLayerAsync(byte[] hash, CancellationToken cancellationToken)
+    {
+        async ValueTask<double?> Query(string path)
+        {
+            var result = await _rpcClient!.CallAsync(new()
+            {
+                ["get"] = path, ["packet_hash"] = hash,
+            }, cancellationToken).ConfigureAwait(false);
+            return result is null ? null : MsgPack.ToDouble(result);
+        }
+        return new(await Query("packet_rssi").ConfigureAwait(false),
+            await Query("packet_snr").ConfigureAwait(false), await Query("packet_q").ConfigureAwait(false));
+    }
+
     public ValueTask<object?> CallManagementAsync(Dictionary<object, object?> call, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -46,7 +67,10 @@ public sealed partial class RnsdHost
             "medium_path_timeout" => lowest is { } minimum ? 2 * (Packet.Mtu * 8 / Math.Max(minimum, 5)) + 6 : 0d,
             "link_count" => Router.LinkTableCount,
             "active_link_count" => Router.ActiveLinkTableCount,
-            "packet_rssi" or "packet_snr" or "packet_q" or "profiling_results" => null,
+            "packet_rssi" => _manager.GetPacketPhysicalLayer(Hash("packet_hash")).Rssi,
+            "packet_snr" => _manager.GetPacketPhysicalLayer(Hash("packet_hash")).Snr,
+            "packet_q" => _manager.GetPacketPhysicalLayer(Hash("packet_hash")).Quality,
+            "profiling_results" => null,
             "blackholed_identities" => _blackholes.PublicationValue(),
             "is_blackholed" => _blackholes.IsBlackholed(Hash("identity_hash")),
             _ => throw new InvalidDataException($"Unsupported management query '{request.Path}'."),

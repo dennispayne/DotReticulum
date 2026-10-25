@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\DotReticulum.Core.Tests\Fixtures\Parity8PhyVectors.json" Link="Fixtures\Parity8PhyVectors.json" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="..\Interop\PyLinkNode.cs" Link="PyLinkNode.cs" />
     <None Include="..\DotReticulum.Core.Tests\Fixtures\announce-vectors.json" Link="Fixtures\announce-vectors.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\DotReticulum.Core.Tests\Fixtures\parity6-outgoing.json" Link="Fixtures\parity6-outgoing.json" CopyToOutputDirectory="PreserveNewest" />

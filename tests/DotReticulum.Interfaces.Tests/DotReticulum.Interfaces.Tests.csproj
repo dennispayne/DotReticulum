@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\DotReticulum.Core.Tests\Fixtures\Parity8PhyVectors.json" Link="Fixtures\Parity8PhyVectors.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

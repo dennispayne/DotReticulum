@@ -188,13 +188,14 @@ public sealed class LinkManager : IAsyncDisposable
     }
 
     /// <summary>LINKREQUEST addressed to a local destination (upstream <c>Destination.incoming_link_request</c>).</summary>
-    internal void HandleLinkRequest(ReceivedPacket received, LocalDestination destination)
+    internal async ValueTask HandleLinkRequestAsync(ReceivedPacket received, LocalDestination destination, CancellationToken cancellationToken)
     {
         if (!destination.AcceptLinks)
         {
             return;
         }
 
+        await ResolvePhysicalLayerAsync(null, received.Packet, cancellationToken).ConfigureAwait(false);
         Link? link;
         lock (_gate)
         {
@@ -216,7 +217,7 @@ public sealed class LinkManager : IAsyncDisposable
     }
 
     /// <summary>LRPROOF for a link we initiated. Returns true when it belonged to a pending local link.</summary>
-    internal bool HandleLinkProof(ReceivedPacket received)
+    internal async ValueTask<bool> HandleLinkProofAsync(ReceivedPacket received, CancellationToken cancellationToken)
     {
         Link? link;
         lock (_gate) _pending.TryGetValue(Convert.ToHexStringLower(received.Packet.DestinationHash.Span), out link);
@@ -225,12 +226,13 @@ public sealed class LinkManager : IAsyncDisposable
             return false;
         }
 
+        await ResolvePhysicalLayerAsync(link, received.Packet, cancellationToken).ConfigureAwait(false);
         link.ValidateProof(received);
         return true;
     }
 
     /// <summary>A packet addressed to one of our active links. Returns true when consumed.</summary>
-    internal bool HandleLinkPacket(ReceivedPacket received)
+    internal async ValueTask<bool> HandleLinkPacketAsync(ReceivedPacket received, CancellationToken cancellationToken)
     {
         Link? link;
         lock (_gate) _active.TryGetValue(Convert.ToHexStringLower(received.Packet.DestinationHash.Span), out link);
@@ -239,8 +241,23 @@ public sealed class LinkManager : IAsyncDisposable
             return false;
         }
 
+        await ResolvePhysicalLayerAsync(link, received.Packet, cancellationToken).ConfigureAwait(false);
         link.Receive(received);
         return true;
+    }
+
+    private async ValueTask ResolvePhysicalLayerAsync(Link? link, Packet packet, CancellationToken cancellationToken)
+    {
+        if (_manager.SharedPhysicalLayerLookup is null || link is not null && !link.TracksPhysicalLayer) return;
+        try { await _manager.ResolvePacketPhysicalLayerAsync(packet, cancellationToken).ConfigureAwait(false); }
+        catch (OperationCanceledException error) when (!cancellationToken.IsCancellationRequested)
+        {
+            Report($"Link {link?.LinkIdHex ?? "request"} shared PHY query timed out: {error.Message}");
+        }
+        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException or TimeoutException)
+        {
+            Report($"Link {link?.LinkIdHex ?? "request"} shared PHY query failed: {error.Message}");
+        }
     }
 
     /// <summary>Runs one watchdog pass at <paramref name="now"/> (the background loop calls this every 100 ms).</summary>

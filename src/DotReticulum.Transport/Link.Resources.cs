@@ -495,6 +495,7 @@ public sealed partial class Link
                         return;
                     }
 
+                    UpdatePhysicalLayer(packet);
                     try
                     {
                         HandleAdvertisement(ResourceAdvertisement.Unpack(plaintext));
@@ -516,6 +517,7 @@ public sealed partial class Link
                         return;
                     }
 
+                    UpdatePhysicalLayer(packet);
                     var hashStart = plaintext[0] == 0xFF ? 1 + Resource.MapHashLength : 1;
                     if (plaintext.Length < hashStart + 32)
                     {
@@ -542,6 +544,7 @@ public sealed partial class Link
                         return;
                     }
 
+                    UpdatePhysicalLayer(packet);
                     foreach (var r in _incomingResources.ToArray())
                     {
                         if (r.Hash.AsSpan().SequenceEqual(plaintext.AsSpan(0, 32)))
@@ -566,6 +569,7 @@ public sealed partial class Link
                     var plaintext = Decrypt(packet.Payload.Span);
                     if (plaintext is { Length: 32 })
                     {
+                        UpdatePhysicalLayer(packet);
                         foreach (var r in _incomingResources.ToArray())
                         {
                             if (r.Hash.AsSpan().SequenceEqual(plaintext.AsSpan(0, 32)))
@@ -588,6 +592,7 @@ public sealed partial class Link
                     var plaintext = Decrypt(packet.Payload.Span);
                     if (plaintext is { Length: 32 })
                     {
+                        UpdatePhysicalLayer(packet);
                         foreach (var r in _outgoingResources.ToArray())
                         {
                             if (r.Hash.AsSpan().SequenceEqual(plaintext.AsSpan(0, 32)))
@@ -604,6 +609,7 @@ public sealed partial class Link
                 foreach (var r in _incomingResources.ToArray())
                 {
                     r.ReceivePart(packet, received.Raw.Length);
+                    UpdatePhysicalLayer(packet);
                 }
 
                 break;
@@ -623,6 +629,7 @@ public sealed partial class Link
             if (r.Hash.AsSpan().SequenceEqual(data[..32]))
             {
                 r.ValidateProof(data);
+                UpdatePhysicalLayer(received.Packet);
             }
         }
     }

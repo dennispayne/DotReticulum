@@ -679,6 +679,7 @@ internal sealed class RNodeDevice
     internal async ValueTask HardResetAsync(CancellationToken cancellationToken)
     {
         await ControlAsync(0x55, [0xf8], requireDisplay: false, cancellationToken).ConfigureAwait(false);
+        foreach (var radio in Radios) radio.ResetPhysicalLayer();
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _stop.Token);
         await Task.Delay(TimeSpan.FromMilliseconds(2250), _options.TimeProvider, linked.Token).ConfigureAwait(false);
     }

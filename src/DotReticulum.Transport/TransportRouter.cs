@@ -464,7 +464,7 @@ public sealed partial class TransportRouter : IAsyncDisposable
             }
             else
             {
-                Links.HandleLinkProof(received);
+                await Links.HandleLinkProofAsync(received, cancellationToken).ConfigureAwait(false);
             }
 
             return;
@@ -488,11 +488,11 @@ public sealed partial class TransportRouter : IAsyncDisposable
 
         if (packet.PacketType == PacketType.LinkRequest)
         {
-            DeliverLinkRequest(received);
+            await DeliverLinkRequestAsync(received, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        if (packet.DestinationType == DestinationType.Link && Links.HandleLinkPacket(received)) return;
+        if (packet.DestinationType == DestinationType.Link && await Links.HandleLinkPacketAsync(received, cancellationToken).ConfigureAwait(false)) return;
 
         switch (packet.PacketType)
         {
@@ -695,7 +695,7 @@ public sealed partial class TransportRouter : IAsyncDisposable
             lock (_gate) isLocal = _locals.ContainsKey(Convert.ToHexStringLower(destination));
             if (isLocal)
             {
-                if (packet.PacketType == PacketType.LinkRequest) DeliverLinkRequest(received);
+                if (packet.PacketType == PacketType.LinkRequest) await DeliverLinkRequestAsync(received, cancellationToken).ConfigureAwait(false);
                 else await DeliverLocalAsync(received).ConfigureAwait(false);
                 return;
             }
@@ -779,11 +779,12 @@ public sealed partial class TransportRouter : IAsyncDisposable
         return raw;
     }
 
-    private void DeliverLinkRequest(ReceivedPacket received)
+    private async ValueTask DeliverLinkRequestAsync(ReceivedPacket received, CancellationToken cancellationToken)
     {
         LocalDestination? local;
         lock (_gate) _locals.TryGetValue(Convert.ToHexStringLower(received.Packet.DestinationHash.Span), out local);
-        if (local is not null && local.Destination.Type == received.Packet.DestinationType) Links.HandleLinkRequest(received, local);
+        if (local is not null && local.Destination.Type == received.Packet.DestinationType)
+            await Links.HandleLinkRequestAsync(received, local, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Relays a packet addressed to a link that passes through this node (upstream link-table forwarding).</summary>

@@ -74,6 +74,32 @@ failed and no build warnings. The skip is the Unix metadata executable case
 on Windows; the actual Windows-native provider case passed. This verifies
 software field mapping/lifecycle, not actual RF or I2P network discovery.
 
+The packet PHY slice adds an optional atomic receive boundary carrying frame
+bytes and immutable measurements together. RNode/Multi capture readings before
+queueing; disconnect/reset clears pending state. Valid decoded ingress
+populates owner-local per-field FIFOs capped at **512**, with full packet
+hashes, source-exact duplicate/eviction behavior and no invented time expiry.
+Authenticated shared RPC can resolve missing measurements; packet snapshots,
+proof receipts and opt-in Link tracking stay distinct from transit readings.
+Unknown TCP values stay null. Cache insertion before router admission and
+immediate clearing on disabled tracking are disclosed native differences.
+`docs/packet-phy.md` records ownership and source references.
+
+`tests\DotReticulum.Core.Tests\GenerateParity8PhyVectors.py` executed actual
+pinned Transport/Packet/Reticulum/Link methods in the verified reference
+environment. Its new fixture records exact revision/source hashes; in-memory
+interface setup is disclosed and does not replace protocol behavior.
+`dotnet build tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
+-c Release --no-restore --nologo` passed with zero warnings/errors.
+Focused `dotnet test <project> -c Release --no-restore --nologo
+--filter FullyQualifiedName~Parity8PhyTests` passed **Core 3, Interfaces 5,
+Transport 2, Applications 2** (**12**, zero skipped/failed); Applications used
+`--no-build`. Tests cover interleaved packets/radios/peers, bounded queues,
+duplicate/sparse/evicted cache values, reconnect/reset, no-subscriber receipts,
+tracking gates, ciphertext rejection, transit separation, management hash/key
+validation and a real authenticated shared-owner Link lookup. These are
+reference-vector/simulated/loopback software results, not physical RF.
+
 ### Parity 7 utility software acceptance; physical acceptance outstanding (2026-10-24)
 
 The intermediate checkpoints below are chronological investigation evidence.

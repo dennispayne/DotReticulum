@@ -22,6 +22,27 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
     private bool _completed;
     private bool _receiversLaunched;
     private readonly Channel<ReceivedPacket> _channel;
+    private readonly PacketPhysicalLayerCache _physicalLayer = new();
+
+    /// <summary>Owner-local FIFO lookup by full packet hash (512 entries per measurement, no time expiry).</summary>
+    public PacketPhysicalLayer GetPacketPhysicalLayer(ReadOnlySpan<byte> packetHash) => _physicalLayer.Get(packetHash);
+
+    /// <summary>Optional authenticated shared-owner query. Ordinary bearers never use a remote PHY source.</summary>
+    public Func<byte[], CancellationToken, ValueTask<PacketPhysicalLayer>>? SharedPhysicalLayerLookup { get; set; }
+
+    /// <summary>Explicit asynchronous fallback for missing measurements; never changes wire bytes.</summary>
+    public async ValueTask<PacketPhysicalLayer> ResolvePacketPhysicalLayerAsync(Packet packet, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(packet);
+        cancellationToken.ThrowIfCancellationRequested();
+        var direct = packet.PhysicalLayer;
+        if (direct.Rssi.HasValue && direct.Snr.HasValue && direct.Quality.HasValue) return direct;
+        var hash = packet.CalculateHash();
+        var cached = SharedPhysicalLayerLookup is { } lookup
+            ? await lookup(hash, cancellationToken).ConfigureAwait(false) : GetPacketPhysicalLayer(hash);
+        packet.PhysicalLayer = new(direct.Rssi ?? cached.Rssi, direct.Snr ?? cached.Snr, direct.Quality ?? cached.Quality);
+        return packet.PhysicalLayer;
+    }
     private readonly PacketInterfaceIngressQueue _ingressQueue;
     private readonly CancellationTokenSource _receiversCts = new();
     private readonly object _gate = new();
@@ -677,6 +698,21 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         finally { Interlocked.Decrement(ref state.Pending); }
     }
 
+    private static async IAsyncEnumerable<ReceivedFrame> ReceiveFramesAsync(IPacketInterface iface,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        if (iface is IPacketInterfacePhysicalLayer reporting)
+        {
+            await foreach (var frame in reporting.ReceiveFramesAsync(cancellationToken).ConfigureAwait(false))
+                yield return frame;
+        }
+        else
+        {
+            await foreach (var raw in iface.ReceiveAsync(cancellationToken).ConfigureAwait(false))
+                yield return new(raw);
+        }
+    }
+
     private async Task ReceiveLoopAsync(InterfaceState state)
     {
         var iface = state.Interface;
@@ -684,8 +720,9 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
         try
         {
             token.ThrowIfCancellationRequested();
-            await foreach (var raw in iface.ReceiveAsync(token).ConfigureAwait(false))
+            await foreach (var frame in ReceiveFramesAsync(iface, token).ConfigureAwait(false))
             {
+                var raw = frame.Data;
                 ReadOnlyMemory<byte> decoded = raw;
                 if (state.AccessCode is { } code)
                 {
@@ -722,6 +759,8 @@ public sealed class PacketInterfaceManager : IAsyncDisposable
                     continue;
                 }
 
+                packet.PhysicalLayer = frame.PhysicalLayer;
+                _physicalLayer.Add(packet);
                 state.Received(raw.Length, packet);
                 var received = new ReceivedPacket(decoded, packet, iface);
                 if (!_channel.Writer.TryWrite(received))

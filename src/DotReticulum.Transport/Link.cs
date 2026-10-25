@@ -45,6 +45,33 @@ public sealed partial class Link
     private readonly Identity? _destinationIdentity;
     private double _staleDeadline;
     private Channel? _channel;
+    private bool _trackPhysicalLayer;
+    private PacketPhysicalLayer _physicalLayer;
+    internal bool TracksPhysicalLayer { get { lock (_gate) return _trackPhysicalLayer; } }
+
+    /// <summary>Last available local ingress measurements while tracking is enabled; never a remote-end RF report.</summary>
+    public PacketPhysicalLayer PhysicalLayer
+    {
+        get { lock (_gate) return _trackPhysicalLayer ? _physicalLayer : default; }
+    }
+
+    /// <summary>Opt-in PHY tracking. Disabling clears retained readings immediately.</summary>
+    public void TrackPhysicalLayer(bool enabled)
+    {
+        lock (_gate)
+        {
+            _trackPhysicalLayer = enabled;
+            if (!enabled) _physicalLayer = default;
+        }
+    }
+
+    private void UpdatePhysicalLayer(Packet packet, bool force = false)
+    {
+        if (!_trackPhysicalLayer && !force) return;
+        var value = packet.PhysicalLayer;
+        _physicalLayer = new(value.Rssi ?? _physicalLayer.Rssi, value.Snr ?? _physicalLayer.Snr,
+            value.Quality ?? _physicalLayer.Quality);
+    }
 
     /// <summary>The reliable message <see cref="Channel"/> of this link, created on first use (upstream <c>get_channel</c>).</summary>
     public Channel GetChannel()
@@ -269,6 +296,7 @@ public sealed partial class Link
         };
         link.EstablishmentTimeout = (EstablishmentTimeoutPerHop * Math.Max(1, link.Hops)) + KeepaliveMax;
         link.Handshake();
+        link.UpdatePhysicalLayer(packet, force: true);
         link.LastInbound = link.Now;
         link.EstablishmentCost = received.Packet.Length;
         link.Prove();
@@ -483,6 +511,7 @@ public sealed partial class Link
                 ActivatedAt = now;
                 LastProof = now;
                 LastInbound = now;
+                UpdatePhysicalLayer(received.Packet);
                 UpdateKeepalive();
                 _mgr.Activate(this);
                 var rttPacket = Packet.Create(PacketType.Data, DestinationType.Link, LinkId, Encrypt(MsgPack.Pack(Rtt.Value)), LinkContext.LrRtt);
@@ -583,6 +612,7 @@ public sealed partial class Link
                         break;
                     }
 
+                    UpdatePhysicalLayer(packet);
                     var callback = PacketReceived;
                     if (callback is not null)
                     {
@@ -600,6 +630,7 @@ public sealed partial class Link
                         var plaintext = Decrypt(packet.Payload.Span);
                         if (plaintext is not null)
                         {
+                            UpdatePhysicalLayer(packet);
                             ProvePacket(packet);
                             coreAfter.Add(() => channel.Receive(plaintext));
                         }
@@ -634,6 +665,7 @@ public sealed partial class Link
                             }
                             if (RemoteIdentity is not null) break;
                             RemoteIdentity = identity;
+                            UpdatePhysicalLayer(packet);
                             var cb = RemoteIdentified;
                             if (cb is not null)
                             {
@@ -650,6 +682,7 @@ public sealed partial class Link
                     var plaintext = Decrypt(packet.Payload.Span);
                     if (plaintext is not null && !IsInitiator)
                     {
+                        UpdatePhysicalLayer(packet);
                         var requestId = packet.CalculateTruncatedHash();
                         if (_owner is { } owner && (owner.MaxRequestSize is null || plaintext.Length <= owner.MaxRequestSize))
                         {
@@ -664,7 +697,11 @@ public sealed partial class Link
             case LinkContext.Response:
                 {
                     var plaintext = Decrypt(packet.Payload.Span);
-                    if (plaintext is not null) HandlePackedResponse(plaintext, smallPacket: true);
+                    if (plaintext is not null)
+                    {
+                        UpdatePhysicalLayer(packet);
+                        HandlePackedResponse(plaintext, smallPacket: true);
+                    }
 
                     break;
                 }
@@ -684,6 +721,7 @@ public sealed partial class Link
                             break;
                         }
                         Rtt = Math.Max(measured, reported);
+                        UpdatePhysicalLayer(packet);
                         Status = LinkStatus.Active;
                         ActivatedAt = Now;
                         UpdateKeepalive();
@@ -701,6 +739,7 @@ public sealed partial class Link
                     var plaintext = Decrypt(packet.Payload.Span);
                     if (plaintext is not null && plaintext.AsSpan().SequenceEqual(LinkId))
                     {
+                        UpdatePhysicalLayer(packet);
                         CloseLocked(IsInitiator ? LinkTeardownReason.DestinationClosed : LinkTeardownReason.InitiatorClosed, after);
                     }
 
@@ -926,6 +965,7 @@ public sealed partial class Link
         List<Action> coreAfter = [];
         lock (_gate)
         {
+            if (!_trackPhysicalLayer) _physicalLayer = default;
             switch (Status)
             {
                 case LinkStatus.Pending:

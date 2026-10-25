@@ -38,6 +38,7 @@ public sealed partial class RnsdHost
         if (IsConnectedToSharedInstance)
         {
             _rpcClient = new ManagementRpcClient(_configuration.SharedInstance.RpcEndpoint, _rpcKey, _configuration.SharedInstance.OperationTimeout);
+            _manager.SharedPhysicalLayerLookup = QuerySharedPhysicalLayerAsync;
             return;
         }
         if (_shared.Role == SharedInstanceRole.Host)

@@ -116,7 +116,9 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] BackboneInterface and egress-state recovery software contracts on Linux
   - [x] LocalInterface and PipeInterface software contracts and native process flows
   - [x] KISSInterface and AX25KISSInterface software contracts; physical TNC acceptance tracked below
-  - [x] RNodeInterface and RNodeMultiInterface software contracts; authorized single-radio USB identification, not RF acceptance
+  - [ ] RNodeInterface and RNodeMultiInterface full software contracts (serial/TCP accepted; desktop BLE selector/provider still missing)
+  - [x] RNode serial/TCP and Multi shared-radio software contracts; authorized single-radio USB identification, not RF acceptance
+  - [ ] Desktop RNode `ble://` Nordic UART selection, bonding, GATT notification/write/reconnect provider and platform/device acceptance
   - [ ] I2PInterface
   - [x] WeaveInterface software contracts; physical acceptance tracked below
   - [ ] Android-specific adapters or documented native platform equivalents
@@ -149,8 +151,12 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] Track Resolver/rnir/rnpkg placeholders without inventing functionality absent from the pinned upstream
 - [ ] Parity 8 - Compatibility and release acceptance
   - [ ] Close the source-backed inventory: no unclassified features or unacknowledged parity gaps
+  - [x] Independently generated non-TCP discovery publication schemas, native factory/lifecycle integration and explicit pinned KISS modulation defect
+  - [x] Restore actual framed bearer statistics and null unknown-extension boundaries, distinct from decoded counters
+  - [x] Packet-specific RNode/Multi PHY snapshots, bounded owner/shared caches, receipts and opt-in Link attribution
   - [ ] Mixed Python/.NET leaf and transport topologies with loss, latency, reconnects, restarts and constrained resources
   - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
+  - [ ] Darwin rnsh terminal backend and actual macOS feature acceptance (user plans macOS access via GitHub Actions later)
   - [ ] Per-interface interoperability and hardware evidence; untested platforms/devices remain unverified
   - [ ] Native utility packaging, executable discovery, installation and user documentation
   - [ ] Record behavioral differences, production coverage and reproducible reference provenance without claiming Python API identity

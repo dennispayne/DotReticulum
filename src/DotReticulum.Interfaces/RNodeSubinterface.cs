@@ -5,10 +5,11 @@ using DotReticulum.Core;
 namespace DotReticulum.Interfaces;
 
 /// <summary>A stable, already-started radio endpoint owned by an RNode device.</summary>
-public sealed class RNodeSubinterface : IReconnectingPacketInterface, IPacketInterfaceDiagnostics, IPacketInterfaceChildPolicy
+public sealed class RNodeSubinterface : IReconnectingPacketInterface, IPacketInterfaceDiagnostics, IPacketInterfaceChildPolicy, IPacketInterfacePhysicalLayer
 {
     private readonly RNodeDevice _device;
-    private readonly Channel<ReadOnlyMemory<byte>> _received;
+    private readonly Channel<ReceivedFrame> _received;
+    private PacketPhysicalLayer _physicalLayer;
     private readonly CancellationTokenSource _stop = new();
     private readonly SemaphoreSlim _sendSlots;
     private readonly SemaphoreSlim _sendOrder = new(1, 1);
@@ -34,7 +35,7 @@ public sealed class RNodeSubinterface : IReconnectingPacketInterface, IPacketInt
         _options = options;
         Outgoing = outgoing;
         _sendSlots = new(deviceOptions.SendQueueCapacity, deviceOptions.SendQueueCapacity);
-        _received = Channel.CreateBounded<ReadOnlyMemory<byte>>(new BoundedChannelOptions(deviceOptions.ReceiveQueueCapacity)
+        _received = Channel.CreateBounded<ReceivedFrame>(new BoundedChannelOptions(deviceOptions.ReceiveQueueCapacity)
         {
             FullMode = BoundedChannelFullMode.Wait, SingleReader = true, SingleWriter = true,
             AllowSynchronousContinuations = false,
@@ -60,6 +61,12 @@ public sealed class RNodeSubinterface : IReconnectingPacketInterface, IPacketInt
         throw new InvalidOperationException("RNode children are started and owned by their parent device.");
 
     public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await foreach (var frame in ReceiveFramesAsync(cancellationToken).ConfigureAwait(false))
+            yield return frame.Data;
+    }
+
+    public async IAsyncEnumerable<ReceivedFrame> ReceiveFramesAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         if (Interlocked.CompareExchange(ref _reader, 1, 0) != 0)
             throw new InvalidOperationException("Only one receiver is supported.");
@@ -103,9 +110,12 @@ public sealed class RNodeSubinterface : IReconnectingPacketInterface, IPacketInt
 
     internal void Incoming(byte[] packet)
     {
-        if (!IsConnected) return;
-        if (_received.Writer.TryWrite(packet)) Interlocked.Add(ref _receivedBytes, packet.Length);
-        else Interlocked.Increment(ref _dropped);
+        lock (_gate)
+        {
+            if (!_connected || _disposed || _device.IsDisposed) return;
+            if (_received.Writer.TryWrite(new(packet, _physicalLayer))) Interlocked.Add(ref _receivedBytes, packet.Length);
+            else Interlocked.Increment(ref _dropped);
+        }
     }
 
     internal void Ready()
@@ -120,6 +130,7 @@ public sealed class RNodeSubinterface : IReconnectingPacketInterface, IPacketInt
         {
             if (_disposed || _connected == connected) return;
             _connected = connected;
+            if (!connected) ResetPhysicalLayer();
             if (connected)
             {
                 while (_credit.Wait(0)) { }
@@ -147,7 +158,32 @@ public sealed class RNodeSubinterface : IReconnectingPacketInterface, IPacketInt
 
     internal void Statistic(string key, object? value)
     {
-        lock (_gate) _statistics[key] = value;
+        lock (_gate)
+        {
+            _statistics[key] = value;
+            if (key is "rssi" or "snr" or "quality")
+            {
+                var number = value is null ? (double?)null : Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+                _physicalLayer = key switch
+                {
+                    "rssi" => _physicalLayer with { Rssi = number },
+                    "snr" => _physicalLayer with { Snr = number },
+                    _ => _physicalLayer with { Quality = number },
+                };
+            }
+        }
+
+    }
+
+    internal void ResetPhysicalLayer()
+    {
+        lock (_gate)
+        {
+            _physicalLayer = default;
+            _statistics.Remove("rssi");
+            _statistics.Remove("snr");
+            _statistics.Remove("quality");
+        }
     }
 
     internal void UpdateBitrate(int sf, int cr, long bandwidth)

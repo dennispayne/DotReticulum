@@ -20,6 +20,8 @@ public enum PacketType : byte { Data = 0, Announce = 1, LinkRequest = 2, Proof =
 /// </summary>
 public sealed class Packet
 {
+    private sealed record PhysicalLayerSnapshot(PacketPhysicalLayer Value);
+    private PhysicalLayerSnapshot? _physicalLayer;
     public const int Mtu = 500;
     public const int HopLimit = 128;
     public const int HashLength = 16;
@@ -57,6 +59,13 @@ public sealed class Packet
     public ReadOnlyMemory<byte> DestinationHash { get; }
     public byte Context { get; }
     public ReadOnlyMemory<byte> Payload { get; }
+
+    /// <summary>Local ingress snapshot, optionally enriched by an explicit hash lookup; never serialized.</summary>
+    public PacketPhysicalLayer PhysicalLayer
+    {
+        get => Volatile.Read(ref _physicalLayer)?.Value ?? default;
+        internal set => Volatile.Write(ref _physicalLayer, value == default ? null : new(value));
+    }
 
     public byte Flags =>
         (byte)((ReservedBit ? 0x80 : 0) | ((int)HeaderType << 6) | (ContextFlag ? 0x20 : 0) |
