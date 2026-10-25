@@ -324,7 +324,7 @@ public sealed class Parity6I2pLiveTests(ITestOutputHelper output)
         finally { Directory.Delete(directory, recursive: true); }
     }
 
-    private sealed class PythonPeer(ITestOutputHelper output) : IAsyncDisposable
+    internal sealed class PythonPeer(ITestOutputHelper output) : IAsyncDisposable
     {
         private readonly CancellationTokenSource _lifetime = new();
         private readonly Channel<JsonElement> _events = Channel.CreateBounded<JsonElement>(128);
@@ -342,7 +342,9 @@ public sealed class Parity6I2pLiveTests(ITestOutputHelper output)
             throw new FileNotFoundException("Could not locate tests\\Interop\\live_i2p_node.py.");
         }
 
-        public async Task<JsonElement> StartAsync(string config, string name, bool connectable, string? peer, CancellationToken token)
+        public async Task<JsonElement> StartAsync(string config, string name, bool connectable, string? peer,
+            CancellationToken token, bool resumeDirectory = false, bool reverseAspects = false,
+            bool staticTransportIdentity = false)
         {
             var executable = Environment.GetEnvironmentVariable("DOTRETICULUM_PYTHON")
                 ?? throw new InvalidOperationException("DOTRETICULUM_PYTHON must select the isolated pinned-reference environment.");
@@ -361,6 +363,9 @@ public sealed class Parity6I2pLiveTests(ITestOutputHelper output)
                 start.ArgumentList.Add("--peer");
                 start.ArgumentList.Add(peer ?? throw new InvalidOperationException("Native server has no actual destination."));
             }
+            if (resumeDirectory) start.ArgumentList.Add("--resume-directory");
+            if (reverseAspects) start.ArgumentList.Add("--reverse-aspects");
+            if (staticTransportIdentity) start.ArgumentList.Add("--static-transport-identity");
             start.Environment["PYTHONPATH"] = upstream;
             start.Environment["PYTHONIOENCODING"] = "utf-8";
             start.Environment["PYTHONDONTWRITEBYTECODE"] = "1";
@@ -369,6 +374,16 @@ public sealed class Parity6I2pLiveTests(ITestOutputHelper output)
             _pumps.Add(PumpAsync(_process.StandardError, false));
             _pumps.Add(WatchExitAsync(_process));
             return await EventAsync("ready", token);
+        }
+
+        public int ProcessId => _process?.Id ?? throw new InvalidOperationException("Python process has not started.");
+
+        public async Task StopProcessAsync(CancellationToken token)
+        {
+            var process = _process ?? throw new InvalidOperationException("Python process has not started.");
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(token);
+            output.WriteLine($"Owned pinned Python process {process.Id} exited; code {process.ExitCode}. No detach-only restart.");
         }
 
         private async Task WatchExitAsync(Process process)

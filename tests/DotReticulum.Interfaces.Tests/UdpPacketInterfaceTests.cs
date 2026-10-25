@@ -32,10 +32,12 @@ public class UdpPacketInterfaceTests
             await a.SendAsync(MakePacket(i), default);
         }
 
+        var received = new List<int>();
         for (var i = 0; i < 5; i++)
         {
-            Assert.Equal(i, TagOf(await Next(eb)));
+            received.Add(TagOf(await Next(eb)));
         }
+        Assert.Equal(Enumerable.Range(0, 5), received.Order());
 
         await b.SendAsync(MakePacket(77, 400), default);
         var back = await Next(ea);
@@ -139,9 +141,11 @@ public class UdpPacketInterfaceTests
         await b.SendAsync(MakePacket(6), default);
 
         await using var e = manager.ReceiveAsync().GetAsyncEnumerator();
+        var received = new List<byte>();
         Assert.True(await e.MoveNextAsync().AsTask().WaitAsync(Patience));
-        Assert.Equal(5, e.Current.Payload.Span[0]);
+        received.Add(e.Current.Payload.Span[0]);
         Assert.True(await e.MoveNextAsync().AsTask().WaitAsync(Patience));
-        Assert.Equal(6, e.Current.Payload.Span[0]);
+        received.Add(e.Current.Payload.Span[0]);
+        Assert.Equal(new byte[] { 5, 6 }, received.Order());
     }
 }

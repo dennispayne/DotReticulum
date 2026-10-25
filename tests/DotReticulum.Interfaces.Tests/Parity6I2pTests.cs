@@ -144,20 +144,40 @@ public sealed class Parity6I2pTests
             using var timeout = new CancellationTokenSource(TestSupport.Patience);
             var options = Options(simulator, directory, true);
             string? firstAddress;
+            I2pPacketPeer? previousChild = null;
+            async Task ExchangeAsync(I2pPacketInterface bearer, int tag)
+            {
+                var session = simulator.SessionIds.Last();
+                var packet = TestSupport.MakePacket(tag);
+                var remote = await simulator.IncomingAsync(HdlcPacketFraming.Encode(packet), timeout.Token, sessionId: session);
+                await TestSupport.WaitFor(() => bearer.Peers.Count == 1);
+                var child = Assert.Single(bearer.Peers);
+                Assert.NotSame(previousChild, child);
+                await using var received = child.ReceiveAsync(timeout.Token).GetAsyncEnumerator();
+                Assert.Equal(packet, (await TestSupport.Next(received)).ToArray());
+                await child.SendAsync(packet, timeout.Token);
+                Assert.Equal(packet, await Parity6I2pSamSimulator.PacketAsync(remote, timeout.Token));
+                previousChild = child;
+            }
             await using (var first = new I2pPacketInterface(options))
             {
                 await first.StartAsync(timeout.Token);
                 await TestSupport.WaitFor(() => first.Base32Address is not null);
                 firstAddress = first.Base32Address;
                 Assert.Equal(1, simulator.Generated);
+                await ExchangeAsync(first, 71);
             }
+            await TestSupport.WaitFor(() => simulator.ActiveSessionCount == 0);
+            Assert.False(previousChild!.IsConnected);
             await using (var second = new I2pPacketInterface(options))
             {
                 await second.StartAsync(timeout.Token);
                 await TestSupport.WaitFor(() => second.Base32Address is not null);
                 Assert.Equal(firstAddress, second.Base32Address);
                 Assert.Equal(1, simulator.Generated);
+                await ExchangeAsync(second, 72);
             }
+            await TestSupport.WaitFor(() => simulator.ActiveSessionCount == 0);
             var newPath = Path.Combine(directory, "i2p", I2pDestination.KeyFileName(options.Name, options.TransportIdentityHash.Span));
             var legacyPath = Path.Combine(directory, "i2p", I2pDestination.KeyFileName(options.Name, [], true));
             File.Move(newPath, legacyPath);
@@ -167,7 +187,10 @@ public sealed class Parity6I2pTests
                 await TestSupport.WaitFor(() => legacy.Base32Address is not null);
                 Assert.Equal(firstAddress, legacy.Base32Address);
                 Assert.Equal(1, simulator.Generated);
+                await ExchangeAsync(legacy, 73);
             }
+            await TestSupport.WaitFor(() => simulator.ActiveSessionCount == 0);
+            Assert.Equal(3, simulator.SessionIds.Distinct().Count());
             Assert.False(File.Exists(newPath));
             Assert.All(simulator.SessionDestinations, destination => Assert.Equal(simulator.PrivateDestination, destination));
             Assert.Empty(Directory.GetFiles(Path.Combine(directory, "i2p"), "*.new"));

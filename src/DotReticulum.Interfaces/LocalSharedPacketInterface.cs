@@ -5,7 +5,45 @@ using DotReticulum.Core;
 
 namespace DotReticulum.Interfaces;
 
-/// <summary>The upstream local HDLC bearer (loopback TCP or Linux abstract Unix socket), with reconnect for initiators.</summary>
+/// <summary>Platform-specific LocalInterface behavior and its timing defaults.</summary>
+public sealed record LocalSharedPlatformPolicy
+{
+    public bool PauseAcceptedClientAfterInactivity { get; init; } = OperatingSystem.IsAndroid();
+    public TimeSpan InitiatorKeepaliveInterval { get; init; } = TimeSpan.FromSeconds(3);
+    public TimeSpan AcceptedClientPauseTimeout { get; init; } = TimeSpan.FromSeconds(12);
+
+    public static bool SupportsAbstractUnixSockets => OperatingSystem.IsLinux() || OperatingSystem.IsAndroid();
+
+    public static LocalSharedPlatformPolicy ForCurrentPlatform() => new();
+
+    internal void Validate()
+    {
+        if (InitiatorKeepaliveInterval <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(InitiatorKeepaliveInterval));
+        if (AcceptedClientPauseTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(AcceptedClientPauseTimeout));
+    }
+}
+
+internal sealed class LocalSharedClientSleepPauseState
+{
+    private readonly TimeProvider timeProvider;
+    private readonly TimeSpan timeout;
+    private long lastActivity;
+
+    public LocalSharedClientSleepPauseState(TimeProvider timeProvider, TimeSpan timeout)
+    {
+        this.timeProvider = timeProvider;
+        this.timeout = timeout;
+        lastActivity = timeProvider.GetTimestamp();
+    }
+
+    public bool IsPaused => timeProvider.GetElapsedTime(Interlocked.Read(ref lastActivity)) > timeout;
+
+    public void RecordActivity() => Interlocked.Exchange(ref lastActivity, timeProvider.GetTimestamp());
+}
+
+/// <summary>The upstream local HDLC bearer (loopback TCP or Linux/Android abstract Unix socket), with reconnect for initiators.</summary>
 public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterfaceDiagnostics
 {
     public const int HardwareMtu = 262144;
@@ -16,8 +54,11 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
     private readonly TimeSpan reconnectDelay;
     private readonly TimeSpan connectTimeout;
     private readonly Action<Exception>? diagnostic;
+    private readonly LocalSharedPlatformPolicy platformPolicy;
+    private readonly TimeProvider timeProvider;
     private readonly Action? closed;
     private readonly bool reconnect;
+    private readonly LocalSharedClientSleepPauseState? sleepPause;
     private readonly object gate = new();
     private readonly CancellationTokenSource stop = new();
     private Connection? connection;
@@ -30,20 +71,42 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
 
     public LocalSharedPacketInterface(EndPoint endpoint, TimeSpan? reconnectDelay = null, TimeSpan? connectTimeout = null,
         Action<Exception>? diagnostic = null)
+        : this(endpoint, reconnectDelay, connectTimeout, diagnostic,
+            LocalSharedPlatformPolicy.ForCurrentPlatform(), TimeProvider.System)
+    {
+    }
+
+    public LocalSharedPacketInterface(EndPoint endpoint, TimeSpan? reconnectDelay, TimeSpan? connectTimeout,
+        Action<Exception>? diagnostic, LocalSharedPlatformPolicy platformPolicy)
+        : this(endpoint, reconnectDelay, connectTimeout, diagnostic, platformPolicy, TimeProvider.System)
+    {
+    }
+
+    internal LocalSharedPacketInterface(EndPoint endpoint, TimeSpan? reconnectDelay, TimeSpan? connectTimeout,
+        Action<Exception>? diagnostic, LocalSharedPlatformPolicy platformPolicy, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
+        ArgumentNullException.ThrowIfNull(platformPolicy);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        platformPolicy.Validate();
         this.endpoint = endpoint;
         this.reconnectDelay = reconnectDelay ?? TimeSpan.FromSeconds(8);
         this.connectTimeout = connectTimeout ?? TimeSpan.FromSeconds(10);
         if (this.reconnectDelay <= TimeSpan.Zero || this.connectTimeout <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(reconnectDelay));
         this.diagnostic = diagnostic;
+        this.platformPolicy = platformPolicy;
+        this.timeProvider = timeProvider;
         reconnect = true;
     }
 
-    internal LocalSharedPacketInterface(Socket socket, Action closed, Action<Exception>? diagnostic)
-        : this(socket.RemoteEndPoint!, diagnostic: diagnostic)
+    internal LocalSharedPacketInterface(Socket socket, Action closed, Action<Exception>? diagnostic,
+        LocalSharedPlatformPolicy platformPolicy, TimeProvider timeProvider)
+        : this(socket.RemoteEndPoint!, null, null, diagnostic, platformPolicy, timeProvider)
     {
+        sleepPause = platformPolicy.PauseAcceptedClientAfterInactivity
+            ? new LocalSharedClientSleepPauseState(timeProvider, platformPolicy.AcceptedClientPauseTimeout)
+            : null;
         connection = NewConnection(socket);
         this.closed = closed;
         reconnect = false;
@@ -53,6 +116,7 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
     public bool IsConnected { get { lock (gate) return connection is not null; } }
     internal long ReceivedBytes => Interlocked.Read(ref receivedBytes);
     internal long SentBytes => Interlocked.Read(ref sentBytes);
+    internal bool IsTransmitPaused => sleepPause?.IsPaused == true;
     public event Action<bool>? ConnectionChanged;
     public override string ToString() => $"LocalInterface[{endpoint}]";
     public IReadOnlyDictionary<string, object?> GetDiagnostics() => new Dictionary<string, object?>
@@ -61,7 +125,8 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
         ["peer"] = endpoint.ToString(), ["bitrate"] = 1_000_000_000L, ["mtu"] = HardwareMtu,
     };
     private Connection NewConnection(Socket socket) => new(socket,
-        count => Interlocked.Add(ref receivedBytes, count), count => Interlocked.Add(ref sentBytes, count));
+        count => Interlocked.Add(ref receivedBytes, count), count => Interlocked.Add(ref sentBytes, count),
+        count => { if (count > 0) sleepPause?.RecordActivity(); });
 
     /// <summary>Reserves a connection during election; StartAsync still belongs to the interface manager.</summary>
     public async ValueTask PrepareAsync(CancellationToken token)
@@ -151,12 +216,25 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
             if (!started) throw new InvalidOperationException("Local shared interface not started.");
             current = connection ?? throw new IOException("Local shared instance is disconnected.");
         }
+        cancellationToken.ThrowIfCancellationRequested();
+        if (sleepPause?.IsPaused == true) return;
         try { await current.SendAsync(packet, cancellationToken).ConfigureAwait(false); }
         catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException)
         {
             await DropAsync(current).ConfigureAwait(false);
             throw;
         }
+    }
+
+    internal ValueTask SendKeepaliveAsync(CancellationToken cancellationToken)
+    {
+        Connection current;
+        lock (gate)
+        {
+            ObjectDisposedException.ThrowIf(disposal is not null, this);
+            current = connection ?? throw new IOException("Local shared instance is disconnected.");
+        }
+        return current.SendKeepaliveAsync(cancellationToken);
     }
 
     private async ValueTask<Connection> ConnectAsync(CancellationToken token)
@@ -177,7 +255,7 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
     {
         try
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+            using var timer = new PeriodicTimer(platformPolicy.InitiatorKeepaliveInterval, timeProvider);
             while (await timer.WaitForNextTickAsync(stop.Token).ConfigureAwait(false))
             {
                 Connection? current;
@@ -238,11 +316,13 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
         public bool IsDisposed => Volatile.Read(ref disposed) != 0;
         private readonly Action<int> received;
         private readonly Action<int> sent;
-        public Connection(Socket socket, Action<int> received, Action<int> sent)
+        private readonly Action<int> activity;
+        public Connection(Socket socket, Action<int> received, Action<int> sent, Action<int> activity)
         {
             stream = new NetworkStream(socket, ownsSocket: true);
             this.received = received;
             this.sent = sent;
+            this.activity = activity;
         }
         public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync([EnumeratorCancellation] CancellationToken token)
         {
@@ -254,16 +334,35 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
             {
                 var count = await stream.ReadAsync(buffer, linked.Token).ConfigureAwait(false);
                 if (count == 0) yield break;
-                received(count);
+                activity(count);
                 frames.Clear();
                 decoder.Feed(buffer.AsSpan(0, count), frames);
+                foreach (var frame in frames) received(frame.Length);
                 foreach (var frame in frames) yield return frame;
             }
         }
-        public ValueTask SendKeepaliveAsync(CancellationToken token) => WriteAsync(new byte[] { 0x7e, 0x7e }, token);
+        public ValueTask SendKeepaliveAsync(CancellationToken token) => WriteAsync(new byte[] { 0x7e, 0x7e }, token, countSent: false);
         public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken token)
         {
             if (!Packet.TryParse(packet, out _, HardwareMtu)) throw new ArgumentException("Invalid local packet.", nameof(packet));
+            return WriteAsync(packet, token, framePacket: true);
+        }
+        private async ValueTask WriteAsync(ReadOnlyMemory<byte> data, CancellationToken token, bool countSent = true,
+            bool framePacket = false)
+        {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, stop.Token);
+            await writes.WaitAsync(linked.Token).ConfigureAwait(false);
+            try
+            {
+                linked.Token.ThrowIfCancellationRequested();
+                if (framePacket) data = EncodePacket(data);
+                await stream.WriteAsync(data, linked.Token).ConfigureAwait(false);
+                if (countSent) sent(data.Length);
+            }
+            finally { writes.Release(); }
+        }
+        private static ReadOnlyMemory<byte> EncodePacket(ReadOnlyMemory<byte> packet)
+        {
             var encoded = new byte[2 + packet.Length * 2];
             var count = 0;
             encoded[count++] = 0x7e;
@@ -273,18 +372,7 @@ public sealed class LocalSharedPacketInterface : IPacketInterface, IPacketInterf
                 else encoded[count++] = b;
             }
             encoded[count++] = 0x7e;
-            return WriteAsync(encoded.AsMemory(0, count), token);
-        }
-        private async ValueTask WriteAsync(ReadOnlyMemory<byte> data, CancellationToken token)
-        {
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, stop.Token);
-            await writes.WaitAsync(linked.Token).ConfigureAwait(false);
-            try
-            {
-                await stream.WriteAsync(data, linked.Token).ConfigureAwait(false);
-                sent(data.Length);
-            }
-            finally { writes.Release(); }
+            return encoded.AsMemory(0, count);
         }
         public async ValueTask DisposeAsync()
         {
@@ -304,6 +392,8 @@ public sealed class LocalSharedServerInterface : ISpawningPacketInterface, IPack
     private readonly EndPoint endpoint;
     private readonly int maximumClients;
     private readonly Action<Exception>? diagnostic;
+    private readonly LocalSharedPlatformPolicy platformPolicy;
+    private readonly TimeProvider timeProvider;
     private readonly object gate = new();
     private readonly HashSet<LocalSharedPacketInterface> clients = [];
     private readonly CancellationTokenSource stop = new();
@@ -315,13 +405,30 @@ public sealed class LocalSharedServerInterface : ISpawningPacketInterface, IPack
     private long closedSentBytes;
 
     public LocalSharedServerInterface(EndPoint endpoint, int maximumClients = 64, Action<Exception>? diagnostic = null)
+        : this(endpoint, maximumClients, diagnostic, LocalSharedPlatformPolicy.ForCurrentPlatform(), TimeProvider.System)
+    {
+    }
+
+    public LocalSharedServerInterface(EndPoint endpoint, int maximumClients, Action<Exception>? diagnostic,
+        LocalSharedPlatformPolicy platformPolicy)
+        : this(endpoint, maximumClients, diagnostic, platformPolicy, TimeProvider.System)
+    {
+    }
+
+    internal LocalSharedServerInterface(EndPoint endpoint, int maximumClients, Action<Exception>? diagnostic,
+        LocalSharedPlatformPolicy platformPolicy, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
+        ArgumentNullException.ThrowIfNull(platformPolicy);
+        ArgumentNullException.ThrowIfNull(timeProvider);
         if (maximumClients < 1) throw new ArgumentOutOfRangeException(nameof(maximumClients));
         if (endpoint is IPEndPoint ip && !IPAddress.IsLoopback(ip.Address)) throw new ArgumentException("Shared bearer must be loopback.", nameof(endpoint));
+        platformPolicy.Validate();
         this.endpoint = endpoint;
         this.maximumClients = maximumClients;
         this.diagnostic = diagnostic;
+        this.platformPolicy = platformPolicy;
+        this.timeProvider = timeProvider;
     }
     public event Action<IPacketInterface>? ChildConnected;
     public EndPoint? LocalEndpoint { get; private set; }
@@ -389,7 +496,7 @@ public sealed class LocalSharedServerInterface : ISpawningPacketInterface, IPack
                                 closedReceivedBytes += captured!.ReceivedBytes;
                                 closedSentBytes += captured.SentBytes;
                             }
-                    }, diagnostic);
+                    }, diagnostic, platformPolicy, timeProvider);
                     captured = child;
                     clients.Add(child);
                 }

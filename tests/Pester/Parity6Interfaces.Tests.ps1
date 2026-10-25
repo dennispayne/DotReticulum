@@ -8,6 +8,76 @@ BeforeAll {
 }
 
 Describe 'Parity 6 native interface processes' -Tag E2E, Interfaces {
+    It 'rejects Java topology without public-network permission before launching Java' {
+        $pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
+        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\invoke-i2p-topology.ps1')).Path
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner,
+            '-JavaExecutable', $pwsh, '-JavaRouterDirectory', $TestDrive) -Environment @{
+                DOTRETICULUM_PYTHON = $null; DOTRETICULUM_UPSTREAM = $null
+            }
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'Java router requires explicit -AllowPublicNetwork'
+    }
+
+    It 'rejects incomplete Java distributions before launching Java' -ForEach @(
+        @{ Missing = 'hosts.txt' }
+        @{ Missing = 'lib\i2p.jar' }
+        @{ Missing = 'lib\router.jar' }
+        @{ Missing = 'lib\sam.jar' }
+        @{ Missing = 'lib\mstreaming.jar' }
+        @{ Missing = 'lib\streaming.jar' }
+    ) {
+        $distribution = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path (Join-Path $distribution 'lib')
+        foreach ($asset in @('hosts.txt', 'lib\i2p.jar', 'lib\router.jar', 'lib\sam.jar', 'lib\mstreaming.jar', 'lib\streaming.jar')) {
+            if ($asset -ne $Missing) {
+                Set-Content -LiteralPath (Join-Path $distribution $asset) -Value 'validation fixture only'
+            }
+        }
+        $pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
+        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\invoke-i2p-topology.ps1')).Path
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner,
+            '-JavaExecutable', $pwsh, '-JavaRouterDirectory', $distribution,
+            '-AllowPublicNetwork') -Environment @{
+                DOTRETICULUM_PYTHON = $null; DOTRETICULUM_UPSTREAM = $null
+            }
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'not a complete extracted distribution: missing'
+    }
+
+    It 'rejects mixing the Java and i2pd router parameter sets' {
+        $pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
+        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\invoke-i2p-topology.ps1')).Path
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner,
+            '-RouterBinary', $pwsh, '-JavaExecutable', $pwsh,
+            '-JavaRouterDirectory', $TestDrive, '-AllowPublicNetwork')
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'Parameter set cannot be resolved'
+    }
+
+    It 'rejects public RouterInfo seeding without explicit network permission' {
+        $pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
+        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\invoke-i2p-topology.ps1')).Path
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner,
+            '-RouterBinary', $pwsh, '-SeedRouterInfoDirectory', $TestDrive) -Environment @{
+                DOTRETICULUM_PYTHON = $null; DOTRETICULUM_UPSTREAM = $null
+            }
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'requires explicit -AllowPublicNetwork'
+    }
+
+    It 'rejects a seed directory without public RouterInfos before starting a router' {
+        $pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
+        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\invoke-i2p-topology.ps1')).Path
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner,
+            '-RouterBinary', $pwsh, '-AllowPublicNetwork', '-CertificatesDirectory', $TestDrive,
+            '-SeedRouterInfoDirectory', $TestDrive) -Environment @{
+                DOTRETICULUM_PYTHON = $null; DOTRETICULUM_UPSTREAM = $null
+            }
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'must contain 1\.\.10000'
+    }
+
     It 'transfers a file over independently configured UDP receive and forwarding ports' {
         $first = [Net.Sockets.UdpClient]::new([Net.IPEndPoint]::new([Net.IPAddress]::Loopback, 0))
         $second = [Net.Sockets.UdpClient]::new([Net.IPEndPoint]::new([Net.IPAddress]::Loopback, 0))

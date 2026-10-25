@@ -32,6 +32,9 @@ platform certification.
   size remains bounded by the stack's supported maximum. Offline sends are
   discarded as upstream, with a diagnostic counter; failed writes are diagnosed.
 * Serial defaults are 9600 baud, 8/N/1, no flow control, HW_MTU=564.
+  DTR and RTS remain asserted as in pyserial; disabling the handshake does
+  not lower these control lines. The common native factory also supplies
+  this default to KISS/AX25, RNode/Multi and Weave.
   Serial uses alternating opening/closing flags, unlike TCP shared flags.
   Partial buffered data expires after more than 100ms idle, observed on 80ms
   polling. Owned ports retry initial open and unplug failures every five seconds.
@@ -58,7 +61,10 @@ and leaves the reason in diagnostics, preserving its existing API.
 Reference vectors execute upstream framing, reconnect and serial reader methods
 with simulated sockets/ports; no device is opened. Native tests use owned duplex
 streams and loopback sockets. Neither establishes real serial/radio support.
-COM4 has not been opened, transmitted to or flashed. Physical unplug recovery,
+An authorized COM8 RAK returned RNode firmware/platform/MCU identification
+through the production serial factory; this read-only probe found and verifies
+the DTR-default correction. It does not validate generic serial settings or RF.
+Physical unplug recovery,
 serial adapter settings, live Python TCP/KISS exchanges and OS-specific socket
 option execution remain separate evidence gates.
 

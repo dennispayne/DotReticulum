@@ -28,7 +28,8 @@ bytes on Windows and LF checkout bytes on Linux.
 Acceptance requires independent Python vectors for constructor/address/token,
 discovery prefix validation and duplicate/timeout boundaries; deterministic
 managed tests for child routing, malformed/bounded input, observer failures,
-peer expiry, cancellation, start failure, address replacement and disposal.
+peer expiry, cancellation, start failure, address replacement, device
+disappearance/reappearance and disposal.
 Actual IPv6 multicast tests must be separately marked, explicitly skipped with
 the unavailable capability reason, and never represented as Python interop.
 
@@ -59,8 +60,16 @@ later missing-attribute failure; unknown multicast-address types fall back to
 temporary as upstream does. Port 0 is not an AutoInterface configuration:
 discovery and reverse discovery must be mutually known. No dynamic Python
 loading, Android permission acquisition, radio/device certification or general
-interface rescan is claimed. As upstream does, periodic address tracking covers
-only interfaces successfully adopted at startup.
+interface rescan is claimed. The initial interface selection remains
+authoritative: periodic checks do not adopt arbitrary newly added device names.
+For selected device names, .NET additionally treats disappearance as a
+lifecycle transition: it closes that device's socket session and child peers,
+and opens a fresh session if the same selected device later reappears. Initial
+socket-open failures are retried for selected devices. This is deliberate .NET
+recovery hardening, not upstream behavior: pinned `peer_jobs` iterates its
+startup `adopted_interfaces`, catches address-query errors and replaces a
+listener when the link-local address changes, but does not remove an interface
+or listener merely because the device is absent.
 Discovery sources must be IPv6 link-local addresses; a valid token from a global
 source is rejected rather than creating an unusable link-local peer. Interface
 names and stable `.NET NetworkInterface.Id` values are accepted in device lists,

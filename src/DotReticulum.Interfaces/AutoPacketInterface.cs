@@ -19,6 +19,7 @@ public sealed class AutoPacketInterface : ISpawningPacketInterface, IPacketInter
     private readonly object _gate = new();
     private readonly CancellationTokenSource _stop = new();
     private readonly Dictionary<string, Session> _sessions = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _trackedDevices = new(StringComparer.Ordinal);
     private readonly Dictionary<IPAddress, AutoPacketPeer> _peers = [];
     private readonly Queue<(byte[] Hash, DateTimeOffset Time)> _duplicates = new(48);
     private readonly Channel<ReadOnlyMemory<byte>> _parentFrames = Channel.CreateBounded<ReadOnlyMemory<byte>>(1);
@@ -70,6 +71,7 @@ public sealed class AutoPacketInterface : ISpawningPacketInterface, IPacketInter
             {
                 linked.Token.ThrowIfCancellationRequested();
                 if (!AutoPacketNetwork.IsAllowed(device, _options, OperatingSystem.IsMacOS(), OperatingSystem.IsAndroid())) continue;
+                lock (_gate) _trackedDevices.Add(device.Name);
                 try
                 {
                     var session = OpenSession(device);
@@ -290,7 +292,28 @@ public sealed class AutoPacketInterface : ISpawningPacketInterface, IPacketInter
         foreach (var session in sessions)
         {
             var updated = devices.LastOrDefault(d => d.Name == session.Device.Name);
-            if (updated is null || updated.Address.Equals(session.Device.Address) &&
+            if (updated is null)
+            {
+                AutoPacketPeer[] detachedPeers = [];
+                lock (_gate)
+                {
+                    if (_sessions.TryGetValue(session.Device.Name, out var current) && ReferenceEquals(current, session))
+                    {
+                        _sessions.Remove(session.Device.Name);
+                        detachedPeers = [.. _peers.Values.Where(peer => peer.DeviceName == session.Device.Name)];
+                        foreach (var peer in detachedPeers)
+                        {
+                            _peers.Remove(peer.Address);
+                            peer.Close();
+                        }
+                    }
+                }
+                foreach (var peer in detachedPeers) await peer.DisposeAsync().ConfigureAwait(false);
+                await session.DisposeAsync().ConfigureAwait(false);
+                Report(new IOException($"AutoInterface device {session.Device.Name} disappeared; its listener and peers were detached."));
+                continue;
+            }
+            if (updated.Address.Equals(session.Device.Address) &&
                 updated.Index == session.Device.Index && !session.Failed) continue;
             await session.DisposeAsync().ConfigureAwait(false);
             try
@@ -306,6 +329,44 @@ public sealed class AutoPacketInterface : ISpawningPacketInterface, IPacketInter
             {
                 session.Failed = true;
                 Report(new IOException($"AutoInterface could not replace listener on {session.Device.Name}; retrying on the next peer job.", error));
+            }
+        }
+
+        string[] trackedDevices;
+        lock (_gate) trackedDevices = [.. _trackedDevices];
+        foreach (var device in devices.Where(device =>
+                     trackedDevices.Contains(device.Name, StringComparer.Ordinal) &&
+                     AutoPacketNetwork.IsAllowed(device, _options, OperatingSystem.IsMacOS(), OperatingSystem.IsAndroid())))
+        {
+            lock (_gate)
+            {
+                if (_shutdown is not null || _sessions.ContainsKey(device.Name)) continue;
+            }
+            try
+            {
+                _stop.Token.ThrowIfCancellationRequested();
+                var replacement = OpenSession(device);
+                var adopted = false;
+                lock (_gate)
+                {
+                    if (_shutdown is null && !_sessions.ContainsKey(device.Name))
+                    {
+                        _sessions.Add(device.Name, replacement);
+                        adopted = true;
+                    }
+                }
+                if (!adopted)
+                {
+                    await replacement.DisposeAsync().ConfigureAwait(false);
+                    continue;
+                }
+                replacement.Run(this);
+                Report(new IOException($"AutoInterface listener restored on {device.Name} at {device.Address}."));
+            }
+            catch (Exception) when (_stop.IsCancellationRequested) { return; }
+            catch (Exception error)
+            {
+                Report(new IOException($"AutoInterface could not restore listener on {device.Name}; retrying on the next peer job.", error));
             }
         }
     }

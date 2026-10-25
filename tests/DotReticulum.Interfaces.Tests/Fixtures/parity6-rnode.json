@@ -19,6 +19,10 @@
       "sha256": "c655675a799413d9bb11d44ab90d56bc1f4fe339fee1ee5d108754dc8bf812d7"
     }
   ],
+  "serial_defaults": {
+    "dtr": true,
+    "rts": true
+  },
   "single": {
     "detect": "c00873c05000c04800c04900c0",
     "configuration": [

@@ -52,7 +52,7 @@ public sealed class SerialPacketInterface : IReconnectingPacketInterface, IPacke
         _open = token =>
         {
             token.ThrowIfCancellationRequested();
-            var port = new SerialPort(portName, baudRate, parity, dataBits, stopBits) { Handshake = Handshake.None };
+            var port = NativeSerialPort.Create(portName, baudRate, parity, dataBits, stopBits);
             try
             {
                 port.Open();

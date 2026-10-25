@@ -6,6 +6,300 @@ Current live interoperability uses the authoritative Reticulum-hosted upstream a
 
 ## Verification records
 
+### Parity 6 software recovery and authorized RNode identification, partial (2026-10-24)
+
+This continues `9bc0b02`, not Parity 7 or CI/CD. The owner confirmed that only
+one RNode is available and requested finishing software while retaining
+unverified RF acceptance. Physical TNC/Multi/Weave and Android execution are
+not established by that deferral. The Parity 6 parent checkbox remains open;
+the earlier Auto and Local software limitations below are superseded here.
+
+Auto maintenance now retires a disappeared device's socket and peers, remembers
+eligible startup devices, retries failed opens and creates a fresh listener on
+reappearance, including the same address/index. Two deterministic regressions
+verify cleanup, receive completion, fresh peer/socket ownership and retry.
+
+Local shared receive counters now count decoded HDLC payloads, excluding framing
+and empty keepalives. An explicit native platform policy preserves desktop
+keepalives and implements Android's three-second initiator keepalive and
+12-second accepted-client sleep pause using monotonic elapsed time. Any incoming
+socket activity refreshes it. Linux/Android abstract-socket selection is shared
+by runtime/config parsing. Deterministic-clock and real loopback tests exercise
+pause, resume and accounting; they are not Android device evidence. Packet
+framing now allocates only after acquiring the existing write semaphore.
+
+The owner's authorized COM8 RAK answered the production native serial factory's
+read-only detection with firmware **1.86**, nRF52 platform **0x70**, MCU **0x71**.
+An initial DTR-low probe received nothing; asserting DTR made identification
+work. Upstream Serial/KISS/AX25/RNode/Weave constructors disable flow handshake
+but retain pyserial's asserted DTR/RTS defaults. The shared `NativeSerialPort`
+factory now preserves that distinction. The RNode generator was rerun against
+the unchanged pinned reference to record actual pyserial defaults; existing
+framing/configuration vectors did not change. An oracle-backed regression and
+explicitly opt-in `DOTRETICULUM_RNODE_PORT` hardware test cover the correction.
+Only detect/version/platform/MCU queries were sent: no RF DATA, radio
+configuration, EEPROM writes or firmware flashing. USB/firmware responsiveness
+does not establish full radio startup, unplug/replug or over-air acceptance.
+
+I2P simulator restart acceptance now exchanges packets in both directions across
+persisted current/legacy bearer restarts, checks new child ownership and verifies
+unchanged private destination generation. An unproven stale-session refresh
+experiment was removed after it failed actual recovery; the source-backed
+healthy session lifetime remains unchanged. The owned topology runner
+canonicalizes reference executable/source paths before changing
+working directories. Actual-router results and non-default SAM configuration
+are recorded separately below; SAM readiness alone is never successful delivery.
+
+The Linux UDP test previously assumed delivery order across separately created
+sender sockets. It now requires all five distinct datagrams without imposing an
+ordering contract UDP does not provide; exact reverse payload comparison remains.
+No packet loss, retry or missing result is accepted.
+
+Stable Windows validation:
+
+* `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+  zero warnings/errors. The initial integration run exposed and corrected a
+  new Local test's incorrect pre-send counter expectation. An existing concurrent
+  default-config test also encountered one Windows sharing violation; its focused
+  rerun and the final complete suite passed without changing that unrelated code.
+* `dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj
+  -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true
+  -p:IlcTreatWarningsAsErrors=true -o artifacts\native-parity6-recovery
+  --nologo -v quiet`, with MSVC environment setup in the same process:
+  passed; the current executable's `--help` passed.
+* With `DOTRETICULUM_RNODE_PORT=COM8`,
+  `pwsh -NoProfile -File tests\run-tests.ps1 -NativeExe
+  artifacts\native-parity6-recovery\DotReticulum.Applications.exe -Coverage
+  -ResultsDirectory TestResults\coverage-parity6-recovery-final-20261024-2231`:
+  **1690 passed, 81 skipped, zero failed**. General live tests were disabled;
+  the explicit hardware probe and published-native encrypted/compressed
+  **2,200,017-byte** resource send/fetch ran. A prior live collection was stopped
+  after an in-flight source update invalidated its mixed build graph; no results
+  from that abandoned collection are used as acceptance or coverage.
+* `dotnet test tests\DotReticulum.Interfaces.Tests\DotReticulum.Interfaces.Tests.csproj
+  -c Release --no-build --filter FullyQualifiedName~LiveInteropTests
+  --nologo -v quiet --logger trx --results-directory
+  TestResults\parity6-recovery-live-desktop`, with the verified reference and
+  `DOTRETICULUM_LIVE=1`: **7 passed**, actual Python UDP/TCP exchanges.
+* `pwsh -NoProfile -File tests\run-pester.ps1 -Python <verified-python>
+  -Upstream <verified-reference>` and the same command with `-Application
+  artifacts\native-parity6-recovery\DotReticulum.Applications.exe`:
+  **24 passed, 2 skipped each**. These execute separate UDP transfer, owned Pipe
+  shutdown, shared election, Python RPC and daemon/client restart processes,
+  plus explicit public-network permission and invalid RouterInfo seed rejection.
+  The Linux-only abstract endpoint case explicitly skips on Windows.
+
+Current Linux/WSL snapshot validation (same production changes):
+
+* `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+  zero warnings/errors.
+* `dotnet test tests/DotReticulum.Interfaces.Tests/DotReticulum.Interfaces.Tests.csproj
+  -c Release --no-build --nologo -v quiet --logger trx --results-directory
+  TestResults/parity6-recovery-linux-bearers-final`:
+  **316 passed, 14 skipped**, including Linux Backbone, Pipe and Local cases.
+* `dotnet publish src/DotReticulum.Applications/DotReticulum.Applications.csproj
+  -c Release -r linux-x64 -p:ILLinkTreatWarningsAsErrors=true
+  -p:IlcTreatWarningsAsErrors=true -o artifacts/native-parity6-recovery
+  --nologo -v quiet`, then current native `--help`: passed.
+* `dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj
+  -c Release --no-build --filter
+  "FullyQualifiedName~NativeResourceTests|FullyQualifiedName~SharedLiveTests"
+  --nologo -v quiet --logger trx --results-directory
+  TestResults/parity6-recovery-linux-native`, with live reference and current
+  native executable enabled: **7 passed**: the published-native resource flow
+  and six managed actual Python shared/management-role cases over TCP.
+* As root in the owned snapshot, `pwsh -NoProfile -File
+  tests/Interop/invoke-auto-topology.ps1 -Dotnet <verified-dotnet>
+  -Python .reference-venv/bin/python -Upstream .reference -MulticastSmoke`:
+  **3 passed**, actual pinned Python raw/IFAC exchanges plus real IPv6 multicast.
+  Owned veth devices/namespaces were cleaned up by the runner; evidence remains
+  in `TestResults/auto-live-782dcdc5/auto-live.trx`.
+* `pwsh -NoProfile -File tests/run-pester.ps1 -Application
+  artifacts/native-parity6-recovery/DotReticulum.Applications
+  -Python <verified-python> -Upstream <verified-reference>`:
+  **26 passed, zero skipped/failed**. This additionally runs the current native
+  executable as an abstract Unix owner and independent clients, checks that only
+  the owner binds the physical listener, and confirms the interactive client's
+  `LocalSharedPacketInterface` role. The existing portable Pester 5.7.1 module
+  was explicitly made available through `PSModulePath`; no global Linux module
+  installation or Android execution was implied.
+
+Final restored-source production coverage (after removing the unsuccessful
+I2P refresh experiment) merged six collections plus their six TRX attachment
+copies by source line/branch identity, without double-counting:
+
+| Project | Lines | Branches |
+| --- | ---: | ---: |
+| Applications | 7848/9655 (81.28%) | 6764/10273 (65.84%) |
+| Core | 1688/1741 (96.96%) | 1045/1136 (91.99%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 4495/5220 (86.11%) | 2530/3225 (78.45%) |
+| Lxmf | 388/430 (90.23%) | 193/272 (70.96%) |
+| Transport | 4905/5374 (91.27%) | 3221/3940 (81.75%) |
+| **Overall** | **19434/22536 (86.24%)** | **13800/18896 (73.03%)** |
+
+#### Actual I2P recovery investigation remains open
+
+The owned i2pd 2.59.0 reruns retain the original four-minute test deadline,
+90-second setup limit and delivery assertions:
+
+* `singlethread=false` excludes one source-observed delayed destination-deletion
+  hazard, but the first actual rerun still failed native restart. Its two Python
+  cases had invalid relative executable paths; they are not interoperability
+  evidence. Artifacts: `i2p-topology-5fff97e37dd54df8bb867dbdd0c4acdc`.
+* With canonicalized paths and the stale-session experiment, a fresh router had
+  zero peer RouterInfos and reported no available inbound/outbound tunnel peers:
+  **1 passed, 3 failed**, not a successful recovery run. Artifacts:
+  `i2p-topology-ad76c16111504c57aee32163b58c1442`.
+* The explicit public-only `-SeedRouterInfoDirectory` imported **172 signed
+  public RouterInfos (189,707 bytes)** from the earlier owned packet-delivering
+  run's `router/netDb`. No router keys, private destinations, lease sets, ready
+  tunnels or fabricated peer state were copied. The router still validates the
+  public files. With `-AllowPublicNetwork -RunStreamTests -NoBuild -KeepArtifacts`
+  and this seed, persistence and both pinned Python roles passed:
+  **3 passed, 1 failed**. Initial native bidirectional delivery passed, but
+  replacement-server accept never arrived. The stale-session refresh ran and
+  preserved its local identity without fixing delivery. Artifacts:
+  `i2p-topology-01c8dbef554e443aaf83501347fc022f`.
+* `-ReferenceRestartOnly` independently runs two actual pinned Python processes,
+  not a Python proxy for .NET. The first diagnostic established callbacks in
+  both directions but exposed an invalid persistence precondition: non-transport
+  RNS uses an ephemeral active transport identity by default
+  (`Transport.py:320-334`), selecting a different I2P key filename after restart.
+  It failed before a valid same-address recovery comparison.
+* The corrected diagnostic uses the supported, disclosed
+  `static_transport_identity=Yes` on the reference server/replacement only.
+  It checks active transport hash, persisted transport-file hash, I2P filename,
+  private-file hash, single-file count and b32 equality after actual process
+  death/restart. No reference source, key serialization or SAM options are
+  patched. Initial callbacks passed both ways; all persistence assertions passed;
+  the surviving reference initiator reported broken pipe/reconnect but no new
+  accepted peer arrived before the unchanged deadline: **0 passed, 1 failed**.
+  Artifacts: `i2p-topology-dc2d6f312a4d4edb96443ddb31280043`.
+
+These failures do not establish a sole router cause or successful .NET recovery;
+they do show that the pinned Python-to-Python topology also fails this recovery
+criterion with the same owned backend. The user requested continuing with a
+different I2P router implementation rather than closing the work as blocked.
+
+The alternate backend is the official Java **I2P 2.14.0** distribution:
+
+* The installer SHA-256 is
+  `5593e5583a703cddbe738cff837026d9917b83491bd0cfbbeb2de0242b6c7990`.
+  Its official detached PGP signature verified against download-page
+  fingerprint `70D2060738BEF80523ACAFF7D75C03B39B5E14E1` in an isolated
+  owned keyring. Matching package bytes alone were not treated as publisher
+  authentication.
+* The isolated Temurin **21.0.13+9** Linux x64 JRE archive's SHA-256 is
+  `a535a1df9c6284d9618872984e026ae0352d1f7e9e0605425c0e6114f47351dd`,
+  checked against official Adoptium release metadata.
+* The authenticated IzPack 5.2.4 package's actual panel IDs supplied the
+  automation XML documented in `docs/i2p-interface.md`. The unattended
+  installer exited **0**, reported automated completion and installed all
+  required assets in the isolated snapshot's `.i2p-tools/java-i2p-router`.
+  Installer Java home/scratch and install target were owned directories;
+  no service or global JRE/router installation was performed. An earlier
+  unsupported console probe stopped on terminal job control and was killed
+  by its specific owned PID; it is not installation evidence.
+* The first foreground launch failed before SAM with a source-confirmed
+  Java 2.14.0 Linux portable-mode context-initialization recursion. Removing
+  only `i2p.dir.portableMode=true` uses the ordinary supported path; the
+  already-created owned `router.config` prevents migration. The subsequent
+  foreground process answered actual SAM 3.1 HELLO. OS inspection showed
+  only owned loopback SAM and the chosen TCP/UDP transport port, not console,
+  proxy or external I2CP listeners. Source citations and the prohibition on
+  direct in-router delivery are in the interface documentation.
+
+The Java runner reuses existing permission gates, explicit public-only
+RouterInfo seeding, process ownership, deadlines and exact TRX assertions.
+Eight early rejection cases additionally check public permission, every
+required distribution asset and incompatible backend parameter sets.
+`pwsh -NoProfile -File tests\run-pester.ps1 -Python <verified-python>
+-Upstream <verified-reference>` and the same command with
+`-Application artifacts\native-parity6-recovery\DotReticulum.Applications.exe`
+each passed **32, skipped 2** on Windows. The corresponding Linux command
+with `artifacts/native-parity6-recovery/DotReticulum.Applications` passed
+**34, skipped 0**, including native abstract-socket election. These supersede
+the earlier Pester counts after adding Java validation; they are not
+actual Java stream/restart acceptance.
+
+The alternate router's four-case run
+`i2p-topology-ab6bdd4b82c84fe393e1ba0582315506` finished **2 passed,
+2 failed, zero skipped** in 8m16s. SAM persistence and Python-as-initiator
+bidirectional traffic passed. Python-as-server failed its initial mixed stream
+before the four-minute deadline; no sole bootstrap cause was isolated.
+The native pair subsequently delivered initial packets both ways at
+03:15:57Z, reused the persisted server b32 after restart, and still failed
+replacement acceptance at the original deadline. The surviving initiator
+retained its one SAM session and repeatedly timed out during STREAM CONNECT.
+The router's hard transit rejection therefore did not prevent its own client
+tunnels or all packet delivery.
+
+This run was compiled before removing the unsuccessful stale-session
+experiment; its diagnostic counter remained zero on the failed native restart.
+It is failed comparative evidence, not acceptance of the final restored source
+or a successful recovery fix. The temporary refresh implementation and its
+test were removed instead of committing an unverified divergence from source
+session ownership. Bidirectional current/legacy restart simulator coverage
+remains. The stopped Java router's private datadir was retired; bounded logs
+and signed public RouterInfos were preserved separately as `router-logs`
+and `public-netdb`, not a reusable private router identity.
+
+The independent, unmodified pinned-Python comparison was then run on Java
+using the **140 signed public RouterInfos** retained from that packet-delivering
+Java run, not its private router state. With the same public permission,
+`-JavaExecutable .i2p-tools/java-jre/bin/java -JavaRouterDirectory
+.i2p-tools/java-i2p-router -ReferenceRestartOnly -NoBuild -KeepArtifacts`,
+the restored current source and unchanged four-minute deadline, it finished
+**0 passed, 1 failed**, zero skipped. Both initial callbacks passed at
+03:24:02/03:24:03Z. The server was actually killed, and all supported static
+transport identity, key hash, filename and b32 persistence assertions passed
+by 03:24:17Z. The surviving Python initiator logged closed socket, broken
+pipe and unresponsive/restart, but no replacement accepted peer arrived.
+Artifacts: `i2p-topology-b722bc354d7b48f8912486ceed9b7a69`.
+Thus the reference also fails this bounded restart criterion on **both**
+backends. This does not identify a sole cause, authorize a guessed sleep or
+larger acceptance deadline, or close the actual I2P recovery gate.
+
+#### Final restored-source gates
+
+Two resumed default-parallel Windows runs exposed different existing executable
+fixture file-sharing races (`WindowsPeAllowedResolverRequiresAuthorizationAndOwnsFailureProcesses`
+and `TimeoutKillsAnOwnedDescendantTree`); both focused cases passed without
+unrelated production changes. The complete serial-collection run passed.
+Final production coverage additionally used serial collections explicitly:
+
+```powershell
+$env:DOTRETICULUM_NATIVE_EXE = (Resolve-Path artifacts\native-parity6-recovery\DotReticulum.Applications.exe).Path
+$env:DOTRETICULUM_RNODE_PORT = 'COM8'
+dotnet test DotReticulum.slnx -c Release --no-build -m:1 --settings tests\coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults\coverage-parity6-final-restored-20261025 --nologo -v quiet --logger trx -- xUnit.MaxParallelThreads=1
+pwsh -NoProfile -File tests\coverage_summary.ps1 TestResults\coverage-parity6-final-restored-20261025
+```
+
+Result: **1689 passed, 82 skipped, zero failed**, six production modules
+present, overall/per-project coverage in the final table above. General live
+tests were off; COM8 read-only identification and the current published-native
+2,200,017-byte encrypted/compressed resource roundtrip were on. The count
+decreased by one when the unsupported refresh experiment/test was removed.
+No build or second collection overlapped these Windows output directories.
+
+Both final `win-x64` and `linux-x64` NativeAOT publishes used
+`-p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true`;
+both current executables ran `--help` and the representative resource flow.
+Final Linux bearer execution exposed the same invalid cross-ephemeral-sender
+UDP ordering assumption in the manager test, which was corrected to require
+both distinct valid datagrams, irrespective of order, while still rejecting
+the malformed datagram. This was test-only, not a production change.
+`dotnet test tests/DotReticulum.Interfaces.Tests/DotReticulum.Interfaces.Tests.csproj
+-c Release --nologo -v quiet` then passed **315, skipped 15** on Linux.
+The final Linux published-resource selection passed **1, skipped 0**.
+On Windows, `dotnet test tests\DotReticulum.Interfaces.Tests\DotReticulum.Interfaces.Tests.csproj
+-c Release --filter FullyQualifiedName~UdpPacketInterfaceTests --nologo -v quiet`
+passed **7, skipped 0**. Final builds were warning/error-free.
+Published-native I2P execution, actual persisted-stream restart and the
+explicitly retained hardware/Android acceptance gaps are still unverified;
+Parity 6 is not marked complete.
+
 ### Parity 6 interface integration, partial (2026-10-24)
 
 Parity 4 cleanup (`6da44c4`) and Parity 5 (`c992e74`) remain completed and

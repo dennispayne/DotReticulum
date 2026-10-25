@@ -1,6 +1,7 @@
 using System.Globalization;
 using DotReticulum.Applications.Runtime;
 using DotReticulum.Core;
+using DotReticulum.Interfaces;
 using DotReticulum.Transport;
 
 namespace DotReticulum.Applications.Rnsd;
@@ -409,7 +410,8 @@ public static partial class RnsdConfigParser
                 Enabled = Bool("share_instance", true),
                 InstancePort = Integer("shared_instance_port", 37428, 1, 65535),
                 ControlPort = Integer("instance_control_port", 37429, 1, 65535),
-                SocketPath = sharedType == "tcp" || !OperatingSystem.IsLinux() ? null : instanceName,
+                SocketPath = sharedType == "tcp" || !LocalSharedPlatformPolicy.SupportsAbstractUnixSockets ? null : instanceName,
+                LocalInterfacePolicy = LocalSharedPlatformPolicy.ForCurrentPlatform(),
                 RpcKey = Value("rpc_key") is { } rpc ? Hex(rpc, "rpc_key") : null,
             },
             Discovery = new DiscoveryOptions

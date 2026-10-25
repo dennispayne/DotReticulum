@@ -1,15 +1,20 @@
 #Requires -Version 7.3
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'I2pd')]
 param(
-    [Parameter(Mandatory)][string] $RouterBinary,
+    [Parameter(Mandatory, ParameterSetName = 'I2pd')][string] $RouterBinary,
+    [Parameter(Mandatory, ParameterSetName = 'Java')][string] $JavaExecutable,
+    [Parameter(Mandatory, ParameterSetName = 'Java')][string] $JavaRouterDirectory,
     [string] $SamEndpoint = '127.0.0.1:17656',
     [ValidateRange(0, 65535)][int] $TransportPort = 0,
     [string] $CertificatesDirectory,
+    [string] $SeedRouterInfoDirectory,
     [string] $DotnetExecutable = 'dotnet',
     [string] $PythonExecutable = $env:DOTRETICULUM_PYTHON,
     [string] $UpstreamPath = $env:DOTRETICULUM_UPSTREAM,
     [switch] $AllowPublicNetwork,
     [switch] $RunStreamTests,
+    [switch] $ReferenceRestartOnly,
+    [Parameter(ParameterSetName = 'I2pd')][switch] $SingleThreadedSam,
     [switch] $NoBuild,
     [switch] $KeepArtifacts,
     [ValidateRange(5, 180)][int] $StartupTimeoutSeconds = 30,
@@ -19,10 +24,32 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+$javaRouter = $PSCmdlet.ParameterSetName -eq 'Java'
+if ($javaRouter) {
+    if (-not $AllowPublicNetwork) { throw 'Java router requires explicit -AllowPublicNetwork; no zero-hop/isolated Java mode is configured.' }
+    if (-not (Test-Path -LiteralPath $JavaExecutable -PathType Leaf)) { throw 'JavaExecutable does not exist.' }
+    $JavaExecutable = (Resolve-Path -LiteralPath $JavaExecutable).ProviderPath
+    if (-not (Test-Path -LiteralPath $JavaRouterDirectory -PathType Container)) { throw 'JavaRouterDirectory does not exist.' }
+    $JavaRouterDirectory = (Resolve-Path -LiteralPath $JavaRouterDirectory).ProviderPath
+    foreach ($asset in @('hosts.txt', 'lib\i2p.jar', 'lib\router.jar', 'lib\sam.jar', 'lib\mstreaming.jar', 'lib\streaming.jar')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $JavaRouterDirectory $asset) -PathType Leaf)) {
+            throw "JavaRouterDirectory is not a complete extracted distribution: missing $asset"
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($CertificatesDirectory)) {
+        $CertificatesDirectory = Join-Path $JavaRouterDirectory 'certificates'
+    }
+} elseif (-not (Test-Path -LiteralPath $RouterBinary -PathType Leaf)) {
+    throw "Router binary does not exist: $RouterBinary"
+}
+
+if ($ReferenceRestartOnly) {
+    if (-not $AllowPublicNetwork) { throw 'ReferenceRestartOnly requires explicit -AllowPublicNetwork.' }
+    if ($RunStreamTests) { throw 'ReferenceRestartOnly and RunStreamTests select separate test groups.' }
+}
 if ($RunStreamTests -and -not $AllowPublicNetwork) {
     throw 'Stock RNS I2P sessions need ready tunnels and lease-set discovery. Same-router zero-hop alone is insufficient. Stream tests require explicit -AllowPublicNetwork; isolated mode only tests real SAM destination persistence.'
 }
-if (-not (Test-Path -LiteralPath $RouterBinary -PathType Leaf)) { throw "Router binary does not exist: $RouterBinary" }
 $endpoint = $null
 if (-not [System.Net.IPEndPoint]::TryParse($SamEndpoint, [ref] $endpoint) -or
     -not [System.Net.IPAddress]::IsLoopback($endpoint.Address) -or
@@ -30,8 +57,19 @@ if (-not [System.Net.IPEndPoint]::TryParse($SamEndpoint, [ref] $endpoint) -or
     $endpoint.Port -eq 0) {
     throw 'SamEndpoint must be an explicitly owned IPv4 loopback address:port.'
 }
-if ($RunStreamTests -and ([string]::IsNullOrWhiteSpace($PythonExecutable) -or [string]::IsNullOrWhiteSpace($UpstreamPath))) {
+if ($javaRouter -and -not $endpoint.Address.Equals([System.Net.IPAddress]::Loopback)) {
+    throw 'Java SAM requires SamEndpoint host 127.0.0.1.'
+}
+if (($RunStreamTests -or $ReferenceRestartOnly) -and ([string]::IsNullOrWhiteSpace($PythonExecutable) -or [string]::IsNullOrWhiteSpace($UpstreamPath))) {
     throw 'Stream tests require PythonExecutable and UpstreamPath for the verified pinned reference.'
+}
+if (-not [string]::IsNullOrWhiteSpace($PythonExecutable)) {
+    if (-not (Test-Path -LiteralPath $PythonExecutable -PathType Leaf)) { throw 'PythonExecutable does not exist.' }
+    $PythonExecutable = (Resolve-Path -LiteralPath $PythonExecutable).ProviderPath
+}
+if (-not [string]::IsNullOrWhiteSpace($UpstreamPath)) {
+    if (-not (Test-Path -LiteralPath $UpstreamPath -PathType Container)) { throw 'UpstreamPath does not exist.' }
+    $UpstreamPath = (Resolve-Path -LiteralPath $UpstreamPath).ProviderPath
 }
 if ($AllowPublicNetwork -and ([string]::IsNullOrWhiteSpace($CertificatesDirectory) -or
     -not (Test-Path -LiteralPath $CertificatesDirectory -PathType Container))) {
@@ -40,6 +78,35 @@ if ($AllowPublicNetwork -and ([string]::IsNullOrWhiteSpace($CertificatesDirector
 if (-not [string]::IsNullOrWhiteSpace($CertificatesDirectory) -and
     -not (Test-Path -LiteralPath $CertificatesDirectory -PathType Container)) {
     throw 'CertificatesDirectory does not exist.'
+}
+if ($javaRouter -and -not (Test-Path -LiteralPath (Join-Path $CertificatesDirectory 'reseed') -PathType Container)) {
+    throw 'Java router requires a public certificates root containing reseed certificates.'
+}
+$seedRouterInfos = @()
+if (-not [string]::IsNullOrWhiteSpace($SeedRouterInfoDirectory)) {
+    if (-not $AllowPublicNetwork) { throw 'SeedRouterInfoDirectory requires explicit -AllowPublicNetwork.' }
+    if (-not (Test-Path -LiteralPath $SeedRouterInfoDirectory -PathType Container)) {
+        throw 'SeedRouterInfoDirectory does not exist.'
+    }
+    $SeedRouterInfoDirectory = (Resolve-Path -LiteralPath $SeedRouterInfoDirectory).ProviderPath
+    $seedRoot = Get-Item -LiteralPath $SeedRouterInfoDirectory
+    if ($seedRoot.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        throw 'SeedRouterInfoDirectory must not be a symbolic link/reparse point.'
+    }
+    $seedRouterInfos = @(Get-ChildItem -LiteralPath $SeedRouterInfoDirectory -Recurse -File -Filter 'routerInfo-*.dat' |
+        Where-Object { $_.Name -cmatch '^routerInfo-[A-Za-z0-9~-]{43}=\.dat$' })
+    if ($seedRouterInfos.Count -eq 0 -or $seedRouterInfos.Count -gt 10000) {
+        throw 'SeedRouterInfoDirectory must contain 1..10000 public routerInfo-<I2P-hash>.dat files.'
+    }
+    foreach ($file in $seedRouterInfos) {
+        $relative = [System.IO.Path]::GetRelativePath($SeedRouterInfoDirectory, $file.FullName)
+        $expected = Join-Path ('r' + $file.Name[11]) $file.Name
+        if ($relative -cne $expected -or $file.Length -lt 1 -or $file.Length -gt 65536 -or
+            ($file.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -or
+            ($file.Directory.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+            throw 'Seed RouterInfos must be bounded regular files in their standard netDb hash subdirectory.'
+        }
+    }
 }
 
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
@@ -113,16 +180,72 @@ try {
     # Refuse to use an existing router or take over its listener.
     $probe = [System.Net.Sockets.TcpListener]::new($endpoint)
     try { $probe.Start() } finally { $probe.Stop() }
-    $transportProbe = [System.Net.Sockets.TcpListener]::new($endpoint.Address, $TransportPort)
+    $transportAddress = if ($javaRouter) { [System.Net.IPAddress]::Any } else { $endpoint.Address }
+    $transportProbe = [System.Net.Sockets.TcpListener]::new($transportAddress, $TransportPort)
     try {
         $transportProbe.Start()
         $TransportPort = $transportProbe.LocalEndpoint.Port
         if ($TransportPort -eq $endpoint.Port) { throw 'SAM and NTCP2 ports must differ.' }
+        if ($javaRouter) {
+            $udpProbe = [System.Net.Sockets.UdpClient]::new([System.Net.Sockets.AddressFamily]::InterNetwork)
+            try {
+                $udpProbe.ExclusiveAddressUse = $true
+                $udpProbe.Client.Bind([System.Net.IPEndPoint]::new($transportAddress, $TransportPort))
+            }
+            finally { $udpProbe.Dispose() }
+        }
     }
     finally { $transportProbe.Stop() }
     $null = New-Item -ItemType Directory -Path $data, $tunnelsDirectory, $result -Force
+    foreach ($file in $seedRouterInfos) {
+        $seedTarget = Join-Path (Join-Path $data 'netDb') ('r' + $file.Name[11])
+        $null = New-Item -ItemType Directory -Path $seedTarget -Force
+        Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $seedTarget $file.Name)
+    }
+    if ($seedRouterInfos.Count -gt 0) {
+        Write-Host "Seeded public NetDb: $($seedRouterInfos.Count) RouterInfo files from $SeedRouterInfoDirectory; no router keys, private destinations or lease sets copied. Router validates RouterInfos."
+    }
+    if ($javaRouter) {
+        $config = Join-Path $data 'router.config'
+        $javaBase = Join-Path $owned 'java-base'
+        $javaScratch = Join-Path $owned 'java-scratch'
+        $null = New-Item -ItemType Directory -Path $javaBase, $javaScratch
+        Copy-Item -LiteralPath (Join-Path $JavaRouterDirectory 'hosts.txt') -Destination $javaBase
+        Copy-Item -LiteralPath $CertificatesDirectory -Destination (Join-Path $javaBase 'certificates') -Recurse
+        @"
+i2cp.disableInterface=true
+i2cp.disableLoopback=true
+i2np.upnp.enable=false
+router.sharePercentage=0
+router.maxParticipatingTunnels=0
+i2np.ntcp.port=$TransportPort
+i2np.ntcp.autoport=false
+i2np.udp.internalPort=$TransportPort
+i2np.udp.port=$TransportPort
+i2np.udp.fixedPort=true
+"@ | Set-Content -LiteralPath $config -Encoding utf8NoBOM
+        @"
+clientApp.0.main=net.i2p.sam.SAMBridge
+clientApp.0.name=Owned SAM
+clientApp.0.args=sam.keys 127.0.0.1 $($endpoint.Port)
+clientApp.0.onBoot=true
+clientApp.0.startOnLoad=true
+"@ | Set-Content -LiteralPath (Join-Path $data 'clients.config') -Encoding utf8NoBOM
+        $routerArguments = @(
+            '-Xmx512m', '-Djava.awt.headless=true', '-DI2P_DISABLE_OUTPUT_OVERRIDE=true',
+            # Explicit non-portable config: 2.14.0 portable mode recurses during Linux temp setup.
+            "-Djava.io.tmpdir=$javaScratch",
+            "-Di2p.dir.base=$javaBase", "-Di2p.dir.config=$data",
+            "-Di2p.dir.router=$data", "-Di2p.dir.app=$data", "-Di2p.dir.log=$data", "-Di2p.dir.pid=$data",
+            "-Drouter.configLocation=$config", '-cp', (Join-Path $JavaRouterDirectory 'lib\*'),
+            'net.i2p.router.Router'
+        )
+        $routerExecutable = $JavaExecutable
+        Write-Host "Java I2P distribution $JavaRouterDirectory; owned SAM 127.0.0.1:$($endpoint.Port); TCP/UDP transport port $TransportPort; public network; internal loopback and transit disabled; source client tunnel defaults unchanged."
+    } else {
     Set-Content -LiteralPath $tunnels -Value '' -Encoding utf8NoBOM
     $network = $AllowPublicNetwork.IsPresent.ToString().ToLowerInvariant()
+    $samSingleThread = $SingleThreadedSam.IsPresent.ToString().ToLowerInvariant()
     $networkId = if ($AllowPublicNetwork) { 2 } else { 222 }
     $binding = if ($AllowPublicNetwork) {
         'reservedrange = true'
@@ -148,6 +271,7 @@ enabled = true
 address = $($endpoint.Address)
 port = $($endpoint.Port)
 portudp = 0
+singlethread = $samSingleThread
 [ntcp2]
 enabled = true
 published = true
@@ -191,8 +315,14 @@ yggdrasil = false
     if (-not [string]::IsNullOrWhiteSpace($CertificatesDirectory)) {
         $routerArguments += "--certsdir=$([System.IO.Path]::GetFullPath($CertificatesDirectory))"
     }
-    $router = Start-OwnedProcess -FileName ([System.IO.Path]::GetFullPath($RouterBinary)) -Arguments $routerArguments -Prefix 'router'
-    Write-Host "Owned router PID $($router.Process.Id); SAM $SamEndpoint; NTCP2 port $TransportPort; public network allowed: $($AllowPublicNetwork.IsPresent)"
+    $routerExecutable = [System.IO.Path]::GetFullPath($RouterBinary)
+    Write-Host "i2pd SAM singlethread: $samSingleThread; public network allowed: $($AllowPublicNetwork.IsPresent)"
+    if ($SingleThreadedSam) {
+        Write-Warning 'i2pd 2.59.0 single-threaded SAM can delete a replacement persisted destination during delayed cleanup of the previous session. This mode preserves the router-default failure reproducer.'
+    }
+    }
+    $router = Start-OwnedProcess -FileName $routerExecutable -Arguments $routerArguments -Prefix 'router'
+    Write-Host "Owned router PID $($router.Process.Id); SAM $SamEndpoint; transport port $TransportPort."
     $ready = $false
     $startup = [System.Diagnostics.Stopwatch]::StartNew()
     while ($startup.Elapsed.TotalSeconds -lt $StartupTimeoutSeconds) {
@@ -219,12 +349,16 @@ yggdrasil = false
         finally { $client.Dispose() }
     }
     if (-not $ready) { throw 'Owned router did not answer SAM 3.1 within the startup deadline.' }
+    if (-not $javaRouter) {
     $transportCheck = [System.Net.Sockets.TcpClient]::new()
     try {
         $transportCheck.ConnectAsync($endpoint.Address, $TransportPort).WaitAsync([TimeSpan]::FromSeconds(2)).GetAwaiter().GetResult()
     }
     finally { $transportCheck.Dispose() }
-    $filter = if ($RunStreamTests) {
+    }
+    $filter = if ($ReferenceRestartOnly) {
+        'FullyQualifiedName~Parity6I2pReferenceRecoveryTests'
+    } elseif ($RunStreamTests) {
         'FullyQualifiedName~Parity6I2pLiveTests'
     } else {
         'FullyQualifiedName~Parity6I2pLiveTests.ActualRouterSamDestinationPersistenceWithoutOverlay'

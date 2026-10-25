@@ -134,7 +134,7 @@ vendored Python tunnel threads and their documented indefinite-shutdown bugs.
 It generates destination keys through SAM, not a native reimplementation of
 I2P cryptography. Session loss closes the affected streams and recreates owned
 sessions. A ready initiating SAM session and its control monitor span ordinary
-remote stream EOF, watchdog teardown, naming/connect failures, setup timeouts
+responsive remote stream EOF, naming/connect failures, setup timeouts
 and reconnect delays. These retire only the attempted/active data socket.
 Control-socket closure/failure or explicit SAM `INVALID_ID` retires the session;
 an unsuccessful SESSION CREATE also closes its incomplete control socket.
@@ -198,7 +198,8 @@ EOF, a remote SAM rejection and a pending-connect timeout using the controlled
 simulator, then verifies a second simulated data socket uses the **same** session
 ID and public identity and carries a framed packet. Control loss during a
 pending connect and explicit `INVALID_ID` have separate recreation tests;
-watchdog reconnect now asserts one retained session. These assertions are
+watchdog reconnect retains the ready session and stable child, like ordinary
+stream EOF. These assertions are
 software lifecycle evidence, not actual I2P network acceptance.
 
 ### Interpreting an actual-router restart timeout
@@ -229,9 +230,80 @@ proving a restart defect or successful recovery.
 A failed replacement-child/packet assertion remains failed actual-router
 restart/recovery acceptance, separately from passing initial exchanges,
 Python exchanges or SAM persistence. Neither the managed suite nor a SAM OK
-reply converts that gap into a hardware-only blocker. Localizing it further
-requires actual SYN/lease-set/accept-transition evidence from safe router logs;
-no production change or deadline increase is justified by these states alone.
+reply converts that gap into a hardware-only blocker.
+
+#### Observed i2pd 2.59.0 destination-cleanup hazard
+
+The retained failed run exposes a router lifecycle hazard, not evidence of a
+Windows firewall failure. It does not establish the sole cause of the remaining
+restart timeout. The router logged
+`Clients: Local destination <server address> exists` at 18:35:56, when the
+replacement reused the persisted key, then `SAM: I2P acceptor has been reset`
+at 18:36:01. The five-second interval matches this source trace exactly:
+
+* [`SAMBridge::CloseSession`, `SAM.cpp:1571-1622`](https://github.com/PurpleI2P/i2pd/blob/2.59.0/libi2pd_client/SAM.cpp#L1571-L1622)
+  removes the session, stops its destination/streams, and, **only when
+  single-threaded**, retains the old session for a five-second cleanup timer.
+* [`ClientContext::CreateNewLocalDestination`, `ClientContext.cpp:407-422`](https://github.com/PurpleI2P/i2pd/blob/2.59.0/libi2pd_client/ClientContext.cpp#L407-L422)
+  finds the destination under the same identity hash, restarts it, and returns
+  that existing object to the replacement session.
+* [`SAMSingleSession::~SAMSingleSession`, `SAM.cpp:1374-1377`](https://github.com/PurpleI2P/i2pd/blob/2.59.0/libi2pd_client/SAM.cpp#L1374-L1377)
+  unconditionally calls `DeleteLocalDestination` when the delayed old session
+  is destroyed.
+* [`ClientContext::DeleteLocalDestination`, `ClientContext.cpp:377-389`](https://github.com/PurpleI2P/i2pd/blob/2.59.0/libi2pd_client/ClientContext.cpp#L377-L389)
+  erases/stops the destination by hash without checking the replacement
+  session's acquisition. Its new acceptor is reset; the new SAM control socket
+  can still be open. Retaining the initiating session cannot repair a server
+  destination deleted inside the router.
+
+The inspected tag files have SHA-256:
+`SAM.cpp=2ad9a2f98bcc86008e80569c6da19c1428215d9759e2140beda87fc2a9522e5a`,
+`ClientContext.cpp=a46a871fbfe395b512c71db3f70ae5901f8cc32867511832151c4d17dd8ac0a1`.
+These are router-source hashes, not changes to the pinned RNS provenance.
+Garlic authentication/resend warnings also occur in that run, but are not
+needed to establish the destination ownership error or independently
+attributed to it.
+
+The owned topology therefore explicitly uses the supported i2pd setting
+`[sam] singlethread=false`. This avoids the deferred-destruction path; it is
+not a source patch, tunnel/lease-set injection, simulator replacement,
+application retry change or longer timeout. The setting is non-default:
+[`Config.cpp:204`](https://github.com/PurpleI2P/i2pd/blob/2.59.0/libi2pd/Config.cpp#L204)
+defaults it to true. Pass `-SingleThreadedSam` to reproduce that router-default
+configuration. The runner prints the selected mode. An eventual passing run
+with this workaround establishes only that configuration, **not recovery with
+i2pd 2.59.0's default single-threaded SAM**. Native clients do not silently
+change an operator's router settings or introduce a guessed cleanup sleep.
+
+The subsequent actual run with `singlethread=false` **also failed** native
+restart acceptance. It did not report destination reuse or a second delayed
+acceptor reset; excluding that hazard did not resolve recovery.
+Initial bidirectional packets passed at 02:15:58Z; replacement
+SAM readiness followed at 02:16:16Z. The old initiating stream exhausted ten
+router retransmissions at 02:17:32Z; its retry used the same SAM destination
+and again received no handshake packets before the unchanged four-minute
+deadline.
+
+Another investigated recovery boundary was the initiating router destination's
+cached remote state:
+[`SAM.cpp:569-584`](https://github.com/PurpleI2P/i2pd/blob/2.59.0/libi2pd_client/SAM.cpp#L569-L584)
+uses that destination's `FindLeaseSet` for each STREAM CONNECT.
+[`Destination.cpp:190-231`](https://github.com/PurpleI2P/i2pd/blob/2.59.0/libi2pd/Destination.cpp#L190-L231)
+returns its cached lease set until expiry (refreshing only near expiration).
+[`Streaming.cpp:1866` onward](https://github.com/PurpleI2P/i2pd/blob/2.59.0/libi2pd/Streaming.cpp#L1866)
+likewise requests replacement remote leases only when missing/expired;
+stream retransmission failure does not flush that destination cache.
+SAM naming success alone therefore does not refresh the already-ready
+initiating destination's remote leases/garlic routing sessions.
+
+A temporary native experiment recreated the ready SAM session after an
+unresponsive stream terminated, preserving the private destination and child.
+The seeded actual-router run exercised it and still failed replacement
+acceptance. It was removed rather than landing an unproven behavior change:
+stream staleness/EOF alone still does not discard a healthy control session.
+Historical run diagnostics mentioning `stale_session_refreshes` describe
+that experiment, not the committed API. No timer or delivery assertion was
+weakened. The source trace does not establish a sole cause of recovery failure.
 
 Safety/API differences: 64 incoming and 64 configured outgoing peers by
 default, bounded 256-packet receive queues per child, bounded SAM lines
@@ -297,7 +369,11 @@ An owned public-bootstrap i2pd 2.59.0 run passed persistence and both pinned
 Python roles (three cases), but **failed native stream recovery after server
 bearer restart**. Initial native bidirectional packets passed; replacement
 accepted-stream delivery timed out despite a retained initiating SAM session.
-This is unresolved acceptance, not a proven environmental fault. Impaired
+The first rerun with the router-cleanup workaround still failed restart.
+The seeded public-NetDb rerun also passed persistence and both Python roles,
+but failed native restart: the stale-session refresh ran, preserved the local
+destination and established a replacement SAM stream without a remote accepted
+peer before the original deadline. It is not a verified recovery fix. Impaired
 network/Reticulum-tunnel recovery, complete IFAC/routing interoperability and
 published-native I2P execution also remain unverified. Neither I2P nor the
 whole Parity 6 section is accepted.
@@ -330,8 +406,18 @@ Four actual-router cases are provided:
   topology and assertions. No protocol reimplementation, SAM option injection,
   zero-hop override or readiness shim is used.
 
-The actual execution above is three passed, one failed, zero skipped. Source
-and process preparation or SAM OK alone are not stream/restart acceptance.
+The recorded actual execution above is three passed, one failed, zero skipped,
+using the router's default single-threaded SAM. Source and process preparation
+or SAM OK alone are not stream/restart acceptance. The replacement topology
+uses non-default `sam.singlethread=false`; its first rerun also failed native
+restart, and its Python cases failed before launching because relative
+reference paths were resolved from the test working directory. The runner
+now validates/resolves PythonExecutable and UpstreamPath to absolute paths
+before spawning either owned process. A fresh unseeded run then failed all
+three stream cases with no available router peers. Seeding only 172 signed
+public RouterInfos from the earlier owned packet-delivering run restored
+initial/native and both Python-role traffic, but **not restart acceptance**.
+See the development history for the separate failed runs and diagnostic.
 
 ### Why a fresh isolated router is not a default stream topology
 
@@ -372,8 +458,12 @@ Reticulum transport-tunnel/resource acceptance.
 `tests\Interop\invoke-i2p-topology.ps1` accepts an already obtained i2pd binary
 and creates only a unique repository-local `TestResults` directory. It refuses
 an occupied SAM port. The process is non-service/non-daemon, with an owned
-datadir/config, empty owned tunnel files and loopback SAM 3.1. Default
-isolation binds IPv4 NTCP2 explicitly to the SAM endpoint's loopback address
+datadir/config, empty owned tunnel files and loopback SAM 3.1.
+SAM threading is explicitly **per-destination** (`singlethread=false`) to
+avoid the diagnosed i2pd 2.59.0 cleanup race; `-SingleThreadedSam` restores
+the router-default mode for reproduction. This is a disclosed router setting,
+not a change to upstream RNS or the native bearer's protocol.
+Default isolation binds IPv4 NTCP2 explicitly to the SAM endpoint's loopback address
 on a separate owned port; it disables IPv6/SSU2, transit, reseed URLs, address-book
 subscriptions, NTP/peer clock sync, UPnP, Yggdrasil and unrelated
 HTTP/proxy/BOB/I2CP/control listeners. No existing router configuration is
@@ -430,6 +520,31 @@ signature verification. It never disables verification to hide missing
 certificate files. Certificate warnings on an isolated empty datadir are not
 evidence of public bootstrap or streaming.
 
+For an explicitly seeded public bootstrap, `-SeedRouterInfoDirectory` may
+point to a previously owned router's **netDb directory only**. It requires
+`-AllowPublicNetwork`, resolves/validates the source before launch, and copies
+only bounded regular `routerInfo-<I2P-hash>.dat` files from their standard
+`r<first-hash-character>` directories into the new owned NetDb. Symlink/reparse
+sources and unexpected layouts are rejected. No whole datadir is reused:
+router keys, private SAM destinations, profiles and lease sets are not copied.
+The unmodified router remains responsible for validating signed RouterInfos;
+the filename allowlist is not signature verification. Normal reseed signature
+verification remains enabled. The runner prints source-directory provenance
+and copied-file count. This is non-default **public NetDb bootstrap**, not
+cached destination leases, fabricated tunnels or an RNS/native protocol change.
+It does not guarantee the advertised peers remain reachable.
+
+This option is motivated by bounded inspection of the retained runs:
+`i2p-topology-a5ab16658d8b490396c218fd8bd8cca3/router/netDb`, from the run
+that exchanged initial native and both Python-role packets, contains 172
+public RouterInfos (189707 bytes). The later
+`i2p-topology-ad76c16111504c57aee32163b58c1442/router/netDb` contains zero
+RouterInfos, and its router repeatedly reported no available peers for
+inbound/outbound tunnel creation. That run finished one pass/three failures
+without ready streaming destinations. Reusing only the earlier public
+RouterInfos directly addresses missing bootstrap candidates; it is not
+evidence that restart recovery now succeeds.
+
 The runner checks an actual SAM HELLO response (30-second startup default),
 bounds process duration (1200 seconds default), test deadlines (40 seconds
 for SAM-only; four minutes per stream case), and owned log size. Native
@@ -462,6 +577,83 @@ pwsh -NoProfile -File tests\Interop\invoke-i2p-topology.ps1 `
   -UpstreamPath '<verified a29bfb51 checkout>' -NoBuild -KeepArtifacts
 ```
 
+To reuse the recorded public bootstrap candidates, add:
+
+```powershell
+-SeedRouterInfoDirectory '<owned earlier i2p-topology-a5ab16658d8b490396c218fd8bd8cca3>\router\netDb'
+```
+
+Record that source and copied count with any resulting acceptance evidence;
+do not describe such a run as a fresh/unseeded router bootstrap.
+
+### Separate pinned-Python restart diagnostic
+
+`-ReferenceRestartOnly` selects exactly one case in
+`Parity6I2pReferenceRecoveryTests`, **not** the normal four-case live group.
+It requires explicit `-AllowPublicNetwork`, PythonExecutable and UpstreamPath;
+it cannot be combined with `-RunStreamTests`. Public RouterInfo seeding and
+the disclosed SAM threading selection remain available. Replace
+`-RunStreamTests` with `-ReferenceRestartOnly` in the command above.
+
+The case uses two separate verified, unmodified pinned Python RNS processes,
+not a native bearer or Python protocol reimplementation. It asserts actual
+PLAIN callbacks both directions, terminates only its owned server process,
+then starts a new process using the same owned configuration directory.
+The initiating Python process survives unchanged. It verifies the persisted
+private-key file by SHA-256 without logging its contents, stable public b32/
+application destinations, replacement accepted peer, and callbacks both
+directions after restart. All setup, pre-restart traffic and recovery share
+the same unchanged **four-minute deadline**.
+
+The thin adapter's explicit `--resume-directory` validates that the existing
+configuration matches rather than overwriting it; `--reverse-aspects` swaps
+only the two application's incoming/outgoing aspect labels so the Python
+peers can address each other. Packet construction, callbacks, SAM sessions,
+framing and reconnect remain the actual upstream methods. Process termination
+is deliberate: pinned `I2PController.stop` iterates its tunnel dictionary keys,
+so `detach()` alone is not proof that the original SAM sessions disappeared.
+No reference-side tunnel, readiness or cleanup shim is injected.
+
+This diagnostic compares reference recovery under the same router settings;
+neither success nor failure is native restart acceptance. The seeded native
+run already exercised session refresh (two sessions, one refresh, unchanged
+public identity) and still failed replacement acceptance despite passing
+initial native bidirectional traffic and both mixed Python roles. The
+reference restart result is recorded separately below.
+
+Its first execution exchanged both initial callbacks but correctly failed the
+replacement b32 assertion: the original non-transport config used upstream's
+ephemeral transport identity. `Transport.py:320-334` already writes/loads
+`storage/transport_identity`, then replaces the active identity with a fresh
+ephemeral one unless transport is enabled or `static_transport_identity` is
+true. Graceful persistence alone cannot preserve that ephemeral active hash.
+The I2P filename includes the active hash, so a new process selected a new
+private destination despite the old key file still existing.
+
+The restart diagnostic now explicitly sets upstream's supported
+`static_transport_identity = Yes` on the server and replacement only
+(`Reticulum.py:513-515`), without enabling routing or writing identity bytes
+itself. This non-default fixture configuration is reported in adapter
+observations. Before/after assertions compare active public transport hash,
+persisted transport identity file SHA-256, I2P filename/key SHA-256, exactly
+one I2P key file, and b32 before interpreting stream recovery. The ordinary
+four-case live group retains its original config. The corrected diagnostic
+ran against the explicitly seeded, per-destination-threaded i2pd 2.59.0:
+initial callbacks in both directions and every persistence assertion passed,
+but no replacement accepted peer arrived before the unchanged four-minute
+deadline (**0 passed, 1 failed**). The surviving initiator reported broken
+pipe/reconnect. This is a reference recovery counterexample in that topology,
+not native acceptance or proof of a sole router cause. The earlier
+identity-changing run is not a same-destination restart counterexample.
+
+The restored-source diagnostic subsequently failed the same accepted-peer
+criterion on official Java I2P 2.14.0: initial callbacks in both directions
+and all persistence assertions passed, but the surviving Python initiator did
+not establish a replacement accepted stream before four minutes (**0 passed,
+1 failed**). That explicitly seeded run used 140 signed public RouterInfos
+from the packet-delivering Java run, not its private router identity.
+Neither backend's reference counterexample closes native restart acceptance.
+
 Alternatively, with an already owned, suitably ready router and the common
 `DOTRETICULUM_PYTHON`/`DOTRETICULUM_UPSTREAM` environment configured:
 
@@ -475,3 +667,149 @@ No router/test processes or live network configuration were launched by the
 bearer author while adding this runner and tests. Router process execution,
 package provenance, actual results and any public-network authorization remain
 coordinator-owned evidence.
+
+### Alternative owned Java I2P 2.14.0 router
+
+The same runner accepts **either** `-RouterBinary` (i2pd) **or**
+`-JavaExecutable` plus `-JavaRouterDirectory` (an already extracted official
+Java distribution, not its installer JAR). It does not download, install,
+start a service, or use the distribution's background wrapper. The Java
+branch requires `-AllowPublicNetwork`; there is no isolated/zero-hop mode.
+For example, in the OS environment containing the supplied Java executable:
+
+```powershell
+pwsh -NoProfile -File tests\Interop\invoke-i2p-topology.ps1 `
+  -JavaExecutable '<owned JRE>\bin\java' `
+  -JavaRouterDirectory '<verified extracted I2P 2.14.0 distribution>' `
+  -SamEndpoint '127.0.0.1:17656' -AllowPublicNetwork -RunStreamTests `
+  -PythonExecutable '<isolated Python executable>' `
+  -UpstreamPath '<verified a29bfb51 checkout>' -NoBuild -KeepArtifacts
+```
+
+Use `-ReferenceRestartOnly` **instead of** `-RunStreamTests` for the separate
+same-identity Python diagnostic. The existing optional public
+`-SeedRouterInfoDirectory` also applies; disclose its source/count exactly as
+for i2pd. Certificates default to the distribution's `certificates` directory;
+`-CertificatesDirectory` can select another verified public certificate root
+containing `reseed`. No verification bypass is used.
+
+The runner checks `hosts.txt` and `lib/{i2p,router,sam,mstreaming,streaming}.jar`, stages
+only the public hosts/certificates into an owned base, and launches foreground
+`net.i2p.router.Router` with the distribution's `lib/*` classpath. All config,
+router/app/log/pid state and Java scratch paths point into the owned run.
+The runner pre-creates owned `router.config`, so ordinary non-portable
+`WorkingDir` treats explicit `i2p.dir.config` as an existing setup and
+returns before migration. `I2P_DISABLE_OUTPUT_OVERRIDE=true` retains the
+common captured output. Do **not** add `i2p.dir.portableMode=true` on Linux
+for this tag: the first actual launch
+(`i2p-topology-7aad5a246a2e41ada4f5dfdbd87914e0`) failed with
+`StackOverflowError` before SAM. In exact source,
+[`I2PAppContext`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/core/java/src/net/i2p/I2PAppContext.java)
+calls `getTempDir()` during portable construction before a global context
+exists; on non-Windows/non-macOS a new temp directory creates
+[`TempDirScanner`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/core/java/src/net/i2p/util/TempDirScanner.java),
+whose [`SimpleTimer2.TimedEvent`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/core/java/src/net/i2p/util/SimpleTimer2.java)
+constructor calls `getGlobalContext()`, recursively constructing another
+portable context. Ordinary `WorkingDir` is a configuration correction, not
+an upstream patch.
+There is no console, HTTP/SOCKS proxy, tunnel controller, browser launcher or
+other client app: the fresh `clients.config` enables only the in-JVM
+`net.i2p.sam.SAMBridge`, on boot, with positional arguments
+`sam.keys 127.0.0.1 <chosen-SAM-port>`. External I2CP is disabled; SAM uses
+the router's internal I2CP queue.
+
+Disclosed Java configuration:
+
+```properties
+i2cp.disableInterface=true
+i2cp.disableLoopback=true
+i2np.upnp.enable=false
+router.sharePercentage=0
+router.maxParticipatingTunnels=0
+i2np.ntcp.port=<owned-transport-port>
+i2np.ntcp.autoport=false
+i2np.udp.internalPort=<owned-transport-port>
+i2np.udp.port=<owned-transport-port>
+i2np.udp.fixedPort=true
+```
+
+The transport port is checked for TCP **and** UDP availability before launch.
+Java retains its normal public transport binding/address discovery; the
+i2pd-specific loopback NTCP2 readiness connection is not applied. Common
+SAM 3.1 HELLO readiness, owned process cleanup, four-case/one-case TRX checks
+and all existing deadlines remain unchanged. SAM HELLO does not imply
+client tunnel readiness. No per-session hop settings are supplied: source
+client defaults remain three hops inbound/outbound, variance zero and no
+zero-hop fallback. `i2cp.disableLoopback=true` prevents direct in-router
+client delivery, so same-router tests must use tunnels. Share zero and the
+hard participating-tunnel limit zero prohibit transit without disabling
+the router's own exploratory/client tunnels.
+
+Source authority is the exact official
+[`i2p-2.14.0` tag](https://github.com/i2p/i2p.i2p/tree/i2p-2.14.0):
+
+- [`Router.java`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/router/java/src/net/i2p/router/Router.java)
+  and [`WorkingDir.java`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/router/java/src/net/i2p/router/startup/WorkingDir.java):
+  foreground entry point, config/base properties, `hosts.txt` prerequisite,
+  existing-setup detection and output ownership.
+- [`ClientAppConfig.java`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/router/java/src/net/i2p/router/startup/ClientAppConfig.java)
+  and [`SAMBridge.java`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/apps/sam/java/src/net/i2p/sam/SAMBridge.java):
+  consecutive client indices, on-boot startup and positional SAM arguments.
+- [`ClientManager.java`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/router/java/src/net/i2p/router/client/ClientManager.java)
+  and [`I2PSessionImpl.java`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/core/java/src/net/i2p/client/impl/I2PSessionImpl.java):
+  disable external I2CP/local shortcut and use internal client queues.
+- [`NTCPTransport.java`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/router/java/src/net/i2p/router/transport/ntcp/NTCPTransport.java),
+  [`UDPTransport.java`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/router/java/src/net/i2p/router/transport/udp/UDPTransport.java),
+  [`RouterThrottleImpl.java`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/router/java/src/net/i2p/router/RouterThrottleImpl.java)
+  and [`TunnelPoolSettings.java`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/router/java/src/net/i2p/router/TunnelPoolSettings.java):
+  transport ports, hard transit rejection and client hop defaults.
+- [`PersistentDataStore.java`](https://github.com/i2p/i2p.i2p/blob/i2p-2.14.0/router/java/src/net/i2p/router/networkdb/kademlia/PersistentDataStore.java):
+  shared hierarchical RouterInfo seed layout; signature, network-ID and
+  filename/hash validation by the router.
+
+The first actual four-case Java run finished **2 passed, 2 failed**:
+SAM persistence and Python-as-initiator bidirectional traffic passed;
+Python-as-server initial setup and native persisted restart timed out.
+The native pair's initial packets and stable replacement b32 passed before
+that restart failure. It was compiled with the since-removed refresh experiment,
+whose counter remained zero in that case; it is not final-source acceptance.
+Exact provenance and retained evidence are in the development history.
+This alternate-router diagnostic does not resolve I2P or establish a sole
+cause of either backend's recovery failure.
+
+#### Authenticated installer automation (provisioning only)
+
+Read-only inspection of the coordinator-authenticated
+`i2pinstall_2.14.0.jar` found `Created-By: 5.2.4-992ec (IzPack)` and these
+exact IDs in serialized `resources/panelsOrder`: `TargetPanel_2`,
+`InstallPanel_4`, `SimpleFinishPanel_7`. For this package, a minimal Linux
+automation record is:
+
+```xml
+<AutomatedInstallation langpack="eng">
+  <panel id="TargetPanel_2">
+    <installpath>/absolute/owned/distribution-directory</installpath>
+  </panel>
+  <panel id="InstallPanel_4"/>
+  <panel id="SimpleFinishPanel_7"/>
+</AutomatedInstallation>
+```
+
+Invoke the verified Java executable with JVM `-Duser.home` and
+`-Djava.io.tmpdir` pointing to owned directories, then
+`-jar <authenticated-installer.jar> <absolute-automation.xml>`. This is
+installation, not plain ZIP extraction: the required Base pack executes its
+normal distribution postinstall steps inside the selected installation.
+It does not select the optional Windows Service pack. The topology runner
+does not perform installation or invoke the installed launch scripts.
+
+The exact underlying
+[IzPack 5.2.4 `Installer.start`](https://github.com/izpack/izpack/blob/izpack-5.2.4/izpack-installer/src/main/java/com/izforge/izpack/installer/bootstrap/Installer.java)
+treats the bare XML pathname as automated mode;
+[`AutomatedInstaller.doInstall`](https://github.com/izpack/izpack/blob/izpack-5.2.4/izpack-installer/src/main/java/com/izforge/izpack/installer/automation/AutomatedInstaller.java)
+dispatches the explicitly listed IDs, and
+[`TargetPanelAutomation`](https://github.com/izpack/izpack/blob/izpack-5.2.4/izpack-panel/src/main/java/com/izforge/izpack/panels/target/TargetPanelAutomation.java)
+reads the `installpath` child. This avoids console/TTY interaction and does
+not select the informational XInfo panel. Source-backed instructions are
+not evidence of a completed installation; verify exit status, automated
+completion output and installed assets before the topology run.

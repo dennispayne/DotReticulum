@@ -56,6 +56,9 @@ def main():
     parser.add_argument("--name", required=True)
     parser.add_argument("--peer")
     parser.add_argument("--connectable", action="store_true")
+    parser.add_argument("--resume-directory", action="store_true")
+    parser.add_argument("--reverse-aspects", action="store_true")
+    parser.add_argument("--static-transport-identity", action="store_true")
     args = parser.parse_args()
     host, port = args.sam.rsplit(":", 1)
     if not ipaddress.ip_address(host).is_loopback or ":" in host or not 0 < int(port) < 65536:
@@ -83,11 +86,16 @@ def main():
     if canonical_source != git_blob.replace(b"\r\n", b"\n"):
         raise RuntimeError("Actual imported I2PInterface differs from the pinned Git blob beyond checkout line endings")
     directory = Path(args.config).resolve()
-    directory.mkdir(parents=True, exist_ok=False)
+    if args.resume_directory:
+        if not directory.is_dir() or not (directory / "config").is_file():
+            raise ValueError("Resume requires an existing owned reference configuration")
+    else:
+        directory.mkdir(parents=True, exist_ok=False)
     config = (
         "[reticulum]\n"
         "  enable_transport = No\n"
-        "  share_instance = No\n"
+        + ("  static_transport_identity = Yes\n" if args.static_transport_identity else "")
+        + "  share_instance = No\n"
         "  panic_on_interface_error = No\n"
         "[logging]\n"
         "  loglevel = 2\n"
@@ -98,7 +106,11 @@ def main():
         f"    connectable = {'Yes' if args.connectable else 'No'}\n"
         + (f"    peers = {args.peer}\n" if args.peer else "")
     )
-    (directory / "config").write_text(config, encoding="utf-8")
+    if args.resume_directory:
+        if (directory / "config").read_text(encoding="utf-8") != config:
+            raise ValueError("Resume configuration must match the original role and peer")
+    else:
+        (directory / "config").write_text(config, encoding="utf-8")
     RNS.Reticulum(configdir=str(directory), loglevel=RNS.LOG_WARNING)
     matches = [interface for interface in RNS.Transport.interfaces
                if isinstance(interface, I2PInterface) and interface.name == "I2PLive"]
@@ -106,9 +118,11 @@ def main():
         raise RuntimeError(f"Expected one actual configured I2PInterface, found {len(matches)}")
     interface = matches[0]
     destination = RNS.Destination(None, RNS.Destination.IN, RNS.Destination.PLAIN,
-                                  "dotreticulum", "interop", "i2p", "python", args.name)
+                                  "dotreticulum", "interop", "i2p",
+                                  "native" if args.reverse_aspects else "python", args.name)
     native_destination = RNS.Destination(None, RNS.Destination.OUT, RNS.Destination.PLAIN,
-                                         "dotreticulum", "interop", "i2p", "native", args.name)
+                                         "dotreticulum", "interop", "i2p",
+                                         "python" if args.reverse_aspects else "native", args.name)
 
     def received(payload, packet):
         source = packet.receiving_interface
@@ -129,6 +143,9 @@ def main():
         "dest": destination.hash.hex(), "native_dest": native_destination.hash.hex(),
         "connectable": args.connectable, "sam": args.sam,
         "ifac_enabled": False, **snapshot(interface),
+        "resume_directory": args.resume_directory, "reverse_aspects": args.reverse_aspects,
+        "static_transport_identity": RNS.Reticulum.static_transport_identity(),
+        "transport_identity_hash": RNS.Transport.identity.hash.hex(),
     })
     try:
         for line in sys.stdin:

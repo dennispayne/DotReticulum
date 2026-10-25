@@ -33,12 +33,14 @@ BeforeAll {
             -TimeoutSeconds 15 -Environment @{ PYTHONPATH = $Upstream; DOTRETICULUM_UPSTREAM = $Upstream; PYTHONIOENCODING = 'utf-8' }
     }
     function Write-SharedConfig {
-        param([string] $Directory, [int] $SharedPort, [int] $ControlPort, [int] $PhysicalPort)
+        param([string] $Directory, [int] $SharedPort, [int] $ControlPort, [int] $PhysicalPort,
+            [string] $InstanceType = 'tcp', [string] $InstanceName = 'default')
         $null = New-Item -ItemType Directory -Path $Directory
         @"
 [reticulum]
 share_instance = yes
-shared_instance_type = tcp
+shared_instance_type = $InstanceType
+instance_name = $InstanceName
 shared_instance_port = $SharedPort
 instance_control_port = $ControlPort
 rpc_key = $key
@@ -53,6 +55,35 @@ listen_port = $PhysicalPort
 }
 
 Describe 'Shared-instance separate CLI processes' -Tag Runtime, E2E {
+    It 'elects an abstract Unix owner and exposes the independently configured local-client role' -Skip:(!$IsLinux) {
+        $shared = New-SharedTestPort
+        $control = New-SharedTestPort
+        $physical = New-SharedTestPort
+        $instance = 'parity6-' + [guid]::NewGuid().ToString('N')
+        $hostDir = Join-Path $TestDrive 'unix-host'
+        $clientDir = Join-Path $TestDrive 'unix-client'
+        Write-SharedConfig $hostDir $shared $control $physical 'unix' $instance
+        Write-SharedConfig $clientDir $shared $control $physical 'unix' $instance
+        $hostPeer = Start-TestProcess $executable ($prefix + @('rnsd', '--config', $hostDir))
+        $clientPeer = $null
+        try {
+            Wait-SharedTestPort $physical $hostPeer
+            $clientPeer = Start-TestProcess $executable ($prefix + @('rnsd', '--config', $clientDir))
+            Start-Sleep -Milliseconds 700
+            $clientPeer.Process.HasExited | Should -BeFalse -Because 'only the abstract-socket owner may open the physical listener'
+            $status = Invoke-TestProcess $executable ($prefix + @('rnsd', '--config', $clientDir, '--interactive')) `
+                -InputText "interfaces`nexit`n"
+            $status.Code | Should -Be 0 -Because $status.Error
+            $status.Output | Should -Match 'Local shared instance.*LocalSharedPacketInterface'
+            $status.Output | Should -Match 'Interfaces: 1'
+            $hostPeer.Process.HasExited | Should -BeFalse
+        }
+        finally {
+            if ($clientPeer) { Stop-TestProcess $clientPeer }
+            Stop-TestProcess $hostPeer
+        }
+    }
+
     It 'elects a host and avoids opening physical listeners in local-client processes' {
         $shared = New-SharedTestPort
         $control = New-SharedTestPort

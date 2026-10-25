@@ -15,7 +15,8 @@ internal sealed class Parity6I2pSamSimulator : IAsyncDisposable
     private readonly ConcurrentDictionary<TcpClient, byte> _clients = new();
     private readonly ConcurrentDictionary<TcpClient, byte> _sessions = new();
     private readonly ConcurrentDictionary<string, TcpClient> _sessionOwners = new(StringComparer.Ordinal);
-    private readonly Channel<NetworkStream> _accepts = Channel.CreateBounded<NetworkStream>(64);
+    private readonly Channel<(string SessionId, NetworkStream Stream)> _accepts =
+        Channel.CreateBounded<(string, NetworkStream)>(64);
     private readonly Channel<NetworkStream> _connects = Channel.CreateBounded<NetworkStream>(64);
     private readonly Task _worker;
     private int _generated;
@@ -122,8 +123,14 @@ internal sealed class Parity6I2pSamSimulator : IAsyncDisposable
             else if (command.StartsWith("STREAM ACCEPT ID=", StringComparison.Ordinal))
             {
                 Assert.EndsWith("SILENT=false", command);
+                var id = command.Split(' ').Single(part => part.StartsWith("ID=", StringComparison.Ordinal))[3..];
+                if (!_sessionOwners.ContainsKey(id))
+                {
+                    await ReplyAsync(stream, "STREAM STATUS RESULT=INVALID_ID\n");
+                    return;
+                }
                 await ReplyAsync(stream, "STREAM STATUS RESULT=OK\n");
-                await _accepts.Writer.WriteAsync(stream, _lifetime.Token);
+                await _accepts.Writer.WriteAsync((id, stream), _lifetime.Token);
                 await Task.Delay(Timeout.Infinite, _lifetime.Token);
             }
             else throw new InvalidDataException("Unexpected simulator command.");
@@ -167,9 +174,13 @@ internal sealed class Parity6I2pSamSimulator : IAsyncDisposable
 
     public async Task<NetworkStream> OutgoingAsync(CancellationToken token) => await _connects.Reader.ReadAsync(token);
 
-    public async Task<NetworkStream> IncomingAsync(ReadOnlyMemory<byte> initialBytes, CancellationToken token, string? peerDestination = null)
+    public async Task<NetworkStream> IncomingAsync(ReadOnlyMemory<byte> initialBytes, CancellationToken token,
+        string? peerDestination = null, string? sessionId = null)
     {
-        var stream = await _accepts.Reader.ReadAsync(token);
+        (string SessionId, NetworkStream Stream) pending;
+        do { pending = await _accepts.Reader.ReadAsync(token); }
+        while (sessionId is not null && pending.SessionId != sessionId);
+        var stream = pending.Stream;
         var combined = Encoding.ASCII.GetBytes((peerDestination ?? PublicDestination) + "\n").Concat(initialBytes.ToArray()).ToArray();
         if (FragmentReplies)
             foreach (var value in combined) await stream.WriteAsync(new byte[] { value }, token);

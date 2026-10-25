@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DotReticulum.Applications.Rnsd;
 using DotReticulum.Applications.Runtime;
+using DotReticulum.Interfaces;
 using DotReticulum.Transport;
 
 namespace DotReticulum.Applications.Tests;
@@ -118,6 +119,33 @@ public sealed class RnsdConfigurationParityTests : IDisposable
         Assert.True(config.LogTimestamps);
         Assert.Equal(3, config.LogLevel);
         Assert.Equal(4, RnsdConfigParser.Parse(RnsdConfigurationFiles.DefaultConfig).LogLevel);
+    }
+
+    [Fact]
+    public void SharedEndpointSelectionUsesAbstractUnixOnLinuxAndAndroidAndKeepsTcpOverride()
+    {
+        var unix = RnsdConfigParser.Parse("""
+            [reticulum]
+            shared_instance_type=unix
+            instance_name=worker
+            """);
+        var tcp = RnsdConfigParser.Parse("""
+            [reticulum]
+            shared_instance_type=tcp
+            instance_name=worker
+            """);
+
+        Assert.Equal(LocalSharedPlatformPolicy.SupportsAbstractUnixSockets ? "worker" : null,
+            unix.SharedInstance.SocketPath);
+        Assert.Null(tcp.SharedInstance.SocketPath);
+        Assert.Equal(LocalSharedPlatformPolicy.ForCurrentPlatform(),
+            unix.SharedInstance.LocalInterfacePolicy);
+
+        var direct = new SharedInstanceOptions { SocketPath = "worker" };
+        if (LocalSharedPlatformPolicy.SupportsAbstractUnixSockets)
+            Assert.IsType<System.Net.Sockets.UnixDomainSocketEndPoint>(direct.BearerEndpoint);
+        else
+            Assert.Throws<PlatformNotSupportedException>(() => _ = direct.BearerEndpoint);
     }
 
     [Fact]

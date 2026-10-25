@@ -46,8 +46,10 @@ CPU/memory/task telemetry and endpoint events are supported independently of
 subscribers. Discovery signatures establish possession of the advertised
 Ed25519 key, **not publisher trust or authenticated device enrollment**.
 
-No real serial device or Bluetooth device was opened. In particular COM4
-VID239A PID8029 “TinyUSB Serial” is unidentified and unauthorized.
+No real Weave serial device or Bluetooth device was opened. The separately
+authorized COM8 RAK answers RNode firmware queries, not Weave acceptance.
+Native serial construction now asserts DTR/RTS like upstream pyserial;
+disabled flow handshake does not mean deasserted control lines.
 Simulators/reference vectors do not establish physical Weave, live mixed-node
 or platform acceptance. Android upstream uses usb4a/usbserial4a + jnius,
 requires USB permission, overrides CH34x CDC, and tunes FTDI/CP210x buffers and

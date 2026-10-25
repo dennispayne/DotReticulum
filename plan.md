@@ -112,25 +112,26 @@ Phase and subphase progress is tracked here. The target is high-fidelity behavio
   - [x] Complete pending stream reads on disposal/link closure; observe ready-callback failures and concurrent close/write/EOF
   - [x] Upstream-exact malformed-input, boundary, concurrent-operation and long-running behavior
 - [ ] Parity 6 - Upstream interface coverage
-  - [ ] AutoInterface
-  - [ ] BackboneInterface and egress-state recovery
-  - [ ] LocalInterface and PipeInterface
-  - [ ] KISSInterface and AX25KISSInterface
-  - [ ] RNodeInterface and RNodeMultiInterface
+  - [x] AutoInterface software contracts and actual Linux/Python raw/IFAC topology
+  - [x] BackboneInterface and egress-state recovery software contracts on Linux
+  - [x] LocalInterface and PipeInterface software contracts and native process flows
+  - [x] KISSInterface and AX25KISSInterface software contracts; physical TNC acceptance tracked below
+  - [x] RNodeInterface and RNodeMultiInterface software contracts; authorized single-radio USB identification, not RF acceptance
   - [ ] I2PInterface
-  - [ ] WeaveInterface
+  - [x] WeaveInterface software contracts; physical acceptance tracked below
   - [ ] Android-specific adapters or documented native platform equivalents
   - [ ] Complete UDP/TCP/serial configuration and validate real serial/radio hardware
   - [x] UDP receive/forward independence, device/hostname/address-family resolution and configured port precedence
   - [x] TCP retry limits, KISS framing/IPv6/fixed MTU, optional-peer diagnostics and documented client-cap difference
-  - [ ] Serial parity/data/stop-bit configuration, idle partial-frame reset and reconnect/unplug recovery
-  - [ ] Backbone flap blocking/watermarks/egress-stall recovery and Pipe owned-child exit/respawn/cancellation
-  - [ ] Per-bearer bounded transmit bytes/frames, partial/zero/interrupted/would-block writes and egress hysteresis/accounting
-  - [ ] RNodeMulti nested subinterface settings/shared queues and Android USB/Bluetooth permission/adaptor contracts
+  - [x] Serial parity/data/stop-bit configuration, idle partial-frame reset and simulated reconnect/unplug recovery; real serial settings/recovery tracked below
+  - [x] Backbone flap blocking/watermarks/egress-stall recovery and Pipe owned-child exit/respawn/cancellation
+  - [x] Per-bearer bounded transmit bytes/frames, partial/zero/interrupted/would-block writes and egress hysteresis/accounting, including pre-allocation write admission
+  - [x] RNodeMulti nested subinterface settings/shared queues
+  - [ ] Android USB/Bluetooth permission/adaptor contracts and on-device execution
   - [x] Generic outgoing-interface selection, inherited child settings and source-exact known-path/direct-transmit exceptions
-  - [ ] Local decoded-frame accounting and Android shared-client pause/keepalive/abstract-socket differences
-  - [ ] Actual I2P stream delivery after persisted bearer restart; SAM readiness alone is insufficient
-  - [ ] Authorized physical serial/TNC/RNode/Multi/Weave and Android USB/Bluetooth/RF acceptance (blocked on identified owned devices, peers, platform access and lawful radio configuration; see development history)
+  - [x] Local decoded-frame accounting, source-backed Android pause/keepalive policy and Linux abstract-socket equivalents; Android execution tracked above
+  - [ ] Actual I2P stream delivery after persisted bearer restart (fails on i2pd and Java I2P); SAM readiness alone is insufficient
+  - [ ] Authorized physical serial/TNC/RNode/Multi/Weave and Android USB/Bluetooth/RF acceptance (COM8 RNode USB/firmware identification verified; one radio only, RF acceptance explicitly retained as unverified; remaining devices/platform access/settings unavailable; see development history)
 - [ ] Parity 7 - Upstream utility coverage
   - [ ] rnid import/export, encryption/decryption, signing/verification, metadata, announcements and network lookup options
   - [ ] rnid recursive/stdin/file/current/legacy/wrapped/embedded RSG/RSM and explicitly authorized bounded editor flows; CLI formatting/base256 and boundary output fidelity

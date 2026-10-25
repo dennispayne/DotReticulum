@@ -85,6 +85,7 @@ def main():
     verify_reference(require_lxmf=True)
     import RNS
     import LXMF
+    import serial
     from RNS.vendor.configobj import ConfigObj
     modules = [importlib.import_module("RNS.Interfaces." + name) for name in
                ("RNodeInterface", "RNodeMultiInterface")]
@@ -209,7 +210,10 @@ def main():
     observed["packets"] = replay.owner.packets
     observed["framebuffer"] = replay.r_framebuffer.hex()
     observed["display"] = replay.r_disp.hex()
+    with serial.Serial(port=None) as unopened_serial:
+        serial_defaults = {"dtr": unopened_serial.dtr, "rts": unopened_serial.rts}
     result = {"revision": PIN, "rns_version": RNS.__version__, "sources": provenance,
+              "serial_defaults": serial_defaults,
               "single": {"detect": detect, "configuration": configuration, "leave": leave,
                          "data": data, "frequency_100_accepted": accepted,
                          "frequency_101_accepted": rejected, "cr_mismatch_accepted": cr_not_compared,

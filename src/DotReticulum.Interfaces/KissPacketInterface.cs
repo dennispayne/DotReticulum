@@ -569,10 +569,7 @@ public class KissPacketInterface : IReconnectingPacketInterface, IPacketInterfac
         return cancellationToken =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var port = new SerialPort(portName, options.BaudRate, options.Parity, options.DataBits, options.StopBits)
-            {
-                Handshake = Handshake.None, DtrEnable = false, RtsEnable = false,
-            };
+            var port = NativeSerialPort.Create(portName, options.BaudRate, options.Parity, options.DataBits, options.StopBits);
             try
             {
                 port.Open();

@@ -133,10 +133,7 @@ internal sealed class RNodeDevice
         return token =>
         {
             token.ThrowIfCancellationRequested();
-            var port = new SerialPort(portName, 115200, Parity.None, 8, StopBits.One)
-            {
-                Handshake = Handshake.None, ReadTimeout = 100, WriteTimeout = 1000,
-            };
+            var port = NativeSerialPort.Create(portName, 115200, Parity.None, 8, StopBits.One, 100, 1000);
             try
             {
                 port.Open();

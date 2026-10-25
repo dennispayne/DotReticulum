@@ -11,17 +11,19 @@ public sealed record SharedInstanceOptions
     public bool Required { get; init; }
     public int InstancePort { get; init; } = 37428;
     public int ControlPort { get; init; } = 37429;
-    /// <summary>Abstract socket name without the upstream "\0rns/" prefix. Linux only; null selects loopback TCP.</summary>
+    /// <summary>Abstract socket name without the upstream "\0rns/" prefix. Linux/Android only; null selects loopback TCP.</summary>
     public string? SocketPath { get; init; }
     public byte[]? RpcKey { get; init; }
     public TimeSpan ReconnectDelay { get; init; } = TimeSpan.FromSeconds(8);
     public TimeSpan OperationTimeout { get; init; } = TimeSpan.FromSeconds(10);
     public int MaximumClients { get; init; } = 64;
+    public LocalSharedPlatformPolicy LocalInterfacePolicy { get; init; } = LocalSharedPlatformPolicy.ForCurrentPlatform();
     public EndPoint BearerEndpoint => SocketPath is null ? new IPEndPoint(IPAddress.Loopback, InstancePort) : Unix("");
     public EndPoint RpcEndpoint => SocketPath is null ? new IPEndPoint(IPAddress.Loopback, ControlPort) : Unix("/rpc");
     private EndPoint Unix(string suffix)
     {
-        if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException("Upstream shared Unix sockets require Linux abstract AF_UNIX; select shared_instance_type=tcp on this platform.");
+        if (!LocalSharedPlatformPolicy.SupportsAbstractUnixSockets)
+            throw new PlatformNotSupportedException("Upstream shared Unix sockets require Linux or Android abstract AF_UNIX; select shared_instance_type=tcp on this platform.");
         if (string.IsNullOrWhiteSpace(SocketPath) || SocketPath.Contains('\0')) throw new ArgumentException("Invalid shared socket name.");
         return new UnixDomainSocketEndPoint("\0rns/" + SocketPath + suffix);
     }
@@ -56,7 +58,7 @@ public sealed class SharedInstanceSession : IAsyncDisposable
         var endpoint = options.BearerEndpoint;
         if (!options.Required)
         {
-            var server = new LocalSharedServerInterface(endpoint, options.MaximumClients, diagnostic);
+            var server = new LocalSharedServerInterface(endpoint, options.MaximumClients, diagnostic, options.LocalInterfacePolicy);
             try
             {
                 server.Reserve();
@@ -68,7 +70,8 @@ public sealed class SharedInstanceSession : IAsyncDisposable
                 Report(diagnostic, ex);
             }
         }
-        var client = new LocalSharedPacketInterface(endpoint, options.ReconnectDelay, options.OperationTimeout, diagnostic);
+        var client = new LocalSharedPacketInterface(endpoint, options.ReconnectDelay, options.OperationTimeout,
+            diagnostic, options.LocalInterfacePolicy);
         try
         {
             await client.PrepareAsync(token).ConfigureAwait(false);

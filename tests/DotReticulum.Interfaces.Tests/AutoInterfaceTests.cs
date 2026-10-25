@@ -395,6 +395,71 @@ public sealed class AutoInterfaceTests
     }
 
     [Fact]
+    public async Task MissingDeviceDisposesItsSessionAndPeersAndReappearanceOpensFreshSocket()
+    {
+        var network = new Network();
+        await using var auto = Create(network);
+        var peers = new List<IPacketInterface>();
+        auto.ChildConnected += peers.Add;
+        await auto.StartAsync(default);
+        Discover(auto, Device, Remote);
+        var originalSocket = network.Opened[Device];
+        await using var reader = peers[0].ReceiveAsync(default).GetAsyncEnumerator();
+        var pendingReceive = reader.MoveNextAsync().AsTask();
+
+        network.Devices = [];
+        await auto.RunMaintenanceAsync();
+
+        Assert.True(originalSocket.Disposed);
+        Assert.Equal(0, auto.GetDiagnostics()["devices"]);
+        Assert.Equal(0, auto.PeerCount);
+        Assert.False(await pendingReceive.WaitAsync(TestSupport.Patience));
+        Assert.True(auto.IsOnline);
+
+        network.Devices = [Device];
+        await auto.RunMaintenanceAsync();
+
+        var restoredSocket = network.Opened[Device];
+        Assert.NotSame(originalSocket, restoredSocket);
+        Assert.False(restoredSocket.Disposed);
+        Assert.Equal(1, auto.GetDiagnostics()["devices"]);
+        Discover(auto, Device, Remote);
+        Assert.Equal(2, peers.Count);
+        Assert.NotSame(peers[0], peers[1]);
+        await peers[1].SendAsync(new byte[] { 7 }, default);
+        Assert.Contains(restoredSocket.Sent, sent =>
+            sent.Address.Equals(Remote) && sent.Data.SequenceEqual(new byte[] { 7 }));
+    }
+
+    [Fact]
+    public async Task InitiallyFailedDeviceSetupAndFailedReappearanceAreRetried()
+    {
+        var network = new Network { FailOpen = true };
+        await using var auto = Create(network);
+        await auto.StartAsync(default);
+        Assert.Equal(0, auto.GetDiagnostics()["devices"]);
+
+        network.FailOpen = false;
+        await auto.RunMaintenanceAsync();
+        var firstSocket = network.Opened[Device];
+        Assert.Equal(1, auto.GetDiagnostics()["devices"]);
+
+        network.Devices = [];
+        await auto.RunMaintenanceAsync();
+        Assert.True(firstSocket.Disposed);
+        network.Devices = [Device];
+        network.FailOpen = true;
+        await auto.RunMaintenanceAsync();
+        Assert.Equal(0, auto.GetDiagnostics()["devices"]);
+
+        network.FailOpen = false;
+        await auto.RunMaintenanceAsync();
+        Assert.NotSame(firstSocket, network.Opened[Device]);
+        Assert.False(network.Opened[Device].Disposed);
+        Assert.Equal(1, auto.GetDiagnostics()["devices"]);
+    }
+
+    [Fact]
     public async Task DeviceStartFailureIsIsolatedAndEmptyInterfaceIsDiagnosed()
     {
         var errors = new ConcurrentQueue<Exception>();

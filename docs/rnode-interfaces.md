@@ -18,7 +18,10 @@ Observable criteria established before implementation:
 * Execute the actual pinned `detect`, setters, `initRadio`, `process_outgoing`,
   `KISS.escape`, and radio validation methods, without opening serial devices.
   Store generated framing/control/configuration vectors and source/import provenance.
-* Serial defaults: 115200, 8N1, no flow handshake; explicit asynchronous start.
+* Serial defaults: 115200, 8N1, no flow handshake, DTR/RTS asserted as in
+  pyserial; explicit asynchronous start. Disabling hardware flow control does
+  not deassert these lines. The shared native serial factory preserves this
+  contract for Serial, KISS/AX25, RNode/Multi and Weave.
   Frequency, bandwidth, power, SF and CR must be supplied; the single Python
   config defaults them to zero and consequently rejects missing configuration.
   Single: 137 MHz–3 GHz, power 0–37 dBm; multi SX127x/SX126x:
@@ -77,9 +80,18 @@ Observable criteria established before implementation:
 
 ## Intentional boundaries and differences
 
-This is a native library slice, not physical-radio certification. No real
-device is opened by generators/tests. COM4's observed USB identifier does not
-establish ownership or RNode identity. Hardware acceptance requires explicit
+This is a native library slice, not physical-radio certification. Generators
+never open real devices; the opt-in `Parity6RNodeHardwareTests` opens only the
+explicitly authorized `DOTRETICULUM_RNODE_PORT`. On the owner's COM8 RAK,
+native read-only detection returned firmware 1.86, nRF52 platform 0x70 and
+MCU 0x71. The device did not answer with DTR low and did answer with DTR
+asserted, exposing the difference between .NET and pyserial defaults.
+The probe sends only detection/version/platform/MCU queries, not radio
+configuration, RF DATA, EEPROM writes or firmware updates. This establishes
+USB/firmware responsiveness, not RF, full startup or unplug/replug acceptance.
+Only one RNode is available; no second-radio receive or over-air exchange
+can be verified with this setup.
+Hardware acceptance still requires explicit
 owned-device/port, chip/firmware, frequency, bandwidth, power, SF/CR, legal RF
 authorization, and platform-specific unplug/replug evidence.
 
@@ -99,7 +111,7 @@ device reconnection instead of replaying a potentially transmitted packet.
 Android's platform-specific class and BLE/bonding remain platform work, not
 verified hardware support. EEPROM, firmware updates, trust changes and
 rnodeconf are separate later utility contracts. Display/framebuffer/reset
-and single-radio TCP controls are implemented below; physical device support
+and single-radio TCP controls are implemented below; physical radio behavior
 is still unverified.
 No helper process is spawned. Each successful stream-factory return transfers
 ownership; serial owners and streams are closed on failure/disposal.

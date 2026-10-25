@@ -38,6 +38,17 @@ public sealed class Parity6RNodeTests
     private static byte[] Hex(JsonElement value) => Convert.FromHexString(value.GetString()!);
 
     [Fact]
+    public void SerialControlLinesMatchReferenceDriverDefaults()
+    {
+        using var vectors = Vectors();
+        var defaults = vectors.RootElement.GetProperty("serial_defaults");
+        using var port = NativeSerialPort.Create("unopened", 115200, System.IO.Ports.Parity.None, 8, System.IO.Ports.StopBits.One);
+        Assert.Equal(defaults.GetProperty("dtr").GetBoolean(), port.DtrEnable);
+        Assert.Equal(defaults.GetProperty("rts").GetBoolean(), port.RtsEnable);
+        Assert.False(port.IsOpen);
+    }
+
+    [Fact]
     public void ControlAndDataMatchActualPinnedPython()
     {
         using var vectors = Vectors();

@@ -87,8 +87,7 @@ public sealed class WeavePacketInterface : ISpawningPacketInterface, IReconnecti
         return token =>
         {
             token.ThrowIfCancellationRequested();
-            var port = new SerialPort(portName, 3_000_000, Parity.None, 8, StopBits.One)
-            { Handshake = Handshake.None, ReadTimeout = 250, WriteTimeout = 1000 };
+            var port = NativeSerialPort.Create(portName, 3_000_000, Parity.None, 8, StopBits.One, 250, 1000);
             try { port.Open(); token.ThrowIfCancellationRequested(); return ValueTask.FromResult<(Stream, IDisposable?)>((port.BaseStream, port)); }
             catch { port.Dispose(); throw; }
         };

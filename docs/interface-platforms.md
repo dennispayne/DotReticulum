@@ -95,26 +95,30 @@ Python's extra `RECONNECT_WAIT + 2` sleep before reannouncement.
 
 Upstream enables physical empty-HDLC keepalives on Android initiators and
 pauses an Android owner's accepted client's outbound traffic after **12 seconds**
-without incoming activity; incoming activity refreshes the timer
-(`LocalInterface.py:98–100,146,213–217,274`).
-The native initiator sends empty-HDLC keepalives every **three seconds** on
-desktop too, but does **not** implement that Android sleep/pause policy.
-Empty keepalives are not Reticulum data packets. Android background suspension,
+without incoming activity; any received socket bytes refresh the timer
+(`LocalInterface.py:98–100,146,188–202,213–217,274`).
+`LocalSharedPlatformPolicy` now carries the explicit three-second initiator
+keepalive and 12-second accepted-client pause defaults. It enables the pause
+only when `OperatingSystem.IsAndroid()` is true; desktop's existing three-second
+keepalive behavior is preserved. The accepted-client pause uses monotonic
+elapsed time, drops outbound traffic after the timeout, and refreshes on socket
+activity (including an empty keepalive). These are source-backed software
+contracts; no Android runtime has been exercised. Background suspension,
 battery use, sleeping-client queue pressure and resume behavior remain
-**missing/unverified**, not demonstrated by desktop reconnect tests.
+**missing/unverified**.
 
-There is also an observable accounting difference: native local `rxb` adds raw
-socket-read bytes, including framing/keepalives, whereas upstream
-`process_incoming` adds decoded frame length. Treat exact LocalInterface
-statistics parity as **partial**, even when packet exchange passes.
-This audit does not change that implementation.
+Local `rxb` now adds the decoded lengths of accepted frames, matching upstream
+`process_incoming`; framing bytes and empty/malformed frames do not count.
+Outbound `txb` continues to count encoded packet frame bytes, while separate
+empty keepalives do not count. This closes the source-backed counter difference,
+but live statistics comparison remains **unverified**.
 
-`RnsdConfig.cs:381–385,407–413` selects Unix only when
-`OperatingSystem.IsLinux()` is true; non-Linux configuration, including an
-explicit `unix` value, selects TCP. Direct `SharedInstanceOptions.SocketPath`
-use throws outside Linux. The native guard does not explicitly include Android
-as upstream does. Android abstract-socket selection is therefore **not covered**;
-do not infer it from Linux kernel ancestry or Linux desktop success.
+`RnsdConfig.cs` and `SharedInstanceOptions` now select abstract Unix endpoints
+on both Linux and Android, with TCP as the explicit override and on other
+platforms. `LocalSharedPlatformPolicy.SupportsAbstractUnixSockets` centralizes
+that platform decision. Android endpoint selection is implemented in software
+but remains **unverified on Android**; it is not evidence that .NET Android
+socket support, packaging or an Android host works.
 
 ## Android adapter and host responsibilities
 
@@ -204,15 +208,18 @@ that the pinned Python files implement permission prompts:
 
 The current projects target `net10.0`, with no Android application target found
 in this audit. Missing packaging, permission handling, USB/RFCOMM/GATT providers
-and Android shared-client sleep policy remain **missing**. Generic socket,
-stream and codec reuse opportunities are **not applicable evidence** of device
-support.
+and Android device/service behavior remain **missing or unverified**. The
+shared-client timing policy is implemented, but its Android runtime integration
+is not validated. Generic socket, stream and codec reuse opportunities are
+**not applicable evidence** of device support.
 
 ## Evidence boundaries and measurable acceptance
 
-No build, test, installation, network command or device access was performed
-for this documentation-only audit. The Windows/Linux coordinator runs are
-separate evidence and must be reported by their actual results.
+The focused implementation adds deterministic-clock unit coverage for the
+pause boundary, keepalive accounting, decoded-frame counters and endpoint
+policy. This subtask did not run builds/tests, installation, network commands
+or device access; the coordinator owns validation and must report its actual
+results separately.
 
 Previously recorded Parity 3 evidence in
 [development history](../.github/development-history.md#parity-3-runtime-configuration-and-operations-2026-10-21)
@@ -240,8 +247,8 @@ The following are acceptance criteria, not a second progress checklist:
 | --- | --- |
 | Local TCP — implemented, prior Windows evidence | Reproduce both owner/client roles with the pinned Python process, byte-identical escaped packets, independent peers, one physical owner, wrong-key/malformed-peer survival and restart/reannouncement. Requires loopback/process access only; no radio or Internet. Current-run results belong in the coordinator's history record. |
 | Local abstract Unix — implemented Linux path, platform evidence not established by this audit | On Linux, verify default and named `NUL+rns/...` packet/RPC endpoints with actual Python in both roles, name isolation, competing ownership, owner restart, and no filesystem socket artifacts. Confirm TCP override separately. Requires a Linux host/container permitting AF_UNIX in the same relevant namespace, not physical hardware. |
-| Local peer/lifecycle/statistics — partial parity | Drop/fault one admitted child while a sibling continues traffic and new clients connect; exercise admission cap, blocked sends, no subscriber, cancellation and disposal. Compare decoded/framed counters and keepalives explicitly rather than asserting current totals match Python. Requires owned local processes/sockets. |
-| Android sharing/service — missing/unverified | On a named Android version/target SDK, verify endpoint policy, owner-only USB access, pause after 12 seconds, wake/reconnect, path-response reannouncements, service termination/restart and permission revocation while unrelated peers survive. Requires an installable Android host plus authorized emulator/device; desktop Linux success alone is insufficient. |
+| Local peer/lifecycle/statistics — software contract implemented; runtime acceptance partial | Drop/fault one admitted child while a sibling continues traffic and new clients connect; exercise admission cap, blocked sends, no subscriber, cancellation and disposal. Compare decoded/framed counters and keepalives against Python, including empty keepalive behavior. Requires owned local processes/sockets; latest focused tests await coordinator validation. |
+| Android sharing/service — timing and endpoint policy implemented; device/runtime missing or unverified | On a named Android version/target SDK, verify endpoint operation, pause after 12 seconds, wake/reconnect, path-response reannouncements, service termination/restart and permission revocation while unrelated peers survive. Requires an installable Android host plus authorized emulator/device; desktop Linux success alone is insufficient. |
 | Android USB Serial/KISS/Weave — missing provider, hardware-dependent acceptance | On an owned Android USB-host device and identified adapter/TNC/Weave, record driver VID/PID and line/control settings; test grant/deny/revoke, unplug/replug, short writes, partial frames, reconnect and cleanup. Compare pinned configuration/control bytes, and validate real bidirectional traffic. An emulator or simulated stream covers protocol software only. |
 | Android RNode RFCOMM/BLE — missing provider, hardware-dependent acceptance | With authorized bonded RNode/firmware, validate target matching, adapter disabled/permission denied, SPP or exact GATT UUIDs, notification/MTU failure, fragmentation, reconnect and clean shutdown. Test control readback and both traffic directions; record negotiated MTU and actual transport. Requires Bluetooth-capable Android hardware and identified device. |
 | Android/native network transports — unverified on Android | Test TCP/UDP, Auto multicast/IPv6 and any configured Backbone/I2P path on an actual Android host, including network transitions and background restrictions. I2P additionally needs a controlled SAM router; desktop/simulated SAM success does not verify Android deployment. No RF is needed for ordinary IP tests. |
