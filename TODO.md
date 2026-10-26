@@ -24,7 +24,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] Android host/providers, desktop RNode BLE and other missing/partial applicable software identified in the compatibility ledger
   - [ ] Per-interface interoperability and hardware evidence; untested platforms/devices remain unverified
 - [ ] CI/CD and automation
-  - [ ] `ci-build-test.yml` (authorized early on 2026-10-26; require actual Windows/Linux/macOS run evidence)
+  - [x] `ci-build-test.yml` (authorized early on 2026-10-26; green on all three OSes in run 40330280525)
   - [ ] `interop-test.yml`
   - [ ] `e2e-mesh-test.yml`
   - [ ] `codeql.yml`

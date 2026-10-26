@@ -12,6 +12,14 @@ The user explicitly authorized `ci-build-test.yml` before the remaining
 parity gates to obtain actual hosted Windows/Linux/macOS feedback. This is a
 narrow exception to the earlier CI-last sequencing, not authorization for
 interop/mesh/CodeQL/stale workflows or a full release/platform-support claim.
+
+Result: run 40330280525 (commit `dbc91a7`) passed on `windows-latest`,
+`ubuntu-latest` and `macos-latest` (managed suites with coverage, NativeAOT
+publish, native help, encrypted compressed multi-megabyte resource, local
+Pester containers). Runs 40324430597 and 40326928959 and 40328376116 exposed
+and fixed portability/test-race failures (Windows fixture-delete race and a
+Linux `/proc` probe race were test-only). Darwin PTY/rnsh remains skipped with
+a reason and tracked; this is not broad macOS support.
 The original roadmap is archived at `docs/archive/plan.md`; every previously
 unchecked item was carried into the sole active `TODO.md`. The archive is
 not maintained as another tracker. Current contributor/agent/template/skill
