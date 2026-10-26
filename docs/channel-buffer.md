@@ -36,40 +36,17 @@ Source SHA-256:
 * `Transport.py`: `333b34eeab020946eefdd8a7e75d3fa74d2ffc5adfef7c0080752980f455bf2c`
 * `Cryptography/Token.py`: `8a75bbc724bce181b4a581f75c72b280f47e9a43db873f45ec576d4df6160b47`
 
-## Acceptance criteria for this slice
+## Protocol behaviour
 
-* Preserve the six-byte big-endian envelope and two-byte stream header,
-  including compressed chunks, EOF, and all 14 stream-ID bits.
-* Deliver once and in order across sequence 65535 → 0, including out-of-order
-  packets, duplicates, stale packets and the inclusive 48-packet receive boundary.
-* Match initial windows and delivery-driven growth at RTT 0, 0.18, 0.75 and
-  1.45 seconds, including immediately above each boundary; match exponential
-  timeout growth and exactly five transmission attempts before link teardown.
-* Failed sends do not consume sequence numbers; retries preserve their sequence;
-  shutdown disconnects receipts and cannot resurrect channel work.
-* Each encrypted retry obtains fresh IV/ciphertext/hash and a fresh receipt,
-  while preserving the Channel envelope bytes and sequence.
-* Bound unread stream bytes and ready-callback work. A slow consumer must not
-  cause unbounded allocation or silent data loss.
-* Pending reads finish on local disposal, peer EOF, cancellation, or channel
-  shutdown. Buffered data is drained before EOF on normal link closure.
-* Serialize writes against EOF/close, send at most one EOF, observe callback
-  exceptions through link logging, and leave no unobserved callback-task faults.
-* Derive budgets from negotiated link MDU, retaining upstream's 16-KiB maximum
-  decompressed stream chunk.
+A Channel envelope has a six-byte big-endian header; its declared length is tolerated even when it differs from the remaining payload length. The two-byte stream header carries the EOF flag, compression flag and 14-bit stream ID. Messages are delivered once and in order across sequence wrap, with a 48-message receive window. The sending window adapts to delivery and RTT; retries preserve the sequence and envelope, and link shutdown disconnects outstanding receipts.
 
-## Acceptance mapping
+A channel stream uses compressed chunks when applicable, drains buffered data before normal EOF, and bounds decoded chunks to 16 KiB. The reader has a configurable unread-byte limit (default 1 MiB); overflow fails the reader and aborts its link rather than silently dropping already-proven data. Writes wait on the channel's receipt/window signal with cancellation. Reads complete on data, EOF, cancellation, disposal or link closure.
 
-The following names are xUnit tests in `DotReticulum.Transport.Tests`. This maps
-contracts to evidence; it is not another roadmap checklist.
+## Verification
 
-| Contract | Pinned source | Focused evidence |
-| --- | --- | --- |
-| Envelope wire format, sequence wrap, reordering, duplicates, inclusive receive boundary, negotiated payload budget | `Channel.py:113–148,175–245,351–415,495–544` | `Parity5ChannelTests.EnvelopeLayoutAndSendWrapMatchPinnedReference`, `WrapReorderDuplicatesAndReceiveWindowMatchReference`, `ConcurrentInWindowDeliveryAndDuplicatesRetainOneOrderedCallbackStream`, `LargerMduStillRejectsEnvelopeLengthFieldOverflowWithoutLosingSequence` |
-| RTT boundary windows, inflight-dependent exponential timeouts, contraction/recovery, five attempts, exhaustion and clean replacement link | `Channel.py:417–544,547–608` | `Parity5ChannelTests.RttBoundaryWindowsMatchEveryReferenceDeliveryRound`, `RetryTimeoutsFiveAttemptsAndExhaustionMatchReference`, `RetryContractsAndSuccessfulRecoveryAdjustWarmFastWindowLikeReference`, `InflightCountExtendsOtherReceiptsWithoutShorteningTimeoutsOnDelivery`, `StaleReceiptCallbacksCannotRetryOrDeliverReplacementAttempt`; existing `ChannelResilienceTests.LostDataOrProof_RetriesWithoutDuplicates_ReleasesFullWindow`, `PersistentLoss_ExhaustsRetries_ClosesPeers_CleansRegistries_AndNewLinkRecovers` |
-| Stream flags, compression/expansion boundary, EOF and chunk budget | `Buffer.py:44–98,201–294` | `Parity5ChannelBufferTests.StreamHeadersCompressedChunkBoundaryAndExpansionRejectionMatchReference`, `NegotiatedMduControlsPayloadBudgetWhileDecodedChunksStayWithin16KiB`; existing `ChannelTests.Buffer_StreamsCompressibleAndRandomDataBothWays_WithEof` |
-| Bounded slow-consumer storage, write backpressure, bounded observer work, core processing despite stalled/no observers | `Channel.py:351–415,417–544`; `Buffer.py:101–198` plus the explicit native policies below | `Parity5ChannelTests.NoSubscriberStillAdvancesProtocolAndDelayedProofCallbacksDoNotLeakWindowSlots`, `StalledHandlerHasBoundedQueueAndDoesNotBlockProtocolShutdown`; `Parity5ChannelBufferTests.ReaderUsesBoundedCircularStorageAcrossPartialReadsAndWrap`, `SlowConsumerOverflowFailsClosedAndDoesNotReturnSilentTruncation`, `OversizedFirstChunkWakesBlockedReadWithExplicitFailure`, `SlowReadyCallbackHasOnlyOneWorkerAndOneCoalescedNotification`, `StalledOptionalChannelObserverDoesNotBlockStreamProtocolOrReaderDisposal`; existing `ChannelResilienceTests.Writer_WaitsForExhaustedWindow_ThenResumesAfterProofLossEnds` |
-| Pending reads on disposal/closure/cancellation, logged callback failures, concurrent close/write and exactly one EOF | `Channel.py:303–320,340–349`; `Buffer.py:101–198,269–294` plus native `Stream` lifecycle semantics below | `Parity5ChannelTests.CallbackExceptionsAreLoggedAndOtherHandlersContinue`, `ShutdownDuringSendCannotReattachReceiptCallbacks`, `WindowWaitsAreCancellableAndShutdownReleasesEveryWaiter`; `Parity5ChannelBufferTests.PendingReadIsReleasedByDisposeAndSubsequentReadsRemainDisposed`, `LinkClosureCompletesPendingReadAndDrainsAlreadyBufferedBytesFirst`, `ReadCancellationAndZeroLengthDoNotConsumeDataOrSignalEof`, `ReadyCallbackFailuresAreLoggedAndDoNotDisableOtherCallbacksOrReads`, `ReadyCallbackCanDisposeItsOwnReaderWithoutDeadlockOrLaterCallbacks`, `ConcurrentWriteAndCloseWaitForBackpressureAndEmitOnlyOneFinalEof`, `CanceledCloseCanRetryWithoutLosingOrDuplicatingEof`, `ShutdownReleasesBlockedWriterAndCloseWithoutSendingPostCloseEof` |
+`tests/DotReticulum.Transport.Tests/Parity5ChannelTests.cs`, `Parity5ChannelBufferTests.cs`, `Parity5ChannelRetryCryptoTests.cs`, `ChannelTests.cs`, `ChannelResilienceTests.cs` and `LifecycleTests.cs` cover envelope encoding, sequence wrap, ordering, RTT/retry behavior, stream bounds, EOF, callbacks and shutdown. Independent vectors are generated by `tests/DotReticulum.Transport.Tests/GenerateParity5ChannelVectors.py` and `GenerateParity5ChannelRetryCryptoVectors.py` against RNS 1.5.7 at `a29bfb51c468945c96a1ee22cae0114e993e2391`; the window/order fixture's synthetic outlet does not establish retry encryption, which is covered by the separate real reference retry path.
+
+Actual pinned Python nodes exercise direct upgraded-MTU Channel traffic in both endpoint roles and a Python transport plus .NET transport path with 40-ms bridge RTT, selective Channel loss in both directions, stream buffers, multipart resources, exhaustion teardown and fresh-link recovery. Live bottlenecks cover 1,024 and 16,384 bytes over TCP, not every MTU or bearer. Sequence-wrap and RTT-boundary sweeps, slow-reader failures, callback races and prolonged soak are vector or focused-test evidence, not live failure-topology claims.
 
 ## Native ownership and intentional API differences
 
@@ -137,122 +114,14 @@ upstream's explicitly unfinished always-true `is_usable` outlet predicate.
 An outgoing envelope-length overflow raises the typed `TooBig` channel error
 instead of Python's incidental `struct.error`.
 
-## Evidence boundary
+## Interoperability and lifecycle
 
-Reference vectors are not live interoperability. Actual pinned Python nodes
-exercise direct upgraded-MTU Channel traffic in both endpoint roles and a Python
-transport plus .NET transport path with 40-ms bridge RTT, selective Channel loss
-in both directions, Buffer streams, multipart resources, exhaustion teardown and
-fresh-link recovery. The mixed topology negotiates both 16,384-byte and
-1,024-byte bottlenecks. Exact commands and results are in the development history.
+Actual pinned Python nodes exercise direct upgraded-MTU Channel traffic in both endpoint roles and a Python transport plus .NET transport path with 40-ms bridge RTT, selective Channel loss in both directions, Buffer streams, multipart resources, exhaustion teardown and fresh-link recovery. Live TCP bottlenecks cover 1,024 and 16,384 bytes, not every MTU or bearer. Sequence-wrap and RTT-boundary sweeps are vector evidence, not live-under-loss claims; slow-reader overflow, callback races and close/write/disposal failure paths are covered by focused tests rather than a live combined-failure topology or prolonged soak.
 
-Concrete remaining evidence boundaries:
+Core receive and receipt settlement continue independently of optional observers. Library stream handlers process protocol data; arbitrary user callbacks use bounded background work, log failures with stream context, and cannot disable unrelated protocol processing. Disposal stops queued notifications but cannot forcibly interrupt an already-running synchronous callback. `HandlerCompletion` and `ReadyCallbacksCompletion` expose owned callback work without making shutdown wait indefinitely for untrusted code.
 
-* Sequence wrap and exact RTT promotion/timeout boundaries are independently
-  executed reference/vector contracts, not reported as live wrap-under-loss or
-  live RTT-threshold sweeps.
-* Slow-reader overflow, deliberately blocked/throwing observers, cancellation and
-  close/write/disposal races have deterministic focused tests; no live impaired
-  topology combining all these failure paths or prolonged soak is claimed.
-* Live bottleneck evidence covers 1,024 and 16,384 bytes over TCP, not every MTU,
-  bearer or physical radio.
-* Native publication and rncp resource execution are not native Channel/Buffer
-  execution evidence; the history identifies each exercised native feature.
+The xUnit coverage is in `tests/DotReticulum.Transport.Tests/Parity5ChannelTests.cs`, `Parity5ChannelBufferTests.cs`, `Parity5ChannelRetryCryptoTests.cs`, `ChannelTests.cs`, `ChannelResilienceTests.cs` and `LifecycleTests.cs`. Independent reference fixtures are generated by `tests/DotReticulum.Transport.Tests/GenerateParity5ChannelVectors.py` and `GenerateParity5ChannelRetryCryptoVectors.py` against RNS 1.5.7 at `a29bfb51c468945c96a1ee22cae0114e993e2391`. The window/order fixture uses a synthetic outlet; retry encryption uses the actual reference Packet/Link/Token/Transport retry path with captured network output and a synthetic established session, not a handshake or live-node claim.
 
-The bounded-failure,
-observer scheduling, synchronous-codec and native-stream differences above
-remain intentional, observable contracts.
+## Retry encryption
 
-Integration hooks:
-
-* Invoke `Channel.Receive` as core protocol work after releasing the Link gate,
-  before optional observer dispatch. Only library stream handlers run inline;
-  arbitrary registered message handlers are bounded off-thread work.
-* Receipt delivery/timeout callbacks belonging to a Channel are core protocol
-  callbacks, not droppable optional observer notifications.
-* Pinned retries reuse the same Python `Packet` object but **repack/re-encrypt**
-  its unchanged plaintext Channel envelope, yielding fresh ciphertext/hash.
-  The Link outlet needs an envelope-resend hook returning its new receipt. `LinkChannelOutlet`
-  calls `internal PacketReceipt? Link.ResendChannelPacket(PacketReceipt previousReceipt)`;
-  retransmission must use fresh encryption, not replay retained encrypted bytes.
-* Use `HandlerCompletion`/`ReadyCallbacksCompletion` for bounded observer-drain
-  diagnostics, not an unconditional shutdown join of untrusted synchronous code.
-
-Link installs packet ownership and `CoreCallbacks` before enqueueing,
-so a fast proof cannot race callback classification. The outlet also marks the
-returned receipt defensively. The retained encrypted packet can recover the
-original plaintext envelope for re-encryption; it is not itself retransmitted.
-Removing completed receipts from protocol registries releases library ownership.
-
-The resend hook returns a newly tracked, SENT receipt for the re-encrypted packet
-(new IV/ciphertext/hash, same Channel sequence/envelope), with fresh send/timeout origins and `CoreCallbacks`
-already true. It returns null on an unusable/closed link, rejects receipts
-owned by another link, and returns a concurrently delivered receipt without
-retransmission. Router receipt indexes and retained `SentPacket` must refer to
-the new hash/packet; the expired receipt must not remain the active proof target.
-Channel already replaces `envelope.Receipt`, disconnects expired callbacks, and
-guards callback receipt identity; it does not key its rings by immutable packet
-hash. Therefore hash changes require no additional Channel production change.
-
-After releasing the Link gate, delivery and tick-timeout callbacks for
-`CoreCallbacks` receipts run directly, not through the optional observer queue.
-Errors are isolated and logged per callback. Channel installs its delivery/timeout delegates,
-increases retry count, computes/updates timeout and window values, and observes
-receipts that already settled before those delegates were attached.
-
-Focused validation selector:
-`FullyQualifiedName~Parity5Channel|FullyQualifiedName~ChannelTests|FullyQualifiedName~ChannelResilienceTests|FullyQualifiedName~LifecycleTests`.
-
-## Corrected retry-encryption oracle
-
-The earlier original-ciphertext replay claim was incorrect: source review stopped
-at `LinkChannelOutlet.resend`, overlooking `Packet.resend` calling `self.pack()`
-and Channel packing calling `destination.encrypt(self.data)`. The synthetic
-window/order outlet could not establish ciphertext or hash behavior. This
-correction supersedes that claim without changing the reference pin or relabeling
-the original deterministic window/order fixture.
-
-`GenerateParity5ChannelRetryCryptoVectors.py` executes the unmodified chain:
-`Channel.send` → `LinkChannelOutlet.send` → `Packet.send` → `Packet.pack` →
-`Link.encrypt` → `Token.encrypt` → `Transport.outbound/_outbound/transmit` →
-`PacketReceipt.__init__`, followed by the actual installed timeout callback →
-`Channel._packet_timeout` → `LinkChannelOutlet.resend` → `Packet.resend` and
-the same packing/encryption/transport/receipt path. Passive profiling records
-each method's actual imported source file, line and call count in the fixture.
-
-Only network I/O is replaced with `CaptureInterface.process_outgoing`. The Link
-starts with an explicitly installed synthetic 64-byte session key and synthetic
-peer signing key; no handshake or live node is claimed. No upstream callable,
-Token primitive, receipt constructor or entropy source is patched. Timeout
-stimulus sets the previous receipt to FAILED and invokes its real installed
-callback. Delivery executes real `PacketReceipt.validate_link_proof` and
-`Link.validate` with a real Ed25519 proof.
-
-Executed command (same verified checkout and isolated venv as the window fixture):
-
-```powershell
-$env:DOTRETICULUM_UPSTREAM = 'C:\Users\dennis\.copilot\session-state\c075724f-f262-4902-9809-a6358920915f\files\upstream-reticulum-rns'
-$env:PYTHONPATH = $env:DOTRETICULUM_UPSTREAM
-& 'C:\Users\dennis\.copilot\session-state\c075724f-f262-4902-9809-a6358920915f\files\refvenv\Scripts\python.exe' tests\DotReticulum.Transport.Tests\GenerateParity5ChannelRetryCryptoVectors.py
-```
-
-Result: exit 0, verified clean pinned imports; three attempts at sequence 65535
-have identical envelopes but distinct random IVs, ciphertexts and hashes, with
-fresh receipts and the same Python Packet object. A signed proof for the latest
-hash is accepted and the next send wraps to sequence 0. Genuine entropy is
-retained, so regeneration intentionally changes captured cipher/hash samples;
-only the observable relationships and decrypted bytes are reproducible.
-The recorded fixture SHA-256 is
-`59e2486a903a85a566dd539e522e4e547d53b44f3949a7fb06cb14edca46f9bd`.
-
-`Parity5ChannelRetryCryptoTests.ActualReferencePacketResendChangesCiphertextAndHashButPreservesEnvelopeAndSequence`
-independently parses/hashes/authenticates/decrypts every captured packet in .NET
-and checks the real proof. `LinkRetryReencryptsSameEnvelopeAndOnlyCurrentHashProofSettlesCurrentReceipt`
-exercises the actual .NET Link hook, new receipt/hash, rejection of an old-hash
-proof and settlement by the current-hash proof. The lightweight Channel test
-outlet now supplies distinct synthetic per-attempt IDs; its `Sent` queue records
-plaintext envelopes only, never wire ciphertext.
-
-These newly added .NET tests and corrected-implementation mixed-node regressions
-must be executed by the coordinator's serialized gates; this agent did not run
-any .NET commands.
+The pinned `Packet.resend` repacks the unchanged plaintext Channel envelope. Link encryption therefore produces a fresh IV, ciphertext and packet hash for each retry, and each attempt has a fresh receipt. A proof for the current hash settles the current receipt; a proof for an expired hash does not. `Parity5ChannelRetryCryptoTests.ActualReferencePacketResendChangesCiphertextAndHashButPreservesEnvelopeAndSequence` validates the reference capture, and the .NET link retry test checks the corresponding receipt and proof behavior. The reference capture uses a synthetic established link and captures outbound packets; it does not claim a handshake or live-node exchange.

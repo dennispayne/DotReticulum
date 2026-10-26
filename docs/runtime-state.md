@@ -1,9 +1,6 @@
-# Runtime persistence contracts
+# Runtime state and persistence
 
-Reference: hosted RNS 1.5.7, commit `a29bfb51c468945c96a1ee22cae0114e993e2391`.
-The independent generator `tests/DotReticulum.Applications.Tests/GenerateRuntimeStateVectors.py`
-executes the reference without modifying its source. Its synthetic owner, active interface and
-frozen clock replace external runtime context only. The fixture records actual imports and hashes:
+Runtime state stores public destination, path, tunnel and packet-cache data so a transport host can recover eligible public state after restart. Private identity and ratchet material has separate ownership and persistence rules. Contracts target RNS 1.5.7 at `a29bfb51c468945c96a1ee22cae0114e993e2391`. The independent generator `tests/DotReticulum.Applications.Tests/GenerateRuntimeStateVectors.py` executes the reference without modifying its source; its synthetic owner, active interface and frozen clock supply external runtime context. The fixture records imported source hashes:
 
 | Source | SHA-256 |
 | --- | --- |
@@ -52,8 +49,7 @@ If all slots are retained, remembering a new destination fails explicitly.
 Persisted paths allow zero hops for shared-instance local clients: upstream
 `Transport.py:1937` removes the shared-instance hop before recording their path.
 
-The runtime deliberately uses **one atomic generation**, not independent overwrites of upstream's
-several files. `runtime-state-v1.msgpack` is a MessagePack map
+The runtime uses **one atomic generation**, rather than independent overwrites of upstream's several files. `runtime-state-v1.msgpack` is a MessagePack map
 `{"version": 1, "payload": binary, "sha256": binary}`. The payload map contains
 `known_destinations`, `paths`, and `tunnels` as binary upstream-format blobs;
 `known_ratchets` as `[destination_hash, public_key, received_timestamp]` rows;
@@ -109,7 +105,7 @@ destination to the owning identity. Unlike upstream's restart reset to rotation 
 the .NET format preserves the recorded rotation schedule. Local keys expire by retained count,
 not wall time. This file is not claimed to be directly readable by upstream.
 
-## Explicit persistent local ratchets
+## Explicit local ratchet persistence
 
 Like upstream `Destination.enable_ratchets(path)` and `rotate_ratchets`
 (`Destination.py:228-241,477-500`), persistence is an **explicit destination opt-in**, not an
@@ -174,3 +170,6 @@ and application nodes. Startup and 15-minute maintenance perform bounded,
 owner-marked 24-hour scavenging; active native files, unrelated names and other
 configuration directories are not deleted. Resource files are ephemeral, not a
 cross-restart transfer-resume format. See [resource storage](resources.md).
+## Verification
+
+`tests/DotReticulum.Applications.Tests/RuntimeStateStoreTests.cs` covers atomic generations, corruption, bounds, persistence and recovery; `tests/DotReticulum.Applications.Tests/GenerateRuntimeStateVectors.py` independently generates the reference-format vectors at RNS 1.5.7. Identity and ratchet contracts are also exercised by the Core tests. Vector agreement does not authenticate a local state-file publisher or prove live-node interoperability.

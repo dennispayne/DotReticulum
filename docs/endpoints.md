@@ -1,4 +1,6 @@
-# Endpoint state and signed ratchets
+# Endpoints and signed ratchets
+
+A destination endpoint combines a destination address with direction-specific identity, encryption, announcement and request-handler behavior. It owns only the state documented below; caller-supplied identities and ratchet rings remain caller-owned.
 
 `Destination` remains the name/address codec. `DestinationEndpoint` owns
 direction, plain/group encryption state and announce defaults/cache; it borrows
@@ -135,3 +137,7 @@ Link ages and inactivity durations use the configured monotonic time source.
 `EstablishmentRate` reports authenticated request/proof bytes per RTT in bits
 per second; later packet proofs do not change it. `ExpectedRate` comes from
 resource transfer observations, not configured bearer bitrate.
+
+## Verification
+
+Endpoint and ratchet contracts are covered by `tests/DotReticulum.Core.Tests/Parity5EndpointTests.cs`, `Parity5EndpointRatchetTests.cs`, `tests/DotReticulum.Transport.Tests/Parity5LocalEndpointTests.cs`, `Parity5EndpointKnownDestinationsTests.cs` and `Parity5RequestTests.cs`. The independent endpoint vector generator records pinned RNS 1.5.7 imports and provider behavior. These vectors and managed tests are not, by themselves, live-node interoperability evidence; router delivery and proof integration are tested separately.

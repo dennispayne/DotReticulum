@@ -131,12 +131,4 @@ The source digests identify the pinned CLI behavior; they are not wire vectors.
 executes each pinned Python utility's `--help` and records the exact captured
 help text and source-file digests in
 `tests/DotReticulum.Applications.Tests/Fixtures/parity7-network-utilities.json`.
-The managed and Pester suites verify the captured option contract, dispatch,
-help/version and malformed-input behavior. Pester exercises local management
-RPC and utility operations from separate processes, authenticated remote
-status/path queries against native and pinned Python transport nodes, and
-successful/lost probes in both proof-policy cases. The current native Pester
-run reports all seven network-utility cases passing; the exact test command,
-broader suite results, and NativeAOT evidence are recorded by the parent in
-`.github/development-history.md`. These results are focused interop evidence,
-not proof of complete utility or platform parity.
+The managed tests in `tests/DotReticulum.Applications.Tests/Parity7NetworkUtilitiesTests.cs` and Pester process tests verify captured option contracts, dispatch, help/version, malformed input, local management operations, authenticated remote status/path queries against native and pinned Python transport nodes, and successful or lost probes under both proof policies. These tests are focused contract and interoperability evidence, not proof of complete utility or platform parity. Windows x64 and Linux x64 are exercised; macOS ARM64 has managed-suite coverage, while platform-specific utility limits are listed in [TODO.md](../TODO.md).

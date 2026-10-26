@@ -1,121 +1,52 @@
-# rnid identity, encryption and signatures
+# rnid identity, encryption, and signatures
 
-`rnid` implements the pinned RNS 1.5.7 identity utility contracts
-(`a29bfb51c468945c96a1ee22cae0114e993e2391`,
-`RNS/Utilities/rnid.py`). DotReticulum is experimental and AI-assisted, not
-an official Reticulum implementation. Signature validity authenticates a key,
-not an independently trusted publisher.
+`rnid` manages Reticulum identities, destination hashes, network identity lookup and announces, file encryption, and signatures. Its utility contract targets RNS 1.5.7 (`a29bfb51c468945c96a1ee22cae0114e993e2391`). DotReticulum is experimental and AI-assisted, not an official or endorsed Reticulum implementation. A valid signature authenticates a key; it does not establish an independently trusted publisher.
 
-```powershell
-dotnet run --project src\DotReticulum.Applications -- rnid --generate identity.rid
-dotnet run --project src\DotReticulum.Applications -- rnid --show identity.rid
-dotnet run --project src\DotReticulum.Applications -- rnid -i identity.rid -p
-dotnet run --project src\DotReticulum.Applications -- rnid -i identity.rid -x -B
-dotnet run --project src\DotReticulum.Applications -- rnid -i identity.rid -s document.txt
-dotnet run --project src\DotReticulum.Applications -- rnid -V document.txt
-dotnet run --project src\DotReticulum.Applications -- rnid -i identity.rid -S "Signed message" -w message.rsm
-dotnet run --project src\DotReticulum.Applications -- rnid -V message.rsm --meta
-dotnet run --project src\DotReticulum.Applications -- rnid -i identity.rid -e document.txt
-dotnet run --project src\DotReticulum.Applications -- rnid -i identity.rid -d document.txt.rfe -w recovered.txt
+```sh
+rnid --generate identity.rid
+rnid --show identity.rid
+rnid -i identity.rid -p
+rnid -i identity.rid -H app.aspect
+rnid -i identity.rid -s document.txt
+rnid -V document.txt
+rnid -i identity.rid -S "Signed message" -w message.rsm
+rnid -V message.rsm --meta
+rnid -i identity.rid -e document.txt
+rnid -i identity.rid -d document.txt.rfe -w recovered.txt
 ```
 
-## Keys and information
+Use `rnid --help` for all options, including `-v`/`-q` verbosity controls and `--version`. From a source checkout, invoke the subcommand with `dotnet run --project src/DotReticulum.Applications -- rnid ...`.
 
-`-m` imports public keys and `-M` imports private keys from a raw 64-byte file,
-hex, uppercase padded base32, or padded URL-safe base64. `-x`/`-X` export
-public/private text. `-w` writes public keys with a `.pub` suffix, unless
-`-X` explicitly selects private output. `-p` hides private keys unless `-P`
-is also supplied. Explicit private exports disclose secrets; do not send them
-to other people or record them in logs.
+## Identity and configuration
 
-Private files use the upstream raw X25519/private Ed25519 seed format.
-They are created owner-only on Unix; Windows files inherit directory ACLs.
-Protect those ACLs. Existing output is refused without `-f`. Legacy exact
-`--generate path` and `--show path` retain their earlier output and error
-status; ordinary upstream-style output uses the reference utility's statuses.
+`-g/--generate` creates a raw private identity and refuses to overwrite unless `-f` is supplied. `--show` displays the identity hash and public key. `-i/--identity` selects an identity or hash; `-m/--import-pub` and `-M/--import-prv` import raw 64-byte files or hexadecimal, uppercase padded base32, or padded URL-safe base64. `-x/--export-pub` and `-X/--export-prv` export keys; private export explicitly writes secret key material. `-p/--print-identity` hides private keys unless `-P/--print-private` is also present. `-w/--write` selects output; public-key output receives a `.pub` suffix unless private output is requested.
 
-`-H app.aspect` calculates the destination hash; `-i HASH -N -H app.aspect`
-does not initialize networking. `-i HASH` recalls identities from persistent
-known destinations, by either destination or identity hash. `-R` requests
-both the supplied hash and its `rns.id` destination and waits up to `-t`
-seconds. `-N` prevents network/cache resolution. `-a [app.aspect]` announces
-an owned identity (default `rns.id`). `--config` uses normal Reticulum
-configuration, including configured shared-instance operation.
+Private files use the upstream raw X25519 private-key and Ed25519 seed format. Files are created owner-only on Unix; Windows files inherit directory ACLs, which must be protected. `--config` selects Reticulum configuration. Network requests use `-t` (default 15 seconds, range 0–3600). `-N/--no-cache` prevents cache/network identity resolution. `-i HASH` recalls a cached identity by destination or identity hash. `-R/--request` requests an unknown identity, including its `rns.id` destination, and waits up to the configured timeout. A hash-only `-H` operation does not initialize networking; `-a/--announce [app.aspect]` announces an owned identity, defaulting to `rns.id`.
 
-## Signatures and file encryption
+## Encryption and signatures
 
-Detached current RSG signatures sign the SHA-256-bearing MessagePack envelope,
-not the original bytes. `--raw` creates the legacy 64-byte direct Ed25519
-signature, which requires an explicit identity during verification. Multiple
-paths are processed in order, stopping at the first failure. This is upstream's
-“recursive” sequence operation, not directory traversal.
+RFE files concatenate independently identity-encrypted chunks without additional framing. Encryption processes 16 MiB plaintext chunks; corresponding ciphertext chunks are 16 MiB plus 96 bytes. Large RFE encryption/decryption and current detached signatures stream with bounded memory. A failed decryption can leave partial plaintext output; do not use that output when the command fails.
 
-`-S` creates an embedded RSM; `-r` reads its UTF-8 message from a file.
-`-E metadata.conf` embeds ConfigObj-style metadata; an adjacent `.spec`, or
-`--meta-spec path`, validates/converts it. Reserved signer/public-key fields
-cannot replace the true signing identity. Metadata is displayed only after
-authentication. Native metadata supports nested sections, quoted/scalar/list
-and multiline values, and built-in string/integer/float/boolean/option/IPv4,
-list and mixed-list checks, defaults and bounded ConfigObj interpolation.
-As in the pinned utility, quote spec expressions containing commas (for
-example `count = "integer(1, 5)"`). Arbitrary Python/custom Validator functions
-are not executed: the reference rnid also installs only the built-in Validator.
-Unknown validators produce explicit errors, not silently accepted values.
+Current detached RSG signatures sign a MessagePack envelope containing the SHA-256 digest, not the original bytes. `--raw` creates a legacy 64-byte direct Ed25519 signature, which requires an explicit identity during verification. `-S/--sign-message` creates embedded RSM messages; `-r/--read` reads UTF-8 message text from a file. `-E/--embed-meta` embeds ConfigObj-style metadata; `--meta-spec` or an adjacent `.spec` validates and converts it. Metadata is displayed only after authentication. Supported built-in validators include string, integer, float, boolean, option, IPv4, list, and mixed-list types, with defaults, bounds, nested sections, and bounded interpolation. Arbitrary Python or custom validator functions are not executed. Quote spec expressions containing commas, for example `count = "integer(1, 5)"`.
 
-`-B`, `-b`, `-U`, `-F` emit 64-codepoint wrapped base32, base64, Reticulum
-base256, or hex signatures. The native verifier additionally accepts these
-wrappers. Identity information follows upstream: `-U` does not change public
-or private key display, which remains hex. Base256 is the exact upstream
-256-symbol alphabet, including supplementary Unicode codepoints.
+`-B`, `-b`, `-U`, and `-F` select wrapped base32, URL-safe base64, Reticulum base256, and hexadecimal signatures. Wrapping uses 64-codepoint lines. Base256 uses upstream's 256-symbol alphabet, including supplementary Unicode code points. These encoding options do not change identity public/private key display, which remains hexadecimal.
 
-RFE files concatenate independent identity-encrypted chunks, with the pinned
-16 MiB plaintext / 16 MiB + 96 ciphertext chunk sizes. No new framing is added.
-Current detached signing/verification and RFE operations stream arbitrarily
-large files with bounded memory. Raw signing and embedded messages are limited
-to 16 MiB; signatures/metadata to 1 MiB and metadata nesting to 32 levels.
-As upstream, a failed decryption can leave partial plaintext output. Do not
-consume that output when the command fails.
+Raw signing and embedded messages are limited to 16 MiB; signatures and metadata to 1 MiB; metadata nesting to 32 levels. Multiple file paths are processed in order and stop on first failure; this sequence behavior is not directory traversal. Existing output is not overwritten unless `-f/--force` is used.
 
-## Explicit native safety extensions
+## Security and native extensions
 
-`-I` or path `-` reads stdin; `-O` writes binary operation bytes to stdout,
-moving status messages to stderr. The pinned utility parses these hidden flags
-but does not wire stdin/stdout into file operations; native support is an
-intentional extension. Use binary-safe redirection, not text recoding.
+`-I/--stdin` reads operation input from standard input (also path `-`); `-O/--stdout` writes operation bytes to standard output and moves diagnostics to stderr. The pinned utility parses these hidden switches but does not wire them into file operations; native stdin/stdout support is an extension. Use binary-safe redirection.
 
-Omitted `-S` text or `-E` path opens an editor **only** with `--allow-editor`.
-Choose `--editor executable` (or `EDITOR`) and optionally
-`--editor-args "-NoProfile -File 'owned-editor.ps1'"`. No implicit shell or
-editor fallback executes. Editor input files are created beneath the current
-directory, cleaned after use, reject symlink output, and have bounded size.
-The owned process tree has a 120-second deadline (override
-`--editor-timeout`, maximum 3600 seconds) and 1 MiB combined output limit.
-Cancellation terminates owned work. Editor-created extra files are not
-recursively deleted.
+If message text or metadata is omitted, an editor starts only with explicit `--allow-editor`. Set `--editor <executable>` or `EDITOR`, and optionally `--editor-args` for POSIX-style quoted arguments. No shell or fallback editor is invoked. Editor input files are created beneath the current directory and cleaned afterward; symlink output is rejected, input/output is bounded, and the owned process tree has a 120-second default deadline (maximum 3600 seconds) and a 1 MiB combined output limit. Cancellation terminates owned work. Extra files created by the editor are not recursively removed.
 
-Exit statuses follow the pinned constants: missing identity 2, missing private
-key 4, missing input 6, invalid encrypted filename 7, invalid identity 8,
-invalid aspects 9, invalid signature 10, existing output 11, decryption failure
-12, invalid operation input 250, bounded/read failure 252, write failure 253,
-other errors 254, cancellation 255; argument-parser errors use 2 and conflicting
-operation/identity/encoding options use 1. Network timeouts are explicitly
-bounded to 0–3600 seconds. `--help` describes all options.
-Short flags may be clustered (`-xp`, `-pPB`), short option values may be
-attached (`-mHEX`, `-Smessage`), and unambiguous long prefixes are accepted
-(`--print-i`). Ambiguous prefixes fail with status 2. The native help text,
-bounded-policy diagnostics and network progress presentation identify native
-behavior rather than reproducing Python argparse usage text or spinner timing.
+## Platform notes and differences from upstream
 
-Reference fixture generation verifies actual RNS and LXMF imports, exact
-revision and source digest. Unit vectors are not live network interoperability.
-`Parity7Identity.Tests.ps1` exercises real processes, editor ownership, file
-persistence and pinned Python encryption/decryption in both directions.
-On Windows x64, both the managed and published NativeAOT acceptance suites
-passed all 11 process tests with no skips: independent Python encrypted/decrypted files larger than 16 MiB,
-Python TCP identity lookup and retained-cache recall after restart, and Python
-validation of the native `rns.id` announce. These are direct local TCP topology
-results, not claims of all routed/impaired/platform topologies. Editor success,
-nonzero exit and forced deadline termination were executed against owned
-PowerShell processes. The NativeAOT binary was published with linker/compiler
-warnings treated as errors; exact commands and aggregate verification are
-recorded in the repository development history.
+Identity and file formats are platform-independent. On Unix, private identity files are created owner-only; on Windows, they inherit directory ACLs. The native CLI adds binary-safe stdin/stdout operations, bounded streaming, and an explicitly authorized editor workflow. It does not execute arbitrary ConfigObj validators; its diagnostics, editor ownership, and progress output are native rather than Python CLI behavior. See [remaining capabilities](../TODO.md) for platform acceptance boundaries.
+
+## Exit statuses
+
+Identity and operation errors follow the pinned utility mapping: missing identity 2, missing private key 4, missing input 6, invalid encrypted filename 7, invalid identity 8, invalid aspects 9, invalid signature 10, existing output 11, and decryption failure 12. Invalid operation input returns 250, bounded/read failure 252, write failure 253, other errors 254, and cancellation 255. Parser errors return 2; conflicting operation, identity, or encoding choices return 1.
+
+## Verification
+
+`tests/Pester/Parity7Identity.Tests.ps1` exercises separate CLI processes, key persistence, editor ownership, network identity lookup, announces, and pinned Python encryption/decryption in both directions. `tests/DotReticulum.Applications.Tests/Parity7RnidTests.cs` covers reference vectors and identity utility behavior. These local TCP and vector results are distinct from routed or impaired-topology acceptance. The pinned reference is RNS 1.5.7 and LXMF 1.2.1; older stored vectors retain their recorded source revision. Version numbering is described in [README versioning](../README.md#versioning).

@@ -1,10 +1,6 @@
-# Transport and interface controls
+# Transport controls
 
-The contract baseline is the verified Reticulum-hosted RNS 1.5.7 checkout at
-`a29bfb51c468945c96a1ee22cae0114e993e2391`. This remains an experimental,
-AI-assisted implementation, not an official Reticulum release. Verification
-scope, commands and platform limits are recorded in the
-[development history](../.github/development-history.md).
+These settings govern route selection, packet scheduling, ingress and egress rate control, receipts, link MTU negotiation and tunnel recovery. DotReticulum targets the Reticulum 1.5.7 reference at `a29bfb51c468945c96a1ee22cae0114e993e2391`; it is experimental, AI-assisted and not an official Reticulum implementation. Missing or unverified capabilities are listed in [TODO.md](../TODO.md).
 
 ## Paths, modes and recovery
 
@@ -134,8 +130,7 @@ terminate with a diagnostic instead of silently abandoning service. Each accepte
 peer is isolated: malformed traffic, disconnect or a child fault cannot terminate
 the listener or other peers.
 
-Runtime tunnel tables are bounded to 1024 tunnels and 65,536 paths. The existing
-aggregate persistence format also bounds cached packets to 65,536: snapshots
-prioritize active paths, then tunnel paths, then proof-cache entries, diagnose
-capacity truncation and remove any omitted path's dangling packet reference.
-This does not evict live routes merely to produce a snapshot.
+Runtime tunnel tables are bounded to 1024 tunnels and 65,536 paths. The aggregate persistence format also bounds cached packets to 65,536: snapshots prioritize active paths, then tunnel paths, then proof-cache entries, diagnose capacity truncation and remove any omitted path's dangling packet reference. Snapshot bounds do not evict live routes.
+## Verification
+
+Routing, queue, receipt, MTU and tunnel behavior is covered by the Core and Transport test suites, including `TransportRouterTests.cs`, `Parity4RoutingTests.cs`, `Parity4ReceiptTests.cs`, `Parity4LinkMtuTests.cs` and `Parity4TunnelTests.cs`. Actual Python transport plus .NET transport tests exercise upgraded DATA, Channel and multipart resource traffic at 1,024- and 16,384-byte bottlenecks. These tests do not establish physical-radio behavior or support for every bearer and platform; see [TODO.md](../TODO.md).

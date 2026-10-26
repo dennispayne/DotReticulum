@@ -1,97 +1,29 @@
 # Packet PHY measurements
 
-PHY measurements describe **local ingress**, not the distant endpoint's radio
-conditions, and are not cryptographically authenticated peer claims. They do not
-change packet serialization, hashes, encryption or forwarding.
+PHY measurements describe the local receive radio at packet ingress. They are not authenticated claims about a distant peer and do not alter packet serialization, hashes, encryption, or forwarding.
 
 ## Native API and ownership
 
-`Packet.PhysicalLayer` holds nullable `Rssi`, `Snr` and `Quality` measurements.
-Absent data stays null, including ordinary TCP/UDP traffic. A reporting bearer
-implements `IPacketInterfacePhysicalLayer.ReceiveFramesAsync` and captures a
-`ReceivedFrame` (bytes plus immutable measurements) **before** enqueueing it.
-The manager selects this receive boundary instead of the ordinary byte stream.
-Extension interfaces without it continue to work and report no PHY measurements.
+`Packet.PhysicalLayer` contains nullable RSSI, SNR, and quality values. A PHY-reporting bearer implements `IPacketInterfacePhysicalLayer.ReceiveFramesAsync` and captures immutable measurements alongside frame bytes before the manager enqueues the frame. Other interfaces continue to report no PHY values.
 
-RNode single and Multi children capture the selected radio's readings at DATA
-frame reception. Later telemetry cannot change an earlier queued frame.
-Disconnect clears pending radio measurements; a new connection starts unknown.
-An explicit device hard reset clears pending readings as well.
-An already received packet retains its snapshot. Each radio retains its latest
-reading until superseded within the connection, as upstream does; a DATA frame
-without a new telemetry command is not evidence of a new measurement.
+RNode single and Multi children capture the selected radio's current readings when a DATA frame arrives. Later telemetry cannot change an already queued frame. Disconnect or hard reset clears pending radio readings; received packets retain their snapshots. A frame without newer telemetry does not imply a new measurement.
 
-Each `PacketInterfaceManager` owns three FIFO caches, each bounded to **512
-reported measurements**, keyed by the full 32-byte packet hash. Only valid,
-IFAC-accepted frames enter the caches. Missing fields do not evict other fields.
-Like pinned RNS, caches have **no clock-based expiry** and duplicate hashes return
-the oldest still-retained measurement for each field. A packet's direct snapshot
-takes precedence over this fallback. A new owner has empty caches; these values
-are not persisted. No process-global singleton or unbounded packet map is used.
-The native owner records at decoded ingress, before router admission/scheduling;
-therefore valid frames subsequently dropped by routing policy can still have
-bounded diagnostic cache entries. Upstream inserts after its early inbound
-filters. This intentional placement never attributes device-global state after
-queueing and does not imply those packets were delivered.
+Each `PacketInterfaceManager` owns three FIFO caches, each limited to 512 measurements and keyed by the full 32-byte packet hash. Only valid, IFAC-accepted frames enter the cache. Missing fields do not evict other fields; duplicate hashes resolve to the oldest retained value per field. There is no time-based expiry or persistence. A direct frame snapshot takes precedence over cache lookup. Ingress records measurements before routing admission, so a valid frame subsequently rejected by router policy can still occupy a bounded diagnostic cache entry.
 
-`manager.GetPacketPhysicalLayer(hash)` queries the owner-local caches.
-`await manager.ResolvePacketPhysicalLayerAsync(packet, cancellationToken)` fills
-missing packet fields from the cache, or an explicitly configured shared-owner
-lookup. Configure `SharedPhysicalLayerLookup` before starting routing. The host
-provides `await host.GetPacketPhysicalLayerAsync(packet, cancellationToken)` for
-the same operation, including `receipt.ProofPacket`. Outgoing packet objects are
-not silently populated with another packet's readings.
+Use `manager.GetPacketPhysicalLayer(hash)` for a cache lookup or `ResolvePacketPhysicalLayerAsync(packet, cancellationToken)` to fill missing fields. `RnsdHost.GetPacketPhysicalLayerAsync` provides the host-level form, including proof receipts. Shared clients may request missing values from their owner through the existing authenticated management RPC. The RPC exposes `packet_rssi`, `packet_snr`, and `packet_q` with a 32-byte `packet_hash`; absent or evicted values return null.
 
-## Shared instances and Links
+## Links
 
-The existing authenticated management RPC exposes `packet_rssi`, `packet_snr`
-and `packet_q` with the existing `packet_hash` argument validation (32 bytes).
-Unknown or evicted entries return null; no alternate unauthenticated endpoint or
-new remote mutation operation is added.
+Link tracking is disabled by default. `link.TrackPhysicalLayer(true)` enables `link.PhysicalLayer`. Incoming authenticated data, requests, responses, identification, handshake, and resource handling update available fields independently; missing fields preserve prior known values. Processing does not depend on packet callbacks or receipt subscribers. A proof receipt retains its received proof packet and its measurement snapshot.
 
-`link.TrackPhysicalLayer(true)` enables `link.PhysicalLayer`. Authenticated link
-data, requests, responses, identification, handshake and resource handling update
-the last available fields independently. Missing fields preserve earlier known
-link fields. Link processing does not require a packet callback or receipt
-subscriber. A proof receipt retains its received proof packet and measurements.
+Disabling tracking clears retained measurements immediately; re-enabling does not restore cleared data. Accepted requests seed initial measurements, while getters remain hidden when tracking is disabled. A shared client performs cancellable, bounded owner lookups only when tracking is enabled and local fields are missing; query failure is diagnosed without discarding valid link traffic.
 
-Tracking is disabled by default. Disabling clears retained measurements
-immediately (upstream hides them immediately and clears them in its watchdog).
-Re-enabling does not resurrect measurements discarded while disabled. Accepted
-incoming requests seed the initial measurements, matching upstream's forced
-request update, but the getters remain hidden unless enabled.
+Forwarding carries wire bytes only. Transit-node measurements remain local to that node and are not represented as the endpoint's radio conditions.
 
-A shared client's opt-in link resolves missing measurements through the existing
-authenticated owner RPC before processing the packet. This is cancellable,
-bounded by the existing operation timeout and creates no background work.
-Optional query failures are diagnosed without discarding otherwise valid link
-traffic; caller cancellation still propagates. Nontracking data traffic does not
-issue these queries. Explicit packet/receipt queries remain available separately.
+## Differences from upstream
 
-Forwarding carries wire bytes only. A transit node's radio reading stays in that
-node's cache; it does **not** appear as an endpoint TCP measurement. A local shared
-client can ask its owner about that owner's ingress, not about arbitrary routers.
+The native caches are manager-owned and bounded, with no global singleton. Their insertion point is decoded ingress before router scheduling; upstream inserts after early inbound filters. This placement preserves the original packet's measurement attribution but may cache frames later dropped by routing policy. Shared lookups use the existing authenticated management channel and do not add an unauthenticated endpoint.
 
-## Reference and evidence
+## Verification
 
-The source is hosted RNS 1.5.7 commit
-`a29bfb51c468945c96a1ee22cae0114e993e2391`:
-`Transport.py:1913–1935` (FIFO insertion, limit 512),
-`Packet.py:370–389` (direct/fallback queries),
-`Reticulum.py:1918–1959` (local/shared queries), and
-`Link.py:215,439,540–570,777–793,954–1164` (tracking and update sites).
-
-`tests\DotReticulum.Core.Tests\GenerateParity8PhyVectors.py` executes the actual
-pinned packet pack/unpack, transport inbound, Reticulum queries and Link methods.
-It verifies source/import paths and LXMF 1.2.1, and records source SHA-256 values
-in `Fixtures\Parity8PhyVectors.json`. Its in-memory interface/singleton setup
-avoids starting a daemon; it does not replace the protocol implementation.
-
-`Parity8PhyTests` in Core, Interfaces, Transport and Applications exercise
-independent reference observations, FIFO eviction/duplicates/sparse fields,
-interleaved peers and radios, delayed enumeration, bounded queues, reconnect,
-TCP absence, disabled tracking, authentication failure, receipts without
-observers, transit separation and authenticated shared-owner Link lookup.
-These are reference-vector/simulated/native-loopback software tests, **not
-physical RF acceptance or Python radio-node interoperability**. No physical
-radio was opened for this work.
+`Parity8PhyTests` in Core, Interfaces, Transport, and Applications covers reference observations, FIFO eviction and duplicate handling, sparse fields, radio/peer separation, reconnect, TCP absence, disabled tracking, authenticated shared-owner lookup, and receipts without observers. `tests\DotReticulum.Core.Tests\GenerateParity8PhyVectors.py` executes the pinned RNS 1.5.7 packet, transport, Reticulum, and Link methods at `a29bfb51c468945c96a1ee22cae0114e993e2391`. Its in-memory interface/singleton setup avoids starting a daemon and does not replace protocol methods. Simulator and loopback tests do not establish physical RF behavior.

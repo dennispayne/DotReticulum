@@ -1,6 +1,6 @@
-# Mixed-transport compatibility acceptance
+# Mixed Python/.NET mesh compatibility
 
-This is bounded experimental interoperability evidence, not release certification.
+This documents the mixed Python/.NET mesh behavior exercised by the opt-in live test. DotReticulum is experimental and independent; this test is not a release certification or a claim of full interoperability.
 The live reference is Reticulum-hosted RNS 1.5.7 at
 `a29bfb51c468945c96a1ee22cae0114e993e2391`; each existing Python
 adapter verifies its checkout, actual imported module path and version through
@@ -20,18 +20,18 @@ and `request` (map-hash-based part selection and retransmission);
 (the upstream five-second reconnect interval). The bearer observes the existing
 packet codec's resource context and packet hash; it creates no protocol bytes.
 
-## Prior evidence and new acceptance
+## Exercised behavior
 
-`LiveMixedTransportTests` already exercises unknown-path discovery, announces,
+`LiveMixedTransportTests` exercises unknown-path discovery, announces,
 proved encrypted datagrams, links and teardown between Python leaves on opposite
 sides of **two actual transports**, one pinned Python and one .NET.
 `Parity4TransportLiveTests` adds IFAC, a lost announce, 64 kbit/s serialization,
 40 ms RTT, TCP reconnect and tunnels. `Parity5TransferLiveTests` adds .NET endpoint
 Channel loss/retry/exhaustion, streams, bidirectional multi-megabyte resources,
-two MTUs and fresh-link recovery. These are not duplicated as new acceptance.
+two MTUs and fresh-link recovery. These cases cover separate transport and transfer contracts.
 
-`Parity8CompatibilityLiveTests` adds this missing impaired-resource and restart
-slice, reusing those verified adapters and their C# process owner:
+`Parity8CompatibilityLiveTests` exercises the impaired-resource and restart
+topology using the existing verified adapters and their C# process owner:
 
 ```text
 Python leaf A -- Python transport -- impaired TCP -- .NET transport -- Python leaf B
@@ -48,7 +48,7 @@ The test requires:
 - Incompressible 2,200,017-byte A-to-B and 2,200,019-byte B-to-A resources.
 - Three deliberately lost **resource data parts in each direction**, not
   delimiters or unrelated packets. Every dropped packet's reference hash must
-  subsequently reappear in its original direction; completed sender/receiver
+  reappear after loss in its original direction; completed sender/receiver
   status and exactly one resource conclusion are required.
 - Twenty milliseconds of delay per forwarded frame in both directions,
   capacity-one wait-on-full bearer queues, and native inbound routing queue
@@ -80,38 +80,19 @@ inputs, process failures, transfer failures and timeouts fail; there are no
 successful early returns. Every listener is loopback-only, every process/config
 directory belongs to the test, and every wait has a bounded lifetime.
 
-## Limits
+## What this test does not prove
 
-Execution results are recorded in `.github/development-history.md` by the
-integrating milestone. Windows x64/.NET 10.0.13 execution on 2026-10-25 passed
-one live case in 2 minutes 1 second, with nine of nine selected resource parts
-observed retransmitted, 208 capacity-one backpressure waits and three TCP
-sessions. The exact command above additionally used
-`--logger "trx;LogFileName=p8-mesh.trx" --results-directory .artifacts\p8-mesh-live`;
-the ignored TRX retains full per-peer/import/topology traces. A separate
-`verify_reference()` invocation printed RNS 1.5.7, the configured checkout's
-`RNS\__init__.py`, and the pinned revision; all three live peers independently
-ran the same verifier.
-The final implementation was repeated successfully in 2 minutes 4 seconds:
-nine of nine retransmissions, 196 backpressure waits and three sessions;
-`.artifacts\p8-mesh-live\p8-mesh-repeat.trx` retains that trace.
-The integrated Windows selection subsequently passed four live/native cases,
-including this mesh; the Ubuntu WSL Linux selection passed 42 cases, also
-including this mesh and separate native resource, terminal and tunnel-restart
-flows. This establishes execution on those two hosts, not other Linux
-distributions or an impaired published-native router.
-
-The first live attempt lacked the gateway interface setting required by the
-existing mixed-path prior art and failed discovery. A subsequent attempt
-completed both lossy multi-megabyte resources but correctly rejected missing
-responder-to-initiator packet proofs, leading to the explicit peer policy above.
-Neither failure required a production change or a weakened assertion.
+The test is opt-in and runs when `DOTRETICULUM_LIVE=1` and the pinned
+reference checkout and isolated Python interpreter are configured. The managed
+suite and published native feature flows are exercised separately in CI; this
+case runs the managed test process and does not establish an impaired
+published-native router.
 
 This case restarts the native router, not the Python
 router, and intentionally does not promise preservation of live links across a
-router restart. Existing links are torn down and new links are required.
-Abrupt process crashes, multiple alternate routing paths, mass-client overload,
-long-duration soak, physical bearers, other platforms and impaired native-binary execution
-remain separate acceptance obligations. A capacity-two native queue setting
-does not prove native queue exhaustion; the explicit pressure assertion applies
-to the capacity-one impairment bearer.
+router restart. Existing links are torn down and new links are required. Abrupt process crashes,
+Python-router restart, alternate routing paths, mass-client overload, prolonged
+soak, physical bearers, other platforms, and impaired published-native execution
+are not covered. The capacity-two native queue setting does not prove native
+queue exhaustion; the pressure assertion applies only to the capacity-one
+impairment bearer.

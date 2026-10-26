@@ -1,154 +1,33 @@
-# Native Weave serial interface
+# Weave serial interface
 
-## Source contract and acceptance criteria
+Weave is a serial WDCL device and endpoint-switch protocol, not Ethernet. The native interface publishes independently routable endpoint children; packets are sent through those children rather than broadcast by the parent.
 
-The reference is `RNS/Interfaces/WeaveInterface.py` at
-`a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7), SHA-256
-`99b4f217fce0afdfef16ea9641fc740065358eec512e22ec92366558051195c5`.
-Weave is a serial WDCL device/endpoint switch, **not Ethernet**.
+## Configuration
 
-Source trace (1-based lines):
+Enable `type = WeaveInterface` and provide `port`. `name` comes from the interface section. The reference type-specific constructor consumes no serial speed or flow-control settings: the device requires 3,000,000 baud, 8N1, and no flow control. Generic `bitrate` sets the reported estimate (default 250,000 bit/s); it is not the serial baud. Generic IFAC defaults to 16 bytes and is applied by the manager, not the serial framing layer.
 
-- 37–69, 111–136, 168–235: HDLC escaping, WDCL types 0–6, 4-byte
-  switch addresses, 3,000,000 baud 8N1/no flow control, discovery and
-  two-second connection deadline.
-- 248–326: serial HDLC framing, receive accounting, errors and five-second
-  reconnect. Upstream declares MAX_CHUNK=32768 but does not enforce it in
-  its receive accumulator; this native implementation enforces a frame cap.
-- 329–334, 599–640: big-endian commands, broadcast discovery, connect
-  signature over the remote switch ID.
-- 699–780: endpoint liveness/via, command 0x0001 outgoing endpoint prefix,
-  incoming endpoint suffix, signed discovery, log and display parsing.
-- 781–844: connection event 0x3002, local endpoint 0x3003, peer alive
-  0x3102/via 0x3104, CPU/task/memory telemetry.
-- 846–1032: fixed 1024 MTU, nominal 250 kbit/s, 20-second peer expiry
-  checked every 22 seconds, independently routable peers, parent no-op send.
-- 1069–1102: shared 48-entry/0.75-second duplicate cache and serialized
-  endpoint delivery/accounting.
+The library API is `WeavePacketInterface(portName, WeaveOptions)` or an owned stream-factory overload. Native timer and resource limits in `WeaveOptions` are not INI keys: handshake timeout defaults to 2 seconds, reconnect delay to 5 seconds, peer expiry to 20 seconds (checked every 22 seconds), peer limit to 256, receive queue to 256 frames, and transmit queue to 256 frames / 256 KiB. Display storage is bounded to 32 KiB.
 
-Measurable software acceptance: independently execute the pinned Python
-discovery/connect/command/delivery/display methods for oracle frames; match
-those frames natively; verify signatures before adopting a remote identity;
-spawn bounded endpoint peers without requiring subscribers; preserve source
-identity, duplicate suppression and timeout removal; isolate observers;
-bound framing, display, peer receive and shared queued transmit resources;
-verify start failure/cancellation, unplug/reconnect and idempotent disposal
-using owned duplex simulators. All .NET validation is run by the coordinator.
+## Behaviour
 
-## Deliberate native boundaries
+WDCL commands use big-endian fields and four-byte switch addresses. HDLC uses `0x7e` delimiters and `0x7d` escaping with XOR `0x20`. Discovery is broadcast; a signed connect response authenticates possession of the advertised Ed25519 key, not operator trust. Data packets carry the endpoint prefix on output and suffix on input. Duplicate suppression uses a shared 48-entry cache and a 750 ms window. The device reports endpoint liveness, path/via, logs, display updates, and CPU/task/memory telemetry. Hardware MTU is 1024 bytes.
 
-Unknown WDCL types (including encapsulation type 6) are ignored: the pinned
-source declares them but has no encapsulation processing implementation.
-Malformed/oversized frames are dropped rather than reproducing unchecked
-indexing, indefinite accumulator growth or display allocation. Logs are exposed
-as structured events, not a Python terminal/UI rendering API. Display updates,
-CPU/memory/task telemetry and endpoint events are supported independently of
-subscribers. Discovery signatures establish possession of the advertised
-Ed25519 key, **not publisher trust or authenticated device enrollment**.
+The parent is a spawning and reconnecting interface. Subscribe to `ChildConnected` before startup; child identities represent eight-byte endpoint IDs. The parent send is a no-op, not a broadcast. Endpoint expiry removes only that child; device loss ends all old children and reconnect can publish new children. Observer failures are reported without disabling processing.
 
-No real Weave serial device or Bluetooth device was opened. The separately
-authorized COM8 RAK answers RNode firmware queries, not Weave acceptance.
-Native serial construction now asserts DTR/RTS like upstream pyserial;
-disabled flow handshake does not mean deasserted control lines.
-Simulators/reference vectors do not establish physical Weave, live mixed-node
-or platform acceptance. Android upstream uses usb4a/usbserial4a + jnius,
-requires USB permission, overrides CH34x CDC, and tunes FTDI/CP210x buffers and
-timeouts (lines 73–96, 180–223). A caller-owned native Android USB adapter
-can supply the duplex stream factory, but no Android adapter, permission
-workflow or platform execution is claimed.
+### WDCL message details
 
-## Native API and integration
+The protocol defines WDCL types 0–6 and four-byte switch addresses. Discovery and connection commands are signed over the remote switch ID. Packet delivery prefixes the outgoing endpoint ID and appends the incoming endpoint ID. Connection events use `0x3002`, local endpoint discovery `0x3003`, peer-alive `0x3102`, and peer-via `0x3104`. Display enable uses `0x0a00`; telemetry includes CPU, task, and memory observations. Unknown types, including type 6, are ignored because the pinned source declares but does not implement encapsulation handling.
 
-`WeavePacketInterface(portName, WeaveOptions)` is an `ISpawningPacketInterface`
-and `IReconnectingPacketInterface`: register the parent before `StartAsync`,
-adopt its `ChildConnected` children, and route sends only through children.
-`WeavePeer.EndpointId` is eight bytes; `ViaSwitchId` is an optional four-byte
-switch ID. The parent send is an upstream-compatible no-op, not a broadcast.
-Use IFAC size 16 by default, fixed hardware MTU 1024 and nominal configured
-bitrate 250000. Child IFAC/policy inheritance is the manager's responsibility.
+The declared upstream `MAX_CHUNK` is 32768 bytes but the reference receive accumulator does not enforce it. The native frame decoder enforces its bound. Duplicate packet tracking is shared by the device and capped at 48 hashes over a 750 ms window. Peer expiry is checked every 22 seconds with a 20-second threshold. The device's serial bitrate is 3 Mbit/s; the 250 kbit/s interface bitrate is only the default network estimate.
 
-### Exact configuration handoff
+## Platform notes
 
-The type-specific reference constructor consumes only `name`, required `port`
-(no default), and `configured_bitrate` (default null, selecting 250000).
-`name` is normally supplied from the configuration section name. Serial
-speed/parity/databits/stopbits/flow-control keys are **not** consumed by Weave:
-the device protocol requires 3000000/none/8/1/no flow control.
+The native bearer uses the shared serial provider and owned streams. Windows x64 and Linux x64 are exercised by software suites; no physical Weave device has been verified. The upstream Android USB implementation is not a native Android adapter here. Android USB permissions, Bluetooth, mobile packaging, and untested platform drivers are not supported claims.
 
-The native host sets `WeaveOptions.ConfiguredBitrate` from generic runtime
-`bitrate`, falling back to 250000 when absent; this is the
-**effective estimate**, shared unchanged by parent, children and diagnostics,
-not the 3000000 serial baud. Upstream `Reticulum.py:929–931` accepts generic
-`bitrate` only at >=5; `1029–1042` applies it after construction.
-`1112` also injects the generic value into constructor `configured_bitrate`,
-overwriting any user entry with that name. Native INI configuration therefore
-does not accept a separate `configured_bitrate` fallback. Direct library callers
-can supply the typed option.
+## Differences from upstream
 
-Generic `enabled`/`interface_enabled` controls creation (default disabled);
-`outgoing` defaults true after generic post-init, even though the raw Weave
-constructor initializes OUT false. Parent/children inherit that policy.
-Generic `ifac_size` is expressed in **bits**, converted to bytes by the host;
-the Weave default is 16 **bytes** (`DefaultIfacSize`). `networkname`/
-`network_name` and `passphrase`/`pass_phrase` use the existing generic IFAC
-derivation; the Weave serial driver must not apply IFAC itself.
-Keep existing generic mode/gravity, announce and ingress-control handling.
+The native implementation enforces a frame limit where upstream's declared `MAX_CHUNK=32768` is not enforced by its receive accumulator. Unknown WDCL types, including declared encapsulation type 6, are ignored because the pinned source has no processing implementation. Malformed frames, unbounded displays, and unchecked allocations are rejected or bounded. Startup failure is surfaced to the owner; reconnection uses owned cancellable work.
 
-Each `ChildConnected` child is already started and represents one eight-byte
-endpoint, not one serial device or a broadcast domain. The manager must apply
-the parent's direction, IFAC, mode/gravity, announce and ingress policy to
-each child. It must never echo traffic to its ingress child; other endpoints
-remain eligible. Child closure/expiry removes only that child; device loss
-completes all old children, and reconnection creates fresh children when
-endpoints reappear. `SendsThroughChildren=true`; registering the parent must
-not introduce additional parent-level sends. Queue/timer/display limits in
-`WeaveOptions` are explicit native API options, not claimed upstream INI keys.
+## Verification
 
-The stream-factory constructor transfers ownership on every open, and copies
-an optional host `Identity` rather than borrowing it. `WeaveOptions` makes the
-handshake/reconnect/peer timers and resource budgets explicit. An initial
-open/handshake failure is surfaced to the lifecycle owner; after successful
-start, unplug/read/write faults close all old peers and retry fresh sessions
-unless reconnection is disabled. This fail-fast first start is an intentional
-difference from upstream's constructor launching a retry thread after failure.
-
-`SendCommandAsync` encodes a big-endian command; `SetDisplayEnabledAsync`
-controls command 0x0a00 and update notifications. `DisplayBuffer`, structured
-`LogReceived`, `DisplayUpdated` and diagnostics expose bounded device state.
-Observer failures are reported to `Faulted` and retained in diagnostics;
-event handlers must return promptly. No subscriber is required for processing.
-The shared transmit byte budget counts decoded packet bytes (or command plus
-command data), not serial escape overhead. Framed allocations are additionally
-bounded by the frame-count limit and at most twice the reserved payload plus
-fixed address/endpoint overhead. No frame is copied before a reservation.
-Receive overflow drops only the affected packet and records a diagnostic,
-rather than blocking the one shared device reader and unrelated peers.
-
-`GenerateParity6WeaveVectors.py` uses `WDCL.__new__` and a recording
-`serial.write` adapter; it does not call the port-opening constructor or launch
-threads. It executes unmodified `WeaveDevice.discover`, `incoming_frame`
-(including signature validation/handshake), `deliver_packet`, display
-connect/disconnect, command and broadcast methods, and unmodified
-`WDCL.process_outgoing`. This is reference-vector evidence, not unmodified
-device-driver or physical/live acceptance. The seven recorded writes include
-escaped payload bytes and declared-but-unimplemented encapsulation framing.
-
-## Slice verification record
-
-The isolated reference Python was executed twice:
-
-```powershell
-& 'C:\Users\dennis\.copilot\session-state\c075724f-f262-4902-9809-a6358920915f\files\refvenv\Scripts\python.exe' tests\DotReticulum.Interfaces.Tests\GenerateParity6WeaveVectors.py --upstream 'C:\Users\dennis\.copilot\session-state\c075724f-f262-4902-9809-a6358920915f\files\upstream-reticulum-rns'
-```
-
-Both runs exited 0, verified the actual RNS/LXMF imports and exact upstream
-revision through `reference_environment.verify_reference(require_lxmf=True)`,
-and recorded seven oracle writes. Exact import paths and source digest are
-persisted in `Fixtures\parity6-weave.json`. No reference source was modified.
-
-Thirteen focused xUnit tests cover the oracle and controlled owned-device
-simulator, passing in the full Windows gate and Linux bearer selection.
-See the [Parity 6 record](../.github/development-history.md#parity-6-interface-integration-partial-2026-10-24).
-Focused selector:
-`FullyQualifiedName~Parity6WeaveTests`. No simulator result may be labeled
-physical serial, Android, Bluetooth or live Weave acceptance.
+`Parity6WeaveTests` and `GenerateParity6WeaveVectors.py` exercise pinned WDCL discovery, handshake, packet delivery, display, command, and framing behavior with owned streams and recording adapters. The generator does not open a serial device. Tests do not establish physical serial, Bluetooth, Android, or live mixed-node interoperability.

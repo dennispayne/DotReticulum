@@ -1,6 +1,6 @@
 # Security policy
 
-DotReticulum is an experimental, LLM-assisted learning project. It is **not** audited and must not be used for production or security-critical purposes.
+DotReticulum is an experimental project written predominantly by LLM coding agents under human direction. It is **not** audited and must not be used for production or security-critical purposes.
 
 ## Reporting a vulnerability
 

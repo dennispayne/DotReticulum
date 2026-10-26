@@ -9,6 +9,8 @@ Supported package RIDs are **Windows x64** (`win-x64`), **Linux x64** (`linux-x6
 only accepts a package matching the current host. macOS packaging and execution have not been
 verified in this environment and are not a platform-support claim.
 
+Binaries carry the project version `<upstream RNS version>.<build number>` (for example `1.5.7.42`); see [Versioning](../README.md#versioning). Each tool's `--version` reports the upstream RNS version it targets.
+
 Publish for the target RID, then stage and install to a user-selected directory:
 
 ```powershell

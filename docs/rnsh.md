@@ -1,152 +1,30 @@
 # rnsh
 
-`dotreticulum rnsh` is the experimental native Channel-based remote shell
-utility, **not** `rnx -x` (which repeats request/response commands).
-The wire contract is pinned RNS 1.5.7
-`RNS/Utilities/rnsh/protocol.py:46-148`, protocol version 1.
+`rnsh` is Reticulum's Channel-based remote shell utility. It supports a persistent interactive terminal session and binary stdin, stdout, and stderr. It is distinct from `rnx -x`, which sends repeated request/response commands and does not provide a PTY. The wire protocol follows RNS 1.5.7 `RNS/Utilities/rnsh/protocol.py`, protocol version 1.
 
-```
-dotreticulum rnsh --config shell-state --rnsconfig network-config -l -a IDENTITY_HASH -b 0 -- /bin/sh
-dotreticulum rnsh --rnsconfig network-config -m DESTINATION -- command argument
+```sh
+rnsh --config <shell-state> --rnsconfig <reticulum-config> -l -a <identity-hash> -b 0 -- /bin/sh
+rnsh --rnsconfig <reticulum-config> -m <destination-hash> -- command argument
 ```
 
-Starting a listener explicitly authorizes child process execution.
-Authentication denies all identities unless `-a` or the shell state's
-`allowed_identities` grants access. The file is re-read for each new session.
-`-n` disables this protection and is dangerous. `-C` rejects remote argv;
-`-A` appends it to the configured default command. No implicit shell
-concatenation is performed. Arguments after `--` remain discrete argv values.
+`--config` selects shell identity and authorization state (default `~/.config/rnsh` when present, otherwise `~/.rnsh`); `--rnsconfig` selects the Reticulum configuration. The listener identity defaults to `identity.default` or a sanitized service suffix; the initiator identity defaults to `identity`. The allowed identity file is `<shell-state>/allowed_identities`. `-l` starts a listener, `-s` selects a service identity suffix, `-i` selects an identity file, and `-p` prints identity (and listener destination) without starting the listener. `-b 0` announces once; an omitted `-b` does not announce. `-a` may be repeated to allow identity hashes. `-n/--no-auth` accepts any identity and is dangerous. `-N/--no-id` suppresses client identification. `-m/--mirror` returns the remote process status. `-w/--timeout` sets the positive finite connect/session deadline (default 30 seconds). `-v`/`-q` increase or decrease logging verbosity. `-A` appends remote arguments to the configured default command; `-C` rejects remote arguments. Arguments after `--` remain discrete argv values. Run `rnsh --help` for the full synopsis.
 
-`--config` selects shell identities and authorization, independently from
-`--rnsconfig`. Listener identities use `identity.default` or a sanitized
-service suffix; initiators use `identity`. `-p` never starts a listener.
-`-b 0` announces once; omitted `-b` does not announce. `-m` mirrors the
-remote process return code. `TERM` and `RNS_REMOTE_IDENTITY` are provided
-to the child.
+## Authorization and behavior
 
-Binary stdin/stdout/stderr use rnsh stream IDs 0/1/2, EOF flags and the
-existing reliable Channel. Window messages carry rows, columns and pixel
-dimensions. Child output is read incrementally, channel queues are bounded,
-and listener concurrency is limited to 16 sessions.
+Starting a listener explicitly authorizes child process execution. Access is denied unless the initiator identity is in `-a` or the shell state's `allowed_identities`; that file is re-read for each new session. `-n` bypasses identity authorization. The default listener command is the platform shell (`cmd.exe` on Windows, otherwise `$SHELL` or `/bin/sh`); operator-supplied arguments are not concatenated into a shell command. `TERM` and `RNS_REMOTE_IDENTITY` are passed to the child. Use an allow-list and a constrained default command when shell access is not intended.
 
-Session construction registers all message types and the receive handler through
-`Link.GetChannel(initialize)`, which publishes the channel only after synchronous
-initialization. The overload requires a previously uncreated channel; ordinary
-`GetChannel()` remains available. This prevents an early version packet from
-being proven and discarded while the listener's asynchronous establishment
-callback is still registering its decoder. A controlled initialization regression
-and actual Windows/Linux native terminal flows cover this race.
+Protocol stream IDs 0, 1, and 2 carry stdin, stdout, and stderr. EOF flags delimit input; window messages carry rows, columns, and pixel dimensions. Output is read incrementally, channel queues are bounded, and the listener accepts at most 16 concurrent sessions. Child ownership and cancellation are explicit. Windows children use a kill-on-close Job; Linux PTY children use a new session/process group. Platform process-tree termination remains best effort for descendants that detach or escape OS ownership.
 
-## Platform and acceptance limits
+The native Windows terminal backend uses ConPTY; the native Linux terminal backend uses `posix_spawn`, a PTY, process groups, and window ioctls. The initiator saves and restores terminal state, enters raw mode, polls window dimensions at an RTT-derived interval, and supports `~~`, `~.`, `~L`, and `~?` escapes. Redirected pipe input bypasses escape processing to preserve arbitrary bytes. Windows ConPTY merges endpoints attached to its terminal surface; independently redirected endpoints remain lossless, and explicit inherited handles support mixed modes. POSIX termios behavior is not reproduced by ConPTY. All eight stdin/stdout/stderr pipe-versus-terminal combinations are exercised on Windows and Linux, including stream separation or terminal merging.
 
-Redirected pipe processes are implemented for Windows and Unix. Windows
-children are created suspended, assigned to a kill-on-close Job, and resumed
-only after ownership succeeds. The Windows terminal backend uses ConPTY,
-separate input/output servicing, native resize and draining during closure.
-ConPTY merges endpoints attached to its terminal surface and does not implement
-POSIX termios. Each endpoint can independently remain a lossless redirected
-pipe; explicit inherited handles are combined with ConPTY for mixed modes.
-All eight stdin/stdout/stderr pipe-versus-terminal combinations have been
-executed on Windows and Linux, checking the child's actual redirection flags
-and stream separation/merging.
+## Platform notes and differences from upstream
 
-The native Linux PTY backend uses libc `posix_spawn`, a new
-session/process group and window ioctls. The initiator snapshots/restores
-terminal settings, enters raw mode, polls window changes at the reference's
-RTT-derived interval and implements the interactive `~~`, `~.`, `~L` and
-`~?` escapes. Pipe input bypasses these escapes to preserve arbitrary bytes.
-macOS terminal support has not been implemented or accepted.
+Native terminal support exists on Windows and Linux. **The Darwin/macOS terminal backend is missing**: the general application may build for macOS, but `rnsh` does not provide an accepted native macOS PTY/terminal implementation. Redirected pipe processes are available on Windows and Unix. The pinned Python shell depends on POSIX-only `fcntl`, `pty`, `termios`, and `fork`, so its process/session implementation cannot run unmodified in Windows Python; Python live sessions use a Linux peer, including WSL when applicable.
 
-Pinned upstream accepts the execute message's `tcflags` but does **not**
-apply them in `session.py`; this implementation likewise does not apply them
-to the server child. Its Linux `CallbackSubprocess.start.poll` also returns
-`waitpid`'s raw status masked by `0xff`, so normal POSIX nonzero exits
-are reported as zero. This is a pinned-reference behavior, not a reliable
-cross-platform process exit contract. Windows uses native process exit codes.
+The pinned server accepts `tcflags` but does not apply them; the native server likewise does not apply them to its child. In pinned Linux upstream, `CallbackSubprocess.start.poll` masks `waitpid` status with `0xff`, causing ordinary POSIX nonzero exits to appear as zero. Windows uses native process exit codes. The native CLI's help and native terminal behavior are not claims of Python UI parity.
 
-Reference fixtures are independently generated by
-`tests/DotReticulum.Applications.Tests/GenerateRnshVectors.py`, which verifies
-the imported reference revision and LXMF version. Vector agreement and .NET
-loopback alone do not establish live Python session or NativeAOT support.
+The pinned upstream has an EOF race: `close_stdin()` schedules termination while a waiter thread can reap the child before the regular polling callback observes termination, leaving the listener return code unset. A successful session that keeps stdin open until the child exits must not be interpreted as proof that EOF completion works. DotReticulum owns child-input shutdown and teardown without reproducing the permanently hung listener; this is a behavior difference from the pinned implementation.
 
-Source anchors: `args.py:47-104`, `rnsh.py:57-184`,
-`session.py:88-425`, `initiator.py:206-472` and
-`process.py:371-704` under the pinned `RNS/Utilities/rnsh` directory.
-Windows ownership and terminal design follow Microsoft's
-[pseudoconsole session lifecycle](https://learn.microsoft.com/windows/console/creating-a-pseudoconsole-session):
-the output endpoint must remain drained while `ClosePseudoConsole` emits its
-final frame, and the original pseudoconsole pipe endpoints are closed after
-successful child creation.
+## Verification
 
-The pinned Python shell implementation imports POSIX-only `fcntl`, `pty` and
-`termios` and invokes `fork`; the Windows Python environment cannot execute
-its session/process implementation unmodified. Live verification therefore
-requires a Linux peer (including an explicitly identified WSL peer), rather
-than a replacement Python process shim being described as upstream rnsh.
-
-## Pinned EOF defect
-
-Independent execution of unmodified
-`CallbackSubprocess.start`, `write` and `close_stdin` at the pinned revision
-identified a reference process race. `close_stdin()` schedules termination;
-`terminate()` starts a thread calling blocking `waitpid()`. That waiter can
-reap the child before the normal `start.poll` callback observes termination,
-leaving `ListenerSession.return_code` unset indefinitely. This occurs on
-both loop-thread and Channel-style-thread launches. The exact same child
-without premature stdin EOF delivers stdout, stderr and exit callback.
-`GenerateRnshProcessVectors.py` reproduces all four cases against verified
-RNS 1.5.7/LXMF 1.2.1; it does not monkeypatch the reference.
-
-Consequently a successful session that keeps stdin open until a
-self-terminating command exits must not be described as EOF completion.
-A bounded negative EOF test and fresh-link recovery are separate acceptance
-requirements. DotReticulum closes its child input and owns process teardown
-without reproducing a permanently hung listener; this recovery difference
-must remain explicit in claims against this pin.
-
-## Recorded Windows/WSL acceptance (2026-10-25)
-
-The parent integration run initially recorded 20 focused rnsh tests passing, including
-actual ConPTY child output, exact terminal-mode change/restoration, binary
-pipe I/O, child-tree disposal and Channel execution/rejection/new-link recovery.
-`TestResults/parity7-shell-live-third` records two additional passing tests:
-
-* Verified RNS 1.5.7/LXMF 1.2.1 Python listener and initiator in Ubuntu WSL
-  exchange exact binary stdin/stdout/stderr with .NET. A C# bridge adds 20ms
-  latency each direction and deliberately drops one Channel message each
-  direction; the test requires at least two actual drops and complete data.
-* Successful Python-listener commands keep stdin open until the child exits.
-  A separate eight-second negative case explicitly observes the unmodified
-  EOF race above (RUNNING with null return code), cancels and recovers a fresh
-  link. A real Python PTY reports initial `31 97`, then `45 120` after resize.
-* Python initiates failed-spawn and cancelled .NET sessions, followed by a
-  successful binary session. A delayed marker verifies the cancelled child
-  did not continue running.
-* A published Windows NativeAOT initiator, itself hosted in an actual ConPTY,
-  establishes a remote session and receives `native-terminal-flow`.
-
-The expanded Windows focused run passed 28 cases, including all eight endpoint
-combinations. The Linux snapshot at
-`/home/dennis/dotreticulum-parity7-73d8d59a` subsequently passed all 23 selected
-cases: native Linux child endpoints/PTY size, exact mode restoration,
-child-tree cancellation, Channel sessions, actual pinned Python bidirectional
-sessions (including the bounded negative EOF/recovery case) and the published
-native terminal-hosted CLI. Linux NativeAOT publish completed with warnings as
-errors; its executable ran `--help`, the terminal-hosted shell session and an
-encrypted resource flow. The later Parity 8 integration reproduced and fixed
-the early-version registration race above, republished both native binaries,
-and repeated the terminal/resource flows. Final repository-wide evidence is
-in the development history.
-
-The Linux restoration test exposed a real Console PAL ordering issue:
-`Console.TreatControlCAsInput` can change termios, so it must run **before**
-the complete native raw/restored state is applied. The test compares exact
-native mode bytes after restoration, rather than merely checking child output.
-
-These are Windows and Ubuntu WSL Linux x64 results, **not** macOS or external
-network/multi-hop shell acceptance. Broader topology/release matrices belong
-to Parity 8; no claim is made for them here. The Python adapter invokes
-unmodified `ListenerSession` and protocol codecs; its client driver bypasses
-upstream's interactive UI and does not prove that UI. The native interactive
-initiator's terminal modes, escapes, resize/stream contracts and actual
-terminal-hosted execution are tested separately.
+`tests/DotReticulum.Applications.Tests/RnshTests.cs`, `RnshNativeTests.cs`, and `RnshLiveTests.cs` cover protocol, process ownership, terminal behavior, and live Python sessions. Windows and Linux x64 native endpoint combinations and Python interoperability are exercised, including binary streams, resize, loss/retry, cancellation, and recovery. Published NativeAOT terminal-hosted flows are exercised on both systems. The Python live driver exercises protocol sessions rather than upstream interactive UI. The EOF race is a bounded negative reference result, not a successful EOF-interoperability claim. macOS terminal behavior is not implemented or verified.

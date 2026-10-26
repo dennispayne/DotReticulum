@@ -1,6 +1,6 @@
 # Contributing
 
-DotReticulum is an experimental, LLM-assisted learning project. Discuss substantial protocol or architecture changes in an issue first. Keep pull requests focused and follow the PR checklist and Code of Conduct.
+DotReticulum is an experimental project written predominantly by LLM coding agents under human direction. Discuss substantial protocol or architecture changes in an issue first. Keep pull requests focused and follow the PR checklist and Code of Conduct.
 
 ## Development
 
@@ -43,7 +43,7 @@ pwsh -NoProfile -File tests\run-pester.ps1 -ToolingOnly
 pwsh -NoProfile -File tests\run-pester.ps1 -Application C:\Publish\DotReticulum.Applications.exe
 ```
 
-`run-pester.ps1` tests the built Release DLL by default, or the supplied published executable. Tooling cases cover coverage merging/exclusions, incomplete/malformed reports and runner input guards. CLI suites launch actual processes for identity persistence, runtime configuration/recovery, interface and resource behavior, Git errors and authenticated multi-megabyte rncp transfers. Parity 7 adds identity/signature/encryption, network utilities, shell, device-maintenance safety and transfer/execution cases. No public gateway is required; the default suite needs no Python. Supplying both `-Python` and `-Upstream` enables additional verified-reference process comparisons; unavailable reference modes explicitly skip. The suite uses isolated temporary directories, bounded process waits, captures stdout/stderr and terminates only processes it launched. Pester checks application boundaries; protocol-level interoperability assertions remain in xUnit. `run-tests.ps1 -Pester` runs these after the .NET suite, using `-NativeExe` as the Pester application when supplied.
+`run-pester.ps1` tests the built Release DLL by default, or the supplied published executable. Tooling cases cover coverage merging/exclusions, incomplete/malformed reports and runner input guards. CLI suites launch actual processes for identity persistence, runtime configuration/recovery, interface and resource behavior, Git errors and authenticated multi-megabyte rncp transfers. The suites also cover identity/signature/encryption, network utilities, shell, device-maintenance safety and transfer/execution cases. No public gateway is required; the default suite needs no Python. Supplying both `-Python` and `-Upstream` enables additional verified-reference process comparisons; unavailable reference modes explicitly skip. The suite uses isolated temporary directories, bounded process waits, captures stdout/stderr and terminates only processes it launched. Pester checks application boundaries; protocol-level interoperability assertions remain in xUnit. `run-tests.ps1 -Pester` runs these after the .NET suite, using `-NativeExe` as the Pester application when supplied.
 
 Measure production coverage with the existing Coverlet collector and merge reports across test projects:
 
@@ -55,6 +55,17 @@ pwsh -NoProfile -File tests/coverage_summary.ps1 TestResults/coverage-<unique-ru
 Use a fresh results directory per run so stale reports cannot inflate coverage, and do not run other builds/tests against the same output directories while the collector is instrumenting assemblies. The summary counts shared lines and individual branch paths once across all test projects, excluding test assemblies, and rejects reports missing a production project. Record whether `DOTRETICULUM_LIVE=1` was enabled; the default suite skips Python interoperability tests. Coverage shows execution, not correctness. Prefer focused tests of uncovered failure behavior over coverage-only assertions.
 
 Live Python harnesses require `DOTRETICULUM_UPSTREAM` to point at an unmodified working checkout of the Reticulum-hosted upstream, currently `a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7), and `DOTRETICULUM_PYTHON` to select the reference venv. They verify the imported source and Git revision; LXMF harnesses also verify the pinned package version (1.2.1). Obtain updates with our .NET `rngit fetch`, verify the resulting objects and materialize a working checkout locally; the GitHub repository is only a secondary comparison mirror. See [rngit.md](docs/rngit.md). Existing vectors and their reproduction generators still identify the older revision that actually generated them; reproducing those requires that historical checkout rather than the current live pin. Disclose reference-side shims and non-default peer limits. Unsupported test modes must explicitly skip rather than return a false pass.
+
+## Moving to a new upstream release
+
+DotReticulum's version is the targeted upstream RNS version plus a git-height build number (see the README's Versioning section). Anyone may take the project to the next upstream release (for example 1.5.8):
+
+1. Fetch the new upstream with our own `rngit fetch` from `rns://7649a50d84610232d1416b41d2896aff/reticulum/reticulum`, verify the Git objects, and compare against the [GitHub mirror](https://github.com/markqvist/Reticulum). The mirror is for comparison, never the origin of a pin.
+2. Update `PINNED_RNS_SHA` (and the LXMF pin if needed) in `tests/Interop/reference_environment.py`, and the commit text in this file and the README.
+3. Regenerate affected vectors by executing the new upstream, recording the new revision. Do not relabel older vectors.
+4. Review upstream changes since the old pin, update the code and `docs/compatibility-contracts.md`, and run the live suites.
+5. Edit `version.json` to the new upstream number (the build height resets) and update the "reference RNS x.y.z" strings in the applications' `--version`/help output.
+6. Record the change in `.github/development-history.md`.
 
 ## NativeAOT and portability
 

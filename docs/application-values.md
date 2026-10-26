@@ -107,25 +107,14 @@ Invalid policies throw ArgumentOutOfRangeException, including through the
 Try API; Try methods return false and null only for data errors. Resource
 exhaustion exceptions are not swallowed.
 
-## Evidence and acceptance
+## Verification
 
-The separate generator `tests/DotReticulum.Core.Tests/GenerateMsgPackApplicationVectors.py`
-executes the pinned module after `tests/Interop/reference_environment.py`
-verifies its actual source path, clean tracked RNS tree, SHA and LXMF 1.2.1.
-No upstream shim is used. The fixture contains independently generated
-extension/timestamp bytes, Unicode/float cases, length-header boundary
-hashes, map-key cases, observed upstream rejection classes and supported
-upstream keys intentionally restricted here. Earlier MessagePack fixtures
-retain their original provenance.
+The generator `tests/DotReticulum.Core.Tests/GenerateMsgPackApplicationVectors.py` executes the pinned module after `tests/Interop/reference_environment.py` verifies its source path, clean tracked RNS tree, SHA and LXMF 1.2.1. No upstream shim is used. Fixtures cover extension/timestamp bytes, Unicode and floats, length-header boundaries, map keys, observed upstream rejection classes and intentionally restricted keys. Existing MessagePack fixtures retain their original provenance.
 
-Acceptance is exact reference bytes/hashes, lossless application-key
-round-trips, unchanged ordinary legacy-map projections, strict malformed
-errors, and read/write bounds at/beyond each configured limit. Focused test:
+`tests/DotReticulum.Core.Tests/MsgPackTests.cs` and `MsgPackApplicationValueTests.cs` cover reference bytes and hashes, lossless application-key round-trips, legacy projections, malformed data and configured read/write bounds. Run the focused suite with:
 
 ```powershell
 dotnet test tests\DotReticulum.Core.Tests\DotReticulum.Core.Tests.csproj -c Release --filter "FullyQualifiedName~MsgPack"
 ```
 
-This focused command reproduces the codec checks. Independent Python vectors
-alone do not prove live interop or NativeAOT execution; the current integrated
-suite and native evidence are recorded in the development history.
+Independent Python vectors establish reference bytes but do not by themselves prove live interoperability or NativeAOT execution. Those broader capabilities have separate evidence and platform boundaries.

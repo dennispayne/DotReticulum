@@ -1,10 +1,6 @@
-# Native runtime operations
+# Runtime operations
 
-The runtime is experimental and does not establish complete RNS parity. The
-source baseline is RNS 1.5.7, commit
-`a29bfb51c468945c96a1ee22cae0114e993e2391`. See [rnsd](rnsd.md) for
-configuration and [development history](../.github/development-history.md) for
-the exact exercised platforms and reference flows.
+DotReticulum provides native .NET runtime services for interface ownership, shared-instance operation, discovery, management and persistence. It is experimental and is not an official or endorsed Reticulum implementation. The pinned reference is RNS 1.5.7 at `a29bfb51c468945c96a1ee22cae0114e993e2391`. See [rnsd](rnsd.md) for daemon configuration and [TODO.md](../TODO.md) for capabilities that are not implemented or verified.
 
 ## Interface ownership and extensions
 
@@ -37,9 +33,7 @@ loop reports the error without completing the daemon channel, and the discovery
 lease retains ownership until its offline-grace/detach policy releases it.
 Ordinary configured top-level interface faults remain terminal.
 
-Python's external-interface contract loads a user `.py` file and executes it
-(`Reticulum.py:1185-1207`). DotReticulum deliberately does **not** load scripts,
-assemblies, arbitrary type names or reflection-discovered plug-ins at runtime.
+Unlike the upstream external-interface contract (`Reticulum.py:1185-1207`), DotReticulum does **not** load or execute user `.py` files, assemblies, arbitrary type names or reflection-discovered plug-ins at runtime.
 NativeAOT extensions are statically compiled `IPacketInterface` implementations,
 registered explicitly through an `InterfaceFactoryRegistry`:
 
@@ -240,3 +234,6 @@ or failed initialization: construct a new node for a restart. Identity names
 passed to `LoadOrCreateIdentity` are relative ASCII file paths beneath storage;
 rooted paths and traversal segments are rejected. Existing tool identities
 retain their `storage/identities/<tool>` locations.
+## Verification and platform scope
+
+`tests/DotReticulum.Applications.Tests/RuntimeOperationsTests.cs`, `SharedRuntimeTests.cs`, `SharedHostIntegrationTests.cs` and `RuntimeStateStoreTests.cs` cover owned interfaces, shared-instance behavior, discovery, persistence and failure handling. Windows x64 and Linux x64 are exercised. macOS ARM64 builds and passes the managed suite and NativeAOT resource test, but the Darwin rnsh terminal backend is unavailable. Android, desktop RNode BLE and other unverified providers are listed in [TODO.md](../TODO.md).
