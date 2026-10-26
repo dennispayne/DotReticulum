@@ -1,7 +1,7 @@
 {
   "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
   "version": "1.5.7",
-  "rnsModule": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "rnsModule": "<reference-files>\\upstream-reticulum-rns\\RNS\\__init__.py",
   "sourceSha256": {
     "RNS/Interfaces/I2PInterface.py": "b654c55fe588480a1211fad150edbc9102e510a6d88ccd9734774c63a7db06bb",
     "RNS/vendor/i2plib/sam.py": "63991f237a3a48628fe62dd33de2d953ce26bfe95b56d664b8478cd638314891",

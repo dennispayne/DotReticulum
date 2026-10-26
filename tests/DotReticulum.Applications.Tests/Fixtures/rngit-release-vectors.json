@@ -1,7 +1,7 @@
 {
   "upstream": "a29bfb51c468945c96a1ee22cae0114e993e2391",
   "rns_version": "1.5.7",
-  "rns_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "rns_module": "<reference-files>\\upstream-reticulum-rns\\RNS\\__init__.py",
   "git_process_policy": "C# adapter sets process-local safe.bareRepository=all and checkout-appropriate core.autocrlf; no persisted Git config or reference-source changes",
   "server_sha256": "6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693",
   "rnid_sha256": "faee0d8acb4263f10812fa378085f2653b2453f584b4a33f2018c7797885f8c8",

@@ -1,7 +1,7 @@
 {
   "upstream": "a29bfb51c468945c96a1ee22cae0114e993e2391",
   "version": "1.5.7",
-  "rns_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "rns_module": "<reference-files>\\upstream-reticulum-rns\\RNS\\__init__.py",
   "source_sha256": {
     "Reticulum.py": "c655675a799413d9bb11d44ab90d56bc1f4fe339fee1ee5d108754dc8bf812d7",
     "Interfaces\\LocalInterface.py": "b241095c0a528f0c9a88817429a9ce54c7adb5aa850ae08e29c9b84dd8fa4371",

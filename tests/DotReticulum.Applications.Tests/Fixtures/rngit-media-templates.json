@@ -2,9 +2,9 @@
   "upstream": "a29bfb51c468945c96a1ee22cae0114e993e2391",
   "version": "1.5.7",
   "imports": {
-    "RNS": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
-    "pages": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\Utilities\\rngit\\pages.py",
-    "media": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\Utilities\\rngit\\media.py"
+    "RNS": "<reference-files>\\upstream-reticulum-rns\\RNS\\__init__.py",
+    "pages": "<reference-files>\\upstream-reticulum-rns\\RNS\\Utilities\\rngit\\pages.py",
+    "media": "<reference-files>\\upstream-reticulum-rns\\RNS\\Utilities\\rngit\\media.py"
   },
   "sha256": {
     "pages": "d165d8ac8d3cfdd1b42929a2512e9d5d03a1cef726124deca5218d7522a89c04",
@@ -167,7 +167,7 @@
   "executable_template": {
     "success": "owned π {PAGE_CONTENT}",
     "nonzero_exit_output": "",
-    "owned_fixture": "C:\\Git\\dennispayne\\DotReticulum\\tests\\Fixtures\\RngitPresentationBackend\\bin\\Release\\net10.0\\RngitPresentationBackend.exe"
+    "owned_fixture": "<repo>\\tests\\Fixtures\\RngitPresentationBackend\\bin\\Release\\net10.0\\RngitPresentationBackend.exe"
   },
   "editor": {
     "input": "owned permission input\n",
@@ -176,10 +176,10 @@
     "shell": false
   },
   "native": {
-    "encoder": "C:\\Git\\dennispayne\\DotReticulum\\TestResults\\media-backend\\ffmpeg-9.0.2-essentials_build\\bin\\ffmpeg.exe",
+    "encoder": "<repo>\\TestResults\\media-backend\\ffmpeg-9.0.2-essentials_build\\bin\\ffmpeg.exe",
     "encoder_sha256": "3256173f3f8bffd7df12227c68adf68025edb1832273a9530688a7bb1ed8edec",
     "encoder_version": "ffmpeg version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
-    "source_image": "C:\\Git\\dennispayne\\DotReticulum\\assets\\branding\\dotreticulum.png",
+    "source_image": "<repo>\\assets\\branding\\dotreticulum.png",
     "source_sha256": "474352118dc848496f47b8f3e757b75b242c29e47f24166b8407eae325031001",
     "cases": [
       {
@@ -224,6 +224,6 @@
       }
     ],
     "invalid_image_result": false,
-    "owned_temp_directory": "C:\\Git\\dennispayne\\DotReticulum\\TestResults\\media-template-vectors"
+    "owned_temp_directory": "<repo>\\TestResults\\media-template-vectors"
   }
 }

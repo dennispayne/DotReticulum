@@ -1,7 +1,7 @@
 {
   "upstream": "a29bfb51c468945c96a1ee22cae0114e993e2391",
   "rns_version": "1.5.7",
-  "rns_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "rns_module": "<reference-files>\\upstream-reticulum-rns\\RNS\\__init__.py",
   "source_sha256": {
     "pages.py": "d165d8ac8d3cfdd1b42929a2512e9d5d03a1cef726124deca5218d7522a89c04",
     "server.py": "6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693",

@@ -1,10 +1,10 @@
 {
   "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
   "rns_version": "1.5.7",
-  "rns_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
-  "auto_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\Interfaces\\AutoInterface.py",
+  "rns_module": "<reference-files>\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "auto_module": "<reference-files>\\upstream-reticulum-rns\\RNS\\Interfaces\\AutoInterface.py",
   "lxmf_version": "1.2.1",
-  "lxmf_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\refvenv\\Lib\\site-packages\\LXMF\\__init__.py",
+  "lxmf_module": "<reference-files>\\refvenv\\Lib\\site-packages\\LXMF\\__init__.py",
   "auto_source_sha256": "c92fe1da13d7633b4bd443660041c8471fd8762fc9f3535cf92926f9f323c9df",
   "auto_source_canonical_lf_sha256": "88efeadbe2e48e374910fa9b7ea747076cdf6ee6163bc95a098596096672aedf",
   "auto_git_blob_sha256": "88efeadbe2e48e374910fa9b7ea747076cdf6ee6163bc95a098596096672aedf",

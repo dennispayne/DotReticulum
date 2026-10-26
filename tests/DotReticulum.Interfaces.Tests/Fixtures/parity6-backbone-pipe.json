@@ -1,6 +1,6 @@
 {
   "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
-  "rns_import": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "rns_import": "<reference-files>\\upstream-reticulum-rns\\RNS\\__init__.py",
   "version": "1.5.7",
   "sources": {
     "RNS\\Interfaces\\BackboneInterface.py": "c3445132d89af04998c35b12e5101c8975d73599f62fe71b501b3d734c150438",

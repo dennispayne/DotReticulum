@@ -1,6 +1,6 @@
 {
   "upstream": "a29bfb51c468945c96a1ee22cae0114e993e2391",
-  "module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS",
+  "module": "<reference-files>\\upstream-reticulum-rns\\RNS",
   "sources": {
     "Packet.py": "f1b12a7068c6036e20439f87f8bfb6ad2dd92689c03be387e2bb697d46bdb075",
     "Transport.py": "333b34eeab020946eefdd8a7e75d3fa74d2ffc5adfef7c0080752980f455bf2c",

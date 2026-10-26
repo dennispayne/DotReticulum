@@ -1,6 +1,6 @@
 {
   "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
-  "source": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\Interfaces\\UDPInterface.py",
+  "source": "<reference-files>\\upstream-reticulum-rns\\RNS\\Interfaces\\UDPInterface.py",
   "sourceSha256": "575d1137716139b238649ae5b35a0f66a6a25a8661bc919f5226942df79f4fa5",
   "method": "Unmodified UDPInterface constructor; isolated unmodified runtime; real ephemeral loopback listeners; no traffic",
   "cases": [

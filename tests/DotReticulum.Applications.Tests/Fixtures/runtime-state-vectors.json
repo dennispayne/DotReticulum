@@ -1,7 +1,7 @@
 {
   "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
   "version": "1.5.7",
-  "import": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "import": "<reference-files>\\upstream-reticulum-rns\\RNS\\__init__.py",
   "sources_sha256": {
     "Identity.py": "ac336bb2b7217278d3a962b6945212313fed0ee9cc10d666e8ac17faca17ea2f",
     "Destination.py": "e1117e5ff9c4baeda53f9117ae52c4cd0e1e2a4f4167de628e4afb8b4506b8ae",

@@ -2,8 +2,8 @@
   "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
   "rns_version": "1.5.7",
   "generation_platform": "win32",
-  "rns_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\upstream-reticulum-rns\\RNS\\__init__.py",
-  "lxmf_module": "C:\\Users\\dennis\\.copilot\\session-state\\c075724f-f262-4902-9809-a6358920915f\\files\\refvenv\\Lib\\site-packages\\LXMF\\__init__.py",
+  "rns_module": "<reference-files>\\upstream-reticulum-rns\\RNS\\__init__.py",
+  "lxmf_module": "<reference-files>\\refvenv\\Lib\\site-packages\\LXMF\\__init__.py",
   "source_sha256": {
     "TCPInterface.py": "d9a4fcaf6e76a9dcb810d335850ab0398d21054848fd84766a62f687a9ec942d",
     "SerialInterface.py": "676f7b038c2950b92ac71f29653cbbe35ba6513a53ca41742d43e19966e1ef1f"
