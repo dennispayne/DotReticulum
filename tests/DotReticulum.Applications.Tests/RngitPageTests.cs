@@ -121,7 +121,7 @@ public sealed class RngitPageTests : IDisposable
             if (vector.TryGetProperty("response", out var expected))
             {
                 var bytes = Assert.IsType<byte[]>(result);
-                var expectedText = Encoding.UTF8.GetString(Convert.FromHexString(expected.GetString()!));
+                var expectedText = LocalizeFixtureDates(Encoding.UTF8.GetString(Convert.FromHexString(expected.GetString()!)));
                 var actualText = NormalizeGenerationTime(Encoding.UTF8.GetString(bytes));
                 if (vector.TryGetProperty("redact_source", out var redaction))
                 {
@@ -170,7 +170,19 @@ public sealed class RngitPageTests : IDisposable
     }
     private sealed class FixtureClock(long timestamp) : TimeProvider
     {
+        private static readonly TimeZoneInfo FixtureTimeZone =
+            TimeZoneInfo.CreateCustomTimeZone("Fixture UTC-05", TimeSpan.FromHours(-5), "Fixture UTC-05", "Fixture UTC-05");
+
         public override DateTimeOffset GetUtcNow() => DateTimeOffset.FromUnixTimeSeconds(timestamp);
+        public override TimeZoneInfo LocalTimeZone => FixtureTimeZone;
+    }
+    private static string LocalizeFixtureDates(string text)
+    {
+        // The unchanged oracle captured epoch 1700000000 in UTC-05:00; upstream renders local time.
+        var date = DateTimeOffset.FromUnixTimeSeconds(1700000000).LocalDateTime;
+        return Regex.Replace(text, @"2023-11-14(?!T)(?: 17:13(?::20)?)?", match =>
+            date.ToString(match.Length switch { 10 => "yyyy-MM-dd", 16 => "yyyy-MM-dd HH:mm", _ => "yyyy-MM-dd HH:mm:ss" },
+                System.Globalization.CultureInfo.InvariantCulture));
     }
     private static string NormalizeGenerationTime(string text)
     {

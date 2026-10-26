@@ -17,5 +17,6 @@
   </Folder>
   <Folder Name="/tests/Fixtures/">
     <Project Path="tests/Fixtures/RngitPresentationBackend/RngitPresentationBackend.csproj" />
+    <Project Path="tests/Fixtures/RnshTerminalProbe/RnshTerminalProbe.csproj" />
   </Folder>
 </Solution>

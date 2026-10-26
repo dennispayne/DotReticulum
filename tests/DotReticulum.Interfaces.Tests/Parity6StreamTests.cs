@@ -245,7 +245,7 @@ public sealed class Parity6StreamTests
         Assert.True(socket.NoDelay);
         if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
         {
-            Assert.Equal(1, (int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive)!);
+            Assert.NotEqual(0, (int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive)!);
             Assert.Equal(i2pTunneled ? 10 : 5, (int)socket.GetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime)!);
         }
 

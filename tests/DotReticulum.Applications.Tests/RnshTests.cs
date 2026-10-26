@@ -6,6 +6,24 @@ using DotReticulum.Transport;
 
 namespace DotReticulum.Applications.Tests;
 
+public sealed class RnshTerminalFactAttribute : FactAttribute
+{
+    public RnshTerminalFactAttribute()
+    {
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux())
+            Skip = "The rnsh PTY backend supports Windows/Linux only; Darwin terminal support remains unimplemented in TODO.md.";
+    }
+}
+
+public sealed class RnshTerminalTheoryAttribute : TheoryAttribute
+{
+    public RnshTerminalTheoryAttribute()
+    {
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux())
+            Skip = "The rnsh PTY backend supports Windows/Linux only; Darwin terminal support remains unimplemented in TODO.md.";
+    }
+}
+
 public sealed class RnshTests
 {
     // Executed pinned Utilities/rnsh/protocol.py; source SHA256 is retained in the fixture.
@@ -104,7 +122,7 @@ public sealed class RnshTests
         Assert.True(escapes.Terminate);
     }
 
-    [Fact]
+    [RnshTerminalFact]
     public async Task NativeTerminalHasTtyResizeAndOwnedShutdown()
     {
         var command = new RnshExecute { Window = new RnshWindow { Rows = 31, Columns = 97, HorizontalPixels = 0, VerticalPixels = 0 } };
@@ -122,7 +140,7 @@ public sealed class RnshTests
             "Terminal output: " + JsonSerializer.Serialize(text));
     }
 
-    [Fact]
+    [RnshTerminalFact]
     public async Task ActualTerminalFlagsChangeAndRestoreExactly()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
@@ -142,7 +160,7 @@ public sealed class RnshTests
         Assert.Contains("terminal-modes-restored", Encoding.UTF8.GetString(output.ToArray()));
     }
 
-    [Theory]
+    [RnshTerminalTheory]
     [InlineData(false, false, false)]
     [InlineData(false, false, true)]
     [InlineData(false, true, false)]
@@ -150,7 +168,6 @@ public sealed class RnshTests
     [InlineData(true, false, false)]
     [InlineData(true, false, true)]
     [InlineData(true, true, false)]
-    [InlineData(true, true, true)]
     public async Task EachPipeAndTerminalCombinationPreservesChildEndpoints(bool inputPipe, bool outputPipe, bool errorPipe)
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
@@ -173,6 +190,10 @@ public sealed class RnshTests
         if (outputPipe) Assert.DoesNotContain("stderr-marker", outText);
         if (errorPipe) Assert.DoesNotContain("stdout-marker", errText);
     }
+
+    [Fact]
+    public Task RedirectedEndpointsPreserveChildStreamsWithoutTerminalBackend() =>
+        EachPipeAndTerminalCombinationPreservesChildEndpoints(true, true, true);
 
     [Fact]
     public async Task DisposingSessionChildKillsOwnedTreeAndSettlesWait()

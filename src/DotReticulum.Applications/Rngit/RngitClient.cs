@@ -170,8 +170,8 @@ public sealed class RngitClient(ReticulumNode node, Identity identity, Action<st
     {
         var objectPath = (await GitAsync(directory, ["rev-parse", "--git-path", "objects"], stop).ConfigureAwait(false)).Trim();
         objectPath = Path.GetFullPath(objectPath, directory);
-        var verification = Path.Combine(directory, "rngit-verify-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(verification);
+        // Some Windows Git versions impose a fixed fsck GIT_DIR limit despite core.longpaths.
+        var verification = Directory.CreateTempSubdirectory("rngit-verify-").FullName;
         try
         {
             // Git owns the clone's temporary invalid HEAD. Validate every object without touching its refs.
