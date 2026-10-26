@@ -12,10 +12,12 @@ dotnet run --project src\DotReticulum.Applications -- rnodeconf --help
 dotnet run --project src\DotReticulum.Applications -- rnodeconf COM_PORT --info
 ```
 
-No COM8 device query or mutation was performed for this implementation.
-The only available radio was previously identified as RNode 1.86 / nRF52;
-that earlier interface evidence does not verify this utility. No second radio
-or firmware installation target was available.
+The published native utility has since completed read-only `--info` and
+`--eeprom-backup` operations on COM8. It identified a RAK4631/SX1262 running
+firmware 1.86 on nRF52 in Normal mode, with a valid EEPROM checksum and an
+unverified signer; the 200-byte backup is retained outside source control.
+No EEPROM mutation, flash, RF transmission or recovery operation was performed.
+No second radio or firmware installation target was available.
 
 ## Source inventory and acceptance boundaries
 

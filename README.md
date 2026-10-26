@@ -6,7 +6,7 @@
 
 An **LLM-assisted learning project**: an experimental native C# / .NET 10 implementation of the [Reticulum Network Stack](https://reticulum.network), aiming for wire compatibility with the Python reference implementation. It was produced with AI assistance, is not an official or community-recognized Reticulum implementation, and is not endorsed by the Reticulum project or its maintainer. Do not use it for production or security-critical purposes.
 
-Compatibility claims here are exactly as strong as the recorded evidence; see the status table and [development history](.github/development-history.md). Phase progress is tracked in [plan.md](plan.md).
+Compatibility claims here are exactly as strong as the recorded evidence; see the status table and [development history](.github/development-history.md). Remaining work is tracked in [TODO.md](TODO.md); the former plan is archived at [docs/archive/plan.md](docs/archive/plan.md).
 
 The roadmap targets high-fidelity feature and behavioral parity with the pinned upstream RNS repository, using idiomatic, well-architected native .NET rather than a line-by-line Python translation. It covers upstream runtime behavior, interfaces and bundled utilities, not just wire formats. Audio/video extensions are out of scope; existing LXMF and .NET-specific telemetry remain supported but their expansion is separate from RNS parity.
 
@@ -81,10 +81,10 @@ traffic. Operational MTUs now follow the path bottleneck, up to the native
 524,288-byte ceiling; actual Python mixed-transport flows exercise MTUs 1,024 and
 16,384, not every supported size or bearer.
 The source-backed inventory and remaining interface, utility and platform acceptance work remain in
-[plan.md](plan.md), with source references and acceptance criteria in the
+[TODO.md](TODO.md), with source references and acceptance criteria in the
 [development history](.github/development-history.md).
 
-Parity 6 is in progress: native Auto, Backbone/Pipe, KISS/AX.25, RNode/Multi,
+Parity 6 remains incomplete: native Auto, Backbone/Pipe, KISS/AX.25, RNode/Multi,
 I2P and Weave bearers are integrated, with source-executed vectors and bounded
 failure-path tests. Real Linux namespace traffic verifies Python/.NET Auto;
 device simulators do not establish physical serial/radio or Android support.
@@ -105,7 +105,16 @@ statistics, [packet-specific PHY attribution](docs/packet-phy.md), create-only
 publication, active resource leases and shell initialization have focused regressions.
 Darwin terminal support, desktop RNode BLE and Android providers are still missing;
 macOS execution, I2P restart delivery, broader impaired topologies and physical
-acceptance remain open. CI/CD has not started.
+acceptance remain open. CI/CD is incomplete: `ci-build-test.yml` is the only
+workflow currently added. It was pushed in `c9347a7`; its first hosted run
+(`40324430597`) failed all three managed suites on platform/test-portability
+issues. NativeAOT publish, `--help` and `NativeResourceTests` passed on all
+three operating systems. A correction run is pending. The workflow's Pester
+selection is `Coverage`, `Cli` and `Parity8Packaging`; mandatory Python
+reference suites are excluded. Native packaging is Windows/Linux-only, while
+the local CLI selection runs on macOS. The package suite explicitly skips
+macOS, and none of these checks alone establish general macOS support.
+Interop, mesh, CodeQL and stale-item workflows remain unimplemented.
 
 | Capability | Evidence / status |
 | --- | --- |
@@ -130,7 +139,7 @@ acceptance remain open. CI/CD has not started.
 | `rnsh` | Actual Python listener and initiator sessions exercise binary streams, deliberate loss, PTY resize, failed spawn, cancellation and fresh-session recovery. Windows/Linux test all eight pipe/terminal combinations and exact terminal-mode restoration; published-native initiators run inside actual terminals. The pinned Python EOF completion defect is independently reproduced and explicitly bounded in tests, not shimmed. Broader topology/macOS acceptance remains open. See [rnsh](docs/rnsh.md). |
 | Device and transfer utilities | Windows/Linux native rncp/rnx process tests cover both actual Python listener roles, raw binary output/limits, timeout/spawn/authorization errors and writable-output failures. RNode firmware plans/provisioning/recovery use independent reference vectors and device simulators; published-native safety/signing/placeholder processes run without real firmware or EEPROM mutation. Actual COM8 native identification and EEPROM backup pass; physical mutation/recovery and RF acceptance remain unverified. See [rnodeconf](docs/rnodeconf.md). |
 | Compatibility and native installation (Parity 8, incomplete) | Full non-live suites pass on Windows/Linux; both current NativeAOT binaries execute CLI/installation, terminal, encrypted multi-MB resource and tunnel-restart flows. The new managed-router mesh crosses actual Python and .NET transports, drops/retransmits nine selected resource parts and restarts the .NET router with surviving peers. Native packages preserve the exact license and test all dispatcher aliases, Git discovery, collision/integrity rejection and owned-file uninstall. macOS/provider/hardware and broader topology gaps remain explicit in the [compatibility ledger](docs/compatibility-contracts.md); passing these slices is not full parity. |
-| Everything else | Not yet implemented; see [plan.md](plan.md) |
+| Remaining parity work | Tracked in [TODO.md](TODO.md); the [archived plan](docs/archive/plan.md) is historical, not an active checklist |
 
 ## License
 

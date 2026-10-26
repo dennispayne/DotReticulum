@@ -126,6 +126,6 @@ errors, and read/write bounds at/beyond each configured limit. Focused test:
 dotnet test tests\DotReticulum.Core.Tests\DotReticulum.Core.Tests.csproj -c Release --filter "FullyQualifiedName~MsgPack"
 ```
 
-The coordinator must run this test, downstream regression suites and the
-NativeAOT feature gate; independent Python vectors alone do not prove live
-interop, native execution or completion of Parity 5.
+This focused command reproduces the codec checks. Independent Python vectors
+alone do not prove live interop or NativeAOT execution; the current integrated
+suite and native evidence are recorded in the development history.

@@ -20,10 +20,10 @@ memory when the reference implementation can establish it.
   by `DOTRETICULUM_UPSTREAM` and `DOTRETICULUM_PYTHON`. Verify the commit,
   imported module paths and versions using `tests\Interop\reference_environment.py`.
   Do not silently use an installed package, move the pin, or relabel old vectors.
-- Read `plan.md` first and implement only the requested, prerequisite-ready
+- Read `TODO.md` first and implement only the requested, prerequisite-ready
   scope. Read `.github\development-history.md` for source references, evidence,
-  intentional differences and known limitations. The plan is the only progress
-  checklist; history is evidence, not another tracker.
+  intentional differences and known limitations. TODO is the only active progress
+  checklist; `docs/archive/plan.md` and history are evidence, not other trackers.
 - DotReticulum targets behavioral and wire parity with an idiomatic native
   .NET implementation: explicit ownership, asynchronous I/O, cancellation,
   bounded resources, testable boundaries and trimming/NativeAOT safety. It is

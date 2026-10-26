@@ -5,8 +5,9 @@ DotReticulum is experimental, AI-assisted and independent of the Reticulum
 project. Integrated native desktop bearers do **not** establish Android support.
 See [runtime operations](runtime-operations.md), [rnsd](rnsd.md), and
 [development history](../.github/development-history.md) for execution evidence.
-The coordinator's current Parity 6 verification record belongs in that history;
-this document does not anticipate its results or duplicate the roadmap.
+Detailed Parity 6 and later integrated verification records belong in that
+history; this document records source and platform boundaries rather than
+duplicating the active checklist.
 
 ## Reference provenance and source map
 
@@ -217,9 +218,10 @@ is not validated. Generic socket, stream and codec reuse opportunities are
 
 The focused implementation adds deterministic-clock unit coverage for the
 pause boundary, keepalive accounting, decoded-frame counters and endpoint
-policy. This subtask did not run builds/tests, installation, network commands
-or device access; the coordinator owns validation and must report its actual
-results separately.
+policy. This source audit did not itself run builds/tests, installation,
+network commands or device access. Subsequent Windows/Linux integrated suites
+passed; their exact results are in the development history. Those suites do not
+establish Android runtime, physical-device or macOS support.
 
 Previously recorded Parity 3 evidence in
 [development history](../.github/development-history.md#parity-3-runtime-configuration-and-operations-2026-10-21)
@@ -246,8 +248,8 @@ The following are acceptance criteria, not a second progress checklist:
 | Surface/status at audit | Measurable acceptance and minimum access |
 | --- | --- |
 | Local TCP — implemented, prior Windows evidence | Reproduce both owner/client roles with the pinned Python process, byte-identical escaped packets, independent peers, one physical owner, wrong-key/malformed-peer survival and restart/reannouncement. Requires loopback/process access only; no radio or Internet. Current-run results belong in the coordinator's history record. |
-| Local abstract Unix — implemented Linux path, platform evidence not established by this audit | On Linux, verify default and named `NUL+rns/...` packet/RPC endpoints with actual Python in both roles, name isolation, competing ownership, owner restart, and no filesystem socket artifacts. Confirm TCP override separately. Requires a Linux host/container permitting AF_UNIX in the same relevant namespace, not physical hardware. |
-| Local peer/lifecycle/statistics — software contract implemented; runtime acceptance partial | Drop/fault one admitted child while a sibling continues traffic and new clients connect; exercise admission cap, blocked sends, no subscriber, cancellation and disposal. Compare decoded/framed counters and keepalives against Python, including empty keepalive behavior. Requires owned local processes/sockets; latest focused tests await coordinator validation. |
+| Local abstract Unix — implemented Linux path; full Python/native matrix unverified | Native Linux abstract owner/client process flows are covered. Still verify default and named `NUL+rns/...` packet/RPC endpoints with actual Python in both roles, name isolation, competing ownership, owner restart, and no filesystem socket artifacts. Confirm TCP override separately. Requires a Linux host/container permitting AF_UNIX in the same relevant namespace, not physical hardware. |
+| Local peer/lifecycle/statistics — bounded software acceptance passed; broader matrix remains | Integrated Windows/Linux suites pass; exact counts and commands are in the development history. Remaining work is a broader Python comparison of admitted-child sibling survival, admission pressure, cancellation/disposal and keepalive/counter behavior. Requires owned local processes/sockets. |
 | Android sharing/service — timing and endpoint policy implemented; device/runtime missing or unverified | On a named Android version/target SDK, verify endpoint operation, pause after 12 seconds, wake/reconnect, path-response reannouncements, service termination/restart and permission revocation while unrelated peers survive. Requires an installable Android host plus authorized emulator/device; desktop Linux success alone is insufficient. |
 | Android USB Serial/KISS/Weave — missing provider, hardware-dependent acceptance | On an owned Android USB-host device and identified adapter/TNC/Weave, record driver VID/PID and line/control settings; test grant/deny/revoke, unplug/replug, short writes, partial frames, reconnect and cleanup. Compare pinned configuration/control bytes, and validate real bidirectional traffic. An emulator or simulated stream covers protocol software only. |
 | Android RNode RFCOMM/BLE — missing provider, hardware-dependent acceptance | With authorized bonded RNode/firmware, validate target matching, adapter disabled/permission denied, SPP or exact GATT UUIDs, notification/MTU failure, fragmentation, reconnect and clean shutdown. Test control readback and both traffic directions; record negotiated MTU and actual transport. Requires Bluetooth-capable Android hardware and identified device. |

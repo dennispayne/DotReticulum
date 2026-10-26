@@ -65,7 +65,7 @@ cleanup/restart paths.
 - Every new vector generator belongs beside its owning tests and must execute
   upstream. Consult `CONTRIBUTING.md` and existing `Generate*.py` files for the
   verified convention.
-- Current behavioral limitations and completed scope are in `plan.md` and
+- Remaining work is in `TODO.md`; historical completed scope is in `docs/archive/plan.md` and
   `.github/development-history.md`. Do not infer that a checked module-level
   item establishes full upstream compatibility.
 

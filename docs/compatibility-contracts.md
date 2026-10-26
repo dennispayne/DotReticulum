@@ -1,9 +1,10 @@
 # Compatibility contracts and acceptance boundaries
 
 This is a source-backed acceptance inventory, **not a second progress
-checklist or a release certification**. [plan.md](../plan.md) is the only
-progress checklist; [development history](../.github/development-history.md)
-records commands, results and chronology. DotReticulum is experimental,
+checklist or a release certification**. [TODO.md](../TODO.md) is the active
+progress checklist; the former plan is retained as [historical context](archive/plan.md).
+[Development history](../.github/development-history.md) records commands,
+results and chronology. DotReticulum is experimental,
 AI-assisted, independent of and not endorsed by the Reticulum project.
 
 ## Scope, provenance and classification
@@ -69,7 +70,9 @@ verification view; Windows Git long paths are enabled for its nested files.
 Installed aliases preserve the exact Reticulum
 License; [installation](installation.md) records scope and refusal behavior.
 The earlier focused/full-gate-pending wording in the baseline discovery rows
-below does not negate these completed Windows/Linux integration gates. Full
+below does not negate these completed Windows/Linux integration gates. The
+residual-contract table is explicitly a baseline-era acceptance definition;
+its remaining gaps must be read with the current results above. Full
 all-platform/per-bearer feature acceptance, actual RF attribution and the named
 missing providers remain open; no complete Parity 8 or release claim is made.
 The development history records exact commands, failures, fixes and final gates.
@@ -87,10 +90,23 @@ acceptance, the parent's necessity/safe recovery assessment, and no second RF
 peer—not simply missing permission. Conditional approval does not justify
 gratuitous firmware changes or establish any hardware result.
 
-macOS execution is explicitly deferred to user-requested GitHub Actions
-**later**, not an assumed currently available Mac host. Its missing terminal
-software and unverified platform flows remain separate gaps. This audit
-created no workflows and does not authorize starting CI/CD.
+The recorded acceptance has no macOS execution; its missing terminal software
+and unverified platform flows remain separate gaps. The only workflow added
+early is `ci-build-test.yml`, pushed in `c9347a7`. Its first hosted run
+`40324430597` failed all three managed suites: failures exposed a timezone-bound
+Git page oracle, a Release solution missing the Debug-built `RnshTerminalProbe`,
+Windows Git fsck with a long source path, macOS `SO_KEEPALIVE` reporting and
+known unsupported Darwin PTY cases. The native NativeAOT publish, `--help` and
+`NativeResourceTests` passed on all three operating systems. A corrected run is
+pending; do not treat this first run as a green matrix.
+
+The workflow's Pester selection is only `Coverage`, `Cli` and
+`Parity8Packaging`; mandatory Python reference suites are excluded.
+`Parity8Packaging` runs only on Windows/Linux; the local CLI selection runs on
+macOS, but the package suite explicitly skips there. These checks are not
+macOS installation acceptance or a general macOS support claim. The known
+Darwin PTY cases are being changed to explicit reasoned skips and tracked in
+TODO. This audit did not create or validate workflows.
 
 The reference is the working checkout materialized from the Reticulum-hosted
 repository `rns://7649a50d84610232d1416b41d2896aff/reticulum/reticulum`:
@@ -227,7 +243,7 @@ statuses only to the extent supported by the later named evidence.
 | Attach/detach/reload/extensions/failure ownership; `Reticulum.py:771–841,1185–1207,1971–1996` | **Implemented native equivalent** U/P/N: `RuntimeOperationsTests`, `RuntimeDiscoveryHostTests`, manager/lifecycle/shared tests. Named bearer reload, no-subscriber processing and child isolation; global policy is not hot-reloaded. Native static `InterfaceFactoryRegistry` replaces dynamic Python execution. Failed replacement does not restore old bearer. Source `panic_on_interface_error` is explicitly rejected; native top-level versus child ownership is fixed. |
 | Known destinations/ratchets/paths/hashlists/cache/tunnel persistence and cleanup; `Identity.py:101–335,410–513`, `Reticulum.py:1316–1357`, `Transport.py:3745–3969` | **Implemented** bounded V/U/P/N slices: `RuntimeStateStoreTests`, `LifecycleStateTests`, `Parity4TunnelTests`, `Parity5ResourceStorageTests`, `Parity5Resources.Tests.ps1`. Public state uses one checksummed atomic native generation; interchange schemas are available but the runtime directory is **not drop-in Python storage**. Signed native ratchet metadata differs from the upstream key-only file; neither checksum nor raw state hash authenticates a publisher. No persistent encrypted-session/resource resume. |
 | Logging/rotation/timestamps/service/interactive/shutdown and housekeeping; `RNS\__init__.py:58–160`, `Reticulum.py:157–206,351–397,461–472`, `Utilities\rnsd.py:40–110` | **Implemented native equivalent** V/U/P/N slices: `RnsdConfigurationParityTests`, `RnsdInteractiveTests`, CLI/shared Pester. Levels 0–8 and rotation, configured graceful persistence; bounded management shell instead of Python REPL. Windows Ctrl+C, Unix SIGTERM and daemon process death are distinct scenarios; not all console/service managers or signals have evidence. |
-| Statistics, profiling and formatting; `Reticulum.py:1498–1969`, `Transport.py:591–676`, `RNS\__init__.py:168–349,357–615,641–664` | **Partial family; identified counter regression resolved in bounded software**: `RuntimeOperationsTests.StatisticsPreserveActualFramedTcpBytesAndSampleBearerRatherThanDecodedBitRates`, measured/unknown-extension and child-aggregate tests, network/shared tests pass within the **70 passed / 1 skipped** focused selection. Diagnostics supply bearer counters, TCP TX counts framed bytes, unknown extension counters remain null, and decoded totals stay separately named. Native profiler and Local pending-write bytes are not Python profiler/TX-buffer semantics. Exact all-output/exit and full integration gates remain **unverified**. |
+| Statistics, profiling and formatting; `Reticulum.py:1498–1969`, `Transport.py:591–676`, `RNS\__init__.py:168–349,357–615,641–664` | **Partial family; identified counter regression resolved**: `RuntimeOperationsTests.StatisticsPreserveActualFramedTcpBytesAndSampleBearerRatherThanDecodedBitRates`, measured/unknown-extension and child-aggregate tests, network/shared tests passed in the earlier **70 passed / 1 skipped** focused selection. The later Windows/Linux integrated suites also pass (current totals above). Diagnostics supply bearer counters, TCP TX counts framed bytes, unknown extension counters remain null, and decoded totals stay separately named. Native profiler and Local pending-write bytes are not Python profiler/TX-buffer semantics. Exact all-output/exit behavior remains **unverified**. |
 | Discovery parsing/stamps/encryption/source/age/capacity/bootstrap/autoconnect; `Discovery.py:43–78,290–650,652–879` | **Implemented** bounded V/U/L/P slices: `DiscoveryTests`, `DiscoveryMetadataTests`, `DiscoveryLiveTests`, `RuntimeDiscoveryHostTests`. Actual Backbone autoconnect on Linux, bounded TCP/HDLC fallback elsewhere. Only Backbone autoconnect is applicable at this pin; I2P autoconnect and Yggdrasil/Tor availability detection are upstream placeholders. |
 | Discovery publication and reload lifecycle; `Discovery.py:136–258`, `Reticulum.py:988–1026` | **Implemented bounded software** for TCPServer/Backbone plus connectable I2P, RNode, Weave, KISS and KISS-framed TCPClient. `DiscoveryTests.BearerPublicationMatchesExecutedReferenceAndMetadataDoesNotTreatRadioAsTcp`, rejection/pinned-KISS-defect test, factory/metadata and existing host lifecycle tests pass in the **70 passed / 1 skipped** focused selection. Independent `GenerateDiscoveryVectors.py --bearer-output` fixture records source-backed schemas/defaults. Numeric KISS modulation's pinned failure is explicitly diagnosed, not repaired by invented wire values. All-bearer live/native/RF publication and full gates remain **unverified**. |
 | Blackhole identities/publication/update/persistence and endpoint rejection; `Reticulum.py:1998–2041`, `Discovery.py:883–978` | **Implemented** bounded V/U/L/P slices: `BlackholeTests`, `BlackholeLiveTests`, network Pester. Expiry/reason/source provenance, failed-update preservation and identified endpoint/path teardown covered. Anonymous datagrams cannot supply an authenticated sender identity; sender-based rejection there is **not applicable**, not secretly implemented. |
@@ -359,9 +375,9 @@ interface. `net10.0` is the library TFM, not an Android/iOS application.
 
 | OS / architecture / deployment | Recorded baseline evidence | Classification and measurable remaining acceptance |
 | --- | --- | --- |
-| Windows x64 / `win-x64` | Managed suite, fresh merged coverage, native warnings-as-errors publish, Pester real processes, actual Python desktop roles, native rnid/rncp/rnx/Git/management/resource/rnsh terminal flows; one read-only COM8 RNode. | **Implemented bounded desktop feature set**, **partial release acceptance**: per-interface physical/BLE/I2P and broader impaired/native meshes still open. Unix-only SIGTERM/abstract-socket skips are honest, not Windows failures or Unix successes. |
-| Ubuntu Linux x64 under WSL / `linux-x64` | Warning-free managed build; native warnings-as-errors publish/help/resource/rnsh; selected actual Python/shared/network/process tests, real Auto namespaces/multicast and Backbone. P7 full Linux Pester then targeted portability rerun caveat above. | **Implemented bounded Linux slices**, **partial release acceptance**: no whole Linux final-gate rerun after every later integration, all native bearers/Git installed flows or arbitrary distributions/kernel/physical adapters established. WSL virtual networking is not bare-metal radio evidence. |
-| macOS arm64 / `osx-arm64` | No recorded managed/native feature execution. Auto/Darwin socket branches and source support are code, not evidence. User defers Mac execution to GitHub Actions later; no Mac host is assumed available now and no workflow was created. | **Deferred/unverified platform**, plus **missing native rnsh terminal backend** (Linux ABI guard). Require actual macOS build/test/publish and protocol/CLI/install/PTY feature execution later. Windows/Linux success cannot close it. |
+| Windows x64 / `win-x64` | Current managed suite: **1847 passed / 87 skipped**; merged production coverage **82.96% lines / 69.97% branches**; warning-free build, warnings-as-errors NativeAOT publish, native Pester and feature flows, actual Python desktop roles, and read-only COM8 RNode evidence. Native Git hosting/helper process selection: **82 passed / 0 skipped**. | **Implemented bounded desktop feature set**, **partial release acceptance**: per-interface physical/BLE/I2P and broader impaired/native meshes still open. Unix-only SIGTERM/abstract-socket skips are honest, not Windows failures or Unix successes. |
+| Ubuntu Linux x64 under WSL / `linux-x64` | Current managed suite: **1856 passed / 78 skipped**; warning-free build, NativeAOT publish and feature flows, native Pester, actual Python/shared/network/process tests, real Auto namespaces/multicast and Backbone. Native Git hosting/helper process selection: **82 passed / 0 skipped**. | **Implemented bounded Linux slices**, **partial release acceptance**: WSL virtual networking is not bare-metal radio evidence; other Linux distributions, kernels and physical adapters remain unverified. |
+| macOS arm64 / `osx-arm64` | First hosted run's NativeAOT publish/help/resource checks passed; its managed suite failed on socket-option and known unsupported PTY cases. Corrected run pending. The package suite explicitly skips macOS; local CLI tests run there. Auto/Darwin socket branches and source support are not broad platform evidence. | **Unverified platform**, plus **missing native rnsh terminal backend** (Linux ABI guard). Require a passing corrected matrix and platform-specific protocol/CLI/install/PTY acceptance before any support claim. CI's package skip is not installation evidence; Windows/Linux success cannot close the gap. |
 | macOS x64 / `osx-x64`; Windows arm64 / `win-arm64` | No target-specific feature evidence. | **Unverified**; separate actual host/toolchain/native dependencies/terminal/bearer tests before any support claim. `osx-arm64` results would not automatically certify x64, or conversely. |
 | Linux ARM64/ARM / `linux-arm64`, `linux-arm` | No architecture-specific feature evidence. | **Unverified** managed/runtime/native availability and feature flows independently; crypto/native bzip2/serial/terminal/Git/OS ABI dependencies must be exercised. |
 | Linux RISC-V | No verified runtime, SDK RID/native toolchain or feature flow in this repository. | **Unverified target**, not a claimed supported NativeAOT RID; establish a viable .NET target/toolchain before promising publish/run commands. |
@@ -464,5 +480,8 @@ signature nor publisher ownership.
 
 Preserve the Reticulum License and notices; the experimental implementation
 must not be presented as official, production-certified, fully interoperable,
-or relicensed. Parity 8 inventory completion is not CI/CD authorization and
-does not resolve the explicitly missing software or external acceptance gates.
+or relicensed. Parity 8 inventory completion does not authorize all CI/CD:
+only `ci-build-test.yml` has been added early. Its first run failed the managed
+suites while NativeAOT resource checks passed on all three OSes; the corrected
+run is pending. The other workflows and explicitly missing software/external
+acceptance gates remain outstanding.

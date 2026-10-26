@@ -1,6 +1,6 @@
-# DotReticulum solution plan
+# Archived DotReticulum solution plan
 
-Phase and subphase progress is tracked here. The target is high-fidelity behavioral and wire parity with the pinned Reticulum upstream, implemented as idiomatic, modern native .NET rather than a line-by-line Python translation. Development history, verification evidence and recorded limitations are in [.github/development-history.md](.github/development-history.md). Checked phases reflect their defined scope, not complete upstream feature parity.
+Archived on 2026-10-26 before the first CI workflow. This is a historical snapshot, not an active checklist. Remaining work is tracked only in [TODO.md](../../TODO.md). Development history, verification evidence and recorded limitations are in [development history](../../.github/development-history.md). Checked phases reflect their defined scope, not complete upstream feature parity.
 
 - [x] Bootstrap
   - [x] Solution, projects, SDK pin and build configuration

@@ -1,10 +1,100 @@
 # DotReticulum development history
 
-Development chronology, verification evidence, upstream comparisons and recorded limitations. Phase and subphase completion is tracked only in [plan.md](../plan.md); this document is not a second progress checklist.
+Development chronology, verification evidence, upstream comparisons and recorded limitations. Remaining work is tracked only in [TODO.md](../TODO.md); the [archived plan](../docs/archive/plan.md) preserves historical completion. References to `plan.md` in older records describe that historical tracker, not a second active checklist.
 
 Current live interoperability uses the authoritative Reticulum-hosted upstream at `a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7). Earlier protocol vectors and their reproduction generators retain their original `e40191b3d193b46b7f2d8a44424a594cd758839b` provenance; Parity 3 runtime and Parity 4 transport/interface fixtures explicitly record the hosted `a29bfb51...` revision and source hashes. Earlier records describe the pins and tooling used at that time, including Python coverage scripts since replaced by PowerShell.
 
 ## Verification records
+
+### Hosted build/test CI and documentation consolidation (2026-10-26)
+
+The user explicitly authorized `ci-build-test.yml` before the remaining
+parity gates to obtain actual hosted Windows/Linux/macOS feedback. This is a
+narrow exception to the earlier CI-last sequencing, not authorization for
+interop/mesh/CodeQL/stale workflows or a full release/platform-support claim.
+The original roadmap is archived at `docs/archive/plan.md`; every previously
+unchecked item was carried into the sole active `TODO.md`. The archive is
+not maintained as another tracker. Current contributor/agent/template/skill
+links use TODO; dated historical references remain historical evidence.
+
+The workflow uses SHA-pinned checkout/setup-dotnet/upload-artifact, read-only
+permissions, filtered main pushes/PRs plus manual runs, cancel-in-progress
+concurrency and independent Windows/Linux/macOS jobs. Each restores/builds,
+collects production OpenCover coverage and merges by source identity,
+publishes NativeAOT with linker/compiler warnings as errors, runs native
+help and an encrypted compressed multi-megabyte resource round trip, and
+executes the local `Coverage`, `Cli` and `Parity8Packaging` Pester containers.
+The Python live opt-in is disabled; this workflow is not live Python or RF
+acceptance. Test results/coverage diagnostics are retained for fourteen days.
+Before changes, `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`
+passed with zero warnings/errors, and `dotnet test DotReticulum.slnx -c
+Release --no-build -m:1 --nologo -v quiet -- xUnit.MaxParallelThreads=1`
+passed **1847 / 87 skipped**, zero failures. Actionlint **1.7.7** validated
+the workflow with zero diagnostics; its Windows release archive was checked
+against the publisher's SHA-256 checksum file. Commit `c9347a7` pushed the
+workflow and triggered hosted run **40324430597**. Hosted results follow
+after execution. Repository-enabled default CodeQL independently triggered;
+no CodeQL workflow or repository security configuration was created/changed
+by this task.
+
+First-run feedback: all three hosted managed gates failed, but all three
+NativeAOT publications, native `--help` and encrypted multi-megabyte resource
+round trips **passed**, including actual macOS ARM64 execution. This does
+not implement Darwin PTY support or establish complete macOS acceptance.
+The initial full Pester runner also failed two deliberately mandatory Python
+identity cases because this local-only workflow has no reference environment.
+Their assertions were retained; build CI now selects only the three explicit
+local containers rather than pretending those Python cases succeeded.
+
+Commit `8daa439` addresses the actionable first-run findings:
+
+- Add `RnshTerminalProbe` to the solution through `dotnet sln ... add`.
+  Solution builds had otherwise mapped this omitted reference to Debug while
+  tests correctly required its Release binary; stale local outputs masked it.
+- Adapt only the captured Git-page local date fields from the unchanged
+  UTC-05 oracle to the executing host's timezone, while preserving ISO UTC
+  strings, precision and exact remaining page bytes. Fixture clock statistics
+  retain their captured local calendar. No vectors or provenance were
+  regenerated. The differential case passed on Windows and Linux with both
+  `TZ=UTC` and day-rollover `TZ=Pacific/Kiritimati`.
+- Keep the strict Git fsck verification view in an owned short temporary
+  directory: hosted Windows Git rejected a deeply nested `$GIT_DIR` despite
+  `core.longpaths`. Caller refs/object-store ownership and full strict
+  verification remain unchanged.
+- Assert that socket keepalive is enabled by a **nonzero** result, rather
+  than Linux's integer one; Darwin returned its valid flag value **8**.
+- Explicitly skip the unsupported Windows/Linux-only PTY cases on Darwin,
+  with the missing backend named in the skip reason and TODO. The all-pipe
+  endpoint case is separately retained on every OS; these skips are not
+  terminal acceptance or a weakened production guard.
+- Update immutable action pins to the then-current checkout **7.0.1**,
+  setup-dotnet **6.0.0**, upload-artifact **7.0.2**, following the hosted
+  Node 20 deprecation warning.
+
+Focused correction commands built without warnings and passed Applications
+**40 / 1 skipped** on Windows and **41 / 0 skipped** on Linux, plus the two
+socket-option cases per platform:
+`dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
+-c Release --no-build --filter
+"FullyQualifiedName~RngitPageTests|FullyQualifiedName~RnshTests|FullyQualifiedName~ImportedObjectVerification"
+--nologo -v quiet -- xUnit.MaxParallelThreads=1`, and
+`dotnet test tests\DotReticulum.Interfaces.Tests\DotReticulum.Interfaces.Tests.csproj
+-c Release --no-build --filter
+FullyQualifiedName~TcpSocketOptionsMatchReferenceOnExecutingOperatingSystem
+--nologo -v quiet`. The later isolated page-case reruns include the final
+timezone/calendar correction above. The corrected workflow also passes
+Actionlint with zero diagnostics.
+
+The documentation sweep reviewed README, CONTRIBUTING, all 31 top-level
+`docs/*.md` files, governance/security/conduct/templates and agent/skill
+guidance. It corrected stale platform/COM8 claims, active tracker links,
+outdated coordinator-pending wording and the narrow CI exception. Relative
+links across **42 Markdown files** and `git diff --check` passed. Historical
+evidence remains dated rather than relabeled as new verification.
+The archive retains all **23** originally unchecked entries; TODO preserves
+each, updating only descriptions affected by the new CI authorization.
+The subsequent hosted matrix determines CI completion, not these focused
+local passes.
 
 ### Parity 8 Windows/Linux acceptance; broader acceptance outstanding (2026-10-25)
 
