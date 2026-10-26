@@ -202,11 +202,15 @@ public sealed class RnshTests
         var argv = OperatingSystem.IsWindows()
             ? new[] { "cmd.exe", "/c", "ping -n 120 127.0.0.1 >nul" }
             : new[] { "/bin/sh", "-c", "sleep 120 & wait" };
-        var child = RnshProcess.Start(argv, command, null);
-        var pending = child.WaitAsync(CancellationToken.None);
-        Assert.False(pending.IsCompleted);
-        await child.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(8));
-        await pending.WaitAsync(TimeSpan.FromSeconds(1));
+        // The wait continuation can race disposal, so repeat to expose an unreadable exit code.
+        for (var i = 0; i < 10; i++)
+        {
+            var child = RnshProcess.Start(argv, command, null);
+            var pending = child.WaitAsync(CancellationToken.None);
+            Assert.False(pending.IsCompleted);
+            await child.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(8));
+            await pending.WaitAsync(TimeSpan.FromSeconds(1));
+        }
     }
 
     [Fact]

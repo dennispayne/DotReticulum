@@ -10,6 +10,7 @@ public sealed class RnshProcess : IAsyncDisposable
     private readonly UnixRnshTerminal? _terminal;
     private readonly WindowsRnshTerminal? _windows;
     private bool _inputClosed;
+    private long _exitCode = long.MinValue;
     private RnshProcess(Process process)
     {
         _process = process;
@@ -65,7 +66,8 @@ public sealed class RnshProcess : IAsyncDisposable
         if (_terminal is not null) return await _terminal.WaitAsync(token).ConfigureAwait(false);
         if (_windows is not null) return await _windows.WaitAsync(token).ConfigureAwait(false);
         await _process!.WaitForExitAsync(token).ConfigureAwait(false);
-        return _process.ExitCode;
+        try { return _process.ExitCode; }
+        catch (InvalidOperationException) when (Volatile.Read(ref _exitCode) != long.MinValue) { return (int)Volatile.Read(ref _exitCode); }
     }
     public async ValueTask DisposeAsync()
     {
@@ -75,6 +77,8 @@ public sealed class RnshProcess : IAsyncDisposable
         {
             if (!_process!.HasExited) _process.Kill(entireProcessTree: true);
             await _process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+            // A pending WaitAsync may resume after disposal, when Process.ExitCode is no longer readable.
+            Volatile.Write(ref _exitCode, _process.ExitCode);
         }
         catch (InvalidOperationException) { }
         finally { _process!.Dispose(); }
