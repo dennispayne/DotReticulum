@@ -95,6 +95,7 @@ public sealed class RngitProcessTests : IDisposable
         }
         catch (FileNotFoundException) { return true; }
         catch (DirectoryNotFoundException) { return true; }
+        catch (IOException) { return !File.Exists($"/proc/{child.Id}/stat"); }
     }
 
     [Fact]
