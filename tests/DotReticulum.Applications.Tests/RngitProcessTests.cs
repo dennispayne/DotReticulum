@@ -224,5 +224,20 @@ internal sealed class PresentationProcessFixture : IDisposable
         File.WriteAllText(Path.Combine(Directory, "rngit-backend-mode"), mode);
         if (output is not null) File.WriteAllText(Path.Combine(Directory, "rngit-backend-output"), Convert.ToBase64String(output));
     }
-    public void Dispose() => System.IO.Directory.Delete(Directory, recursive: true);
+    public void Dispose()
+    {
+        // A terminated descendant can briefly retain its executable on Windows; bound the wait, then surface the failure.
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                System.IO.Directory.Delete(Directory, recursive: true);
+                return;
+            }
+            catch (Exception e) when (attempt < 50 && e is UnauthorizedAccessException or IOException)
+            {
+                Thread.Sleep(100);
+            }
+        }
+    }
 }
