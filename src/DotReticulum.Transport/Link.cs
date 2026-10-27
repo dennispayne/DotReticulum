@@ -33,6 +33,7 @@ public sealed partial class Link
     private readonly CancellationTokenSource _closedCancellation = new();
     private readonly List<PacketReceipt> _receipts = [];
     private readonly List<RequestReceipt> _pendingRequests = [];
+    private Action<byte[], Packet>? _packetReceiver;
     private byte[]? _prv;
     private byte[]? _sigSeed;
     private byte[] _pub = [];
@@ -198,6 +199,13 @@ public sealed partial class Link
 
     /// <summary>Fires for each received link data packet (decrypted payload, packet).</summary>
     public Action<byte[], Packet>? PacketReceived { get; set; }
+
+    /// <summary>Registers a short receiver invoked in ingress order before asynchronous packet observers.
+    /// Use it to enqueue protocol work without relying on observer scheduling. Null removes the receiver.</summary>
+    public void SetPacketReceiver(Action<byte[], Packet>? receiver)
+    {
+        lock (_gate) _packetReceiver = receiver;
+    }
 
     public Action<Link, Identity>? RemoteIdentified { get; set; }
 
@@ -418,14 +426,27 @@ public sealed partial class Link
     /// <summary>Sends link data (encrypted) with an optional receipt. Returns null when the link is not usable.</summary>
     public PacketReceipt? Send(ReadOnlySpan<byte> data, bool createReceipt = true) => SendWithContext(data, LinkContext.None, createReceipt, encrypt: true);
 
+    /// <summary>Queues receiptless encrypted data, returning false when the link or bounded outbound queue is unavailable.
+    /// Success means local enqueue, not peer delivery.</summary>
+    public bool TrySend(ReadOnlySpan<byte> data) =>
+        TrySendWithContext(data, LinkContext.None, createReceipt: false, encrypt: true, out _);
+
     internal PacketReceipt? SendWithContext(ReadOnlySpan<byte> data, byte context, bool createReceipt, bool encrypt,
         Action<PacketReceipt?>? beforeSend = null, bool updateActivity = true)
     {
+        TrySendWithContext(data, context, createReceipt, encrypt, out var receipt, beforeSend, updateActivity);
+        return receipt;
+    }
+
+    private bool TrySendWithContext(ReadOnlySpan<byte> data, byte context, bool createReceipt, bool encrypt,
+        out PacketReceipt? receipt, Action<PacketReceipt?>? beforeSend = null, bool updateActivity = true)
+    {
         lock (_gate)
         {
+            receipt = null;
             if (Status is LinkStatus.Closed or LinkStatus.Pending)
             {
-                return null;
+                return false;
             }
 
             var payload = encrypt ? Encrypt(data) : data.ToArray();
@@ -435,7 +456,6 @@ public sealed partial class Link
             }
 
             var packet = Packet.Create(PacketType.Data, DestinationType.Link, LinkId, payload, context, mtu: Mtu);
-            PacketReceipt? receipt = null;
             if (createReceipt && PacketReceipt.IsEligible(packet))
             {
                 var timeout = Math.Max((Rtt ?? 0) * TrafficTimeoutFactor, 0.005);
@@ -454,12 +474,14 @@ public sealed partial class Link
                 {
                     _receipts.Remove(receipt);
                     receipt.Conclude(PacketReceiptStatus.Failed, _mgr.UnixNow);
-                    if (receipt.TimedOut is { } failed) _mgr.Dispatch(() => failed(receipt));
+                    var failedReceipt = receipt;
+                    if (receipt.TimedOut is { } failed) _mgr.Dispatch(() => failed(failedReceipt));
                 }
-                return null;
+                receipt = null;
+                return false;
             }
             if (updateActivity) HadOutbound(keepalive: context == LinkContext.Keepalive);
-            return receipt;
+            return true;
         }
     }
 
@@ -629,6 +651,14 @@ public sealed partial class Link
                     }
 
                     UpdatePhysicalLayer(packet);
+                    if (_packetReceiver is { } receiver)
+                    {
+                        coreAfter.Add(() =>
+                        {
+                            try { receiver(plaintext, packet); }
+                            catch (Exception ex) { _mgr.Report($"Link {LinkIdHex} packet receiver failed: {ex.Message}"); }
+                        });
+                    }
                     var callback = PacketReceived;
                     if (callback is not null)
                     {

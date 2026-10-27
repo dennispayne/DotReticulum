@@ -12,6 +12,7 @@ public class LinkTests
     {
         private readonly Channel<byte[]> _inbox = System.Threading.Channels.Channel.CreateUnbounded<byte[]>();
         public Loopback? Peer { get; set; }
+        public Task? SendBlock { get; set; }
         public ValueTask StartAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
         public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
@@ -19,10 +20,10 @@ public class LinkTests
             await foreach (var p in _inbox.Reader.ReadAllAsync(cancellationToken)) yield return p;
         }
 
-        public ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken)
+        public async ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken)
         {
+            if (SendBlock is { } blocked) await blocked.WaitAsync(cancellationToken);
             Peer?._inbox.Writer.TryWrite(packet.ToArray());
-            return ValueTask.CompletedTask;
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -270,6 +271,58 @@ public class LinkTests
         Assert.Equal("first packet"u8.ToArray(), await Within(received.Task));
         Assert.Equal(sender.Hash, await Within(identified.Task));
         Assert.Equal(initializerThrows, errors.Any(message => message.Contains("setup observer failed", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task Link_OrderedReceiverRunsWithoutObserversAndSurvivesItsOwnFailure()
+    {
+        await using var topo = await BuildAsync(false);
+        var delivered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var values = new List<byte>();
+        var errors = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        topo.Responder.Router.Log = errors.Enqueue;
+        topo.Destination.LinkEstablished = link => link.SetPacketReceiver((data, _) =>
+        {
+            values.Add(data[0]);
+            if (data[0] == 0) throw new InvalidOperationException("receiver failure");
+            if (data[0] == 31) delivered.TrySetResult();
+        });
+        var established = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sender = topo.Initiator.Router.Links.Connect(topo.Destination.Identity,
+            topo.Destination.Destination.Hash, value => established.TrySetResult(value));
+        await Within(established.Task);
+        for (byte value = 0; value < 32; value++) Assert.True(sender.TrySend([value]));
+        await delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(Enumerable.Range(0, 32).Select(value => (byte)value), values);
+        Assert.Contains(errors, message => message.Contains("receiver failure", StringComparison.Ordinal));
+        sender.Teardown();
+        Assert.False(sender.TrySend([99]));
+    }
+
+    [Fact]
+    public async Task Link_ReceiptlessTrySendReportsBoundedQueueFailure()
+    {
+        await using var topo = await BuildAsync(false);
+        var established = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sender = topo.Initiator.Router.Links.Connect(topo.Destination.Identity,
+            topo.Destination.Destination.Hash, value => established.TrySetResult(value));
+        await Within(established.Task);
+        var bearer = Assert.IsType<Loopback>(sender.AttachedInterface);
+        var blocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var errors = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        topo.Initiator.Router.Log = errors.Enqueue;
+        bearer.SendBlock = blocked.Task;
+        try
+        {
+            var accepted = 0;
+            while (sender.TrySend([1])) Assert.True(++accepted <= LinkManager.WorkQueueCapacity + 1);
+            Assert.InRange(accepted, 1, LinkManager.WorkQueueCapacity + 1);
+            Assert.Contains(errors, message => message.Contains("outbound queue is full", StringComparison.Ordinal));
+        }
+        finally
+        {
+            blocked.TrySetResult();
+        }
     }
 
     [Theory]

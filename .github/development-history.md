@@ -71,6 +71,20 @@ Windows validation:
 | Transport | 4978/5464 (91.11%) | 3150/3982 (79.11%) |
 | **Overall** | 21954/26443 (83.02%) | 15893/22819 (69.65%) |
 
+## Ordered protocol ingress and receiptless enqueue feedback (2026-10-26)
+
+Native ecosystem telephone stress exposed adjacent asynchronous observer callbacks executing in reverse order. Pinned `RNS/Link.py:957` itself launches one thread per packet callback, so observer ordering is not claimed as an upstream guarantee. `SetPacketReceiver` is an explicit .NET protocol-adapter API: it receives decrypted data in ordered core ingress, outside the link lock, before optional asynchronous observers; it must enqueue briefly rather than block. Existing `PacketReceived` scheduling is preserved. Receiver exceptions use protected contextual logging without preventing later packets. Separately, `TrySend` exposes bounded receiptless enqueue success, eliminating the ambiguity of `Send(..., createReceipt: false)` returning null for success and failure. Neither API adds wire reliability or delivery confirmation.
+
+Focused in-process cases exercise ordered reception without observers, recovery after a throwing receiver, closed-link rejection and a deliberately blocked bearer saturating the outbound queue. `dotnet test tests/DotReticulum.Transport.Tests/DotReticulum.Transport.Tests.csproj -c Release --filter FullyQualifiedName~LinkTests --nologo -v quiet`: 15 passed, 8 live cases skipped.
+
+Windows validation:
+
+- `dotnet test DotReticulum.slnx -c Release --settings tests/coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/coverage-ordered-ingress-acfd --nologo -v quiet`: 1,821 passed, 79 skipped, zero failures.
+- With verified RNS `a29bfb51c468945c96a1ee22cae0114e993e2391` and `DOTRETICULUM_LIVE=1`, `dotnet test tests/DotReticulum.Transport.Tests/DotReticulum.Transport.Tests.csproj -c Release --filter FullyQualifiedName~LiveLinkTests --nologo -v quiet`: 11 passed, zero skipped; bidirectional data, identification, requests, channel and multi-megabyte Resource cases.
+- `dotnet publish src/DotReticulum.Applications/DotReticulum.Applications.csproj -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o artifacts/native-ordered-ingress`: succeeded. Published `--help` and `dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj -c Release --no-build --filter FullyQualifiedName~NativeResourceTests --nologo -v quiet -- xUnit.MaxParallelThreads=1` with that binary: 1 passed, zero skipped; encrypted/compressed multi-megabyte Resource flow.
+
+`tests/coverage_summary.ps1 TestResults/coverage-ordered-ingress-acfd` reported production line/branch coverage: Applications 76.88%/63.75%, Core 96.64%/89.72%, Crypto 94.83%/94.00%, Interfaces 85.56%/76.32%, Transport 91.27%/79.22%; merged overall 21,972/26,456 lines (83.05%) and 15,900/22,821 branches (69.67%). Ecosystem native telephone acceptance follows separately after its adapter opts into the APIs; this stack validation is not physical audio or RF evidence.
+
 ## Chronological milestones
 
 | Date | Milestone | Outcome |

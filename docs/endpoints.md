@@ -41,6 +41,24 @@ precedence. Local fallback does not supply app data or participate in
 identity-hash searches, matching upstream. Recalled remote identities contain a
 detached `AppData` value. The router must own registration/deregistration.
 
+## Link protocol receivers and receiptless sending
+
+`Link.PacketReceived` remains an asynchronous observer; callback scheduling is
+not packet ordering. Pinned Python also starts a thread per packet callback
+(`RNS/Link.py:957`). Protocol adapters requiring deterministic ingress can use
+`SetPacketReceiver(receiver)` to install one short core receiver, invoked outside
+the link lock in ingress order before asynchronous packet observers. It should
+only enqueue bounded application work and return promptly; blocking it blocks
+that router's ingress. Exceptions are reported and later packets still run.
+`SetPacketReceiver(null)` removes it. The adapter owns its queue and registration;
+the link does not own application workers.
+
+`TrySend(data)` sends encrypted data without creating a receipt and returns
+whether the local bounded outbound queue accepted it. False means the link or
+queue is unavailable; oversize input still throws. Success is not delivery or
+wire transmission. Existing `Send(data, createReceipt: false)` remains available,
+but its null return cannot distinguish successful receiptless enqueue from failure.
+
 ## Signed file API
 
 `SignedDestinationRatchetFile.Open(path, identity)` reads/writes the upstream
