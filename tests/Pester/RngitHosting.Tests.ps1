@@ -9,7 +9,8 @@ BeforeAll {
         param([string[]] $Arguments, [string] $WorkingDirectory = $root.FullName, [hashtable] $Environment = @{})
         Invoke-TestProcess $executable ($prefix + @('rngit') + $Arguments) -TimeoutSeconds 90 -WorkingDirectory $WorkingDirectory -Environment $Environment
     }
-    $root = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'hosting')
+    $drive = if ($IsWindows) { $TestDrive } else { (& realpath $TestDrive) }
+    $root = New-Item -ItemType Directory -Path (Join-Path $drive 'hosting')
     $groups = New-Item -ItemType Directory -Path (Join-Path $root.FullName 'repositories')
     $server = New-Item -ItemType Directory -Path (Join-Path $root.FullName 'server')
     $client = New-Item -ItemType Directory -Path (Join-Path $root.FullName 'client')
