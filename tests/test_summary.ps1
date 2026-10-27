@@ -13,6 +13,7 @@ to $env:GITHUB_STEP_SUMMARY.
 param(
     [Parameter(Mandatory)] [string[]] $Path,
     [string] $Title = 'Test results',
+    [string] $JsonPath,
     [int] $MaxFailures = 50,
     [int] $MaxMessageLength = 600
 )
@@ -71,6 +72,11 @@ foreach ($file in $files) {
     $rows += [pscustomobject]@{ File = $label; Passed = $passed; Failed = $failed.Count; Skipped = $skipped.Count; Total = $results.Count }
     $failures += $failed
     foreach ($s in $skipped) { $reason = Limit $s.Message; if (-not $reason) { $reason = '(no reason recorded)' }; $skips[$reason] = 1 + [int]$skips[$reason] }
+}
+
+if ($JsonPath) {
+    [ordered]@{ Rows = @($rows); Failures = @($failures); Skips = $skips } |
+        ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $JsonPath -Encoding utf8
 }
 
 "### $Title"

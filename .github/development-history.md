@@ -4,6 +4,35 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Consolidated compatibility results
+
+Added `tests\compatibility_summary.ps1` and a final CI aggregation job that
+downloads each platform's compatibility JSON. All catalog rows retain their IDs,
+families and full behavior descriptions alongside Linux, macOS and Windows
+columns. Missing platform reports or contract rows are explicitly unavailable.
+Failure and skip details are retained below the table. The aggregation runs after
+failed matrix jobs too; it does not replace their failing conclusions.
+
+Contract aggregation no longer labels a partially skipped/not-run contract as
+passed because one associated case passed. Unexpected incomplete execution and
+Pester container failures fail the runner. This can make earlier broad contract
+results appear more conservative without changing the tests themselves.
+
+Test results also export structured per-assembly counts and failure/skip details,
+then combine Unit, Integration and Native tables across the same three platforms.
+Build jobs no longer write summaries, and per-platform test/compatibility tables
+remain in artifacts/logs rather than duplicating the consolidated tables.
+
+`pwsh -NoProfile -File tests\run-pester.ps1 -ToolingOnly` passed 7/7,
+including ID-based alignment with reordered input, missing OS/contract reports,
+Markdown escaping and failure/skip details. The consolidated renderer also ran
+against all three real artifacts from Actions run `40463533001`.
+One full managed compatibility invocation failed waiting for the default-created
+daemon's ready log (`UTIL-RNSD-002`); this was not hidden as a summary pass.
+CI execution of the new aggregation jobs is pending. No upstream source or Python
+environment is vendored; reference provisioning and hosted-CI `rns://` retrieval
+are still outstanding.
+
 ### Public medium timing estimates for ecosystem scheduling
 
 A subsequent Linux ecosystem idle-link reconnect failure exposed a separate

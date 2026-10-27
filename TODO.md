@@ -25,6 +25,10 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] Per-interface interoperability and hardware evidence; untested platforms/devices remain unverified
 - [ ] CI/CD and automation
   - [x] `ci-build-test.yml` (authorized early on 2026-10-26; green on all three OSes in run 40330280525)
+  - [ ] Consolidated compatibility report with every contract row and Linux/macOS/Windows columns
+  - [ ] Consolidated Unit/Integration/Native test tables with Linux/macOS/Windows columns
+  - [ ] Provision the separately fetched pinned Python reference for CI interoperability
+  - [ ] Native .NET `rngit` hosted-CI upstream retrieval and separate upstream-drift comparison
   - [ ] `interop-test.yml`
   - [ ] `e2e-mesh-test.yml`
   - [ ] `codeql.yml`

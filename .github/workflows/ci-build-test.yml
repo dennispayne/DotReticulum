@@ -113,8 +113,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           [ordered]@{ commit = $env:GITHUB_SHA; rid = '${{ matrix.rid }}'; executable = $executable } |
             ConvertTo-Json | Set-Content -LiteralPath artifacts/native/build-manifest.json -Encoding utf8
-          "### Build (${{ matrix.rid }})`n`nNativeAOT executable built from ``$env:GITHUB_SHA`` with warnings as errors and ``--help`` verified. Test and Compatibility jobs reuse this exact binary." |
-            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
       - name: Upload native build
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -186,16 +184,14 @@ jobs:
       - name: Summarize unit test results
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
-          $summary = & ./tests/test_summary.ps1 -Path "$env:COVERAGE_DIRECTORY/unit" -Title 'Unit tests (${{ matrix.rid }})'
+          $summary = & ./tests/test_summary.ps1 -Path "$env:COVERAGE_DIRECTORY/unit" -Title 'Unit tests (${{ matrix.rid }})' -JsonPath TestResults/summary-unit.json
           $summary
-          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
       - name: Summarize integration test results
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
-          $summary = & ./tests/test_summary.ps1 -Path "$env:COVERAGE_DIRECTORY/integration" -Title 'Integration tests (${{ matrix.rid }})'
+          $summary = & ./tests/test_summary.ps1 -Path "$env:COVERAGE_DIRECTORY/integration" -Title 'Integration tests (${{ matrix.rid }})' -JsonPath TestResults/summary-integration.json
           $summary
-          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
       - name: Summarize merged coverage
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -228,9 +224,8 @@ jobs:
       - name: Summarize native test results
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
-          $summary = & ./tests/test_summary.ps1 -Path TestResults/native, TestResults/native-cli.xml -Title 'Native executable tests (${{ matrix.rid }})'
+          $summary = & ./tests/test_summary.ps1 -Path TestResults/native, TestResults/native-cli.xml -Title 'Native executable tests (${{ matrix.rid }})' -JsonPath TestResults/summary-native.json
           $summary
-          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
       - name: Retain test diagnostics
         if: ${{ !cancelled() }}
@@ -278,7 +273,7 @@ jobs:
         run: ./tests/install-pester.ps1
 
       - name: Run compatibility suite against the native executable
-        run: ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}'
+        run: ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary
 
       - name: Retain compatibility report
         if: ${{ !cancelled() }}
@@ -288,3 +283,63 @@ jobs:
           path: TestResults/compatibility/
           if-no-files-found: warn
           retention-days: 14
+
+  compatibility-summary:
+    name: Upstream Compatibility / All platforms
+    needs: compatibility
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download platform reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: compatibility-*-${{ github.run_attempt }}
+          path: TestResults/compatibility-platforms
+
+      - name: Summarize all contract rows across platforms
+        run: |
+          $directory = 'TestResults/compatibility-platforms'
+          $null = New-Item -ItemType Directory -Force -Path $directory
+          $summary = & ./tests/compatibility_summary.ps1 -ReportsDirectory $directory
+          $summary
+          $summary | Set-Content -LiteralPath TestResults/compatibility-all-platforms.md -Encoding utf8
+          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+  test-summary:
+    name: Test / All platforms
+    needs: test
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download platform test summaries
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: test-results-*-${{ github.run_attempt }}
+          path: TestResults/test-platforms
+
+      - name: Summarize tests across platforms
+        run: |
+          $directory = 'TestResults/test-platforms'
+          $null = New-Item -ItemType Directory -Force -Path $directory
+          $summary = & ./tests/test_platform_summary.ps1 -ReportsDirectory $directory
+          $summary
+          $summary | Set-Content -LiteralPath TestResults/tests-all-platforms.md -Encoding utf8
+          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
