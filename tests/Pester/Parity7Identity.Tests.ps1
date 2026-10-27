@@ -66,7 +66,7 @@ AfterAll {
 }
 
 Describe 'Parity 7 rnid real processes' {
-    It 'preserves legacy create/show output and refuses destructive overwrite' {
+    It 'preserves legacy create/show output and refuses destructive overwrite' -Tag 'Contract:UTIL-RNID-001' {
         $identity = Join-Path $root 'legacy identity.rid'
         $generated = Invoke-RnidProcess -Arguments @('--generate', $identity)
         $generated.Code | Should -Be 0
@@ -82,7 +82,7 @@ Describe 'Parity 7 rnid real processes' {
         [Convert]::ToHexString([IO.File]::ReadAllBytes($identity)) | Should -BeExactly ([Convert]::ToHexString($original))
     }
 
-    It 'imports, exports, persists and reloads independent reference keys' {
+    It 'imports, exports, persists and reloads independent reference keys' -Tag 'Contract:UTIL-RNID-002' {
         $path = Join-Path $root 'imported.rid'
         $imported = Invoke-RnidProcess -Arguments @('-M', $testKey, '-X', '-w', $path)
         $imported.Code | Should -Be 0
@@ -95,7 +95,7 @@ Describe 'Parity 7 rnid real processes' {
         (Invoke-RnidProcess -Arguments @('-M', $testKey, '-X', '-w', $path)).Code | Should -Be 11
     }
 
-    It 'creates byte-identical detached signatures, validates files recursively and rejects tampering' {
+    It 'creates byte-identical detached signatures, validates files recursively and rejects tampering' -Tag 'Contract:UTIL-RNID-003' {
         $first = Join-Path $root 'first'
         $second = Join-Path $root 'second'
         [IO.File]::WriteAllBytes($first, [Convert]::FromHexString($fixture.message))
@@ -107,7 +107,7 @@ Describe 'Parity 7 rnid real processes' {
         (Invoke-RnidProcess -Arguments @('-V', $first, $second)).Code | Should -Be 10
     }
 
-    It 'verifies legacy signatures only with an explicit key' {
+    It 'verifies legacy signatures only with an explicit key' -Tag 'Contract:UTIL-RNID-004' {
         $path = Join-Path $root 'legacy-data'
         [IO.File]::WriteAllBytes($path, [Convert]::FromHexString($fixture.message))
         [IO.File]::WriteAllBytes("$path.rsg", [Convert]::FromHexString($fixture.raw))
@@ -115,7 +115,7 @@ Describe 'Parity 7 rnid real processes' {
         (Invoke-RnidProcess -Arguments @('-m', $fixture.base64, '-V', $path)).Code | Should -Be 0
     }
 
-    It 'handles stdin, binary stdout, wrapped base256 RSM and authenticated metadata' {
+    It 'handles stdin, binary stdout, wrapped base256 RSM and authenticated metadata' -Tag 'Contract:UTIL-RNID-005' {
         $signed = Invoke-RnidProcess -Arguments @('-M', $testKey, '-S', '-I', '-O') -InputBytes ([Text.Encoding]::UTF8.GetBytes('stdin λ'))
         $signed.Code | Should -Be 0
         $verified = Invoke-RnidProcess -Arguments @('-V', '-', '-I') -InputBytes $signed.Bytes
@@ -132,7 +132,7 @@ Describe 'Parity 7 rnid real processes' {
         (Invoke-RnidProcess -Arguments @('-i', ('a' * 32), '-N', '-V', $metadata)).Code | Should -Be 10
     }
 
-    It 'decrypts the independent reference ciphertext and rejects wrong identities and overwrite' {
+    It 'decrypts the independent reference ciphertext and rejects wrong identities and overwrite' -Tag 'Contract:UTIL-RNID-006' {
         $encrypted = Join-Path $root 'reference.rfe'
         $plain = Join-Path $root 'reference.plain'
         [IO.File]::WriteAllBytes($encrypted, [Convert]::FromHexString($fixture.encrypted))
@@ -143,7 +143,7 @@ Describe 'Parity 7 rnid real processes' {
         (Invoke-RnidProcess -Arguments @('-M', $wrongKey, '-d', $encrypted, '-w', $plain, '-f')).Code | Should -Be 12
     }
 
-    It 'uses current metadata specs, file messages and output extension rules' {
+    It 'uses current metadata specs, file messages and output extension rules' -Tag 'Contract:UTIL-RNID-007' {
         $message = Join-Path $root 'file-message.txt'
         $metadata = Join-Path $root 'file-metadata'
         $output = Join-Path $root 'file-message'
@@ -159,7 +159,7 @@ Describe 'Parity 7 rnid real processes' {
         Test-Path -LiteralPath "${output}-invalid.rsm" | Should -BeFalse
     }
 
-    It 'requires explicit editor authorization and bounds authorized success, failure and timeout' {
+    It 'requires explicit editor authorization and bounds authorized success, failure and timeout' -Tag 'Contract:UTIL-RNID-008' {
         $editor = (Get-Command pwsh -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
         $script = Join-Path $root 'owned-editor.ps1'
         [IO.File]::WriteAllText($script, 'param($Path); [IO.File]::WriteAllText($Path, "editor message λ")')
@@ -179,14 +179,14 @@ Describe 'Parity 7 rnid real processes' {
         @(Get-ChildItem -LiteralPath $root -Directory -Filter '.rnid-editor-*').Count | Should -Be 0
     }
 
-    It 'rejects invalid encoding, mutually exclusive arguments and nonfinite network timeout' {
+    It 'rejects invalid encoding, mutually exclusive arguments and nonfinite network timeout' -Tag 'Contract:UTIL-RNID-009' {
         (Invoke-RnidProcess -Arguments @('-m', 'invalid', '-p')).Code | Should -Be 8
         (Invoke-RnidProcess -Arguments @('-b', '-B', '-p')).Code | Should -Be 1
         (Invoke-RnidProcess -Arguments @('-t', 'NaN', '-p')).Code | Should -Be 2
         (Invoke-RnidProcess -Arguments @('-i', $fixture.hash, '-N', '-H', 'rns.id')).Output | Should -Match $fixture.destination
     }
 
-    It 'interoperates with pinned Python file encryption in both directions across the exact 16 MiB boundary' {
+    It 'interoperates with pinned Python file encryption in both directions across the exact 16 MiB boundary' -Tag 'Contract:UTIL-RNID-010', 'Reference' {
         if (-not $Python -or -not $Upstream) { throw 'This contract requires explicit pinned Python and upstream paths; it is not silently skipped.' }
         $source = Join-Path $root 'large-source'
         $bytes = [byte[]]::new(16 * 1024 * 1024 + 257)
@@ -207,7 +207,7 @@ Describe 'Parity 7 rnid real processes' {
             Should -BeExactly ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)))
     }
 
-    It 'requests a real Python identity, retains it across restart and sends an authenticated announce back' {
+    It 'requests a real Python identity, retains it across restart and sends an authenticated announce back' -Tag 'Contract:UTIL-RNID-011', 'Reference' {
         if (-not $Python -or -not $Upstream) { throw 'Pinned Python and upstream are required for actual network acceptance.' }
         $probe = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
         $probe.Start()

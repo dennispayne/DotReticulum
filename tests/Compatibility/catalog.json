@@ -1,0 +1,30 @@
+{
+  "reference": {
+    "name": "Reticulum (RNS) 1.5.7",
+    "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391"
+  },
+  "note": "Each contract has a stable ID. Pester It blocks claim a contract with -Tag 'Contract:<ID>'; cases that need the pinned Python reference also carry the 'Reference' tag. Contracts with no tagged case are reported as Not covered. Add rows as the source inventory in docs/compatibility-contracts.md is converted into testable contracts.",
+  "contracts": [
+    { "id": "UTIL-RNID-001", "family": "rnid", "title": "Create and show identity; refuse destructive overwrite", "source": "RNS/Utilities/rnid.py" },
+    { "id": "UTIL-RNID-002", "family": "rnid", "title": "Import, export, persist and reload identity keys", "source": "RNS/Utilities/rnid.py" },
+    { "id": "UTIL-RNID-003", "family": "rnid", "title": "Detached signatures are byte-identical; recursive validation rejects tampering", "source": "RNS/Utilities/rnid.py" },
+    { "id": "UTIL-RNID-004", "family": "rnid", "title": "Legacy signatures verify only with an explicit key", "source": "RNS/Utilities/rnid.py" },
+    { "id": "UTIL-RNID-005", "family": "rnid", "title": "stdin/stdout, base256 wrapped RSM and authenticated metadata", "source": "RNS/Utilities/rnid.py" },
+    { "id": "UTIL-RNID-006", "family": "rnid", "title": "Decrypt upstream-generated ciphertext; reject wrong identity and overwrite", "source": "RNS/Utilities/rnid.py; RNS/Identity.py" },
+    { "id": "UTIL-RNID-007", "family": "rnid", "title": "Metadata specs, file messages and output extension rules", "source": "RNS/Utilities/rnid.py" },
+    { "id": "UTIL-RNID-008", "family": "rnid", "title": "Editor use requires explicit authorization and is bounded (native difference)", "source": "RNS/Utilities/rnid.py" },
+    { "id": "UTIL-RNID-009", "family": "rnid", "title": "Invalid encodings, exclusive arguments and nonfinite timeouts are rejected", "source": "RNS/Utilities/rnid.py" },
+    { "id": "UTIL-RNID-010", "family": "rnid", "title": "File encryption interoperates with Python in both directions across 16 MiB", "source": "RNS/Utilities/rnid.py; RNS/Identity.py", "reference": true },
+    { "id": "UTIL-RNID-011", "family": "rnid", "title": "Request a Python identity over the network, retain it, announce back", "source": "RNS/Utilities/rnid.py", "reference": true },
+    { "id": "UTIL-RNSD-001", "family": "rnsd", "title": "Daemon starts, logs and shuts down gracefully with documented exit codes", "source": "RNS/Utilities/rnsd.py" },
+    { "id": "UTIL-RNSTATUS-001", "family": "rnstatus", "title": "Local and remote interface statistics output", "source": "RNS/Utilities/rnstatus.py" },
+    { "id": "UTIL-RNPATH-001", "family": "rnpath", "title": "Path table, rates and request/drop operations", "source": "RNS/Utilities/rnpath.py" },
+    { "id": "UTIL-RNPROBE-001", "family": "rnprobe", "title": "Probe round trip, hops and exit codes", "source": "RNS/Utilities/rnprobe.py", "reference": true },
+    { "id": "UTIL-RNCP-001", "family": "rncp", "title": "File send and fetch with a Python peer", "source": "RNS/Utilities/rncp.py", "reference": true },
+    { "id": "UTIL-RNX-001", "family": "rnx", "title": "Remote command execution with explicit authorization", "source": "RNS/Utilities/rnx.py" },
+    { "id": "UTIL-RNSH-001", "family": "rnsh", "title": "Remote shell sessions with a Python peer", "source": "RNS/Utilities/rnsh/", "reference": true },
+    { "id": "UTIL-RNODECONF-001", "family": "rnodeconf", "title": "RNode device maintenance and provisioning", "source": "RNS/Utilities/rnodeconf.py" },
+    { "id": "UTIL-RNGIT-001", "family": "rngit", "title": "Direct clone and fetch over Reticulum", "source": "RNS/Utilities/rngit/client.py", "reference": true },
+    { "id": "UTIL-RNGIT-002", "family": "rngit", "title": "git-remote-rns ordinary clone, fetch and push", "source": "RNS/Utilities/rngit/client.py", "reference": true }
+  ]
+}
