@@ -6,6 +6,31 @@ Historical reference only: this file records milestone outcomes and verification
 
 ### Consolidated compatibility results
 
+### CI reference provisioning (implementation awaiting hosted acceptance)
+
+Added a manual/weekly hosted fetch workflow using the existing native Linux
+Build artifact and the previously used public TCP gateway. The reference fetch
+seeds through parent `7f2b3b9b524c9386316379af1313b43a5e4f7a5d` from the
+GitHub comparison mirror, asserts the pin is absent, then requires actual
+nonzero bundle bytes from native `rngit` over Reticulum. Strict fsck, head/tree
+and seed/network provenance are recorded without publishing identities or config.
+Only the verified Git bundle and provenance are uploaded.
+
+Main compatibility jobs can download that reference artifact and provision fresh
+checkouts/venvs outside tracked source. An unavailable artifact remains a visible
+reference prerequisite, not a pass. Existing pinned Python import/clean-tree checks
+are retained; the versioned requirements record all six dependencies from the
+existing verified environment, including the separately installed RNS package
+needed by LXMF. Runtime imports must still resolve to the fetched source checkout,
+not that installed package.
+
+Local provisioning from a Git bundle of the existing verified checkout succeeded;
+`verify_reference.py` reported RNS 1.5.7 from the new checkout. Running
+`tests\run-compatibility.ps1` with those newly provisioned paths passed **127**,
+skipped **2**, with **16** unselected cases; contract results were **35 pass,
+2 skipped, 2 not covered**. This is local pinned-peer evidence, not hosted-network
+acceptance or an upstream-head differential comparison. Both remain outstanding.
+
 Added `tests\compatibility_summary.ps1` and a final CI aggregation job that
 downloads each platform's compatibility JSON. All catalog rows retain their IDs,
 families and full behavior descriptions alongside Linux, macOS and Windows

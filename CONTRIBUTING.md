@@ -77,6 +77,22 @@ Live Python harnesses require `DOTRETICULUM_UPSTREAM` to point at an unmodified 
 
 ## Moving to a new upstream release
 
+CI's **Fetch upstream over Reticulum** workflow runs manually or weekly. It reuses
+a successful Linux native Build artifact, seeds only history through the pin's
+parent from the GitHub comparison mirror, and uses our native `rngit` to fetch
+missing objects over `rns://`. Nonzero network bundle bytes, strict fsck and the
+pin's absence before retrieval are required. The resulting source bundle and
+provenance are Actions artifacts, not tracked source or a venv.
+
+Compatibility jobs reuse that bundle, checking the recorded SHA-256 and pin,
+then run `tests\prepare-reference.ps1` to create a fresh checkout and venv in
+runner temporary storage. Dependency versions are recorded in
+`tests\Interop\reference-requirements.txt`; actual imported modules are checked
+before testing. If no unexpired source artifact exists, cases needing Python
+remain explicitly unexecuted rather than passing. Object integrity does not
+authenticate the publisher. Moving the compatibility pin remains a separate,
+explicit change; fetching current head does not change it.
+
 DotReticulum's version is the targeted upstream RNS version plus a git-height build number (see the README's Versioning section). Anyone may take the project to the next upstream release (for example 1.5.8):
 
 1. Fetch the new upstream with our own `rngit fetch` from `rns://7649a50d84610232d1416b41d2896aff/reticulum/reticulum`, verify the Git objects, and compare against the [GitHub mirror](https://github.com/markqvist/Reticulum). The mirror is for comparison, never the origin of a pin.

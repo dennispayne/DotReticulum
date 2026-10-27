@@ -241,6 +241,9 @@ jobs:
     needs: build
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
     strategy:
       fail-fast: false
       matrix:
@@ -271,6 +274,18 @@ jobs:
 
       - name: Install Pester
         run: ./tests/install-pester.ps1
+
+      - name: Provision the pinned reference from Reticulum-fetched objects
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $directory = Join-Path $env:RUNNER_TEMP 'reference-artifact'
+          ./tests/download-reference.ps1 -Directory $directory
+          $bundle = Join-Path $directory 'reference.bundle'
+          if (Test-Path -LiteralPath $bundle) {
+            $python = if ($IsWindows) { 'python' } else { 'python3' }
+            ./tests/prepare-reference.ps1 -Bundle $bundle -Directory (Join-Path $env:RUNNER_TEMP 'pinned-python') -Python $python
+          }
 
       - name: Run compatibility suite against the native executable
         run: ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary

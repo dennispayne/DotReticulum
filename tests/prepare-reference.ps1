@@ -1,0 +1,44 @@
+#Requires -Version 7.0
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)] [string] $Bundle,
+    [Parameter(Mandatory)] [string] $Directory,
+    [string] $Python = 'python'
+)
+
+$ErrorActionPreference = 'Stop'
+$catalog = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Compatibility\catalog.json') -Raw | ConvertFrom-Json
+$bundlePath = (Resolve-Path -LiteralPath $Bundle).Path
+if (Test-Path -LiteralPath $Directory) { throw 'Reference directory must be fresh.' }
+$null = New-Item -ItemType Directory -Path $Directory
+$directoryPath = (Resolve-Path -LiteralPath $Directory).Path
+$checkout = Join-Path $directoryPath 'upstream'
+$venv = Join-Path $directoryPath 'venv'
+& git clone --no-checkout $bundlePath $checkout
+if ($LASTEXITCODE -ne 0) { throw 'Reference bundle clone failed.' }
+& git -C $checkout fsck --full --strict
+if ($LASTEXITCODE -ne 0) { throw 'Reference object integrity check failed.' }
+& git -C $checkout -c advice.detachedHead=false checkout --detach $catalog.reference.revision
+if ($LASTEXITCODE -ne 0) { throw 'Reference bundle does not contain the pinned revision.' }
+& $Python -m venv $venv
+if ($LASTEXITCODE -ne 0) { throw 'Reference venv creation failed.' }
+$interpreter = Join-Path $venv $(if ($IsWindows) { 'Scripts\python.exe' } else { 'bin\python' })
+& $interpreter -m pip install --disable-pip-version-check -r (Join-Path $PSScriptRoot 'Interop\reference-requirements.txt')
+if ($LASTEXITCODE -ne 0) { throw 'Reference dependency installation failed.' }
+$savedPath = $env:PYTHONPATH
+$savedUpstream = $env:DOTRETICULUM_UPSTREAM
+try {
+    $env:PYTHONPATH = $checkout
+    $env:DOTRETICULUM_UPSTREAM = $checkout
+    & $interpreter (Join-Path $PSScriptRoot 'Interop\verify_reference.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Pinned reference verification failed.' }
+}
+finally {
+    $env:PYTHONPATH = $savedPath
+    $env:DOTRETICULUM_UPSTREAM = $savedUpstream
+}
+if ($env:GITHUB_ENV) {
+    "DOTRETICULUM_PYTHON=$interpreter" | Add-Content -LiteralPath $env:GITHUB_ENV
+    "DOTRETICULUM_UPSTREAM=$checkout" | Add-Content -LiteralPath $env:GITHUB_ENV
+}
+[pscustomobject]@{ Python = $interpreter; Upstream = $checkout; Revision = $catalog.reference.revision }
