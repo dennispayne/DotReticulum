@@ -7,7 +7,7 @@ namespace DotReticulum.Applications;
 
 /// <summary>
 /// A running client-side Reticulum node: the interfaces and <see cref="TransportRouter"/> configured like <c>rnsd</c> (same config file),
-/// with the router loop already running in the background. Applications (LXMF, rncp, rnx, telemetry) register destinations on
+/// with the router loop already running in the background. Applications (rncp, rnx, and external ones such as DotLXMF and DotTelemetry) register destinations on
 /// <see cref="Router"/> and use <see cref="TransportRouter.Links"/> for links.
 /// </summary>
 public sealed class ReticulumNode : IAsyncDisposable

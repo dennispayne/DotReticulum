@@ -37,8 +37,7 @@ dispatcher aliases:
 `git-remote-rns`, `rngit`, `rngcs`, `rnid`, `rnstatus`, `rnpath`, `rnprobe`, `rnsh`,
 `rnodeconf`, `rnir`, `rnpkg`, `rncp`, `rnx`, and `rnsd`.
 
-`telemetry` is a subcommand rather than an executable-name alias in the current dispatcher; use
-`DotReticulum.Applications telemetry --help`. `rnir` and `rnpkg` retain their explicitly
+Telemetry is no longer part of this repository; see [DotReticulum.Ecosystem](https://github.com/dennispayne/DotReticulum.Ecosystem). `rnir` and `rnpkg` retain their explicitly
 documented upstream-placeholder behavior. This packaging step does not enable remote execution or
 authorize device operations.
 

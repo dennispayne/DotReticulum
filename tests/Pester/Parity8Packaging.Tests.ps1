@@ -62,7 +62,7 @@ Describe 'Parity 8 native packaging and installation' -Tag E2E -Skip:(!$IsWindow
         [Linq.Enumerable]::SequenceEqual[byte]($license, $repositoryLicense) | Should -BeTrue
     }
 
-    It 'installs and runs every separate executable alias, version/help surfaces, and telemetry subcommand' {
+    It 'installs and runs every separate executable alias, and version/help surfaces' {
         $installed = Invoke-Packaging 'Install' @{ PackageDirectory = $script:package; InstallRoot = $script:install }
         $installed.Code | Should -Be 0 -Because $installed.Error
         $installedLicense = [IO.File]::ReadAllBytes([IO.Path]::Combine($script:install, 'bin', 'LICENSE'))
@@ -88,9 +88,6 @@ Describe 'Parity 8 native packaging and installation' -Tag E2E -Skip:(!$IsWindow
                 $version.Output | Should -Match $tool
             }
         }
-        $telemetry = Invoke-Installed 'DotReticulum.Applications' @('telemetry', '--help')
-        $telemetry.Code | Should -Be 0 -Because ($telemetry.Output + $telemetry.Error)
-        $telemetry.Output | Should -Match 'telemetry'
         $gitCapabilities = Invoke-Installed 'git-remote-rns' @('rns', 'rns://bad/group/repo') "capabilities`n`n"
         $gitCapabilities.Code | Should -Be 0 -Because ($gitCapabilities.Output + $gitCapabilities.Error)
         $gitCapabilities.Output | Should -Match 'fetch'

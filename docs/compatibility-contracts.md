@@ -167,10 +167,9 @@ differences, not exact Python help/spinner/REPL compatibility.
 
 ### Supported extension scope
 
-LXMF is **outside this repository**: it lives in
+LXMF and telemetry are **outside this repository**: they live in
 [DotReticulum.Ecosystem](https://github.com/dennispayne/DotReticulum.Ecosystem)
-as `DotLXMF`, which builds on this stack. Telemetry is **implemented .NET-only**, U/process/direct-and-.NET-hop evidence,
-not a pinned RNS wire protocol or a substitute for upstream management.
+as `DotLXMF` and `DotTelemetry`, which build on this stack. Neither is a pinned RNS wire protocol or a substitute for upstream management.
 Absent audio/video extensions are **not applicable**
 to this inventory's implementation authorization.
 

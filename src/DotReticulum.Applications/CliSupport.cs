@@ -3,7 +3,7 @@ using DotReticulum.Core;
 
 namespace DotReticulum.Applications;
 
-/// <summary>Helpers shared by the command line front ends (rncp, rnx, telemetry, lxmf).</summary>
+/// <summary>Helpers shared by the command line front ends (rncp, rnx, rnsh, rngit and others).</summary>
 internal static class CliSupport
 {
     private static readonly string[] LevelNames = ["CRITICAL", "ERROR", "WARNING", "NOTICE", "INFO", "VERBOSE", "DEBUG", "PATHING", "EXTREME"];

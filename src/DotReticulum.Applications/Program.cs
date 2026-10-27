@@ -25,7 +25,6 @@ const string Usage = """
       rnodeconf ...            RNode device maintenance ("rnodeconf --help")
       rncp ...                 File transfer ("rncp --help")
       rnx ...                  Authorized remote command execution ("rnx --help")
-      telemetry ...            Publish/view node telemetry ("telemetry --help")
       rngit ...                Repository node, collaboration and bare Git transfers ("rngit --help")
       git-remote-rns ...       Native read/write Git remote helper
       rngcs ...                Git SSHSIG/RSG signing and verification ("rngcs --help")
@@ -34,7 +33,7 @@ const string Usage = """
     location only you can read.
     """;
 
-if (args is ["rnid" or "rnstatus" or "rnpath" or "rnprobe" or "rnodeconf" or "rnir" or "rnpkg" or "rnsd" or "rncp" or "rnx" or "rnsh" or "telemetry" or "rngit" or "rngcs" or "git-remote-rns", ..])
+if (args is ["rnid" or "rnstatus" or "rnpath" or "rnprobe" or "rnodeconf" or "rnir" or "rnpkg" or "rnsd" or "rncp" or "rnx" or "rnsh" or "rngit" or "rngcs" or "git-remote-rns", ..])
 {
     using var stop = new CancellationTokenSource();
     Console.CancelKeyPress += (_, e) => { e.Cancel = true; stop.Cancel(); };
@@ -51,7 +50,6 @@ if (args is ["rnid" or "rnstatus" or "rnpath" or "rnprobe" or "rnodeconf" or "rn
         "rngit" => await DotReticulum.Applications.Rngit.RngitApp.RunAsync(args[1..], Console.Out, Console.Error, stop.Token),
         "rngcs" => await DotReticulum.Applications.Rngit.RngcsApp.RunAsync(args[1..], Console.OpenStandardInput(), Console.Out, Console.Error, stop.Token),
         "rncp" => await DotReticulum.Applications.Rncp.RncpApp.RunAsync(args[1..], Console.Out, Console.Error, stop.Token),
-        "telemetry" => await DotReticulum.Applications.Telemetry.TelemetryApp.RunAsync(args[1..], Console.Out, Console.Error, stop.Token),
         "rnx" => await DotReticulum.Applications.Rnx.RnxApp.RunAsync(args[1..], Console.Out, Console.Error, stop.Token, Console.OpenStandardOutput(), Console.OpenStandardError()),
         "rnsh" => await DotReticulum.Applications.Rnsh.RnshApp.RunAsync(args[1..], Console.Out, Console.Error, stop.Token),
         _ => await DotReticulum.Applications.Rnsd.RnsdApp.RunAsync(args[1..], Console.Out, Console.Error, stop.Token),

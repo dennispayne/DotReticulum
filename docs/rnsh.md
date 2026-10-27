@@ -1,6 +1,6 @@
 # rnsh
 
-`rnsh` is Reticulum's Channel-based remote shell utility. It supports a persistent interactive terminal session and binary stdin, stdout, and stderr. It is distinct from `rnx -x`, which sends repeated request/response commands and does not provide a PTY. The wire protocol follows RNS 1.5.7 `RNS/Utilities/rnsh/protocol.py`, protocol version 1.
+`rnsh` is Reticulum's Channel-based remote shell utility. It ships in the pinned RNS repository (`RNS/Utilities/rnsh`) and is documented in the RNS manual. That version is included under the Reticulum License and is based on the original `rnsh` by Aaron Heise ([acehoss/rnsh](https://github.com/acehoss/rnsh), MIT License, Copyright (c) 2023 Aaron Heise), as its source headers state. It supports a persistent interactive terminal session and binary stdin, stdout, and stderr. It is distinct from `rnx -x`, which sends repeated request/response commands and does not provide a PTY. The wire protocol follows RNS 1.5.7 `RNS/Utilities/rnsh/protocol.py`, protocol version 1.
 
 ```sh
 rnsh --config <shell-state> --rnsconfig <reticulum-config> -l -a <identity-hash> -b 0 -- /bin/sh
