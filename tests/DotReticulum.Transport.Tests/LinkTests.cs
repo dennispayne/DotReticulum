@@ -325,6 +325,30 @@ public class LinkTests
         }
     }
 
+    [Fact]
+    public async Task Link_TeardownDoesNotSpinWaitingForCompletedResourceBookkeeping()
+    {
+        await using var topo = await BuildAsync(false);
+        var established = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sender = topo.Initiator.Router.Links.Connect(topo.Destination.Identity,
+            topo.Destination.Destination.Hash, value => established.TrySetResult(value));
+        await Within(established.Task);
+        Task? completion = null;
+        var teardown = Task.Run(() => sender.SendWithContext([1], LinkContext.None, false, true,
+            beforeSend: _ =>
+            {
+                var work = new TaskCompletionSource();
+                sender.TrackResourceWork(work.Task);
+                completion = Task.Run(() => work.SetResult());
+                Assert.True(SpinWait.SpinUntil(() => work.Task.IsCompleted, TimeSpan.FromSeconds(5)));
+                sender.Teardown();
+            }));
+        await teardown.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.IsAssignableFrom<Task>(completion).WaitAsync(TimeSpan.FromSeconds(5));
+        await sender.DrainResourceWorkAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(LinkStatus.Closed, sender.Status);
+    }
+
     [Theory]
     [MemberData(nameof(Topologies))]
     public async Task Link_RequestResponse_RoundTrips(bool viaTransport)

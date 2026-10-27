@@ -166,7 +166,11 @@ public sealed partial class Link
         while (true)
         {
             Task[] work;
-            lock (_gate) work = _resourceWork.ToArray();
+            lock (_gate)
+            {
+                _resourceWork.RemoveWhere(task => task.IsCompleted);
+                work = _resourceWork.ToArray();
+            }
             if (work.Length == 0) return;
             try { await Task.WhenAll(work).ConfigureAwait(false); }
             catch (Exception ex) { Log("Joining resource work failed: " + ex.Message); }

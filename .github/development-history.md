@@ -85,6 +85,16 @@ Windows validation:
 
 `tests/coverage_summary.ps1 TestResults/coverage-ordered-ingress-acfd` reported production line/branch coverage: Applications 76.88%/63.75%, Core 96.64%/89.72%, Crypto 94.83%/94.00%, Interfaces 85.56%/76.32%, Transport 91.27%/79.22%; merged overall 21,972/26,456 lines (83.05%) and 15,900/22,821 branches (69.67%). Ecosystem native telephone acceptance follows separately after its adapter opts into the APIs; this stack validation is not physical audio or RF evidence.
 
+## Completed resource-work drain race (2026-10-26)
+
+An ecosystem propagation stress capture showed a resource-work removal continuation waiting for the link lock while `CloseLocked` synchronously entered `DrainResourceWorkAsync` holding that same lock. A completed `Task.WhenAll` did not yield, so repeatedly snapshotting the still-registered completed task could spin indefinitely and prevent the removal continuation from acquiring the lock. The drain now prunes completed tasks under the lock before taking its pending-work snapshot; the original continuation still observes and reports failures.
+
+The deterministic regression completes tracked resource work on another thread while the send preparation callback holds the link lock, then tears down and joins both work and cleanup within a deadline. Targeted `LinkTests|Parity5ResourceTests`: 88 passed, 9 live cases skipped.
+
+Windows gates: `dotnet test DotReticulum.slnx -c Release --settings tests/coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/coverage-resource-drain-acfd --nologo -v quiet` passed 1,822, skipped 79. With verified pinned RNS and live mode, `dotnet test tests/DotReticulum.Transport.Tests/DotReticulum.Transport.Tests.csproj -c Release --filter FullyQualifiedName~LiveLinkTests --nologo -v quiet` passed all 11. Strict `dotnet publish src/DotReticulum.Applications/DotReticulum.Applications.csproj -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o artifacts/native-resource-drain`, native `--help`, and `dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj -c Release --no-build --filter FullyQualifiedName~NativeResourceTests --nologo -v quiet -- xUnit.MaxParallelThreads=1` with that native executable all passed (native flow 1/1).
+
+Production merged coverage from `tests/coverage_summary.ps1 TestResults/coverage-resource-drain-acfd`: Applications lines/branches 76.87%/63.75%, Core 96.64%/89.80%, Crypto 94.83%/94.00%, Interfaces 85.60%/76.16%, Transport 91.42%/79.52%; overall 21,984/26,459 lines (83.09%) and 15,908/22,821 branches (69.71%). No wire behavior or reference pin changed.
+
 ## Chronological milestones
 
 | Date | Milestone | Outcome |
