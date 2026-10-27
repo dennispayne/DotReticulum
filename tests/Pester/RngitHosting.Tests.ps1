@@ -320,6 +320,7 @@ param([string] $DocumentPath)
             EDITOR = "`"$editor`" -NoProfile -NonInteractive -File `"$scriptPath`""
             TEMP = $temporary.FullName
             TMP = $temporary.FullName
+            TMPDIR = $temporary.FullName
             POWERSHELL_TELEMETRY_OPTOUT = '1'
         }
         $denied = Invoke-HostingCli (@('work', $remote, 'edit', '--id', $script:documentId) + $common) -Environment $environment
