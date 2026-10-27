@@ -11,7 +11,8 @@ param(
     [string] $Upstream = $env:DOTRETICULUM_UPSTREAM,
     [string] $OutputDirectory = (Join-Path $PSScriptRoot '..\TestResults\compatibility'),
     [string] $Label = '',
-    [switch] $NoJobSummary
+    [switch] $NoJobSummary,
+    [string] $UpstreamResults
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,6 +23,9 @@ $resolved = (Resolve-Path -LiteralPath $Application).Path
 $catalog = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Compatibility\catalog.json') -Raw | ConvertFrom-Json
 $null = New-Item -ItemType Directory -Force -Path $OutputDirectory
 $OutputDirectory = (Resolve-Path -LiteralPath $OutputDirectory).Path
+if ($UpstreamResults -and (Test-Path -LiteralPath $UpstreamResults)) {
+    Copy-Item -LiteralPath $UpstreamResults -Destination (Join-Path $OutputDirectory 'upstream.json')
+}
 
 $data = @{ Application = $resolved; Python = $Python; Upstream = $Upstream }
 $suites = Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'Pester') -Filter '*.Tests.ps1' |

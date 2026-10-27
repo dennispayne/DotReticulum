@@ -29,6 +29,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] Consolidated Unit/Integration/Native test tables with Linux/macOS/Windows columns
   - [ ] Provision the separately fetched pinned Python reference for CI interoperability
   - [ ] Native .NET `rngit` hosted-CI upstream retrieval and separate upstream-drift comparison
+  - [ ] Advertised-core functionality family and directly executed Upstream results alongside the three .NET platforms
   - [ ] `interop-test.yml`
   - [ ] `e2e-mesh-test.yml`
   - [ ] `codeql.yml`

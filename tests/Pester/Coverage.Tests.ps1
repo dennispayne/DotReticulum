@@ -77,6 +77,8 @@ Describe 'PowerShell test runner' -Tag Tooling {
                 @{ Id = 'SECOND'; Status = 'Fail'; Detail = 'wrong output' },
                 @{ Id = 'FIRST'; Status = 'Pass'; Detail = '' }
             ) | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $linux.FullName 'compatibility.json')
+            @(@{ Id = 'FIRST'; Status = 'Pass'; Revision = 'test-pin' }) |
+                ConvertTo-Json -AsArray | Set-Content -LiteralPath (Join-Path $linux.FullName 'upstream.json')
             $mac = New-Item -ItemType Directory -Path (Join-Path $directory.FullName 'compatibility-osx-arm64-1')
             @(@{ Id = 'FIRST'; Status = 'Skipped'; Detail = 'requires Linux' }) |
                 ConvertTo-Json -AsArray | Set-Content -LiteralPath (Join-Path $mac.FullName 'compatibility.json')
@@ -84,9 +86,9 @@ Describe 'PowerShell test runner' -Tag Tooling {
                 (Join-Path $PSScriptRoot '..\compatibility_summary.ps1'),
                 '-ReportsDirectory', $directory.FullName, '-Catalog', $catalog)
             $result.Code | Should -Be 0 -Because $result.Error
-            $result.Output | Should -Match '\| Linux \| macOS \| Windows \|'
-            $result.Output | Should -Match 'Full first behavior &#124; with delimiter \| Pass \| Skipped \| Unavailable'
-            $result.Output | Should -Match 'Full second behavior \| Fail \| Unavailable \| Unavailable'
+            $result.Output | Should -Match '\| Upstream \| .NET Linux \| .NET macOS \| .NET Windows \|'
+            $result.Output | Should -Match 'Full first behavior &#124; with delimiter \| Pass \| Pass \| Skipped \| Unavailable'
+            $result.Output | Should -Match 'Full second behavior \| Not run \| Fail \| Unavailable \| Unavailable'
             $result.Output | Should -Match 'FIRST.*macOS: requires Linux'
             $result.Output | Should -Match 'SECOND.*Linux: wrong output'
         }

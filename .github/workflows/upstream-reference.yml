@@ -39,6 +39,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up .NET for C# test fixtures
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
       - name: Download a verified native Build artifact
         run: |
           $run = $env:BUILD_RUN
@@ -63,9 +68,28 @@ jobs:
         run: ./tests/prepare-reference.ps1 -Bundle "$env:RUNNER_TEMP/hosted-reference/reference.bundle" -Directory "$env:RUNNER_TEMP/pinned-python" -Python python3
 
       - name: Run pinned compatibility with the native binary and actual Python peers
+        id: compatibility
+        continue-on-error: true
         run: |
           ./tests/install-pester.ps1
           ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label 'linux-x64, Reticulum-fetched reference'
+
+      - name: Execute matching pinned upstream CLI cases
+        run: |
+          $pin = (Get-Content tests/Compatibility/catalog.json -Raw | ConvertFrom-Json).reference.revision
+          ./tests/compare-upstream.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Python $env:DOTRETICULUM_PYTHON -Upstream $env:DOTRETICULUM_UPSTREAM -Revision $pin -OutputDirectory TestResults/upstream-pinned -Label 'Pinned upstream CLI comparison'
+          Copy-Item -LiteralPath TestResults/upstream-pinned/upstream.json -Destination "$env:RUNNER_TEMP/hosted-reference/upstream.json"
+
+      - name: Compare retrieved upstream head with the native implementation
+        run: |
+          $provenance = Get-Content -LiteralPath "$env:RUNNER_TEMP/hosted-reference/reference-provenance.json" -Raw | ConvertFrom-Json
+          git -C $env:DOTRETICULUM_UPSTREAM checkout --detach $provenance.head
+          if ($LASTEXITCODE -ne 0) { throw 'Could not materialize retrieved head for drift comparison.' }
+          ./tests/compare-upstream.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Python $env:DOTRETICULUM_PYTHON -Upstream $env:DOTRETICULUM_UPSTREAM -Revision $provenance.head -OutputDirectory TestResults/upstream-head
+
+      - name: Propagate pinned compatibility failure
+        if: ${{ !cancelled() && steps.compatibility.outcome == 'failure' }}
+        run: throw 'Pinned compatibility failed; see retained reports.'
 
       - name: Retain verified reference and provenance
         if: ${{ !cancelled() }}
@@ -75,6 +99,7 @@ jobs:
           path: |
             ${{ runner.temp }}/hosted-reference/reference.bundle
             ${{ runner.temp }}/hosted-reference/reference-provenance.json
+            ${{ runner.temp }}/hosted-reference/upstream.json
           if-no-files-found: warn
           retention-days: 30
 
@@ -83,6 +108,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hosted-reference-compatibility
-          path: TestResults/compatibility/
+          path: |
+            TestResults/compatibility/
+            TestResults/upstream-head/
+            TestResults/upstream-pinned/
           if-no-files-found: warn
           retention-days: 30

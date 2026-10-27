@@ -68,7 +68,7 @@ Describe 'DotReticulum CLI end-to-end' -Tag E2E {
         Test-Path -LiteralPath $target | Should -BeFalse
     }
 
-    It 'sends and fetches a multi-megabyte file between separately launched authenticated rncp processes' -Tag 'Contract:UTIL-RNCP-002' {
+    It 'sends and fetches a multi-megabyte file between separately launched authenticated rncp processes' -Tag 'Contract:UTIL-RNCP-002', 'Contract:FUNC-CORE-RESOURCES' {
         $portProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
         $portProbe.Start()
         $port = $portProbe.LocalEndpoint.Port

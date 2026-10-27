@@ -275,6 +275,11 @@ jobs:
       - name: Install Pester
         run: ./tests/install-pester.ps1
 
+      - name: Set up .NET for C# test fixtures
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
       - name: Provision the pinned reference from Reticulum-fetched objects
         env:
           GH_TOKEN: ${{ github.token }}
@@ -288,7 +293,7 @@ jobs:
           }
 
       - name: Run compatibility suite against the native executable
-        run: ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary
+        run: ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary -UpstreamResults (Join-Path $env:RUNNER_TEMP 'reference-artifact/upstream.json')
 
       - name: Retain compatibility report
         if: ${{ !cancelled() }}

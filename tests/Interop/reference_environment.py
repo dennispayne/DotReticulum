@@ -8,7 +8,7 @@ PINNED_RNS_SHA = "a29bfb51c468945c96a1ee22cae0114e993e2391"
 PINNED_LXMF_VERSION = "1.2.1"
 
 
-def verify_reference(require_lxmf=False):
+def verify_reference(require_lxmf=False, *, expected_revision=PINNED_RNS_SHA):
     import RNS
 
     root = Path(os.environ["DOTRETICULUM_UPSTREAM"]).resolve(strict=True)
@@ -23,8 +23,8 @@ def verify_reference(require_lxmf=False):
         ).stdout.strip()
 
     revision = git("rev-parse", "HEAD")
-    if revision != PINNED_RNS_SHA:
-        raise RuntimeError(f"RNS revision {revision} does not match {PINNED_RNS_SHA}")
+    if revision != expected_revision:
+        raise RuntimeError(f"RNS revision {revision} does not match {expected_revision}")
     if git("status", "--porcelain", "--untracked-files=no", "--", "RNS"):
         raise RuntimeError("Reference RNS source contains tracked modifications")
 

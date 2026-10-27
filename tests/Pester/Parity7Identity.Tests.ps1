@@ -95,7 +95,7 @@ Describe 'Parity 7 rnid real processes' {
         (Invoke-RnidProcess -Arguments @('-M', $testKey, '-X', '-w', $path)).Code | Should -Be 11
     }
 
-    It 'creates byte-identical detached signatures, validates files recursively and rejects tampering' -Tag 'Contract:UTIL-RNID-003' {
+    It 'creates byte-identical detached signatures, validates files recursively and rejects tampering' -Tag 'Contract:UTIL-RNID-003', 'Contract:FUNC-CORE-CRYPTO' {
         $first = Join-Path $root 'first'
         $second = Join-Path $root 'second'
         [IO.File]::WriteAllBytes($first, [Convert]::FromHexString($fixture.message))
@@ -132,7 +132,7 @@ Describe 'Parity 7 rnid real processes' {
         (Invoke-RnidProcess -Arguments @('-i', ('a' * 32), '-N', '-V', $metadata)).Code | Should -Be 10
     }
 
-    It 'decrypts the independent reference ciphertext and rejects wrong identities and overwrite' -Tag 'Contract:UTIL-RNID-006' {
+    It 'decrypts the independent reference ciphertext and rejects wrong identities and overwrite' -Tag 'Contract:UTIL-RNID-006', 'Contract:FUNC-CORE-CRYPTO' {
         $encrypted = Join-Path $root 'reference.rfe'
         $plain = Join-Path $root 'reference.plain'
         [IO.File]::WriteAllBytes($encrypted, [Convert]::FromHexString($fixture.encrypted))
@@ -179,7 +179,7 @@ Describe 'Parity 7 rnid real processes' {
         @(Get-ChildItem -LiteralPath $root -Directory -Filter '.rnid-editor-*').Count | Should -Be 0
     }
 
-    It 'rejects invalid encoding, mutually exclusive arguments and nonfinite network timeout' -Tag 'Contract:UTIL-RNID-009' {
+    It 'rejects invalid encoding, mutually exclusive arguments and nonfinite network timeout' -Tag 'Contract:UTIL-RNID-009', 'Contract:FUNC-CORE-ADDRESSING' {
         (Invoke-RnidProcess -Arguments @('-m', 'invalid', '-p')).Code | Should -Be 8
         (Invoke-RnidProcess -Arguments @('-b', '-B', '-p')).Code | Should -Be 1
         (Invoke-RnidProcess -Arguments @('-t', 'NaN', '-p')).Code | Should -Be 2

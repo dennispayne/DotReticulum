@@ -6,6 +6,62 @@
   "note": "Each contract has a stable ID. Pester It blocks claim a contract with -Tag 'Contract:<ID>'; cases that need the pinned Python reference also carry the 'Reference' tag. Contracts with no tagged case are reported as Not covered. Add rows as the source inventory in docs/compatibility-contracts.md is converted into testable contracts.",
   "contracts": [
     {
+      "id": "FUNC-CORE-ADDRESSING",
+      "family": "advertised-core",
+      "title": "Cryptographic addressing: derive the expected destination address from a fixed identity and application name",
+      "source": "README.md:46-83 (Notable Features); RNS/Identity.py; RNS/Destination.py",
+      "boundary": "One deterministic identity/name fixture; not a statistical uniqueness proof."
+    },
+    {
+      "id": "FUNC-CORE-CRYPTO",
+      "family": "advertised-core",
+      "title": "Cryptographic communication: produce Ed25519 signatures and decrypt authenticated identity ciphertext matching independent fixtures",
+      "source": "README.md:46-83 (Notable Features); RNS/Identity.py; RNS/Cryptography",
+      "boundary": "Fixture-level functionality, not a cryptographic audit or complete forward-secrecy acceptance."
+    },
+    {
+      "id": "FUNC-CORE-RECEIPTS",
+      "family": "advertised-core",
+      "title": "Delivery confirmations: probe an actual Python proof destination and distinguish a destination that supplies no proof",
+      "source": "README.md:46-83 (Notable Features); RNS/Packet.py",
+      "boundary": "Loopback Python peer; not arbitrary-topology or forged-proof acceptance."
+    },
+    {
+      "id": "FUNC-CORE-INTERFACES",
+      "family": "advertised-core",
+      "title": "Interface authentication: reject wrong IFAC credentials and continue serving after malformed or disconnected peers",
+      "source": "README.md:46-83 (Notable Features); RNS/Reticulum.py; RNS/Transport.py",
+      "boundary": "Configured local software interfaces; not every interface or physical radio."
+    },
+    {
+      "id": "FUNC-CORE-RESOURCES",
+      "family": "advertised-core",
+      "title": "Reliable bulk data: send and fetch a multi-megabyte file between separately launched authenticated CLI processes",
+      "source": "README.md:46-83 (Notable Features); RNS/Resource.py",
+      "boundary": "Bounded multi-megabyte local transfer; not the advertised multi-gigabyte scale."
+    },
+    {
+      "id": "FUNC-CORE-ROUTING",
+      "family": "advertised-core",
+      "title": "Self-configuring multi-hop transport over heterogeneous carriers",
+      "source": "README.md:46-83 (Notable Features); RNS/Transport.py",
+      "boundary": "Advertised-functionality case is not yet mapped; existing behavioral evidence does not automatically pass this row."
+    },
+    {
+      "id": "FUNC-CORE-REQUESTS",
+      "family": "advertised-core",
+      "title": "Application request/response exchanges over encrypted links",
+      "source": "README.md:46-83 (Notable Features); RNS/Link.py",
+      "boundary": "Advertised-functionality case is not yet mapped."
+    },
+    {
+      "id": "FUNC-CORE-CHANNEL",
+      "family": "advertised-core",
+      "title": "Reliable sequential delivery through Channel and Buffer",
+      "source": "README.md:46-83 (Notable Features); RNS/Channel.py; RNS/Buffer.py",
+      "boundary": "Advertised-functionality case is not yet mapped."
+    },
+    {
       "id": "IFACE-I2P-001",
       "family": "interfaces",
       "title": "I2P router configuration rejects unsafe or inconsistent settings before launch",

@@ -8,6 +8,39 @@ Historical reference only: this file records milestone outcomes and verification
 
 ### CI reference provisioning (implementation awaiting hosted acceptance)
 
+The first hosted fetch in run `40519261522` **retrieved 69,228 Git bundle bytes
+using our native .NET stack** via `reticulum.thecryptosquid.com:4242`, after the
+disclosed mirror-parent seed. Strict fsck passed. Retrieved head:
+`30c6428e0b59bfc05563167c72c2e0f21ef015c0`; tree:
+`0ff68fb38620afee8acb0cf8868ae0f7940fbf4a`. The pinned checkout and dependency
+environment were then provisioned and import-verified on the Linux runner.
+This establishes actual CI `rns://` retrieval, not publisher authentication.
+The run failed later because C# fixture/remote-command tests needed .NET 10 but
+the runner's default SDK was 8; setup-dotnet is now explicit in both reference
+and main compatibility jobs. Hosted compatibility acceptance remains pending.
+
+Added an explicit revision-scoped CLI adapter for drift comparisons; all existing
+reference adapters retain the default pin check. Four identical CLI acceptance
+cases execute on both implementations: key persistence, detached signature bytes,
+authenticated fixture decryption and destination-address derivation. All eight
+executions passed locally (managed .NET and Python). Pinned results are exported
+separately from retrieved-head drift results; the latter cannot populate the
+pinned Upstream column.
+
+An initial `advertised-core` family maps the pinned README's Notable Features
+to eight explicit rows. Five rows reuse actual acceptance cases for addressing,
+crypto, proof/no-proof delivery, IFAC isolation and multi-megabyte resources.
+Multi-hop routing, application requests and Channel/Buffer remain unmapped in
+this new family rather than inheriting historical passes. Each row states its
+bounded evidence; neither a few megabytes nor fixtures establish every advertised
+scale/security claim. Upstream gets its own column populated only by directly
+executed reference cases, not by using Python as a .NET test peer.
+
+After adding these mappings, the locally provisioned pinned-peer run passed
+**127**, skipped **2**, with **16** unselected cases: **47** catalog rows,
+**40 pass, 2 skipped, 5 not covered**. No newly generated reference vectors or
+changed compatibility pin is claimed.
+
 Added a manual/weekly hosted fetch workflow using the existing native Linux
 Build artifact and the previously used public TCP gateway. The reference fetch
 seeds through parent `7f2b3b9b524c9386316379af1313b43a5e4f7a5d` from the

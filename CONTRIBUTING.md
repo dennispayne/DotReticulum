@@ -77,6 +77,15 @@ Live Python harnesses require `DOTRETICULUM_UPSTREAM` to point at an unmodified 
 
 ## Moving to a new upstream release
 
+The consolidated compatibility table preserves all contract rows and displays
+Upstream, .NET Linux, .NET macOS and .NET Windows side by side. The
+`advertised-core` family starts from the pinned upstream README's notable
+features; row-specific bounds distinguish a concrete acceptance case from the
+whole advertised capability. Unmapped rows are not covered. Upstream is marked
+passed only when the reference itself ran the corresponding acceptance case;
+using Python as the peer of a .NET test is not sufficient. Retrieved-head drift
+results are separate from this pinned table.
+
 CI's **Fetch upstream over Reticulum** workflow runs manually or weekly. It reuses
 a successful Linux native Build artifact, seeds only history through the pin's
 parent from the GitHub comparison mirror, and uses our native `rngit` to fetch

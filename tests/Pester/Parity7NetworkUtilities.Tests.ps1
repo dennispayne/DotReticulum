@@ -287,7 +287,7 @@ try {
         finally { Stop-TestProcess $server }
     }
 
-    It 'queries pinned Python remote management and probes announced reply and no-proof destinations' -Tag 'Contract:UTIL-RNSTATUS-001', 'Contract:UTIL-RNPROBE-001', 'Reference' -Skip:([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullOrWhiteSpace($Upstream)) {
+    It 'queries pinned Python remote management and probes announced reply and no-proof destinations' -Tag 'Contract:UTIL-RNSTATUS-001', 'Contract:UTIL-RNPROBE-001', 'Contract:FUNC-CORE-RECEIPTS', 'Reference' -Skip:([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullOrWhiteSpace($Upstream)) {
         $managementIdentity = Join-Path $utilityWork 'python-management.identity'
         $probeIdentity = Join-Path $utilityWork 'python-probe.identity'
         $noProofIdentity = Join-Path $utilityWork 'python-no-proof.identity'
