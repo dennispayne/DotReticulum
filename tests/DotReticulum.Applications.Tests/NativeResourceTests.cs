@@ -8,10 +8,12 @@ namespace DotReticulum.Applications.Tests;
 
 public sealed class NativeFactAttribute : FactAttribute
 {
-    public NativeFactAttribute()
+    public NativeFactAttribute(bool requiresTerminal = false)
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOTRETICULUM_NATIVE_EXE")))
             Skip = "Set DOTRETICULUM_NATIVE_EXE to a published NativeAOT Applications executable.";
+        else if (requiresTerminal && !OperatingSystem.IsWindows() && !OperatingSystem.IsLinux())
+            Skip = "The rnsh PTY backend supports Windows/Linux only; Darwin terminal support is not implemented.";
     }
 }
 
