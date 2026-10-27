@@ -221,6 +221,58 @@ public class LinkTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Link_ResponderInitializesBeforeFirstDataEvenWhenObserversAreBusy(bool initializerThrows)
+    {
+        // RNS a29bfb5 Link.rtt_packet invokes the owner's setup callback before receiving more data.
+        await using var topo = await BuildAsync(false);
+        using var releaseObservers = new ManualResetEventSlim();
+        var observersStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = 0;
+        var received = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var identified = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var errors = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        topo.Responder.Router.Log = errors.Enqueue;
+        topo.Destination.ProofStrategy = ProofStrategy.All;
+        topo.Destination.LinkEstablished = link =>
+        {
+            link.PacketReceived = (data, _) => received.TrySetResult(data);
+            link.RemoteIdentified = (_, identity) => identified.TrySetResult(identity.Hash);
+            if (initializerThrows) throw new InvalidOperationException("setup observer failed");
+        };
+        for (var index = 0; index < LinkManager.ObserverConcurrency; index++)
+        {
+            topo.Responder.Router.Links.Dispatch(() =>
+            {
+                if (Interlocked.Increment(ref started) == LinkManager.ObserverConcurrency)
+                    observersStarted.TrySetResult();
+                releaseObservers.Wait();
+            });
+        }
+        using var sender = Identity.Generate();
+        try
+        {
+            await observersStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var established = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var link = topo.Initiator.Router.Links.Connect(topo.Destination.Identity,
+                topo.Destination.Destination.Hash, value => established.TrySetResult(value));
+            await Within(established.Task);
+            link.Identify(sender);
+            var receipt = link.Send("first packet"u8.ToArray());
+            Assert.NotNull(receipt);
+            Assert.True(await Within(receipt.Completion));
+        }
+        finally
+        {
+            releaseObservers.Set();
+        }
+        Assert.Equal("first packet"u8.ToArray(), await Within(received.Task));
+        Assert.Equal(sender.Hash, await Within(identified.Task));
+        Assert.Equal(initializerThrows, errors.Any(message => message.Contains("setup observer failed", StringComparison.Ordinal)));
+    }
+
+    [Theory]
     [MemberData(nameof(Topologies))]
     public async Task Link_RequestResponse_RoundTrips(bool viaTransport)
     {

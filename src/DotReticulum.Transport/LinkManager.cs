@@ -361,7 +361,7 @@ public sealed class LinkManager : IAsyncDisposable
         await StopAsync().ConfigureAwait(false);
     }
 
-    private void Report(string message)
+    internal void Report(string message)
     {
         try { Log?.Invoke(message); }
         catch (Exception observer) { System.Diagnostics.Trace.TraceError("Link diagnostic observer failed: {0}; original: {1}", observer, message); }

@@ -102,7 +102,8 @@ public sealed class LocalDestination(Identity identity, Destination destination,
     /// <summary>Upstream <c>accepts_links</c>: whether incoming link requests to this destination are accepted.</summary>
     public bool AcceptLinks { get => _endpoint.AcceptLinks; set => _endpoint.AcceptLinks = value; }
 
-    /// <summary>Called once an incoming link is established (after the initiator's RTT packet).</summary>
+    /// <summary>Initializes an incoming link after its RTT packet, before later ingress is processed.
+    /// Install handlers here and return promptly; exceptions are logged without stopping packet processing.</summary>
     public Action<Link>? LinkEstablished { get; set; }
 
     /// <summary>Whether data packets received over this destination's links are proven automatically.</summary>

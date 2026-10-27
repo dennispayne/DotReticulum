@@ -743,7 +743,14 @@ public sealed partial class Link
                         UpdateKeepalive();
                         var owner = _owner;
                         var cb = Established;
-                        if (owner?.LinkEstablished is { } accepted) after.Add(() => accepted(this));
+                        if (owner?.LinkEstablished is { } accepted)
+                        {
+                            coreAfter.Add(() =>
+                            {
+                                try { accepted(this); }
+                                catch (Exception ex) { _mgr.Report($"Link {LinkIdHex} establishment callback failed: {ex.Message}"); }
+                            });
+                        }
                         if (cb is not null) after.Add(() => cb(this));
                     }
                 }
