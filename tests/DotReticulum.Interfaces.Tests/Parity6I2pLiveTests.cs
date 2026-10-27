@@ -35,6 +35,7 @@ public sealed class Parity6I2pLiveCollection { }
 /// no router is launched/configured, and no simulator/zero-hop shim is used.
 /// </summary>
 [Collection("Parity6 actual I2P router")]
+[Trait("Category", "Integration")]
 public sealed class Parity6I2pLiveTests(ITestOutputHelper output)
 {
     private static readonly TimeSpan Deadline = TimeSpan.FromMinutes(4);
@@ -146,6 +147,7 @@ public sealed class Parity6I2pLiveTests(ITestOutputHelper output)
         throw new EndOfStreamException("The actual I2P packet stream ended before the expected packet arrived.");
     }
 
+    [Trait("Category", "Live")]
     [I2pLiveFact]
     public async Task ActualRouterSamDestinationPersistenceWithoutOverlay()
     {
@@ -189,6 +191,7 @@ public sealed class Parity6I2pLiveTests(ITestOutputHelper output)
         finally { Directory.Delete(directory, recursive: true); }
     }
 
+    [Trait("Category", "Live")]
     [I2pLiveFact]
     public async Task ActualRouterNativeStreamsAreBidirectionalAndPersistAcrossBearerRestart()
     {
@@ -249,6 +252,7 @@ public sealed class Parity6I2pLiveTests(ITestOutputHelper output)
         finally { Directory.Delete(directory, recursive: true); }
     }
 
+    [Trait("Category", "Live")]
     [I2pLiveTheory]
     [InlineData(true)]
     [InlineData(false)]

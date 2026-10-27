@@ -8,6 +8,7 @@ namespace DotReticulum.Interfaces.Tests;
 
 // Source-backed by GenerateParity6BackbonePipeVectors.py at a29bfb51c468945c96a1ee22cae0114e993e2391.
 // Internal endpoint socket tests are software loopback, not a supported Windows Backbone or live RNS claim.
+[Trait("Category", "Integration")]
 public sealed class Parity6BackboneTests
 {
     private static JsonDocument Vectors() => JsonDocument.Parse(File.ReadAllText(

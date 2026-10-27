@@ -4,6 +4,7 @@ using DotReticulum.Crypto;
 
 namespace DotReticulum.Crypto.Tests;
 
+[Trait("Category", "Unit")]
 public class TokenTests
 {
     [Theory]
@@ -113,6 +114,7 @@ public class TokenTests
 // (markqvist/Reticulum @ e40191b3d193b46b7f2d8a44424a594cd758839b, RNS.Cryptography.Token / hkdf)
 // via GenerateCryptoVectors.py. Tokens there are upstream-produced; we must open them.
 // The reverse direction (upstream opens our tokens) is checked by tests/Interop/VerifyDotNetOutput.py.
+[Trait("Category", "Unit")]
 public class PythonReferenceCryptoTests
 {
     private static JsonElement Load() =>

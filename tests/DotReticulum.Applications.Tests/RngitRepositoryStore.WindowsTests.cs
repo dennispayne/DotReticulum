@@ -5,6 +5,7 @@ using DotReticulum.Applications.Rngit;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class RngitWindowsPermissionFactAttribute : FactAttribute
 {
     public RngitWindowsPermissionFactAttribute()

@@ -264,11 +264,13 @@ public sealed class LiveAnnounceFixture : IAsyncLifetime
     }
 }
 
+[Trait("Category", "Integration")]
 public sealed class LiveAnnounceTests(LiveAnnounceFixture live, ITestOutputHelper output) : IClassFixture<LiveAnnounceFixture>
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(30);
     private static readonly byte[] Message = "dotnet says hello to python"u8.ToArray();
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task PythonAnnounces_AreValidatedAndRecalled()
     {
@@ -283,6 +285,7 @@ public sealed class LiveAnnounceTests(LiveAnnounceFixture live, ITestOutputHelpe
         output.WriteLine($"validated+recalled python announces; ratchet={Convert.ToHexStringLower(live.Engine.Known.GetRatchet(live.RatchetHash)!)}");
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task PythonAnnounceReachesRegisteredHandler_WithAspectFilter()
     {
@@ -304,6 +307,7 @@ public sealed class LiveAnnounceTests(LiveAnnounceFixture live, ITestOutputHelpe
         Assert.Empty(wrongHits);
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task DotNetEncryptsToPythonRatchet_PythonDecrypts()
     {
@@ -317,6 +321,7 @@ public sealed class LiveAnnounceTests(LiveAnnounceFixture live, ITestOutputHelpe
         output.WriteLine("python (ratchets enforced) decrypted the packet we encrypted to the announced ratchet");
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task DotNetEncryptsToPythonIdentity_PythonDecrypts()
     {
@@ -329,9 +334,11 @@ public sealed class LiveAnnounceTests(LiveAnnounceFixture live, ITestOutputHelpe
         Assert.Equal(Convert.ToHexStringLower(Message), e.GetProperty("payload").GetString());
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public Task DotNetRatchetAnnounce_IsRecordedByPython_AndPythonEncryptsToUs() => RoundTrip(withRatchet: true);
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public Task DotNetPlainAnnounce_IsRecordedByPython_AndPythonEncryptsToUs() => RoundTrip(withRatchet: false);
 

@@ -9,6 +9,7 @@ namespace DotReticulum.Applications.Tests;
 
 // Actual RNS 1.5.7 pages.py at a29bfb51c468945c96a1ee22cae0114e993e2391.
 // GenerateRngitPageVectors.py records source SHA-256, actual imports and visible fixture shims.
+[Trait("Category", "Integration")]
 public sealed class RngitPageTests : IDisposable
 {
     private readonly string directory = Path.Combine(Directory.GetCurrentDirectory(), "rngit-pages-" + Guid.NewGuid().ToString("N"));

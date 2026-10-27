@@ -107,6 +107,7 @@ internal sealed class PyTool : IDisposable
 
 // LIVE: .NET rncp / rnx <-> real upstream Python rncp / rnx. Opt-in: DOTRETICULUM_LIVE=1 (+ DOTRETICULUM_PYTHON, DOTRETICULUM_UPSTREAM):
 //   dotnet test tests/DotReticulum.Applications.Tests -c Release --filter "FullyQualifiedName~LiveRncpRnx"
+[Trait("Category", "Integration")]
 public sealed class LiveRncpRnxTests
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(90);
@@ -139,6 +140,7 @@ public sealed class LiveRncpRnxTests
         throw new TimeoutException("File did not arrive: " + path + "\n" + string.Join(", ", Directory.GetFiles(Path.GetDirectoryName(path)!).Select(f => Path.GetFileName(f) + "=" + new FileInfo(f).Length)) + "\n" + tool?.Output);
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task DotNetRncp_SendsAndFetches_FromPythonListener()
     {
@@ -174,6 +176,7 @@ public sealed class LiveRncpRnxTests
         }
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task PythonRncp_SendsAndFetches_FromDotNetListener()
     {
@@ -219,6 +222,7 @@ public sealed class LiveRncpRnxTests
         }
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task DotNetRnx_RunsCommand_OnPythonListener()
     {
@@ -263,6 +267,7 @@ public sealed class LiveRncpRnxTests
         }
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task PythonRnx_RunsCommand_OnDotNetListener()
     {

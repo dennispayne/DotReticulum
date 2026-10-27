@@ -8,6 +8,7 @@ namespace DotReticulum.Applications.Tests;
 // SHA-256: 6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693.
 // Fixture executes actual recording methods. Generator discloses the Windows
 // os.rename workaround and avoids the upstream shared-default dictionary bug.
+[Trait("Category", "Unit")]
 public sealed class RngitHostStatisticsTests : IDisposable
 {
     private const string Hash = "0123456789abcdef0123456789abcdef";

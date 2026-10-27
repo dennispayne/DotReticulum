@@ -7,6 +7,7 @@ using DotReticulum.Transport;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public class RnsdConfigTests
 {
     [Fact]
@@ -80,6 +81,7 @@ public class RnsdConfigTests
     }
 }
 
+[Trait("Category", "Integration")]
 public class RnsdAppTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Environment.CurrentDirectory, "TestResults", "rnsd-test-" + Guid.NewGuid().ToString("N"));

@@ -8,6 +8,7 @@ namespace DotReticulum.Interfaces.Tests;
 // sha256 d9a4fcaf6e76a9dcb810d335850ab0398d21054848fd84766a62f687a9ec942d: process_outgoing and read_loop)
 // with GenerateHdlcVectors.py. Upstream's frame list is the oracle; DotReticulum additionally drops frames that are not
 // parseable Reticulum packets or that contain an invalid escape sequence (see InvalidEscape tests).
+[Trait("Category", "Unit")]
 public class HdlcFramingTests
 {
     private static JsonElement Root { get; } =

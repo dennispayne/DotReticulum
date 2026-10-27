@@ -7,6 +7,7 @@ namespace DotReticulum.Core.Tests;
 // Independently executed RNS a29bfb51c468945c96a1ee22cae0114e993e2391 umsgpack.py.
 // Source SHA-256 0710f48f495193a764048c883b27b51cc7e7f7ae12486d4aad859994271cba50.
 // GenerateMsgPackApplicationVectors.py verifies actual RNS/LXMF imports before generation.
+[Trait("Category", "Unit")]
 public class MsgPackApplicationValueTests
 {
     private static JsonElement Vectors { get; } = JsonDocument.Parse(File.ReadAllText(

@@ -11,6 +11,7 @@ public sealed class RNodeHardwareFactAttribute : FactAttribute
     }
 }
 
+[Trait("Category", "Unit")]
 public sealed class Parity6RNodeHardwareTests(ITestOutputHelper output)
 {
     [RNodeHardwareFact]

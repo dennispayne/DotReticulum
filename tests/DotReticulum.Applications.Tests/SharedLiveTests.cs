@@ -11,6 +11,7 @@ using DotReticulum.Transport;
 namespace DotReticulum.Applications.Tests;
 
 /// <summary>Actual pinned Reticulum local daemon/client processes, not mocks of their authentication or HDLC.</summary>
+[Trait("Category", "Integration")]
 public sealed class SharedLiveTests
 {
     private static readonly byte[] Key = Enumerable.Range(0, 32).Select(n => (byte)n).ToArray();
@@ -21,6 +22,7 @@ public sealed class SharedLiveTests
         return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task NativeIdentifiedManagementLinkQueriesActualPythonRemoteHandlers()
     {
@@ -39,6 +41,7 @@ public sealed class SharedLiveTests
         Assert.Empty(paths);
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task ActualPythonIdentifiedLinkQueriesNativeAllowlistedRemoteManagement()
     {
@@ -84,6 +87,7 @@ public sealed class SharedLiveTests
         }
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task NativeRpcClientPerformsOperationsOnUnmodifiedPythonDaemon()
     {
@@ -102,6 +106,7 @@ public sealed class SharedLiveTests
         Assert.Equal(false, await client.CallAsync(new() { ["destination_data"] = "retain", ["destination_hash"] = hash }));
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task ActualPythonMultiprocessingClientAuthenticatesAndCallsNativeServer()
     {
@@ -114,6 +119,7 @@ public sealed class SharedLiveTests
         await peer.ExpectExitAsync();
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task NativeLocalClientExchangesEscapedPacketsWithPythonSharedDaemon()
     {
@@ -144,6 +150,7 @@ public sealed class SharedLiveTests
         Assert.Equal(bytes, Convert.FromHexString(received.GetProperty("packed").GetString()!));
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task ActualRequiredPythonSharedClientExchangesPacketsWithNativeHost()
     {

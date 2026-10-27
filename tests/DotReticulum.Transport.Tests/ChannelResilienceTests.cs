@@ -6,6 +6,7 @@ using static DotReticulum.Transport.Tests.LinkTests;
 namespace DotReticulum.Transport.Tests;
 
 // Retry/teardown semantics checked against upstream Channel.py at e40191b3d193b46b7f2d8a44424a594cd758839b.
+[Trait("Category", "Unit")]
 public sealed class ChannelResilienceTests
 {
     public sealed class Text : MessageBase

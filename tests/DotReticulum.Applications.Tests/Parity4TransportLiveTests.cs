@@ -7,6 +7,7 @@ using Xunit.Abstractions;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(60);
@@ -142,6 +143,7 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
         while (!condition()) await Task.Delay(25, timeout.Token);
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task MixedTransportsRecoverAfterConstrainedLostAnnouncementAndTcpReconnectAndExchangeTunnels()
     {

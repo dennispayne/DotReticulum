@@ -24,6 +24,7 @@ public sealed class RnshTerminalTheoryAttribute : TheoryAttribute
     }
 }
 
+[Trait("Category", "Integration")]
 public sealed class RnshTests
 {
     // Executed pinned Utilities/rnsh/protocol.py; source SHA256 is retained in the fixture.

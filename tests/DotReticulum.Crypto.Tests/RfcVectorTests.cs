@@ -5,6 +5,7 @@ namespace DotReticulum.Crypto.Tests;
 
 // Published test vectors: RFC 8032 section 7.1 (Ed25519), RFC 7748 section 6.1 (X25519),
 // RFC 5869 appendix A cases 1-3 (HKDF-SHA256). Values were copied from the RFC texts.
+[Trait("Category", "Unit")]
 public class RfcVectorTests
 {
     private static byte[] H(string hex) => Convert.FromHexString(hex.Replace(" ", ""));

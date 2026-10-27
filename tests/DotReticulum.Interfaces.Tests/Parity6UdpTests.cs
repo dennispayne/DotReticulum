@@ -9,6 +9,7 @@ namespace DotReticulum.Interfaces.Tests;
 
 // Independent constructor observations from RNS a29bfb51c468945c96a1ee22cae0114e993e2391.
 // GenerateParity6UdpVectors.py executes the actual reference with ephemeral listeners.
+[Trait("Category", "Integration")]
 public sealed class Parity6UdpTests
 {
     [Fact]

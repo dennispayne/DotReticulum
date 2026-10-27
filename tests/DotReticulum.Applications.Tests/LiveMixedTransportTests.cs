@@ -9,6 +9,7 @@ namespace DotReticulum.Applications.Tests;
 
 // Actual upstream transport (not a leaf): A --TCP-- Python router --TCP-- .NET router --TCP-- B.
 // All listeners bind loopback; pinned checkout and imported RNS path are verified by the harness.
+[Trait("Category", "Integration")]
 public sealed class LiveMixedTransportTests(ITestOutputHelper output)
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(45);
@@ -21,6 +22,7 @@ public sealed class LiveMixedTransportTests(ITestOutputHelper output)
         return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task PythonTransportAndDotNetRouter_ForwardUnknownPathRequests_Announces_EncryptedDatagramsAndLinks()
     {

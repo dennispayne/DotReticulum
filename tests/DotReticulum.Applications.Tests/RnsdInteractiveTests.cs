@@ -2,6 +2,7 @@ using DotReticulum.Applications.Rnsd;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class RnsdInteractiveTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Environment.CurrentDirectory, "TestResults", "rnsd-interactive-" + Guid.NewGuid().ToString("N"));

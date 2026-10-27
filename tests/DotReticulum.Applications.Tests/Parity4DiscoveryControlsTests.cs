@@ -6,6 +6,7 @@ using DotReticulum.Transport;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class Parity4DiscoveryControlsTests
 {
     [Fact]

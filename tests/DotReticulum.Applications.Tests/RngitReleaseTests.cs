@@ -10,6 +10,7 @@ namespace DotReticulum.Applications.Tests;
 // New vectors execute unmodified RNS 1.5.7 a29bfb51c468945c96a1ee22cae0114e993e2391.
 // GenerateRngitReleaseVectors.py records exact source hashes and actual imports.
 // C# owns fixture setup, request sequences, assertions and cleanup; no network is claimed.
+[Trait("Category", "Integration")]
 public sealed class RngitReleaseTests
 {
     private static readonly byte[] Artifact = Encoding.UTF8.GetBytes("upstream release artifact\n");

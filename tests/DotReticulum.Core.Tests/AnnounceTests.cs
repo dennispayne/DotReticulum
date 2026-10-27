@@ -6,6 +6,7 @@ namespace DotReticulum.Core.Tests;
 // markqvist/Reticulum @ e40191b3d193b46b7f2d8a44424a594cd758839b via GenerateAnnounceVectors.py. The upstream verdict for every
 // tampered/truncated variant is recorded in the fixture and compared with ours; Ed25519 is deterministic, so re-creating an
 // upstream announce with the same identity, random hash, ratchet and app_data must reproduce the upstream bytes exactly.
+[Trait("Category", "Unit")]
 public class AnnounceTests
 {
     private static JsonElement Root { get; } =

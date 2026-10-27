@@ -65,7 +65,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Run Core tests
-        run: dotnet test tests/DotReticulum.Core.Tests/DotReticulum.Core.Tests.csproj -c Release
+        run: dotnet test tests/DotReticulum.Core.Tests/DotReticulum.Core.Tests.csproj -c Release --logger trx --results-directory TestResults/release
+
+      - name: Summarize test results
+        if: ${{ !cancelled() }}
+        run: |
+          $summary = & ./tests/test_summary.ps1 -Path TestResults/release -Title 'Release tests (${{ matrix.rid }})'
+          $summary
+          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
       - name: Publish NativeAOT
         run: |

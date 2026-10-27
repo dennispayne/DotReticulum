@@ -5,6 +5,7 @@ using DotReticulum.Core;
 namespace DotReticulum.Interfaces.Tests;
 
 // Reference: a29bfb51c468945c96a1ee22cae0114e993e2391; independent generator records actual imports/source hashes.
+[Trait("Category", "Integration")]
 public sealed class Parity6PipeTests
 {
     private static string Fixture()

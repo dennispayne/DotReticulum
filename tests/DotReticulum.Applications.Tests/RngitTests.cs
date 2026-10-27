@@ -5,6 +5,7 @@ using DotReticulum.Tests.Interop;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class RngitTests
 {
     [Theory]
@@ -70,6 +71,7 @@ public sealed class RngitTests
     // Real pinned upstream ReticulumGitNode, not an emulated response fixture.
     // Exercises resource-based list, resource-based fetch request (>MDU),
     // metadata/file response resources, >25 ref batching, annotated tag and full history.
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task LiveRngit_CloneMatchesUpstreamHeadTreeAndEveryRef_AndRejectsFailures()
     {

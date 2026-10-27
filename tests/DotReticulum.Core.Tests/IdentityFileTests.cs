@@ -2,6 +2,7 @@ using DotReticulum.Core;
 
 namespace DotReticulum.Core.Tests;
 
+[Trait("Category", "Unit")]
 public class IdentityFileTests : IDisposable
 {
     private readonly string _dir = Directory.CreateTempSubdirectory("dotreticulum-idfile-").FullName;

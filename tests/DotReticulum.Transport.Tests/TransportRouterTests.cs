@@ -4,6 +4,7 @@ namespace DotReticulum.Transport.Tests;
 
 // Behaviour follows upstream RNS/Transport.py (e40191b3d193b46b7f2d8a44424a594cd758839b): packet_filter, _inbound transport forwarding,
 // reverse-table proofs, path_request / path_request_handler, announce table path responses. These are in-process tests, not live interop.
+[Trait("Category", "Unit")]
 public class TransportRouterTests
 {
     private sealed class RecordingInterface : IPacketInterface

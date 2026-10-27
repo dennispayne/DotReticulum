@@ -6,6 +6,7 @@ using DotReticulum.Transport;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Integration")]
 public class ReticulumNodeTests
 {
     internal static int FreePort()

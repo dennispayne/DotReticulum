@@ -7,6 +7,7 @@ namespace DotReticulum.Transport.Tests;
 // reconstructs paths from active stable interface hashes and cached announces;
 // save_path_table:3788 preserves all eight path fields. Native restoration also
 // validates signatures, expiry and blackhole policy before installing state.
+[Trait("Category", "Unit")]
 public class LifecycleStateTests
 {
     private static readonly byte[] InterfaceHash = Enumerable.Repeat((byte)7, 32).ToArray();

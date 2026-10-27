@@ -26,6 +26,7 @@ public sealed class NullInterface : IPacketInterface
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
+[Trait("Category", "Unit")]
 public class AnnounceEngineTests
 {
     private const long T0 = 1_800_000_000;

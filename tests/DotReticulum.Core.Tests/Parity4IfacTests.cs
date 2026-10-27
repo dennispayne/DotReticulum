@@ -10,6 +10,7 @@ namespace DotReticulum.Core.Tests;
 /// GenerateParity4IfacVectors.py records individual source SHA-256 values and the in-memory bearer adapter.
 /// These are algorithm/bearer vectors, not live resource/channel interoperability evidence.
 /// </summary>
+[Trait("Category", "Unit")]
 public sealed class Parity4IfacTests
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(10);

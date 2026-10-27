@@ -10,6 +10,7 @@ namespace DotReticulum.Interfaces.Tests;
 // GenerateParity6StreamVectors.py executes unmodified RNS 1.5.7
 // a29bfb51c468945c96a1ee22cae0114e993e2391; source hashes are recorded in the fixture.
 // All ports below are loopback sockets or owned stream simulators, never serial hardware.
+[Trait("Category", "Integration")]
 public sealed class Parity6StreamTests
 {
     private static JsonElement Vectors { get; } = JsonDocument.Parse(

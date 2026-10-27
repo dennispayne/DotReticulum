@@ -12,6 +12,7 @@ namespace DotReticulum.Applications.Tests;
 /// a29bfb51c468945c96a1ee22cae0114e993e2391. Fixture records the actual rnid.py SHA-256.
 /// All test keys are intentionally public, disposable synthetic bytes, never operational keys.
 /// </summary>
+[Trait("Category", "Unit")]
 public sealed class Parity7RnidTests : IDisposable
 {
     private readonly string root = Path.Combine(FindRepository(), "TestResults", "rnid-unit-" + Guid.NewGuid().ToString("N"));

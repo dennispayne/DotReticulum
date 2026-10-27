@@ -5,6 +5,7 @@ namespace DotReticulum.Transport.Tests;
 
 // Vectors produced by executing upstream RNS.Resource / ResourceAdvertisement (see GenerateResourceVectors.py): hashes, proof, bz2 stream,
 // part split, map hashes, part packets and the msgpack advertisement must match byte for byte.
+[Trait("Category", "Unit")]
 public class ResourceVectorTests
 {
     private static readonly JsonElement Root =

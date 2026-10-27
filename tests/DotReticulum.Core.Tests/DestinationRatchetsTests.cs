@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 
 namespace DotReticulum.Core.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class DestinationRatchetsTests
 {
     private sealed class Lifetime : IDisposable

@@ -19,6 +19,7 @@ public sealed class DiscoveryWindowsFactAttribute : FactAttribute
     }
 }
 
+[Trait("Category", "Unit")]
 public sealed class DiscoveryMetadataTests
 {
     private static DiscoveryAdvertisement Advertisement(string host = "native.example") => new()

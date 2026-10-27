@@ -23,8 +23,10 @@ public sealed class DiscoveryBackboneLiveFactAttribute : FactAttribute
     }
 }
 
+[Trait("Category", "Integration")]
 public sealed class DiscoveryLiveTests
 {
+    [Trait("Category", "Live")]
     [DiscoveryBackboneLiveFact]
     public async Task ActualPythonBackboneAdvertisementAutoconnectsAndCarriesEncryptedLinkAfterBootstrapDetaches()
     {
@@ -171,6 +173,7 @@ public sealed class DiscoveryLiveTests
         }
     }
 
+    [Trait("Category", "Live")]
     [InProcessLiveFact]
     public async Task PlainAndEncryptedAdvertisementsCrossRealTcpBothDirections()
     {

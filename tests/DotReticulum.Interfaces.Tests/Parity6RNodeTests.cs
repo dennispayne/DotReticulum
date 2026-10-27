@@ -6,6 +6,7 @@ using DotReticulum.Core;
 namespace DotReticulum.Interfaces.Tests;
 
 /// <summary>Vectors execute RNS a29bfb51 (1.5.7); simulator tests are not physical-radio interoperability.</summary>
+[Trait("Category", "Integration")]
 public sealed class Parity6RNodeTests
 {
     private static RNodeRadioOptions Radio(bool flow = false) => new()

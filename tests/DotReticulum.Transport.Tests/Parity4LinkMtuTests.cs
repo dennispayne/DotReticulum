@@ -8,6 +8,7 @@ namespace DotReticulum.Transport.Tests;
 // Executed reference: a29bfb51c468945c96a1ee22cae0114e993e2391.
 // GenerateParity4ReceiptLinkMtuVectors.py records imported source SHA-256 values.
 // Link.py:148-212,306-310,365-432; Transport.py:2529-2565 clamps inbound link requests.
+[Trait("Category", "Unit")]
 public class Parity4LinkMtuTests
 {
     internal static JsonElement Vectors { get; } = JsonDocument.Parse(File.ReadAllText(

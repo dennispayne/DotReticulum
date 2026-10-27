@@ -11,6 +11,7 @@ using TransportRouterOptions = DotReticulum.Transport.TransportRouterOptions;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class RuntimeOperationsTests
 {
     private sealed class MemoryInterface : IPacketInterface, ISpawningPacketInterface

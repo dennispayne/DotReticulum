@@ -5,6 +5,7 @@ using DotReticulum.Core;
 
 namespace DotReticulum.Transport.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class Parity8PhyTests
 {
     private sealed class Bearer : IPacketInterfacePhysicalLayer

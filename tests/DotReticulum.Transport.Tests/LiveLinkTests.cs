@@ -14,6 +14,7 @@ namespace DotReticulum.Transport.Tests;
 // Skipped unless DOTRETICULUM_LIVE=1 (plus DOTRETICULUM_PYTHON / DOTRETICULUM_UPSTREAM):
 //   dotnet test tests/DotReticulum.Transport.Tests -c Release --filter "FullyQualifiedName~LiveLink"
 // One Python process with a TCPServerInterface and a .NET TransportRouter connected to it over real TCP, per test.
+[Trait("Category", "Integration")]
 public sealed class LiveLinkTests(ITestOutputHelper output)
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(45);
@@ -124,6 +125,7 @@ public sealed class LiveLinkTests(ITestOutputHelper output)
     private static string Sha(byte[] data) => Convert.ToHexStringLower(SHA256.HashData(data));
 
     // (a) .NET initiator -> Python responder: data both ways with receipts, RTT, keepalive, teardown by each side
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task DotNetInitiator_PythonResponder_DataRttKeepaliveAndTeardownByEachSide()
     {
@@ -185,6 +187,7 @@ public sealed class LiveLinkTests(ITestOutputHelper output)
     }
 
     // (b) Python initiator -> .NET responder
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task PythonInitiator_DotNetResponder_DataIdentifyRequestAndTeardown()
     {
@@ -268,6 +271,7 @@ public sealed class LiveLinkTests(ITestOutputHelper output)
     ];
 
     // (c) multi-MB resources in both directions over a direct link, verified by SHA-256; the .NET side initiates the link
+    [Trait("Category", "Live")]
     [LiveTheory]
     [MemberData(nameof(ResourceCases))]
     public async Task Resource_TransfersBothWaysOverDirectLink_ByteIdentical(int size, string mode)
@@ -313,6 +317,7 @@ public sealed class LiveLinkTests(ITestOutputHelper output)
     }
 
     // (c, other direction of link establishment) Python initiator -> .NET responder: resources both ways plus a file-response request
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task Resource_TransfersOverPythonInitiatedLink_AndFileResponseRequest()
     {
@@ -353,6 +358,7 @@ public sealed class LiveLinkTests(ITestOutputHelper output)
     }
 
     // (e) Channel messages and Buffer streams between .NET and upstream Python, with the .NET side as link initiator
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task Channel_MessagesAndBufferStreamsInteroperate_BothWays()
     {
@@ -423,6 +429,7 @@ public sealed class LiveLinkTests(ITestOutputHelper output)
         });
     }
 
+    [Trait("Category", "Live")]
     [LiveTheory]
     [InlineData(true)]
     [InlineData(false)]
@@ -493,6 +500,7 @@ public sealed class LiveLinkTests(ITestOutputHelper output)
         });
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task Parity5StreamFileResponse_UpstreamReadsMultipartFileAndMetadata()
     {
@@ -535,6 +543,7 @@ public sealed class LiveLinkTests(ITestOutputHelper output)
     }
 
     // .NET requests of a Python responder: large request (sent as a Resource), echoed back as a large response Resource, and a file response
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task DotNetRequests_AgainstPython_UseResourcesForLargeRequestResponseAndFileResponse()
     {

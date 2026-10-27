@@ -7,6 +7,7 @@ namespace DotReticulum.Transport.Tests;
 
 // Independent upstream execution: GenerateParity5ChannelVectors.py,
 // a29bfb51c468945c96a1ee22cae0114e993e2391; source hashes are in the fixture.
+[Trait("Category", "Unit")]
 public sealed class Parity5ChannelTests
 {
     internal static JsonElement Vectors { get; } = JsonDocument.Parse(File.ReadAllText(

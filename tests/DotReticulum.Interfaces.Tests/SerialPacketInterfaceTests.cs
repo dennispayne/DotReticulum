@@ -3,6 +3,7 @@ using static DotReticulum.Interfaces.Tests.TestSupport;
 
 namespace DotReticulum.Interfaces.Tests;
 
+[Trait("Category", "Unit")]
 public class SerialPacketInterfaceTests
 {
     [Fact]

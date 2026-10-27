@@ -2,6 +2,7 @@ using System.Text.Json;
 
 namespace DotReticulum.Transport.Tests;
 
+[Trait("Category", "Unit")]
 public class Bz2Tests
 {
     private static JsonElement Root { get; } =

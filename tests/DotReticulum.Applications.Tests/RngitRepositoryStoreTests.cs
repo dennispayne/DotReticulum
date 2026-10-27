@@ -9,6 +9,7 @@ namespace DotReticulum.Applications.Tests;
 // SHA-256 6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693.
 // GenerateRngitRepositoryStoreVectors.py executes actual upstream handlers. Its Windows
 // static .allowed classification shim is recorded in the fixture; not live interop.
+[Trait("Category", "Integration")]
 public sealed partial class RngitRepositoryStoreTests : IDisposable
 {
     private readonly string directory = Path.Combine(Directory.GetCurrentDirectory(), "rngit-store-tests-" + Guid.NewGuid().ToString("N"));

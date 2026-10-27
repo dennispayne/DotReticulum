@@ -18,6 +18,7 @@ public sealed class Parity4NativeLiveFactAttribute : FactAttribute
     }
 }
 
+[Trait("Category", "Integration")]
 public sealed class Parity4NativeTransportTests(ITestOutputHelper output)
 {
     private sealed class Daemon : IAsyncDisposable
@@ -83,6 +84,7 @@ public sealed class Parity4NativeTransportTests(ITestOutputHelper output)
         }
     }
 
+    [Trait("Category", "Live")]
     [Parity4NativeLiveFact]
     public async Task PublishedDaemonPersistsDormantTunnelsAndAuthenticallyRestoresPythonTransportPathsAfterRestart()
     {

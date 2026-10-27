@@ -5,6 +5,7 @@ using static DotReticulum.Transport.Tests.LinkTests;
 namespace DotReticulum.Transport.Tests;
 
 // In-process Resource transfers over direct and transport-hop topologies. Wire formats against upstream: ResourceVectorTests; live: LiveLinkTests.
+[Trait("Category", "Unit")]
 public class ResourceTests
 {
     private static async Task<(Link Initiator, Link Responder)> ConnectAsync(Topology topo)

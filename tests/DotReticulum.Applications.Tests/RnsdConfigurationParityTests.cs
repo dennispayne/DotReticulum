@@ -11,6 +11,7 @@ namespace DotReticulum.Applications.Tests;
 /// a29bfb51c468945c96a1ee22cae0114e993e2391. Per-source SHA-256 values are in
 /// Fixtures/rnsd-configuration.json and checked by the generator.
 /// </summary>
+[Trait("Category", "Unit")]
 public sealed class RnsdConfigurationParityTests : IDisposable
 {
     private readonly string _workspace = Path.Combine(Environment.CurrentDirectory, "TestResults", "rnsd-parity-" + Guid.NewGuid().ToString("N"));

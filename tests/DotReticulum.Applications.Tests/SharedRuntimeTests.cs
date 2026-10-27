@@ -12,6 +12,7 @@ using DotReticulum.Transport;
 namespace DotReticulum.Applications.Tests;
 
 /// <summary>Vectors independently executed against hosted upstream a29bfb51 and the recorded Python connection.py SHA-256.</summary>
+[Trait("Category", "Integration")]
 public sealed class SharedRuntimeTests
 {
     private static JsonDocument Vectors() => JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "shared-runtime.json")));

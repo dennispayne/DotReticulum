@@ -7,6 +7,7 @@ namespace DotReticulum.Applications.Tests;
 // Source: RNS a29bfb51c468945c96a1ee22cae0114e993e2391 server.py:1990-2260,4912-5081.
 // SHA-256: 6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693.
 // GenerateRngitHostVectors.py executes actual __apply_config, not a port.
+[Trait("Category", "Unit")]
 public sealed class RngitHostConfigurationTests : IDisposable
 {
     private const string Hash = "0123456789abcdef0123456789abcdef";

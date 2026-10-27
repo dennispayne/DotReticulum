@@ -6,6 +6,7 @@ namespace DotReticulum.Applications.Tests;
 
 // RNS Destination.py:622-650 reloads persisted keys after failed ratchet decryption;
 // Identity.py:852-900 reports the actual selected ratchet. Pin a29bfb51c468945c96a1ee22cae0114e993e2391.
+[Trait("Category", "Unit")]
 public sealed class Parity5EndpointRuntimeRatchetTests : IDisposable
 {
     private readonly string _directory = Path.GetFullPath(Path.Combine("TestResults", "parity5-runtime-ratchets", Guid.NewGuid().ToString("N")));

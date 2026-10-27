@@ -4,6 +4,7 @@ using DotReticulum.Applications.Rngit;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class RngitProcessTests : IDisposable
 {
     private readonly PresentationProcessFixture fixture = new();

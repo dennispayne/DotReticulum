@@ -66,12 +66,14 @@ public sealed class LiveLinkTransportFixture : IAsyncLifetime
 // LIVE: Python A <-> .NET rnsd (transport, link table) <-> Python B. Link establishment, data, keepalive, teardown and multi-MB Resources
 // all cross the .NET hop. Skipped unless DOTRETICULUM_LIVE=1:
 //   dotnet test tests/DotReticulum.Applications.Tests -c Release --filter "FullyQualifiedName~LiveLinkTransport"
+[Trait("Category", "Integration")]
 public sealed class LiveLinkTransportTests(LiveLinkTransportFixture live, ITestOutputHelper output) : IClassFixture<LiveLinkTransportFixture>
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(45);
 
     private static string Sha(byte[] data) => Convert.ToHexStringLower(SHA256.HashData(data));
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task PythonChannelAndBuffer_ThroughDotNetTransport()
     {
@@ -103,6 +105,7 @@ public sealed class LiveLinkTransportTests(LiveLinkTransportFixture live, ITestO
         }
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task PythonLink_ThroughDotNetTransport_DataKeepaliveResourcesAndTeardown()
     {

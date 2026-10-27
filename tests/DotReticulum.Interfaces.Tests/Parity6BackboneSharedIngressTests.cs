@@ -7,6 +7,7 @@ using DotReticulum.Core;
 namespace DotReticulum.Interfaces.Tests;
 
 // Pinned source's actual periodic/immediate control methods execute in GenerateParity6BackbonePipeVectors.py.
+[Trait("Category", "Integration")]
 public sealed class Parity6BackboneSharedIngressTests
 {
     [Fact]

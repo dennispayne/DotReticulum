@@ -3,6 +3,7 @@ using DotReticulum.Interfaces;
 
 namespace DotReticulum.Interfaces.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class LocalSharedPacketInterfaceParityTests
 {
     [Fact]

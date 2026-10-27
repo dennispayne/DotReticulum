@@ -5,6 +5,7 @@ using DotReticulum.Core;
 namespace DotReticulum.Transport.Tests;
 
 // GenerateParity6OutgoingVectors.py executes Transport.py at hosted a29bfb51c468945c96a1ee22cae0114e993e2391.
+[Trait("Category", "Unit")]
 public sealed class Parity6OutgoingTests
 {
     public static IEnumerable<object[]> Cases()

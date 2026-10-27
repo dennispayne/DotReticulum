@@ -9,6 +9,7 @@ namespace DotReticulum.Core.Tests;
 // tests/DotReticulum.Crypto.Tests/GenerateCryptoVectors.py. Ciphertexts are upstream Identity.encrypt output
 // (with and without a ratchet); signatures, public keys and hashes are upstream values for fixed private keys.
 // The reverse direction (upstream decrypts our ciphertext) is checked by tests/Interop/VerifyDotNetOutput.py.
+[Trait("Category", "Unit")]
 public class IdentityTests
 {
     private static List<JsonElement> Vectors() =>

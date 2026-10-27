@@ -8,6 +8,7 @@ namespace DotReticulum.Transport.Tests;
 
 // Independent vectors: GenerateParity5ResourceVectors.py executes RNS at
 // a29bfb51c468945c96a1ee22cae0114e993e2391; source hash is recorded in the fixture.
+[Trait("Category", "Unit")]
 public class Parity5ResourceTests
 {
     private static readonly JsonElement Vectors = JsonDocument.Parse(File.ReadAllText(

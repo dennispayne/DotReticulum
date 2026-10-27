@@ -9,6 +9,7 @@ namespace DotReticulum.Interfaces.Tests;
 /// RNS a29bfb51c468945c96a1ee22cae0114e993e2391 TCPInterface.py initial_connect/reconnect/read_loop
 /// and Interface.py optimise_mtu. These are native bearer lifecycle tests, not upgraded resource/channel claims.
 /// </summary>
+[Trait("Category", "Integration")]
 public sealed class Parity4BearerTests
 {
     [Theory]

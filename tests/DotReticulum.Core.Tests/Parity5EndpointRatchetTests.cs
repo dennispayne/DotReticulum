@@ -3,6 +3,7 @@ using System.Text.Json;
 
 namespace DotReticulum.Core.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class Parity5EndpointRatchetTests
 {
     [Fact]

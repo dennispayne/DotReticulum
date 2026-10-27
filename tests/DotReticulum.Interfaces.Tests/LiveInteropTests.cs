@@ -281,6 +281,7 @@ public sealed class LiveHarness : IAsyncLifetime
     }
 }
 
+[Trait("Category", "Integration")]
 public class LiveInteropTests(LiveHarness harness, ITestOutputHelper output) : IClassFixture<LiveHarness>
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(30);
@@ -328,6 +329,7 @@ public class LiveInteropTests(LiveHarness harness, ITestOutputHelper output) : I
         Assert.True(derived.AsSpan().SequenceEqual(p.DestinationHash.Span));
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task TcpClient_ReceivesRealPythonAnnounces_FromPythonTcpServerInterface()
     {
@@ -335,6 +337,7 @@ public class LiveInteropTests(LiveHarness harness, ITestOutputHelper output) : I
         AssertIsPythonAnnounce(announce);
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task TcpServer_ReceivesRealPythonAnnounces_FromPythonTcpClientInterface()
     {
@@ -343,6 +346,7 @@ public class LiveInteropTests(LiveHarness harness, ITestOutputHelper output) : I
         Assert.True(harness.DotNetTcpServer.ClientCount >= 1);
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task Udp_ReceivesRealPythonAnnounces_FromPythonUdpInterface()
     {
@@ -363,6 +367,7 @@ public class LiveInteropTests(LiveHarness harness, ITestOutputHelper output) : I
         Assert.Contains(expectedInterfaceName, seen.GetProperty("interface").GetString());
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task Python_ReceivesDotNetPacket_OverTcpClient()
     {
@@ -370,6 +375,7 @@ public class LiveInteropTests(LiveHarness harness, ITestOutputHelper output) : I
         await AssertPythonReceives(harness.DotNetTcpClient, "Client on PyTCPServer", "tcp-client");
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task Python_ReceivesDotNetPacket_OverTcpServer()
     {
@@ -377,6 +383,7 @@ public class LiveInteropTests(LiveHarness harness, ITestOutputHelper output) : I
         await AssertPythonReceives(harness.DotNetTcpServer, "PyTCPClient", "tcp-server");
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task Python_ReceivesDotNetPacket_OverUdp()
     {
@@ -384,6 +391,7 @@ public class LiveInteropTests(LiveHarness harness, ITestOutputHelper output) : I
         await AssertPythonReceives(harness.DotNetUdp, "PyUDP", "udp");
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task PythonInterfaceCountersShowTrafficOnAllThreeBearers()
     {

@@ -3,6 +3,7 @@ using DotReticulum.Core;
 
 namespace DotReticulum.Interfaces.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class InterfaceStatisticsTests
 {
     [Fact]

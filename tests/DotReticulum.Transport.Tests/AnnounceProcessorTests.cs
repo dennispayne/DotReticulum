@@ -3,6 +3,7 @@ using DotReticulum.Core;
 
 namespace DotReticulum.Transport.Tests;
 
+[Trait("Category", "Unit")]
 public class AnnounceProcessorTests
 {
     private sealed class ScriptedInterface : IPacketInterface

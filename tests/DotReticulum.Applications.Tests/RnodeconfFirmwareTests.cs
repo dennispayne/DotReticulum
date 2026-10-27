@@ -6,6 +6,7 @@ using DotReticulum.Applications.Rnodeconf;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class RnodeconfFirmwareTests
 {
     [Fact]

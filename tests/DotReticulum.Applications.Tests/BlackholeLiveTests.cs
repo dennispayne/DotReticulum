@@ -8,8 +8,10 @@ using DotReticulum.Tests.Interop;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class BlackholeLiveTests
 {
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task ActualPythonPublisherAndUpdaterExchangeWithNativeEndpoints()
     {

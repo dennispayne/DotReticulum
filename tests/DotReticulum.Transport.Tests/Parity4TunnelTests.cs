@@ -8,6 +8,7 @@ namespace DotReticulum.Transport.Tests;
 // Executed reference: a29bfb51c468945c96a1ee22cae0114e993e2391, Transport.py:
 // synthesis 2764-2810, restoration 2820-2874, path association 2467-2476,
 // housekeeping 1015-1060. GenerateParity4TunnelVectors.py preserves provenance.
+[Trait("Category", "Unit")]
 public sealed class Parity4TunnelTests
 {
     private static readonly JsonElement Fixture = JsonDocument.Parse(File.ReadAllText(

@@ -10,6 +10,7 @@ using Xunit.Abstractions;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class Parity5TransferLiveTests(ITestOutputHelper output)
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(90);
@@ -27,9 +28,11 @@ public sealed class Parity5TransferLiveTests(ITestOutputHelper output)
         while (!predicate()) await Task.Delay(20, cancellation.Token);
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public Task MixedPythonTransport_ChannelLossStreamsResourcesExhaustionAndFreshLinkRecovery() => RunTransfer(16384);
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public Task MixedPythonTransport_NarrowMtuBottleneckKeepsStreamedTransfersAndRecoveryCompatible() => RunTransfer(1024);
 

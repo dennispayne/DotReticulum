@@ -5,6 +5,7 @@ using static DotReticulum.Interfaces.Tests.TestSupport;
 
 namespace DotReticulum.Interfaces.Tests;
 
+[Trait("Category", "Integration")]
 public class TcpPacketInterfaceTests
 {
     private static async Task<TcpServerPacketInterface> StartServer(int maxClients = 64)

@@ -5,6 +5,7 @@ namespace DotReticulum.Transport.Tests;
 
 // Vectors produced by executing upstream RNS.Link (see GenerateLinkVectors.py). Both ephemeral keys are fixed, so the .NET responder must produce
 // the byte-identical LRPROOF and derive the identical link key; the .NET initiator must emit the identical LINKREQUEST and accept the upstream proof.
+[Trait("Category", "Unit")]
 public class LinkVectorTests
 {
     private sealed class Capture : IPacketInterface

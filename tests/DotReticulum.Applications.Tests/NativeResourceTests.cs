@@ -15,6 +15,7 @@ public sealed class NativeFactAttribute : FactAttribute
     }
 }
 
+[Trait("Category", "Integration")]
 public sealed class NativeResourceTests
 {
     internal sealed class NativePeer : IDisposable

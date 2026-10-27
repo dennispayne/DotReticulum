@@ -6,6 +6,7 @@ using static DotReticulum.Transport.Tests.LinkTests;
 namespace DotReticulum.Transport.Tests;
 
 // Channel and stream Buffer. Wire layouts are checked against bytes produced by upstream RNS.Channel.Envelope / RNS.Buffer.StreamDataMessage; live: LiveLinkTests.
+[Trait("Category", "Unit")]
 public class ChannelTests
 {
     private sealed class TextMessage : MessageBase

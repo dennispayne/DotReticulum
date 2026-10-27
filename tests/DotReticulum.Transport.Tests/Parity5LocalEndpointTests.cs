@@ -7,6 +7,7 @@ namespace DotReticulum.Transport.Tests;
 /// <summary>Managed integration acceptance for the bounded endpoint contracts observed by
 /// GenerateParity5EndpointVectors.py at a29bfb51c468945c96a1ee22cae0114e993e2391.
 /// These tests exercise the router and actual packet-interface sends, not live Python interoperability.</summary>
+[Trait("Category", "Unit")]
 public sealed class Parity5LocalEndpointTests
 {
     private static TaskCompletionSource<T> Completion<T>() => new(TaskCreationOptions.RunContinuationsAsynchronously);

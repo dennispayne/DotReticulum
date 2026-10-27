@@ -1,5 +1,6 @@
 namespace DotReticulum.Transport.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class Parity4SnapshotCapacityTests
 {
     [Fact]

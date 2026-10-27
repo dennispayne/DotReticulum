@@ -4,6 +4,7 @@ using DotReticulum.Core;
 namespace DotReticulum.Core.Tests;
 
 // Vectors: Fixtures/msgpack-vectors.json, produced by EXECUTING upstream's bundled umsgpack (GenerateMsgPackVectors.py).
+[Trait("Category", "Unit")]
 public class MsgPackTests
 {
     private static JsonElement Root { get; } =

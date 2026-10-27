@@ -6,6 +6,7 @@ using DotReticulum.Tests.Interop;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class RngitHostTests
 {
     [Fact]
@@ -51,6 +52,7 @@ public sealed class RngitHostTests
         finally { TestDirectory.DeleteWithRetry(networkDirectory); }
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task NativeManagementAndRepositoryLifecycleUseActualPinnedServer()
     {
@@ -134,6 +136,7 @@ public sealed class RngitHostTests
         }
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task ActualPinnedClientUsesNativeListFetchCreateAndPermissions()
     {

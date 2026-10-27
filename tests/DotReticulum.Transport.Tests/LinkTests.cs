@@ -5,6 +5,7 @@ namespace DotReticulum.Transport.Tests;
 
 // In-process link tests: routers connected by in-memory interfaces (direct A-B, and A-T-B through a transport node). Wire formats are checked
 // against upstream vectors in LinkVectorTests; live interop is in LiveLinkTests.
+[Trait("Category", "Unit")]
 public class LinkTests
 {
     internal sealed class Loopback : IPacketInterface

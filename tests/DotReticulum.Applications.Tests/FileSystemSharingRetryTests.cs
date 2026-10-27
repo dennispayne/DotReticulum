@@ -2,6 +2,7 @@ using DotReticulum.Applications.Runtime;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class FileSystemSharingRetryTests
 {
     [Fact]

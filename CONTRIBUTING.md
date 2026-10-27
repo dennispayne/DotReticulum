@@ -11,6 +11,25 @@ dotnet build DotReticulum.slnx -c Release
 dotnet test DotReticulum.slnx -c Release
 ```
 
+### Test categories
+
+Every test class carries `[Trait("Category", "...")]`; new test classes must too.
+
+| Category | Meaning |
+|---|---|
+| `Unit` | In-process and deterministic: no sockets, subprocesses, serial ports or external tools. |
+| `Integration` | Uses real OS resources: loopback sockets, child processes, git, serial/pty, a native executable. Still runs by default. |
+| `Live` | Needs the pinned Python reference; set on individual test methods and skipped unless `DOTRETICULUM_LIVE=1`. Live tests sit inside `Integration` classes. |
+
+Run a subset with a trait filter:
+
+```sh
+dotnet test DotReticulum.slnx -c Release --filter "Category=Unit"
+dotnet test DotReticulum.slnx -c Release --filter "Category=Integration"
+```
+
+A class that mixes both kinds is tagged by its heavier side; a single method that needs a native executable or the reference sets its own gate and skips explicitly.
+
 Every behavior change needs tests, including malformed inputs, boundary lengths and failure paths. Protocol changes require independently generated reference vectors produced by executing the upstream Python implementation, with the exact upstream revision and generation method recorded in the test. Round-trip tests alone are not interoperability evidence. Do not commit real private keys, captured private traffic, or credentials.
 
 ## Language ownership

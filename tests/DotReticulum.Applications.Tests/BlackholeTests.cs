@@ -9,6 +9,7 @@ namespace DotReticulum.Applications.Tests;
 // Transport.py:3984-4115, Discovery.py:883-966, Reticulum.py:1998-2041.
 // SHA-256 anchors for all five reviewed source files are in Fixtures/Blackhole.json.
 // Generator's injected clock/link adapter is explicitly not live-node evidence.
+[Trait("Category", "Integration")]
 public sealed class BlackholeTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Directory.GetCurrentDirectory(), "Blackhole-tests-" + Guid.NewGuid().ToString("N"));

@@ -11,6 +11,7 @@ namespace DotReticulum.Applications.Tests;
 /// Discovery SHA256 ae26445adf6325ed3e47f2b7c4b412060994d75ae583a58162849507ed7a9950.
 /// Reproduce with GenerateDiscoveryVectors.py; no production Python dependency.
 /// </summary>
+[Trait("Category", "Unit")]
 public sealed class DiscoveryTests
 {
     private static JsonDocument Vectors() => JsonDocument.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "DiscoveryVectors.json")));

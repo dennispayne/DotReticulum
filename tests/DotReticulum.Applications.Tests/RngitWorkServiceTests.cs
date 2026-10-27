@@ -11,6 +11,7 @@ namespace DotReticulum.Applications.Tests;
 /// server.py SHA256 6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693.
 /// GenerateRngitWorkVectors.py executes original methods with a disclosed deterministic clock.
 /// </summary>
+[Trait("Category", "Integration")]
 public sealed class RngitWorkServiceTests
 {
     private sealed class Harness : IDisposable

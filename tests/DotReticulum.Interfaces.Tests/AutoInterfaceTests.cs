@@ -9,6 +9,7 @@ namespace DotReticulum.Interfaces.Tests;
 
 // Reference: a29bfb51c468945c96a1ee22cae0114e993e2391; GenerateParity6AutoVectors.py
 // executes upstream constructor, discovery handler and peer duplicate suppression.
+[Trait("Category", "Integration")]
 public sealed class AutoInterfaceTests
 {
     private static readonly AutoPacketDevice Device = new("ethernet-test", 7, IPAddress.Parse("fe80::1"));

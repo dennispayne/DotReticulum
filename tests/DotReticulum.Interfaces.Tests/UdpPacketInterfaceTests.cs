@@ -5,6 +5,7 @@ using static DotReticulum.Interfaces.Tests.TestSupport;
 
 namespace DotReticulum.Interfaces.Tests;
 
+[Trait("Category", "Integration")]
 public class UdpPacketInterfaceTests
 {
     private static async Task<(UdpPacketInterface A, UdpPacketInterface B)> StartPair()

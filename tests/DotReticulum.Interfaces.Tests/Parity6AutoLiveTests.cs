@@ -12,11 +12,13 @@ using Xunit.Abstractions;
 namespace DotReticulum.Interfaces.Tests;
 
 /// <summary>Real pinned Python/managed .NET AutoInterface traffic over coordinator-owned Linux namespaces/veth.</summary>
+[Trait("Category", "Integration")]
 public sealed class Parity6AutoLiveTests(ITestOutputHelper output)
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(45);
     private const string TestPassphrase = "auto-live-test-passphrase-not-a-secret";
 
+    [Trait("Category", "Live")]
     [AutoLiveTheory]
     [InlineData(false)]
     [InlineData(true)]

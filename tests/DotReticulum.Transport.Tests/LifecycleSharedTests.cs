@@ -7,6 +7,7 @@ namespace DotReticulum.Transport.Tests;
 // 1937 local/shared hop adjustment; 1981 plain relay; 1997 local-client
 // transport despite enable_transport=false; 2399 immediate announce relay;
 // 3420 path requests. Four actual native routers, in-process bearers, not live Python evidence.
+[Trait("Category", "Unit")]
 public class LifecycleSharedTests
 {
     private sealed class RuntimeNode : IAsyncDisposable

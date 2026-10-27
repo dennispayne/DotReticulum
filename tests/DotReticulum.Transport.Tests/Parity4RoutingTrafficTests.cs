@@ -5,6 +5,7 @@ namespace DotReticulum.Transport.Tests;
 
 // Direct Interface.py execution at a29bfb51c468945c96a1ee22cae0114e993e2391,
 // RNS1.5.7. Generator: GenerateParity4RoutingTrafficVectors.py. Not live interoperability.
+[Trait("Category", "Unit")]
 public sealed class Parity4RoutingTrafficTests
 {
     private const long T0 = 1_800_000_000;

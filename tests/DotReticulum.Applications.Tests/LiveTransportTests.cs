@@ -247,6 +247,7 @@ public sealed class LiveTransportFixture : IAsyncLifetime
 // LIVE: Python A <-TCP-> .NET rnsd (transport) <-TCP-> Python B. Skipped unless DOTRETICULUM_LIVE=1.
 //   $env:DOTRETICULUM_LIVE='1'; $env:DOTRETICULUM_PYTHON='<python>'; $env:DOTRETICULUM_UPSTREAM='<pinned checkout>'
 //   dotnet test tests/DotReticulum.Applications.Tests -c Release --filter "FullyQualifiedName~LiveTransport"
+[Trait("Category", "Integration")]
 public sealed class LiveTransportTests(LiveTransportFixture live, ITestOutputHelper output) : IClassFixture<LiveTransportFixture>
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(30);
@@ -261,6 +262,7 @@ public sealed class LiveTransportTests(LiveTransportFixture live, ITestOutputHel
         }
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task BAnnounce_IsRebroadcastByDotNet_AndALearnsPathWithTwoHops()
     {
@@ -278,6 +280,7 @@ public sealed class LiveTransportTests(LiveTransportFixture live, ITestOutputHel
         });
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task AEncryptedPacketToB_IsRoutedByDotNet_BDecrypts_AndProofReturnsViaReverseTable()
     {
@@ -295,6 +298,7 @@ public sealed class LiveTransportTests(LiveTransportFixture live, ITestOutputHel
         });
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task PathRequestFromLateJoiner_IsAnsweredByDotNetFromItsPathTable()
     {
@@ -314,6 +318,7 @@ public sealed class LiveTransportTests(LiveTransportFixture live, ITestOutputHel
         });
     }
 
+    [Trait("Category", "Live")]
     [InProcessLiveFact]
     public async Task DotNetAnnounce_ReachesBothPythonNodes_AndPythonEncryptsToIt()
     {

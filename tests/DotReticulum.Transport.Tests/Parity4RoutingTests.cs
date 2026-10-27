@@ -6,6 +6,7 @@ namespace DotReticulum.Transport.Tests;
 // RNS 1.5.7, authoritative hosted-source a29bfb51c468945c96a1ee22cae0114e993e2391.
 // GenerateParity4RoutingVectors.py executes source decisions and actual queue methods.
 // These deterministic protocol tests are not live-node interoperability evidence.
+[Trait("Category", "Unit")]
 public sealed class Parity4RoutingTests
 {
     private const long T0 = 1_800_000_000;

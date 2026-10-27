@@ -6,6 +6,7 @@ namespace DotReticulum.Applications.Tests;
 
 // Executed reference decisions: RNS1.5.7 a29bfb51c468945c96a1ee22cae0114e993e2391,
 // Reticulum.py881-971. Reproduce with GenerateParity4RoutingConfiguration.py.
+[Trait("Category", "Unit")]
 public sealed class Parity4RoutingConfigurationTests
 {
     private static readonly JsonElement Vectors = JsonDocument.Parse(File.ReadAllText(

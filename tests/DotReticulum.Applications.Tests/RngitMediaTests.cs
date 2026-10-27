@@ -4,6 +4,7 @@ using DotReticulum.Applications.Rngit;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class RngitMediaTests : IDisposable
 {
     // Actual pinned media.py header/argument results, not live-node interoperability.

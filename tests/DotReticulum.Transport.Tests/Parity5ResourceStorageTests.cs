@@ -11,6 +11,7 @@ internal sealed class ResourceUnixFactAttribute : FactAttribute
     }
 }
 
+[Trait("Category", "Unit")]
 public class Parity5ResourceStorageTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.FromUnixTimeSeconds(1700000000);

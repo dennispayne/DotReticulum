@@ -7,6 +7,7 @@ using DotReticulum.Applications.Rnstatus;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class Parity7NetworkUtilitiesTests
 {
     private const string Revision = "a29bfb51c468945c96a1ee22cae0114e993e2391";

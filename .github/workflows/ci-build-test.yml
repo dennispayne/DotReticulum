@@ -95,6 +95,13 @@ jobs:
           if (Test-Path -LiteralPath $env:COVERAGE_DIRECTORY) { throw 'Coverage directory must be fresh.' }
           dotnet test DotReticulum.slnx -c Release --no-build -m:1 --settings tests/coverage.runsettings --collect:"XPlat Code Coverage" --results-directory $env:COVERAGE_DIRECTORY --logger trx -- xUnit.MaxParallelThreads=1
 
+      - name: Summarize test results
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          $summary = & ./tests/test_summary.ps1 -Path $env:COVERAGE_DIRECTORY -Title 'Unit and integration tests (${{ matrix.rid }})'
+          $summary
+          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
       - name: Summarize merged coverage
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
@@ -149,6 +156,13 @@ jobs:
           $configuration.TestResult.OutputPath = 'TestResults/native-cli.xml'
           $result = Invoke-Pester -Configuration $configuration
           if ($result.FailedCount -gt 0 -or $result.Result -ne 'Passed' -or $result.PassedCount -eq 0) { exit 1 }
+
+      - name: Summarize native test results
+        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        run: |
+          $summary = & ./tests/test_summary.ps1 -Path TestResults/native, TestResults/native-cli.xml -Title 'Native executable tests (${{ matrix.rid }})'
+          $summary
+          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
       - name: Retain test diagnostics
         if: ${{ !cancelled() }}

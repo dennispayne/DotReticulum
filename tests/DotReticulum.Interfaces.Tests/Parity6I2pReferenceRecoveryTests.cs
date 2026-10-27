@@ -8,6 +8,7 @@ namespace DotReticulum.Interfaces.Tests;
 
 /// <summary>Diagnostic reference counterexample, separate from native bearer acceptance.</summary>
 [Collection("Parity6 actual I2P router")]
+[Trait("Category", "Integration")]
 public sealed class Parity6I2pReferenceRecoveryTests(ITestOutputHelper output)
 {
     private static void VerifyReference(JsonElement ready)
@@ -42,6 +43,7 @@ public sealed class Parity6I2pReferenceRecoveryTests(ITestOutputHelper output)
         output.WriteLine($"{DateTimeOffset.UtcNow:O} verified callback {tag}");
     }
 
+    [Trait("Category", "Live")]
     [I2pLiveFact]
     public async Task ActualPinnedPythonServerProcessRestartWithSurvivingInitiator()
     {

@@ -8,6 +8,7 @@ using DotReticulum.Transport;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class RuntimeDiscoveryHostTests
 {
     [Fact]

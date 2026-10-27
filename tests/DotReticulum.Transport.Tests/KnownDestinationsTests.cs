@@ -2,6 +2,7 @@ using DotReticulum.Core;
 
 namespace DotReticulum.Transport.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class KnownDestinationsTests
 {
     private const long Now = 1_800_000_000;

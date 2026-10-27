@@ -6,6 +6,7 @@ namespace DotReticulum.Transport.Tests;
 // Packet.py:399-610, Transport.py:745-759,1358-1369,3194-3197 at
 // a29bfb51c468945c96a1ee22cae0114e993e2391. Expected predicates, proofs and
 // timeout boundaries execute upstream in GenerateParity4ReceiptLinkMtuVectors.py.
+[Trait("Category", "Unit")]
 public class Parity4ReceiptTests
 {
     [Fact]

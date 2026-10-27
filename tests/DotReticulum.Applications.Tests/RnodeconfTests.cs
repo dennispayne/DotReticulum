@@ -7,6 +7,7 @@ using DotReticulum.Interfaces;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class RnodeconfTests
 {
     // Independently executed RNS a29bfb51c468945c96a1ee22cae0114e993e2391,

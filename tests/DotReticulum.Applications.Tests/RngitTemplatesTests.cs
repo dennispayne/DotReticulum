@@ -4,6 +4,7 @@ using DotReticulum.Applications.Rngit;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class RngitTemplatesTests : IDisposable
 {
     // Actual upstream a29bfb51c468945c96a1ee22cae0114e993e2391 execution.

@@ -7,8 +7,10 @@ using Xunit.Abstractions;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class RnshLiveTests(ITestOutputHelper log)
 {
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task ActualPinnedPythonListenerAndInitiatorExchangeBinaryStdinOutputAndRecoverNewSessions()
     {

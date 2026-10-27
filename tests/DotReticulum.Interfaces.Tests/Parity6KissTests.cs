@@ -6,6 +6,7 @@ namespace DotReticulum.Interfaces.Tests;
 /// Expected bytes execute RNS a29bfb51c468945c96a1ee22cae0114e993e2391 through GenerateParity6KissVectors.py.
 /// Fixture source SHA-256 and generation adapters are recorded in parity6-kiss.json. No physical device evidence.
 /// </summary>
+[Trait("Category", "Unit")]
 public sealed class Parity6KissTests
 {
     private static JsonDocument Vectors() => JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "parity6-kiss.json")));

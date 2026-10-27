@@ -10,6 +10,7 @@ namespace DotReticulum.Core.Tests;
 // with GeneratePacketVectors.py. Upstream validity is recorded per vector (`upstream_valid`).
 // Intentional hardening versus upstream unpack(): packets longer than the MTU (500) are rejected unless a larger
 // per-link MTU is passed explicitly; upstream's unpack() does not itself check length.
+[Trait("Category", "Unit")]
 public class PacketTests
 {
     private static JsonElement Root { get; } =

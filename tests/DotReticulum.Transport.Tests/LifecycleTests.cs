@@ -8,6 +8,7 @@ namespace DotReticulum.Transport.Tests;
 // Link.py:981 authenticated blackhole rejection; Resource.py:1090 cancel;
 // Buffer.py:188,269 close. Async read settlement and
 // restartable Stop versus terminal Dispose are explicit .NET ownership contracts.
+[Trait("Category", "Unit")]
 public class LifecycleTests
 {
     [Fact]

@@ -2,6 +2,7 @@ using DotReticulum.Core;
 
 namespace DotReticulum.Transport.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class Parity5EndpointKnownDestinationsTests
 {
     [Fact]

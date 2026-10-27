@@ -5,6 +5,7 @@ namespace DotReticulum.Interfaces.Tests;
 
 // Oracle: pinned a29bfb51c468945c96a1ee22cae0114e993e2391, actual methods in
 // GenerateParity6WeaveVectors.py. Simulator traffic is not physical/live acceptance.
+[Trait("Category", "Unit")]
 public sealed class Parity6WeaveTests
 {
     private static WeaveOptions FastOptions => new()

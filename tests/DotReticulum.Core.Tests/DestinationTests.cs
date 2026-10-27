@@ -6,6 +6,7 @@ namespace DotReticulum.Core.Tests;
 // Vectors: Fixtures/destination-vectors.json, produced by EXECUTING upstream Reticulum
 // (markqvist/Reticulum @ e40191b3d193b46b7f2d8a44424a594cd758839b, RNS/Destination.py: constructor, expand_name, hash,
 // hash_from_name_and_identity) with GenerateDestinationVectors.py.
+[Trait("Category", "Unit")]
 public class DestinationTests
 {
     private static JsonElement Root { get; } =

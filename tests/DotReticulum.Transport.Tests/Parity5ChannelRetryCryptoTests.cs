@@ -9,6 +9,7 @@ namespace DotReticulum.Transport.Tests;
 // GenerateParity5ChannelRetryCryptoVectors.py executes unmodified upstream methods
 // through the real Transport.outbound and Token crypto at a29bfb51c468945c96a1ee22cae0114e993e2391.
 // Only interface I/O is captured; random IVs are not replaced.
+[Trait("Category", "Unit")]
 public sealed class Parity5ChannelRetryCryptoTests
 {
     private static JsonElement Vectors { get; } = JsonDocument.Parse(File.ReadAllText(

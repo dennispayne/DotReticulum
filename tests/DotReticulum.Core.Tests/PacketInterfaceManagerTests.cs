@@ -4,6 +4,7 @@ using DotReticulum.Core;
 
 namespace DotReticulum.Core.Tests;
 
+[Trait("Category", "Unit")]
 public class PacketInterfaceManagerTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);

@@ -4,6 +4,7 @@ using System.Net.Sockets;
 namespace DotReticulum.Interfaces.Tests;
 
 /// <summary>Actual OS IPv6 multicast, distinct from injected-network vectors and from live Python interop.</summary>
+[Trait("Category", "Integration")]
 public sealed class Parity6AutoMulticastTests
 {
     [AutoMulticastFact]

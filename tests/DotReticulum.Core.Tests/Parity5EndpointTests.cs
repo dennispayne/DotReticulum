@@ -6,6 +6,7 @@ namespace DotReticulum.Core.Tests;
 
 /// <summary>Independent vectors: GenerateParity5EndpointVectors.py, RNS a29bfb51c468945c96a1ee22cae0114e993e2391.
 /// Exact source hashes are recorded in Fixtures/parity5-endpoints.json. No .NET output generated these fixtures.</summary>
+[Trait("Category", "Unit")]
 public sealed class Parity5EndpointTests
 {
     private static JsonDocument Fixture() => JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "parity5-endpoints.json")));

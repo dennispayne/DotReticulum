@@ -2,6 +2,7 @@ using DotReticulum.Applications.Rngit;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class GitRemoteRnsTests
 {
     private const string Url = "rns://0123456789abcdef0123456789abcdef/group/repo";

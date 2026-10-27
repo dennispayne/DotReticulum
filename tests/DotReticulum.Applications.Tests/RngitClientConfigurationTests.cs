@@ -14,6 +14,7 @@ public sealed class RngitUnixFactAttribute : FactAttribute
 
 // Contracts: pinned RNS a29bfb51c468945c96a1ee22cae0114e993e2391, Utilities/rngit/client.py:55-213,679-718.
 // client.py SHA-256: 78358331ddac087860fb8a1f350632d3875917782dc000681d48597affd8936b.
+[Trait("Category", "Unit")]
 public sealed class RngitClientConfigurationTests : IDisposable
 {
     private readonly string directory = Path.Combine(Directory.GetCurrentDirectory(), "rngit-config-tests-" + Guid.NewGuid().ToString("N"));

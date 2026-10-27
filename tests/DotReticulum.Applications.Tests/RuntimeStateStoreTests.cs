@@ -16,6 +16,7 @@ public sealed class WindowsPersistenceFactAttribute : FactAttribute
 
 // Fixtures EXECUTE unmodified hosted upstream a29bfb51c468945c96a1ee22cae0114e993e2391 (RNS 1.5.7).
 // GenerateRuntimeStateVectors.py records imported path and Identity/Destination/Reticulum/Transport SHA-256.
+[Trait("Category", "Unit")]
 public sealed class RuntimeStateStoreTests : IDisposable
 {
     private readonly string _directory = Path.GetFullPath(Path.Combine("TestResults", "runtime-state", Guid.NewGuid().ToString("N")));

@@ -8,6 +8,7 @@ namespace DotReticulum.Interfaces.Tests;
 
 // Independent oracle: GenerateParity6I2pVectors.py, pinned RNS a29bfb51c468945c96a1ee22cae0114e993e2391.
 // Controlled SAM tests prove bounded software contracts, not actual router or I2P network interoperability.
+[Trait("Category", "Unit")]
 public sealed class Parity6I2pTests
 {
     private static JsonDocument Vectors() => JsonDocument.Parse(File.ReadAllText(

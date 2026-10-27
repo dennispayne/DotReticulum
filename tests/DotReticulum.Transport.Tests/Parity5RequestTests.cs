@@ -6,6 +6,7 @@ namespace DotReticulum.Transport.Tests;
 
 // Pinned Link.py:484-529,858-887,1319-1470; GenerateParity5RequestVectors.py
 // executes request settlement and the bundled MessagePack small-response size domain.
+[Trait("Category", "Unit")]
 public sealed class Parity5RequestTests
 {
     [Fact]

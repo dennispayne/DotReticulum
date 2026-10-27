@@ -4,6 +4,7 @@ using DotReticulum.Interfaces;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class Parity4IfacConfigurationTests
 {
     [Theory]

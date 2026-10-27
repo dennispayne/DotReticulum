@@ -11,6 +11,7 @@ namespace DotReticulum.Applications.Tests;
 
 // Oracle: GenerateParity7TransferVectors.py executes pinned RNS a29bfb51c468945c96a1ee22cae0114e993e2391.
 // Source hashes and verified actual import path are recorded in Fixtures/Parity7Transfer.json.
+[Trait("Category", "Unit")]
 public sealed class Parity7TransferTests
 {
     internal static string Command(string script) =>

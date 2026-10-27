@@ -11,6 +11,7 @@ using Xunit.Abstractions;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Integration")]
 public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(90);
@@ -29,6 +30,7 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
         while (!predicate()) await Task.Delay(25, timeout.Token);
     }
 
+    [Trait("Category", "Live")]
     [LiveFact]
     public async Task MixedTransports_RetryLostResourcePartsBothWays_ThenReconnectAndRestartWithSurvivingLeaves()
     {

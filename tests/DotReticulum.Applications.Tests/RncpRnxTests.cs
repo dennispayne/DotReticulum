@@ -4,6 +4,7 @@ using DotReticulum.Core;
 
 namespace DotReticulum.Applications.Tests;
 
+[Trait("Category", "Unit")]
 public class RncpRnxTests
 {
     [Fact]

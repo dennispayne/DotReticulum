@@ -11,6 +11,7 @@ using DotReticulum.Transport;
 namespace DotReticulum.Applications.Tests;
 
 /// <summary>Composed runtime contracts: real host, managers, routers, RPC, physical TCP and local shared clients.</summary>
+[Trait("Category", "Integration")]
 public sealed class SharedHostIntegrationTests
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(20);
