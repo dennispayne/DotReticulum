@@ -64,7 +64,7 @@ BeforeAll {
 AfterAll { if ($work -and (Test-Path -LiteralPath $work.FullName)) { Remove-Item -LiteralPath $work.FullName -Recurse -Force } }
 
 Describe 'Parity 7 transfer and execution process contracts' -Tag E2E, Utilities {
-    It 'reports parser/version/output and execution authorization failures without starting a listener' {
+    It 'reports parser/version/output and execution authorization failures without starting a listener' -Tag 'Contract:UTIL-RNX-001' {
         foreach ($tool in 'rnsd', 'rncp', 'rnx') {
             $version = Invoke-TestProcess $executable ($prefix + @($tool, '--version'))
             $version.Code | Should -Be 0
@@ -80,7 +80,7 @@ Describe 'Parity 7 transfer and execution process contracts' -Tag E2E, Utilities
         $policy.Error | Should -Match 'allow-execution'
     }
 
-    It 'returns writable-output exit 4 for an existing directory without write access' {
+    It 'returns writable-output exit 4 for an existing directory without write access' -Tag 'Contract:UTIL-RNCP-002' {
         $directory = New-Item -ItemType Directory -Path (Join-Path $work.FullName 'denied-save')
         $acl = $null
         try {
@@ -106,7 +106,7 @@ Describe 'Parity 7 transfer and execution process contracts' -Tag E2E, Utilities
         }
     }
 
-    It 'sends fetches renames overwrites and refuses jailed files using separate authorized CLI processes' {
+    It 'sends fetches renames overwrites and refuses jailed files using separate authorized CLI processes' -Tag 'Contract:UTIL-RNCP-002' {
         $port = Get-TransferPort
         $server = New-TransferConfig 'rncp-server' TCPServerInterface $port
         $client = New-TransferConfig 'rncp-client' TCPClientInterface $port
@@ -148,7 +148,7 @@ Describe 'Parity 7 transfer and execution process contracts' -Tag E2E, Utilities
         finally { Stop-TestProcess $listener }
     }
 
-    It 'preserves binary streams output slice limits failed spawn and remote versus protocol exit codes' {
+    It 'preserves binary streams output slice limits failed spawn and remote versus protocol exit codes' -Tag 'Contract:UTIL-RNX-001' {
         $port = Get-TransferPort
         $server = New-TransferConfig 'rnx-server' TCPServerInterface $port
         $client = New-TransferConfig 'rnx-client' TCPClientInterface $port
@@ -194,7 +194,7 @@ Describe 'Parity 7 transfer and execution process contracts' -Tag E2E, Utilities
         finally { Stop-TestProcess $listener }
     }
 
-    It 'exchanges files with verified pinned Python utilities in both CLI listener roles' -Skip:(!$Python -or !$Upstream) {
+    It 'exchanges files with verified pinned Python utilities in both CLI listener roles' -Tag 'Contract:UTIL-RNCP-001', 'Reference' -Skip:(!$Python -or !$Upstream) {
         $port = Get-TransferPort
         $nativeConfig = New-TransferConfig 'mixed-native' TCPServerInterface $port
         $pythonConfig = New-TransferConfig 'mixed-python' TCPClientInterface $port
@@ -240,7 +240,7 @@ Describe 'Parity 7 transfer and execution process contracts' -Tag E2E, Utilities
         finally { Stop-TestProcess $pythonPeer }
     }
 
-    It 'executes explicitly authorized commands in both verified Python and native CLI listener roles' -Skip:(!$Python -or !$Upstream) {
+    It 'executes explicitly authorized commands in both verified Python and native CLI listener roles' -Tag 'Contract:UTIL-RNX-001', 'Reference' -Skip:(!$Python -or !$Upstream) {
         $port = Get-TransferPort
         $nativeConfig = New-TransferConfig 'mixed-rnx-native' TCPServerInterface $port
         $pythonConfig = New-TransferConfig 'mixed-rnx-python' TCPClientInterface $port

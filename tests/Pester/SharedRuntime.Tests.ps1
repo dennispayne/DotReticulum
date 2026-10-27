@@ -55,7 +55,7 @@ listen_port = $PhysicalPort
 }
 
 Describe 'Shared-instance separate CLI processes' -Tag Runtime, E2E {
-    It 'elects an abstract Unix owner and exposes the independently configured local-client role' -Skip:(!$IsLinux) {
+    It 'elects an abstract Unix owner and exposes the independently configured local-client role' -Tag 'Contract:RUNTIME-SHARED-001' -Skip:(!$IsLinux) {
         $shared = New-SharedTestPort
         $control = New-SharedTestPort
         $physical = New-SharedTestPort
@@ -84,7 +84,7 @@ Describe 'Shared-instance separate CLI processes' -Tag Runtime, E2E {
         }
     }
 
-    It 'elects a host and avoids opening physical listeners in local-client processes' {
+    It 'elects a host and avoids opening physical listeners in local-client processes' -Tag 'Contract:RUNTIME-SHARED-001' {
         $shared = New-SharedTestPort
         $control = New-SharedTestPort
         $physical = New-SharedTestPort
@@ -108,7 +108,7 @@ Describe 'Shared-instance separate CLI processes' -Tag Runtime, E2E {
         }
     }
 
-    It 'serves actual Python multiprocessing RPC and rejects a bad key without losing service' -Skip:([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullOrWhiteSpace($Upstream)) {
+    It 'serves actual Python multiprocessing RPC and rejects a bad key without losing service' -Tag 'Contract:RUNTIME-SHARED-002', 'Reference' -Skip:([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullOrWhiteSpace($Upstream)) {
         $shared = New-SharedTestPort
         $control = New-SharedTestPort
         $physical = New-SharedTestPort
@@ -128,7 +128,7 @@ Describe 'Shared-instance separate CLI processes' -Tag Runtime, E2E {
         finally { Stop-TestProcess $hostPeer }
     }
 
-    It 'reconnects an existing local client after the independently launched daemon restarts' -Skip:([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullOrWhiteSpace($Upstream)) {
+    It 'reconnects an existing local client after the independently launched daemon restarts' -Tag 'Contract:RUNTIME-SHARED-002', 'Reference' -Skip:([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullOrWhiteSpace($Upstream)) {
         $shared = New-SharedTestPort
         $control = New-SharedTestPort
         $physical = New-SharedTestPort

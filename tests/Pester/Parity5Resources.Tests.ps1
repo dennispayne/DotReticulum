@@ -8,7 +8,7 @@ BeforeAll {
 }
 
 Describe 'Parity 5 config-owned streamed resources' -Tag E2E, Transport {
-    It 'spools multipart files in each receiver configuration and scavenges only its expired owned cache' {
+    It 'spools multipart files in each receiver configuration and scavenges only its expired owned cache' -Tag 'Contract:RESOURCE-SPOOL-001' {
         $working = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'working')
         $source = Join-Path $TestDrive 'multipart.bin'
         $output = [IO.File]::Create($source)

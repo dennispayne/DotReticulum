@@ -158,7 +158,7 @@ Describe 'Native repository hosting CLI' -Tag E2E {
         }
     }
 
-    It 'discovers actual utility filenames and preserves ordinary Git clone, Unicode ref push and fetch' {
+    It 'discovers actual utility filenames and preserves ordinary Git clone, Unicode ref push and fetch' -Tag 'Contract:UTIL-RNGIT-004' {
         $alias = Invoke-TestProcess (Join-Path $helperDirectory.FullName "rngit$suffix") @('--version')
         $alias.Code | Should -Be 0 -Because $alias.Error
         $alias.Output | Should -Match 'rngit 1.5.7'
@@ -193,7 +193,7 @@ Describe 'Native repository hosting CLI' -Tag E2E {
         $main.Output.Trim() | Should -Not -Be $local.Output.Trim()
     }
 
-    It 'creates repositories and refuses duplicate creation without replacing persisted identity' {
+    It 'creates repositories and refuses duplicate creation without replacing persisted identity' -Tag 'Contract:UTIL-RNGIT-004' {
         $target = "rns://$destination/fixtures/created.git"
         $created = Invoke-HostingCli (@('create', $target) + $common)
         $created.Code | Should -Be 0 -Because ($created.Output + $created.Error)
@@ -205,7 +205,7 @@ Describe 'Native repository hosting CLI' -Tag E2E {
         (Get-FileHash -LiteralPath (Join-Path $server.FullName 'repositories_identity')).Hash | Should -Be $identityHash
     }
 
-    It 'creates, views, comments, completes and activates signed work documents through separate processes' {
+    It 'creates, views, comments, completes and activates signed work documents through separate processes' -Tag 'Contract:UTIL-RNGIT-005' {
         $content = Join-Path $root.FullName 'document.md'
         'Owned persistent work document.' | Set-Content -LiteralPath $content -Encoding utf8
         $created = Invoke-HostingCli (@('work', $remote, 'create', '--title', 'Owned document', '--content', $content) + $common)
@@ -228,7 +228,7 @@ Describe 'Native repository hosting CLI' -Tag E2E {
         $activated.Code | Should -Be 0 -Because $activated.Error
     }
 
-    It 'edits repository permissions through authorized content and diagnoses hidden state' {
+    It 'edits repository permissions through authorized content and diagnoses hidden state' -Tag 'Contract:UTIL-RNGIT-006' {
         $content = Join-Path $root.FullName 'permissions.allowed'
         "read:all`nwrite:none`nadmin:all" | Set-Content -LiteralPath $content -Encoding utf8
         $edited = Invoke-HostingCli (@('perms', "rns://$destination/fixtures/created.git", '--content', $content) + $common)
@@ -239,7 +239,7 @@ Describe 'Native repository hosting CLI' -Tag E2E {
         $hidden.Error | Should -Match 'Not found'
     }
 
-    It 'proposes, edits, administers and deletes scoped work without resetting persisted IDs' {
+    It 'proposes, edits, administers and deletes scoped work without resetting persisted IDs' -Tag 'Contract:UTIL-RNGIT-005' {
         $content = Join-Path $root.FullName 'proposal.md'
         [IO.File]::WriteAllText($content, 'Owned proposed content')
         $proposed = Invoke-HostingCli (@('work', $remote, 'propose', '--title', 'Owned proposal', '--content', $content) + $common)
@@ -265,7 +265,7 @@ Describe 'Native repository hosting CLI' -Tag E2E {
         $missing.Error | Should -Match 'not found'
     }
 
-    It 'creates and lists signed releases, sets latest, fetches and verifies offline, diagnoses tampering and deletes' {
+    It 'creates and lists signed releases, sets latest, fetches and verifies offline, diagnoses tampering and deletes' -Tag 'Contract:UTIL-RNGIT-007' {
         $artifacts = New-Item -ItemType Directory -Path (Join-Path $root.FullName 'release-artifacts')
         [IO.File]::WriteAllText((Join-Path $artifacts.FullName 'payload.txt'), 'Owned release payload')
         $notes = Join-Path $root.FullName 'notes.md'
@@ -307,7 +307,7 @@ Describe 'Native repository hosting CLI' -Tag E2E {
         $missing.Error | Should -Match 'not found|does not exist'
     }
 
-    It 'runs a real editor only with explicit CLI authorization and removes owned temporary files' {
+    It 'runs a real editor only with explicit CLI authorization and removes owned temporary files' -Tag 'Contract:UTIL-RNGIT-005' {
         $editor = (Get-Command pwsh -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
         $scriptPath = Join-Path $root.FullName 'authorized-editor.ps1'
         [IO.File]::WriteAllText($scriptPath, @'
@@ -334,7 +334,7 @@ param([string] $DocumentPath)
         @(Get-ChildItem -LiteralPath $temporary.FullName -Force).Count | Should -Be 0
     }
 
-    It 'restarts with the same identity and serves persisted work state' {
+    It 'restarts with the same identity and serves persisted work state' -Tag 'Contract:UTIL-RNGIT-004' {
         Stop-TestProcess $script:hostProcess
         $script:hostProcess = Start-OwnedHost
         (Get-FileHash -LiteralPath (Join-Path $server.FullName 'repositories_identity')).Hash | Should -Be $identityHash

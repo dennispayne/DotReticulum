@@ -8,21 +8,21 @@ BeforeAll {
 }
 
 Describe 'Parity 7 native maintenance safety and placeholder processes' -Tag E2E, Device {
-    It 'describes actual maintenance scope without claiming physical firmware validation' {
+    It 'describes actual maintenance scope without claiming physical firmware validation' -Tag 'Contract:UTIL-RNODECONF-001' {
         $result = Invoke-TestProcess $executable ($prefix + @('rnodeconf', '--help'))
         $result.Code | Should -Be 0
         $result.Output | Should -Match 'authorize-device-write'
         $result.Output | Should -Match 'NOT verified'
     }
 
-    It 'lists actual pinned board variants without opening serial hardware' {
+    It 'lists actual pinned board variants without opening serial hardware' -Tag 'Contract:UTIL-RNODECONF-001' {
         $result = Invoke-TestProcess $executable ($prefix + @('rnodeconf', '--list-models'))
         $result.Code | Should -Be 0
         $result.Output | Should -Match 'rnode_firmware_rak4631.zip'
         $result.Output | Should -Match 'SX1262'
     }
 
-    It 'accepts long equals syntax and reports parser errors with argparse exit status' {
+    It 'accepts long equals syntax and reports parser errors with argparse exit status' -Tag 'Contract:UTIL-RNODECONF-001' {
         $state = Join-Path $TestDrive 'equals-state'
         $result = Invoke-TestProcess $executable ($prefix + @('rnodeconf', '--key', '--authorize-key-write', "--state-dir=$state"))
         $result.Code | Should -Be 0 -Because $result.Error
@@ -33,28 +33,28 @@ Describe 'Parity 7 native maintenance safety and placeholder processes' -Tag E2E
         $unknown.Code | Should -Be 2
     }
 
-    It 'rejects device writes before accessing a serial port' {
+    It 'rejects device writes before accessing a serial port' -Tag 'Contract:UTIL-RNODECONF-001' {
         $result = Invoke-TestProcess $executable ($prefix + @('rnodeconf', 'NOT-A-REAL-PORT', '--normal'))
         $result.Code | Should -Be 1
         $result.Error | Should -Match 'authorize-device-write'
         $result.Error | Should -Match 'port was not opened'
     }
 
-    It 'rejects unapproved firmware operations rather than invoking tools or downloading' {
+    It 'rejects unapproved firmware operations rather than invoking tools or downloading' -Tag 'Contract:UTIL-RNODECONF-001' {
         $result = Invoke-TestProcess $executable ($prefix + @('rnodeconf', 'NOT-A-REAL-PORT', '--update'))
         $result.Code | Should -Be 1
         $result.Error | Should -Match 'authorize-device-write'
         $result.Error | Should -Match 'no device tool was run'
     }
 
-    It 'does not leak a malformed credential on failure' {
+    It 'does not leak a malformed credential on failure' -Tag 'Contract:UTIL-RNODECONF-001' {
         $credential = 'do-not-log-this-credential'
         $result = Invoke-TestProcess $executable ($prefix + @('rnodeconf', 'NOT-A-REAL-PORT', '--psk', $credential))
         $result.Code | Should -Be 1
         ($result.Output + $result.Error) | Should -Not -Match ([regex]::Escape($credential))
     }
 
-    It 'refuses unapproved local trust enrollment without creating state' {
+    It 'refuses unapproved local trust enrollment without creating state' -Tag 'Contract:UTIL-RNODECONF-001' {
         $state = Join-Path $TestDrive 'unapproved-trust'
         $result = Invoke-TestProcess $executable ($prefix + @('rnodeconf', '--trust-key', '00', '--state-dir', $state))
         $result.Code | Should -Be 1
@@ -62,7 +62,7 @@ Describe 'Parity 7 native maintenance safety and placeholder processes' -Tag E2E
         Test-Path -LiteralPath $state | Should -BeFalse
     }
 
-    It 'generates persistent native signing keys only with explicit authorization and does not overwrite them' {
+    It 'generates persistent native signing keys only with explicit authorization and does not overwrite them' -Tag 'Contract:UTIL-RNODECONF-001' {
         $state = Join-Path $TestDrive 'signing-state'
         $denied = Invoke-TestProcess $executable ($prefix + @('rnodeconf', '--key', '--state-dir', $state))
         $denied.Code | Should -Be 1
@@ -80,7 +80,7 @@ Describe 'Parity 7 native maintenance safety and placeholder processes' -Tag E2E
         $public.Output | Should -Match 'Device Signing Public key'
     }
 
-    It 'exposes only an honest placeholder shell for <Tool>' -ForEach @(@{ Tool = 'rnir' }, @{ Tool = 'rnpkg' }) {
+    It 'exposes only an honest placeholder shell for <Tool>' -Tag 'Contract:UTIL-RNIR-001' -ForEach @(@{ Tool = 'rnir' }, @{ Tool = 'rnpkg' }) {
         $result = Invoke-TestProcess $executable ($prefix + @($Tool, '--help'))
         $result.Code | Should -Be 0
         $result.Output | Should -Match 'upstream placeholder'
@@ -89,13 +89,13 @@ Describe 'Parity 7 native maintenance safety and placeholder processes' -Tag E2E
         $result.Error | Should -Match 'no resolver/package operations'
     }
 
-    It 'prints the actual upstream minimal package configuration example' {
+    It 'prints the actual upstream minimal package configuration example' -Tag 'Contract:UTIL-RNIR-001' {
         $result = Invoke-TestProcess $executable ($prefix + @('rnpkg', '--exampleconfig'))
         $result.Code | Should -Be 0
         $result.Output.Trim() | Should -Be '# This is an example package manager configuration file.'
     }
 
-    It 'initializes configured runtime state then exits without offering placeholder operations' -ForEach @(@{ Tool = 'rnir' }, @{ Tool = 'rnpkg' }) {
+    It 'initializes configured runtime state then exits without offering placeholder operations' -Tag 'Contract:UTIL-RNIR-001' -ForEach @(@{ Tool = 'rnir' }, @{ Tool = 'rnpkg' }) {
         $state = Join-Path $TestDrive $Tool
         $null = New-Item -ItemType Directory -Path $state
         @'

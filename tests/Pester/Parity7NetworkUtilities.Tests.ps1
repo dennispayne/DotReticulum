@@ -141,7 +141,7 @@ AfterAll {
 }
 
 Describe 'Parity 7 rnstatus, rnpath and rnprobe processes' -Tag E2E, NetworkUtilities {
-    It 'exposes independently dispatchable help and version commands' {
+    It 'exposes independently dispatchable help and version commands' -Tag 'Contract:UTIL-NET-001' {
         foreach ($tool in 'rnstatus', 'rnpath', 'rnprobe') {
             $help = Invoke-NetworkUtility $tool @('--help')
             $help.Code | Should -Be 0 -Because $help.Error
@@ -152,13 +152,13 @@ Describe 'Parity 7 rnstatus, rnpath and rnprobe processes' -Tag E2E, NetworkUtil
         }
     }
 
-    It 'rejects unsupported options without opening a Reticulum configuration' {
+    It 'rejects unsupported options without opening a Reticulum configuration' -Tag 'Contract:UTIL-NET-001' {
         $result = Invoke-NetworkUtility 'rnstatus' @('--not-an-option')
         $result.Code | Should -Be 2
         $result.Error | Should -Match 'Unknown option'
     }
 
-    It 'rejects invalid monitor and path-filter values before runtime startup' {
+    It 'rejects invalid monitor and path-filter values before runtime startup' -Tag 'Contract:UTIL-NET-001' {
         $status = Invoke-NetworkUtility 'rnstatus' @('-m', '-I', 'NaN')
         $status.Code | Should -Be 1
         $status.Error | Should -Match 'monitor interval'
@@ -167,13 +167,13 @@ Describe 'Parity 7 rnstatus, rnpath and rnprobe processes' -Tag E2E, NetworkUtil
         $path.Error | Should -Match 'Maximum hops'
     }
 
-    It 'rejects oversized or negative probe payload input before loading configuration' {
+    It 'rejects oversized or negative probe payload input before loading configuration' -Tag 'Contract:UTIL-NET-001' {
         $probe = Invoke-NetworkUtility 'rnprobe' @('--size', '-1', 'app.aspect', ('0' * 32))
         $probe.Code | Should -Be 1
         $probe.Error | Should -Match 'nonnegative'
     }
 
-    It 'queries local daemon management and sends a real probe path request from separate CLI processes' {
+    It 'queries local daemon management and sends a real probe path request from separate CLI processes' -Tag 'Contract:UTIL-RNSTATUS-001', 'Contract:UTIL-RNPATH-001' {
         $shared = New-UtilityPort
         $control = New-UtilityPort
         $physical = New-UtilityPort
@@ -218,7 +218,7 @@ Describe 'Parity 7 rnstatus, rnpath and rnprobe processes' -Tag E2E, NetworkUtil
         finally { Stop-TestProcess $hostPeer }
     }
 
-    It 'performs authenticated remote status and path requests over separate native node processes' {
+    It 'performs authenticated remote status and path requests over separate native node processes' -Tag 'Contract:UTIL-RNSTATUS-001', 'Contract:UTIL-RNPATH-001' {
         $port = New-UtilityPort
         $identityFile = Join-Path $utilityWork 'remote-management.identity'
         $identity = New-UtilityIdentity $identityFile
@@ -287,7 +287,7 @@ try {
         finally { Stop-TestProcess $server }
     }
 
-    It 'queries pinned Python remote management and probes announced reply and no-proof destinations' -Skip:([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullOrWhiteSpace($Upstream)) {
+    It 'queries pinned Python remote management and probes announced reply and no-proof destinations' -Tag 'Contract:UTIL-RNSTATUS-001', 'Contract:UTIL-RNPROBE-001', 'Reference' -Skip:([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullOrWhiteSpace($Upstream)) {
         $managementIdentity = Join-Path $utilityWork 'python-management.identity'
         $probeIdentity = Join-Path $utilityWork 'python-probe.identity'
         $noProofIdentity = Join-Path $utilityWork 'python-no-proof.identity'

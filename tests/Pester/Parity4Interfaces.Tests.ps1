@@ -12,7 +12,7 @@ BeforeAll {
 }
 
 Describe 'Parity 4 authenticated interface processes' -Tag E2E, Transport {
-    It 'rejects wrong IFAC credentials then preserves service through malformed and disconnected peers' {
+    It 'rejects wrong IFAC credentials then preserves service through malformed and disconnected peers' -Tag 'Contract:IFACE-IFAC-001' {
         $probe = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
         $probe.Start()
         $port = $probe.LocalEndpoint.Port

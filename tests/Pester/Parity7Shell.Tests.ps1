@@ -11,7 +11,7 @@ BeforeAll {
 }
 
 Describe 'Parity 7 rnsh process contracts' {
-    It 'has a distinct shell command and rejects malformed destinations' {
+    It 'has a distinct shell command and rejects malformed destinations' -Tag 'Contract:UTIL-RNSH-002' {
         $help = Invoke-ShellCli @('--help')
         $help.Code | Should -Be 0 -Because $help.Error
         $help.Output | Should -Match 'Remote Shell'
@@ -20,7 +20,7 @@ Describe 'Parity 7 rnsh process contracts' {
         $invalid.Code | Should -Be 2
         $invalid.Error | Should -Match 'Invalid destination'
     }
-    It 'persists service-specific identities without using shell state as RNS configuration' {
+    It 'persists service-specific identities without using shell state as RNS configuration' -Tag 'Contract:UTIL-RNSH-002' {
         $state = Join-Path $TestDrive 'rnsh'
         $first = Invoke-ShellCli @('-c', $state, '-l', '-s', 'test-service!', '-p')
         $first.Code | Should -Be 0 -Because $first.Error

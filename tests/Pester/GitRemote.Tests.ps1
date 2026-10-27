@@ -260,7 +260,7 @@ AfterAll {
     # Only this suite's unique repository-local directory and processes are owned.
 }
 
-Describe 'Git-first remote helper against the pinned Python rngit server' -Tag E2E, GitRemote, Live {
+Describe 'Git-first remote helper against the pinned Python rngit server' -Tag E2E, GitRemote, Live, 'Contract:UTIL-RNGIT-002', 'Reference' {
     It 'also supports the explicit Applications git-remote-rns subcommand' {
         $executable = if ([System.IO.Path]::GetExtension($cli) -eq '.dll') { 'dotnet' } else { $cli }
         $arguments = @(if ($executable -eq 'dotnet') { $cli }) + @('git-remote-rns', 'origin', $remoteUrl)

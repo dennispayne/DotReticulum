@@ -12,7 +12,7 @@ BeforeAll {
 }
 
 Describe 'DotReticulum CLI end-to-end' -Tag E2E {
-    It 'advertises the complete native Git utility surface in root help' {
+    It 'advertises the complete native Git utility surface in root help' -Tag 'Contract:UTIL-CLI-001' {
         $result = Invoke-Cli @('--help')
         $result.Code | Should -Be 0 -Because $result.Error
         $result.Output | Should -Match 'rngit.*Repository node'
@@ -21,7 +21,7 @@ Describe 'DotReticulum CLI end-to-end' -Tag E2E {
         $result.Output | Should -Not -Match 'Read-only bare Git clone'
     }
 
-    It 'advertises and dispatches the upstream utility commands' {
+    It 'advertises and dispatches the upstream utility commands' -Tag 'Contract:UTIL-CLI-001' {
         $rootHelp = Invoke-Cli @('--help')
         $rootHelp.Code | Should -Be 0 -Because $rootHelp.Error
         foreach ($tool in 'rnid', 'rnstatus', 'rnpath', 'rnprobe', 'rnsh', 'rnodeconf') {
@@ -32,7 +32,7 @@ Describe 'DotReticulum CLI end-to-end' -Tag E2E {
         }
     }
 
-    It 'persists identity generation, preserves it on overwrite refusal and reloads the same public identity' {
+    It 'persists identity generation, preserves it on overwrite refusal and reloads the same public identity' -Tag 'Contract:UTIL-RNID-001' {
         $path = Join-Path $TestDrive 'private identity'
         $created = Invoke-Cli @('rnid', '--generate', $path)
         $created.Code | Should -Be 0 -Because $created.Error
@@ -47,7 +47,7 @@ Describe 'DotReticulum CLI end-to-end' -Tag E2E {
         $loaded.Output | Should -Be $created.Output
     }
 
-    It 'dispatches a renamed utility executable without a repeated subcommand' {
+    It 'dispatches a renamed utility executable without a repeated subcommand' -Tag 'Contract:UTIL-CLI-001' {
         $directory = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'identity-alias')
         $helper = Install-TestGitHelper $cli $directory.FullName
         $alias = Join-Path $directory.FullName $(if ($IsWindows) { 'rnid.exe' } else { 'rnid' })
@@ -60,7 +60,7 @@ Describe 'DotReticulum CLI end-to-end' -Tag E2E {
         $loaded.Output | Should -Be $created.Output
     }
 
-    It 'reports invalid rngit limits without creating a target repository' {
+    It 'reports invalid rngit limits without creating a target repository' -Tag 'Contract:UTIL-RNGIT-003' {
         $target = Join-Path $TestDrive 'invalid.git'
         $result = Invoke-Cli @('rngit', 'clone', 'rns://0123456789abcdef0123456789abcdef/group/repo', $target, '--timeout', '0')
         $result.Code | Should -Be 2
@@ -68,7 +68,7 @@ Describe 'DotReticulum CLI end-to-end' -Tag E2E {
         Test-Path -LiteralPath $target | Should -BeFalse
     }
 
-    It 'sends and fetches a multi-megabyte file between separately launched authenticated rncp processes' {
+    It 'sends and fetches a multi-megabyte file between separately launched authenticated rncp processes' -Tag 'Contract:UTIL-RNCP-002' {
         $portProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
         $portProbe.Start()
         $port = $portProbe.LocalEndpoint.Port

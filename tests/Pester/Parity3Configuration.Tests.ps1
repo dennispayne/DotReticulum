@@ -28,14 +28,14 @@ AfterAll {
 }
 
 Describe 'Parity 3 daemon configuration and logging processes' -Tag E2E, Runtime {
-    It 'reports native and pinned reference versions without starting a daemon' {
+    It 'reports native and pinned reference versions without starting a daemon' -Tag 'Contract:UTIL-RNSD-002' {
         $result = Invoke-Rnsd @('--version')
         $result.Code | Should -Be 0 -Because $result.Error
         $result.Output | Should -Match 'DotReticulum'
         $result.Output | Should -Match 'reference RNS 1\.5\.7'
     }
 
-    It 'runs a bounded native interactive management shell and persists identity and runtime state across restart' {
+    It 'runs a bounded native interactive management shell and persists identity and runtime state across restart' -Tag 'Contract:UTIL-RNSD-001' {
         $config = New-Item -ItemType Directory -Path (Join-Path $workspace 'interactive')
         "[reticulum]`nshare_instance=no`n[logging]`nloglevel=4`n[interfaces]`n" |
             Set-Content -LiteralPath (Join-Path $config.FullName 'config')
@@ -58,7 +58,7 @@ Describe 'Parity 3 daemon configuration and logging processes' -Tag E2E, Runtime
         $restarted.Output | Should -Match 'Shutting down'
     }
 
-    It 'gracefully persists on interactive EOF and rejects oversized lines without executing them' {
+    It 'gracefully persists on interactive EOF and rejects oversized lines without executing them' -Tag 'Contract:UTIL-RNSD-001' {
         $config = New-Item -ItemType Directory -Path (Join-Path $workspace 'interactive-bounds')
         "[reticulum]`nshare_instance=no`n[logging]`nloglevel=4`n[interfaces]`n" |
             Set-Content -LiteralPath (Join-Path $config.FullName 'config')
@@ -71,7 +71,7 @@ Describe 'Parity 3 daemon configuration and logging processes' -Tag E2E, Runtime
         Test-Path -LiteralPath (Join-Path $config.FullName 'storage\runtime-state-v1.msgpack') | Should -BeTrue
     }
 
-    It 'does not silently accept ineffective configuration controls' {
+    It 'does not silently accept ineffective configuration controls' -Tag 'Contract:UTIL-RNSD-002' {
         $config = New-Item -ItemType Directory -Path (Join-Path $workspace 'unsupported')
         "[reticulum]`npanic_on_interface_error=yes`n" | Set-Content -LiteralPath (Join-Path $config.FullName 'config')
         $result = Invoke-Rnsd @('--config', $config.FullName)
@@ -80,7 +80,7 @@ Describe 'Parity 3 daemon configuration and logging processes' -Tag E2E, Runtime
         Test-Path -LiteralPath (Join-Path $config.FullName 'storage\transport_identity') | Should -BeFalse
     }
 
-    It 'creates missing directory configuration without silently opting into network discovery' {
+    It 'creates missing directory configuration without silently opting into network discovery' -Tag 'Contract:UTIL-RNSD-002' {
         $config = Join-Path $workspace 'created'
         $log = Join-Path $config 'logfile'
         $peer = Start-TestProcess $executable ($prefix + @('rnsd', '--config', $config, '--service'))
@@ -94,7 +94,7 @@ Describe 'Parity 3 daemon configuration and logging processes' -Tag E2E, Runtime
         finally { Stop-TestProcess $peer }
     }
 
-    It 'service mode ignores quiet flags, respects disabled timestamps and preserves the existing config' {
+    It 'service mode ignores quiet flags, respects disabled timestamps and preserves the existing config' -Tag 'Contract:UTIL-RNSD-001' {
         $config = New-Item -ItemType Directory -Path (Join-Path $workspace 'service')
         $file = Join-Path $config.FullName 'config'
         "[reticulum]`nshare_instance=no`n[logging]`nloglevel=8`nlogtimestamps=no`n[interfaces]`n" | Set-Content -LiteralPath $file
@@ -111,7 +111,7 @@ Describe 'Parity 3 daemon configuration and logging processes' -Tag E2E, Runtime
         finally { Stop-TestProcess $peer }
     }
 
-    It 'persists identity across graceful SIGTERM and restart (Unix only; Windows uses managed cancellation tests)' -Skip:$IsWindows {
+    It 'persists identity across graceful SIGTERM and restart (Unix only; Windows uses managed cancellation tests)' -Tag 'Contract:UTIL-RNSD-001' -Skip:$IsWindows {
         # Windows has no POSIX SIGTERM; in-process cancellation/identity persistence is covered by xUnit.
         $config = New-Item -ItemType Directory -Path (Join-Path $workspace 'signal')
         "[reticulum]`nshare_instance=no`n[logging]`nloglevel=4`n[interfaces]`n" |

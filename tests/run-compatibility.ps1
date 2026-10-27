@@ -25,7 +25,12 @@ $OutputDirectory = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $data = @{ Application = $resolved; Python = $Python; Upstream = $Upstream }
 $suites = Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'Pester') -Filter '*.Tests.ps1' |
     Where-Object { Select-String -LiteralPath $_.FullName -Pattern "Contract:" -Quiet }
-$containers = @($suites | ForEach-Object { New-PesterContainer -Path $_.FullName -Data $data })
+$containers = @($suites | ForEach-Object {
+    $declared = (Get-Command $_.FullName).Parameters.Keys
+    $suiteData = @{}
+    foreach ($key in $data.Keys) { if ($key -in $declared) { $suiteData[$key] = $data[$key] } }
+    New-PesterContainer -Path $_.FullName -Data $suiteData
+})
 
 $configuration = New-PesterConfiguration
 $configuration.Run.Container = $containers
@@ -35,7 +40,7 @@ if (!$referenceAvailable) { $configuration.Filter.ExcludeTag = 'Reference' }
 $configuration.Output.Verbosity = 'Minimal'
 $result = Invoke-Pester -Configuration $configuration
 
-$cases = foreach ($test in $result.Tests | Where-Object Result -ne 'NotRun') {
+$cases = foreach ($test in $result.Tests) {
     foreach ($tag in $test.Block.Tag + $test.Tag | Where-Object { $_ -like 'Contract:*' } | Select-Object -Unique) {
         [pscustomobject]@{
             Contract = $tag.Substring('Contract:'.Length)
@@ -52,7 +57,7 @@ $rows = foreach ($contract in $catalog.contracts) {
     $status = if ($mine | Where-Object Result -eq 'Failed') { 'Fail' }
     elseif ($mine | Where-Object Result -eq 'Passed') { 'Pass' }
     elseif ($mine | Where-Object Result -eq 'Skipped') { 'Skipped' }
-    elseif ($contract.reference -and !$referenceAvailable) { 'Needs reference' }
+    elseif ($mine | Where-Object Result -eq 'NotRun') { 'Needs reference' }
     else { 'Not covered' }
     [pscustomobject]@{
         Id = $contract.id
