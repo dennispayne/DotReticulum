@@ -48,6 +48,25 @@ public sealed class MediumTimingTests
     }
 
     [Fact]
+    public async Task PendingLinkRequestStartsOutboundActivityBeforeAnyHandshake()
+    {
+        var clock = new Parity4LinkMtuTests.Clock();
+        await using var manager = new PacketInterfaceManager([new Probe(1200, true)]);
+        await manager.StartAsync();
+        await using var router = new TransportRouter(manager, new TransportRouterOptions { TimeProvider = clock });
+        using var identity = Identity.Generate();
+        var link = router.Links.Connect(identity, new byte[16]);
+        Assert.Equal(LinkStatus.Pending, link.Status);
+        Assert.Equal(link.RequestTime, link.LastOutbound);
+        Assert.Equal(link.RequestTime, link.LastData);
+        Assert.Equal(0, link.NoDataFor);
+        clock.Advance(0.25);
+        Assert.Equal(0.25, link.NoDataFor);
+        Assert.Equal(0.25, link.NoOutboundFor);
+        Assert.Equal(LinkStatus.Pending, link.Status);
+    }
+
+    [Fact]
     public async Task DynamicOnlineAndBitrateChangesAreObservedWithoutRestart()
     {
         var radio = new Probe(1200, true);

@@ -6,6 +6,21 @@ Historical reference only: this file records milestone outcomes and verification
 
 ### Public medium timing estimates for ecosystem scheduling
 
+A subsequent Linux ecosystem idle-link reconnect failure exposed a separate
+initialization gap: `LinkManager.Connect` queued LINKREQUEST but never recorded
+outbound activity. A pending link's zero `LastData` looked epoch-old to application
+idle maintenance. Pinned `Link.py:318-321` calls `had_outbound()` after sending the
+request. Native now records activity only after successful queue admission.
+A deterministic fake-clock test verifies pending status and `LastOutbound`,
+`LastData`, `NoDataFor` and elapsed activity before any handshake.
+Focused timing tests passed **4/4 on Windows and Linux**. The full stack passed
+**1,831**, skipped **79**, failed zero; one preceding run had an unrelated
+refused-port interface test failure whose targeted rerun passed, so no socket
+fix is claimed. Strict Windows NativeAOT and actual encrypted multi-megabyte CLI
+send/fetch acceptance passed (**1/1**, 6.89 seconds). The test bearer is explicitly
+started, preventing an asynchronous send-before-start error from changing pending
+status during the regression itself.
+
 Exposed the existing `TransportRouter.FirstHopTimeout(ReadOnlySpan<byte>)` and
 added `GetLowestInterfaceBitrate()` / `GetMediumPathTimeout()`. Read-only daemon
 management now reuses the router calculations instead of maintaining a second

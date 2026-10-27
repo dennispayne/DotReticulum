@@ -102,6 +102,7 @@ public sealed class LinkManager : IAsyncDisposable
                 Report("Link outbound queue is full; link establishment rejected.");
                 link.FailEstablishment();
             }
+            else link.HadOutbound();
             return link;
         }
     }
