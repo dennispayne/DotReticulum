@@ -78,11 +78,30 @@ equal-content binary keys. Writers reject duplicates even in ordered pair
 lists or dictionaries constructed with incompatible CLR equality. Maps
 support non-null finite scalar, binary, extension and timestamp keys.
 Null keys, array/tuple keys, map keys and nonfinite numeric keys are
-**intentional diagnosed restrictions**, even where Python permits them.
-Python's recursive list-to-tuple key conversion, user extension registries,
+**diagnosed restrictions in the default view**, even where Python permits them.
+User extension registries,
 old-spec compatibility mode, permissive invalid-UTF-8 mode, ordered-dict option,
 and opt-in float32 writing are not implemented. Ordered input maps preserve
 their enumeration order.
+
+Applications requiring the broader Python key domain may opt into
+`UnpackApplicationValue(..., allowExtendedMapKeys: true)` or its Try equivalent.
+Ordinary maps still return `Dictionary<object, object?>`; maps with nil,
+array/tuple or nonfinite numeric keys return ordered `MsgPackMap` entries.
+Nested arrays represent Python's recursively converted tuple keys. Maps inside
+keys remain unhashable and are rejected. `Pack` accepts an explicit `MsgPackMap`
+without changing the accepted keys of ordinary dictionaries or pair lists.
+This option is independent of request-handler lossless binary-key selection;
+existing request handlers do not implicitly enable extended keys.
+
+Extended maps use structural binary/tuple and exact numeric key equality.
+NaN-containing keys stay distinct, matching separately decoded Python NaNs;
+they bypass duplicate-key hashing to avoid quadratic same-hash work. Duplicate
+non-NaN tuple keys are rejected, unlike the reference decoder's tuple branch,
+which can overwrite earlier entries. This is an explicit validation difference,
+not lossless support for duplicate-key wire maps. `MsgPackMap` copies its entry
+array, not nested mutable values or keys; do not mutate a value while packing.
+All existing byte, value, depth and container limits apply to extended maps.
 
 ## Bounds and failures
 
@@ -116,5 +135,10 @@ The generator `tests/DotReticulum.Core.Tests/GenerateMsgPackApplicationVectors.p
 ```powershell
 dotnet test tests\DotReticulum.Core.Tests\DotReticulum.Core.Tests.csproj -c Release --filter "FullyQualifiedName~MsgPack"
 ```
+
+Extended-map vectors execute nil, nested tuples, infinities, distinct NaNs
+and mixed ordinary/binary keys against the same pinned source. Focused tests
+also exercise duplicate structural keys, cyclic keys, truncated input and
+configured depth limits.
 
 Independent Python vectors establish reference bytes but do not by themselves prove live interoperability or NativeAOT execution. Those broader capabilities have separate evidence and platform boundaries.

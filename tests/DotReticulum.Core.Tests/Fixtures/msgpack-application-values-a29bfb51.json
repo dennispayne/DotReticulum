@@ -367,5 +367,55 @@
       "hex": "8192010203",
       "reference_type": "tuple"
     }
+  ],
+  "extended_map_keys": [
+    {
+      "name": "null",
+      "hex": "81c0a36e696c",
+      "repacked_hex": "81c0a36e696c",
+      "entries": 1
+    },
+    {
+      "name": "tuple",
+      "hex": "81920102a57475706c65",
+      "repacked_hex": "81920102a57475706c65",
+      "entries": 1
+    },
+    {
+      "name": "nested-tuple",
+      "hex": "8193c0920102c40178a66e6573746564",
+      "repacked_hex": "8193c0920102c40178a66e6573746564",
+      "entries": 1
+    },
+    {
+      "name": "positive-infinity",
+      "hex": "81cb7ff0000000000000a8696e66696e697479",
+      "repacked_hex": "81cb7ff0000000000000a8696e66696e697479",
+      "entries": 1
+    },
+    {
+      "name": "negative-infinity",
+      "hex": "81cbfff0000000000000a8696e66696e697479",
+      "repacked_hex": "81cbfff0000000000000a8696e66696e697479",
+      "entries": 1
+    },
+    {
+      "name": "nan",
+      "hex": "81cb7ff8000000000000a36e616e",
+      "repacked_hex": "81cb7ff8000000000000a36e616e",
+      "entries": 1
+    },
+    {
+      "name": "distinct-nans",
+      "hex": "82cb7ff800000000000001cb7ff800000000000002",
+      "repacked_hex": "82cb7ff800000000000001cb7ff800000000000002",
+      "entries": 2
+    },
+    {
+      "name": "mixed",
+      "hex": "82a66e6f726d616c81c001c401788192c3cb400400000000000092c003",
+      "repacked_hex": "82a66e6f726d616c81c001c401788192c3cb400400000000000092c003",
+      "entries": 2
+    }
   ]
 }

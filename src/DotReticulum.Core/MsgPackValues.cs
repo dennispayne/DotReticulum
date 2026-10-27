@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Numerics;
 
 namespace DotReticulum.Core;
@@ -58,6 +59,57 @@ public readonly record struct MsgPackTimestamp
 
     public long Seconds { get; }
     public uint Nanoseconds { get; }
+}
+
+/// <summary>Ordered application map supporting nil, tuple-array and nonfinite numeric keys.</summary>
+public sealed class MsgPackMap : IReadOnlyList<KeyValuePair<object?, object?>>
+{
+    private readonly KeyValuePair<object?, object?>[] _entries;
+
+    public MsgPackMap(params KeyValuePair<object?, object?>[] entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        _entries = entries.ToArray();
+    }
+
+    public int Count => _entries.Length;
+    public KeyValuePair<object?, object?> this[int index] => _entries[index];
+    public IEnumerator<KeyValuePair<object?, object?>> GetEnumerator() =>
+        ((IEnumerable<KeyValuePair<object?, object?>>)_entries).GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+internal sealed class MsgPackExtendedKeyComparer : IEqualityComparer<object?>
+{
+    internal static MsgPackExtendedKeyComparer Instance { get; } = new();
+
+    internal static bool IsSupported(object? key) => key is null ||
+        key is float or double || MsgPackKeyComparer.IsSupported(key) ||
+        key is object?[] items && items.All(IsSupported);
+
+    internal static bool ContainsNaN(object? key) => key is double d && double.IsNaN(d) ||
+        key is float f && float.IsNaN(f) || key is object?[] items && items.Any(ContainsNaN);
+
+    public new bool Equals(object? x, object? y)
+    {
+        if (x is object?[] left && y is object?[] right)
+        {
+            if (left.Length != right.Length) return false;
+            for (var i = 0; i < left.Length; i++)
+                if (!Equals(left[i], right[i])) return false;
+            return true;
+        }
+        return MsgPackKeyComparer.Instance.Equals(x, y);
+    }
+
+    public int GetHashCode(object? obj)
+    {
+        if (obj is null) return 0;
+        if (obj is not object?[] items) return MsgPackKeyComparer.Instance.GetHashCode(obj);
+        var hash = new HashCode();
+        foreach (var item in items) hash.Add(GetHashCode(item));
+        return hash.ToHashCode();
+    }
 }
 
 internal sealed class MsgPackKeyComparer : IEqualityComparer<object>

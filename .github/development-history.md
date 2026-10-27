@@ -46,6 +46,36 @@ The following SHA-256 values fingerprint pinned RNS 1.5.7 source files used in l
 
 The original `e40191...` vectors retain their commit provenance; this history did not preserve a complete per-file SHA-256 ledger for that older source snapshot. Some fixture fingerprints are also preserved in their owning tests (for example retry-crypto fixture `59e2486a903a85a566dd539e522e4e547d53b44f3949a7fb06cb14edca46f9bd` and `rngit-push.json` fixture `941ae1dc34ea3425a428c03cb096738db84145c9999a2b5f1e7382697927752c`); these hash generated outputs, not upstream source files.
 
+## Opt-in extended application map keys
+
+LXST's arbitrary signalling surface exposed the remaining native map-key domain:
+pinned RNS `a29bfb51c468945c96a1ee22cae0114e993e2391`, `RNS/vendor/umsgpack.py:772-805`,
+accepts nil, recursively tuple-converted arrays, infinities and distinct NaNs.
+The existing application-value generator now executes eight additional cases
+against that exact source and independently records packing and unpack/repacking.
+No reference shim or source change is used.
+
+`MsgPackMap` represents these keys as ordered nullable-key entries.
+`UnpackApplicationValue` and its Try counterpart require the explicit
+`allowExtendedMapKeys: true` opt-in. Ordinary decoded maps remain dictionaries;
+legacy projection, request-handler defaults and existing restricted readers are
+unchanged. Structural tuple/binary and exact numeric equality reject duplicates.
+NaN-containing keys remain distinct and bypass same-hash duplicate checking.
+Unhashable map-containing keys fail; all ordinary bounds still apply before
+recursive key comparison. Unlike Python's tuple decoder branch, duplicate
+non-NaN tuple keys are diagnosed rather than silently overwritten.
+
+Validation on Windows:
+
+- `dotnet test tests\DotReticulum.Core.Tests\DotReticulum.Core.Tests.csproj -c Release --filter "FullyQualifiedName~MsgPack"`: **33 passed**, zero skipped. Cases cover executed bytes, default-reader rejection, nested and numeric structural equality, repeated NaNs, cyclic keys, depth bounds and truncated input.
+- `dotnet test DotReticulum.slnx -c Release`: **1,827 passed, 79 opt-in skipped**.
+- `dotnet test DotReticulum.slnx -c Release --settings tests\coverage.runsettings --collect:"XPlat Code Coverage" --logger trx --results-directory TestResults\coverage-extended-map-acfd`: **1,827 passed, 79 skipped**.
+- `pwsh -NoProfile -File tests\coverage_summary.ps1 TestResults\coverage-extended-map-acfd`: overall **22,063/26,532 lines (83.16%)**, **15,998/22,891 branches (69.89%)**; Core **1,840/1,899 lines (96.89%)**, **1,153/1,268 branches (90.93%)**. Shared production code counted once. Other project line/branch coverage: Applications 76.92%/63.78%, Crypto 94.83%/94.00%, Interfaces 85.60%/76.41%, Transport 91.38%/79.53%. Live mode disabled.
+- `dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 --artifacts-path artifacts\parent-map-aot-build -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o artifacts\native-extended-map`: passed with MSVC environment initialized; published `--help` passed.
+- With `DOTRETICULUM_NATIVE_EXE` selecting that binary, `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --filter FullyQualifiedName~NativeResourceTests -- xUnit.MaxParallelThreads=1`: **1 passed**, zero skipped; actual encrypted multi-megabyte Resource feature flow, not new extended-map live evidence.
+
+WSL Ubuntu/Linux x64 `dotnet test tests/DotReticulum.Core.Tests/DotReticulum.Core.Tests.csproj -c Release --artifacts-path <isolated-native-output> --filter "FullyQualifiedName~MsgPack"`: **33 passed**, zero skipped. Extended-map live LXST and native application traffic require separate ecosystem acceptance; vectors and AOT publication do not establish them.
+
 ## Incoming-link initialization ordering (2026-10-26)
 
 Ecosystem `lxmd` acceptance exposed a first-packet race: the responder marked a link active and asynchronously queued its destination initializer behind optional observers. Identification/data could then be proved before handlers were installed. Pinned RNS `a29bfb51c468945c96a1ee22cae0114e993e2391`, `RNS/Link.py:515-535`, invokes the owner callback inside RTT processing. The responder now runs this short initializer in ordered core-after-receive work, outside the link lock but before subsequent ingress. General link-established observers remain asynchronous. Initializer failures are reported through the protected diagnostic mechanism and do not stop later packets.

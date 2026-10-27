@@ -138,6 +138,7 @@ public class MsgPackApplicationValueTests
     public void NumericDuplicatesAreRejectedAcrossEncodings(string hex)
     {
         Assert.Throws<FormatException>(() => MsgPack.UnpackApplicationValue(Convert.FromHexString(hex)));
+        Assert.Throws<FormatException>(() => MsgPack.UnpackApplicationValue(Convert.FromHexString(hex), allowExtendedMapKeys: true));
     }
 
     [Fact]
@@ -153,6 +154,88 @@ public class MsgPackApplicationValueTests
         Assert.Throws<ArgumentException>(() => MsgPack.Pack(new List<KeyValuePair<object, object?>> { new(null!, 1L) }));
         Assert.Throws<ArgumentException>(() => MsgPack.Pack("\uD800"));
         Assert.Throws<ArgumentException>(() => MsgPack.Pack("\uDC00"));
+    }
+
+    private static MsgPackMap Map(params (object? Key, object? Value)[] entries) =>
+        new(entries.Select(entry => new KeyValuePair<object?, object?>(entry.Key, entry.Value)).ToArray());
+
+    [Fact]
+    public void ExtendedMapsMatchExecutedReferenceBytesWithoutChangingDefaultReaders()
+    {
+        Assert.Equal(8, Vectors.GetProperty("extended_map_keys").GetArrayLength());
+        foreach (var vector in Vectors.GetProperty("extended_map_keys").EnumerateArray())
+        {
+            var value = vector.GetProperty("name").GetString() switch
+            {
+                "null" => Map((null, "nil")),
+                "tuple" => Map((new object?[] { 1L, 2L }, "tuple")),
+                "nested-tuple" => Map((new object?[] { null, new object?[] { 1L, 2L }, new byte[] { (byte)'x' } }, "nested")),
+                "positive-infinity" => Map((double.PositiveInfinity, "infinity")),
+                "negative-infinity" => Map((double.NegativeInfinity, "infinity")),
+                "nan" => Map((Value("nan"), "nan")),
+                "distinct-nans" => Map((Value("nan"), 1L), (Value("nan"), 2L)),
+                "mixed" => Map(("normal", Map((null, 1L))),
+                    (new byte[] { (byte)'x' }, Map((new object?[] { true, 2.5 }, new object?[] { null, 3L })))),
+                _ => throw new InvalidOperationException(),
+            };
+            var wire = Convert.FromHexString(vector.GetProperty("hex").GetString()!);
+            Assert.Equal(wire, MsgPack.Pack(value));
+            Assert.Throws<FormatException>(() => MsgPack.UnpackApplicationValue(wire));
+            Assert.True(MsgPack.TryUnpackApplicationValue(wire, out var decoded, allowExtendedMapKeys: true));
+            Assert.Equal(vector.GetProperty("repacked_hex").GetString(), Convert.ToHexStringLower(MsgPack.Pack(decoded)));
+            if (decoded is MsgPackMap map)
+                Assert.Equal(vector.GetProperty("entries").GetInt32(), map.Count);
+        }
+    }
+
+    [Fact]
+    public void ExtendedModeKeepsOrdinaryMapsAndBinaryKeyEquality()
+    {
+        var wire = Wire("scalar-keys");
+        var decoded = Assert.IsType<Dictionary<object, object?>>(MsgPack.UnpackApplicationValue(wire, allowExtendedMapKeys: true));
+        Assert.Equal("bin", decoded[new byte[] { (byte)'x' }]);
+        Assert.Equal(wire, MsgPack.Pack(decoded));
+        var entries = new[] { new KeyValuePair<object?, object?>(null, "original") };
+        var map = new MsgPackMap(entries);
+        entries[0] = new(null, "changed");
+        Assert.Equal("original", map[0].Value);
+    }
+
+    [Fact]
+    public void ExtendedMapsRejectStructuralNumericDuplicatesAndUnhashableKeys()
+    {
+        foreach (var duplicate in new[]
+        {
+            Map((null, 1L), (null, 2L)),
+            Map((new object?[] { true, new byte[] { 1 } }, 1L),
+                (new object?[] { 1.0, new byte[] { 1 } }, 2L)),
+            Map((double.PositiveInfinity, 1L), (float.PositiveInfinity, 2L)),
+            Map((new Dictionary<object, object?>(), 1L)),
+            Map((new object?[] { Map((null, 1L)) }, 1L)),
+        })
+            Assert.Throws<ArgumentException>(() => MsgPack.Pack(duplicate));
+    }
+
+    [Fact]
+    public void ExtendedMapsRetainBoundsAndClearTryResults()
+    {
+        var key = new object?[1];
+        key[0] = key;
+        Assert.Throws<ArgumentException>(() => MsgPack.Pack(Map((key, 1L))));
+        var bounded = Map((new object?[] { new object?[] { 1L } }, 2L));
+        Assert.Throws<ArgumentException>(() => MsgPack.Pack(bounded, new MsgPackLimits { MaxDepth = 2 }));
+        var wire = MsgPack.Pack(bounded);
+        Assert.False(MsgPack.TryUnpackApplicationValue(wire, out var decoded,
+            new MsgPackLimits { MaxDepth = 2 }, allowExtendedMapKeys: true));
+        Assert.Null(decoded);
+        for (var length = 0; length < wire.Length; length++)
+        {
+            Assert.False(MsgPack.TryUnpackApplicationValue(wire.AsSpan(0, length), out decoded, allowExtendedMapKeys: true));
+            Assert.Null(decoded);
+        }
+        var nans = Map(Enumerable.Range(0, 1000).Select(i => ((object?)double.NaN, (object?)(long)i)).ToArray());
+        var decodedNaNs = Assert.IsType<MsgPackMap>(MsgPack.UnpackApplicationValue(MsgPack.Pack(nans), allowExtendedMapKeys: true));
+        Assert.Equal(1000, decodedNaNs.Count);
     }
 
     [Theory]

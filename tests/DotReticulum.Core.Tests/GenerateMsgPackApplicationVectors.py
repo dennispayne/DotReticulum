@@ -81,10 +81,29 @@ def main():
         decoded = umsgpack.unpackb(packed)
         observations.append({"name": name, "hex": packed.hex(),
                              "reference_type": type(next(iter(decoded))).__name__})
+    extended = []
+    for name, value in [
+        ("null", {None: "nil"}),
+        ("tuple", {(1, 2): "tuple"}),
+        ("nested-tuple", {(None, (1, 2), b"x"): "nested"}),
+        ("positive-infinity", {float("inf"): "infinity"}),
+        ("negative-infinity", {-float("inf"): "infinity"}),
+        ("nan", {float("nan"): "nan"}),
+        ("distinct-nans", {float("nan"): 1, float("nan"): 2}),
+        ("mixed", {"normal": {None: 1}, b"x": {(True, 2.5): [None, 3]}}),
+    ]:
+        packed = umsgpack.packb(value)
+        decoded = umsgpack.unpackb(packed)
+        extended.append({
+            "name": name, "hex": packed.hex(),
+            "repacked_hex": umsgpack.packb(decoded).hex(),
+            "entries": len(decoded),
+        })
     output = {
         "pinned_sha": PINNED_RNS_SHA,
         "source_sha256": hashlib.sha256(Path(umsgpack.__file__).read_bytes()).hexdigest(),
         "cases": cases, "rejected": rejected, "intentional_restrictions": observations,
+        "extended_map_keys": extended,
     }
     target = Path(__file__).parent / "Fixtures" / "msgpack-application-values-a29bfb51.json"
     target.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")

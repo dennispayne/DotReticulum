@@ -27,16 +27,18 @@ public static class MsgPack
     public static object? Unpack(ReadOnlySpan<byte> data, MsgPackLimits limits) => Decode(data, limits, false);
 
     /// <summary>Preserves binary map keys, using content and exact numeric key equality.</summary>
-    public static object? UnpackApplicationValue(ReadOnlySpan<byte> data, MsgPackLimits? limits = null) =>
-        Decode(data, limits ?? MsgPackLimits.Default, true);
+    public static object? UnpackApplicationValue(ReadOnlySpan<byte> data, MsgPackLimits? limits = null,
+        bool allowExtendedMapKeys = false) =>
+        Decode(data, limits ?? MsgPackLimits.Default, true, allowExtendedMapKeys);
 
-    private static object? Decode(ReadOnlySpan<byte> data, MsgPackLimits limits, bool binaryKeys)
+    private static object? Decode(ReadOnlySpan<byte> data, MsgPackLimits limits, bool binaryKeys,
+        bool extendedMapKeys = false)
     {
         ArgumentNullException.ThrowIfNull(limits);
         limits.Validate();
         if (data.Length > limits.MaxEncodedBytes) throw new FormatException("MessagePack encoded-byte limit exceeded.");
         var pos = 0;
-        var v = Read(data, ref pos, 0, new Operation(limits, binaryKeys));
+        var v = Read(data, ref pos, 0, new Operation(limits, binaryKeys, extendedMapKeys));
         if (pos != data.Length)
         {
             throw new FormatException("Trailing bytes after msgpack value.");
@@ -48,15 +50,17 @@ public static class MsgPack
     public static bool TryUnpack(ReadOnlySpan<byte> data, out object? value)
         => TryDecode(data, out value, false, MsgPackLimits.Default);
 
-    public static bool TryUnpackApplicationValue(ReadOnlySpan<byte> data, out object? value, MsgPackLimits? limits = null)
-        => TryDecode(data, out value, true, limits ?? MsgPackLimits.Default);
+    public static bool TryUnpackApplicationValue(ReadOnlySpan<byte> data, out object? value, MsgPackLimits? limits = null,
+        bool allowExtendedMapKeys = false)
+        => TryDecode(data, out value, true, limits ?? MsgPackLimits.Default, allowExtendedMapKeys);
 
-    private static bool TryDecode(ReadOnlySpan<byte> data, out object? value, bool binaryKeys, MsgPackLimits limits)
+    private static bool TryDecode(ReadOnlySpan<byte> data, out object? value, bool binaryKeys, MsgPackLimits limits,
+        bool extendedMapKeys = false)
     {
         limits.Validate();
         try
         {
-            value = Decode(data, limits, binaryKeys);
+            value = Decode(data, limits, binaryKeys, extendedMapKeys);
             return true;
         }
         catch (Exception ex) when (ex is FormatException or ArgumentException or OverflowException or InvalidOperationException)
@@ -140,6 +144,21 @@ public static class MsgPack
                 else if (arr.Length < 65536) { s.WriteByte(0xDC); WriteBE(s, (ulong)arr.Length, 2); }
                 else { s.WriteByte(0xDD); WriteBE(s, (ulong)arr.Length, 4); }
                 foreach (var e in arr) { Write(s, e, depth + 1, operation); }
+                break;
+            case MsgPackMap extendedMap:
+                operation.Container((ulong)extendedMap.Count, true, false);
+                WriteMapHeader(s, extendedMap.Count);
+                var extendedKeys = new HashSet<object?>(MsgPackExtendedKeyComparer.Instance);
+                foreach (var (key, value) in extendedMap)
+                {
+                    Write(s, key, depth + 1, operation);
+                    if (!MsgPackExtendedKeyComparer.IsSupported(key))
+                        throw new ArgumentException("MessagePack map keys cannot contain maps or unsupported values.");
+                    // NaNs never compare equal; avoid quadratic work from their identical hash codes.
+                    if (!MsgPackExtendedKeyComparer.ContainsNaN(key) && !extendedKeys.Add(key))
+                        throw new ArgumentException("Duplicate MessagePack map key.");
+                    Write(s, value, depth + 1, operation);
+                }
                 break;
             case IReadOnlyList<KeyValuePair<object, object?>> map:
                 operation.Container((ulong)map.Count, true, false);
@@ -336,12 +355,33 @@ public static class MsgPack
         return arr;
     }
 
-    private static Dictionary<object, object?> ReadMap(ReadOnlySpan<byte> d, ref int pos, ulong n, int depth, Operation operation)
+    private static object ReadMap(ReadOnlySpan<byte> d, ref int pos, ulong n, int depth, Operation operation)
     {
         operation.Container(n, true, true);
         if (n > (ulong)(d.Length - pos) / 2)
         {
             throw new FormatException("Truncated msgpack.");
+        }
+
+        if (operation.ExtendedMapKeys)
+        {
+            var entries = new KeyValuePair<object?, object?>[(int)n];
+            var keys = new HashSet<object?>(MsgPackExtendedKeyComparer.Instance);
+            var extended = false;
+            for (var i = 0; i < entries.Length; i++)
+            {
+                var key = Read(d, ref pos, depth + 1, operation);
+                if (!MsgPackExtendedKeyComparer.IsSupported(key))
+                    throw new FormatException("MessagePack map keys cannot contain maps or unsupported values.");
+                if (!MsgPackExtendedKeyComparer.ContainsNaN(key) && !keys.Add(key))
+                    throw new FormatException("Duplicate MessagePack map key.");
+                extended |= !MsgPackKeyComparer.IsSupported(key);
+                entries[i] = new(key, Read(d, ref pos, depth + 1, operation));
+            }
+            if (extended) return new MsgPackMap(entries);
+            var ordinary = new Dictionary<object, object?>(entries.Length, MsgPackKeyComparer.Instance);
+            foreach (var (key, value) in entries) ordinary.Add(key!, value);
+            return ordinary;
         }
 
         var map = new Dictionary<object, object?>((int)n, MsgPackKeyComparer.Instance);
@@ -416,11 +456,12 @@ public static class MsgPack
         }
     }
 
-    private sealed class Operation(MsgPackLimits limits, bool binaryKeys)
+    private sealed class Operation(MsgPackLimits limits, bool binaryKeys, bool extendedMapKeys = false)
     {
         private int _values;
         internal MsgPackLimits Limits { get; } = limits;
         internal bool BinaryKeys { get; } = binaryKeys;
+        internal bool ExtendedMapKeys { get; } = extendedMapKeys;
 
         internal void Visit(int depth, bool reading)
         {
