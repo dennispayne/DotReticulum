@@ -116,6 +116,10 @@ A DotReticulum version is **the upstream RNS release it targets plus a build num
 
 So `1.5.7.42` is the forty-second build aimed at RNS 1.5.7. A version number names the target, not completed parity. To move to a newer upstream, see [Moving to a new upstream release](CONTRIBUTING.md#moving-to-a-new-upstream-release).
 
+### Releases
+
+A release is a `v<version>` tag (for example `v1.5.7.42`) on `main`. Create it with `pwsh tools/new-release-tag.ps1` and push it; the [Release workflow](.github/workflows/release.yml) then builds the NativeAOT packages for `linux-x64`, `win-x64` and `osx-arm64`, zips them with SHA-256 checksums, and attaches them to a GitHub release. A manual run of the workflow builds the zips as artifacts without publishing. Each zip is the output of `tools/dotreticulum-packaging.ps1` (see [installation](docs/installation.md)). Platform support is only as strong as the recorded evidence; macOS in particular is built but not verified.
+
 ## Contributing
 
 Contributions are welcome; read [CONTRIBUTING.md](CONTRIBUTING.md). The [development history](.github/development-history.md) is a condensed historical reference.
