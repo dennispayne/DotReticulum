@@ -922,9 +922,9 @@ public sealed partial class Link
             return;
         }
 
+        TeardownReason = reason;
         Status = LinkStatus.Closed;
         _mgr.CancelOwnedWork(_closedCancellation);
-        TeardownReason = reason;
         CancelResources(after);
         _mgr.ObserveRequiredCleanup(DrainResourceWorkAsync(), "resource cleanup");
         foreach (var r in _receipts.ToArray())

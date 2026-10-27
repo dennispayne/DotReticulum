@@ -143,7 +143,17 @@ jobs:
         if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
         run: |
           if (!(Get-Module -ListAvailable Pester | Where-Object Version -eq '5.7.1')) {
-            Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck -Repository PSGallery
+            for ($attempt = 1; ; $attempt++) {
+              try {
+                if (!(Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) { Register-PSRepository -Default }
+                Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck -Repository PSGallery -ErrorAction Stop
+                break
+              } catch {
+                if ($attempt -ge 4) { throw }
+                Write-Warning "Pester install attempt $attempt failed: $($_.Exception.Message)"
+                Start-Sleep -Seconds (10 * $attempt)
+              }
+            }
           }
           Import-Module Pester -RequiredVersion 5.7.1
           $configuration = New-PesterConfiguration
