@@ -300,6 +300,33 @@ public class LinkTests
     }
 
     [Fact]
+    public async Task Link_PacketReceiverLeaseProtectsConcurrentOwnersAndLaterRegistrations()
+    {
+        await using var topo = await BuildAsync(false);
+        var established = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sender = topo.Initiator.Router.Links.Connect(topo.Destination.Identity,
+            topo.Destination.Destination.Hash, value => established.TrySetResult(value));
+        await Within(established.Task);
+        var leases = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
+        {
+            try { return sender.RegisterPacketReceiver((_, _) => { }); }
+            catch (InvalidOperationException) { return null; }
+        })));
+        var lease = Assert.Single(leases.OfType<IDisposable>());
+        Assert.Throws<InvalidOperationException>(() => sender.SetPacketReceiver(null));
+        lease.Dispose();
+        using var replacement = sender.RegisterPacketReceiver((_, _) => { });
+        lease.Dispose();
+        Assert.Throws<InvalidOperationException>(() => sender.RegisterPacketReceiver((_, _) => { }));
+        replacement.Dispose();
+        sender.SetPacketReceiver((_, _) => { });
+        Assert.Throws<InvalidOperationException>(() => sender.RegisterPacketReceiver((_, _) => { }));
+        sender.SetPacketReceiver(null);
+        sender.Teardown();
+        Assert.Throws<InvalidOperationException>(() => sender.RegisterPacketReceiver((_, _) => { }));
+    }
+
+    [Fact]
     public async Task Link_ReceiptlessTrySendReportsBoundedQueueFailure()
     {
         await using var topo = await BuildAsync(false);

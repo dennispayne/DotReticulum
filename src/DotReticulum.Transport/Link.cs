@@ -34,6 +34,7 @@ public sealed partial class Link
     private readonly List<PacketReceipt> _receipts = [];
     private readonly List<RequestReceipt> _pendingRequests = [];
     private Action<byte[], Packet>? _packetReceiver;
+    private PacketReceiverRegistration? _packetReceiverRegistration;
     private byte[]? _prv;
     private byte[]? _sigSeed;
     private byte[] _pub = [];
@@ -204,7 +205,41 @@ public sealed partial class Link
     /// Use it to enqueue protocol work without relying on observer scheduling. Null removes the receiver.</summary>
     public void SetPacketReceiver(Action<byte[], Packet>? receiver)
     {
-        lock (_gate) _packetReceiver = receiver;
+        lock (_gate)
+        {
+            if (_packetReceiverRegistration is not null)
+                throw new InvalidOperationException("The packet receiver has an active owner.");
+            _packetReceiver = receiver;
+        }
+    }
+
+    /// <summary>Exclusively registers a short ordered protocol receiver. Dispose the returned lease to remove it.
+    /// Rejects an existing receiver; a disposed old lease cannot remove a later registration.</summary>
+    public IDisposable RegisterPacketReceiver(Action<byte[], Packet> receiver)
+    {
+        ArgumentNullException.ThrowIfNull(receiver);
+        lock (_gate)
+        {
+            if (Status == LinkStatus.Closed) throw new InvalidOperationException("The link is closed.");
+            if (_packetReceiver is not null) throw new InvalidOperationException("The link already has a packet receiver.");
+            var registration = new PacketReceiverRegistration(this);
+            _packetReceiver = receiver;
+            _packetReceiverRegistration = registration;
+            return registration;
+        }
+    }
+
+    private sealed class PacketReceiverRegistration(Link link) : IDisposable
+    {
+        public void Dispose()
+        {
+            lock (link._gate)
+            {
+                if (!ReferenceEquals(link._packetReceiverRegistration, this)) return;
+                link._packetReceiverRegistration = null;
+                link._packetReceiver = null;
+            }
+        }
     }
 
     public Action<Link, Identity>? RemoteIdentified { get; set; }

@@ -103,6 +103,12 @@ WSL Ubuntu/Linux x64 follow-up at source commit `36dafd2`, using `/home/dennis/.
 
 This verifies the actual Linux runtime/native encrypted multi-megabyte flow, not physical hardware.
 
+## Exclusive packet-receiver ownership (2026-10-26)
+
+`RegisterPacketReceiver` adds an atomic exclusive lease for the ordered protocol receiver. It rejects a closed link or existing receiver; legacy setter operations cannot replace or remove an actively leased receiver. Disposal uses registration identity, so repeated disposal cannot remove a replacement owner. The existing setter remains available for explicitly caller-managed ownership. Removal does not cancel an in-flight callback; adapters still own bounded enqueue/disposal coordination. An in-process eight-way registration race proves one winner, foreign setter rejection and stale-lease safety.
+
+`dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet` passed 1,823, skipped 79. The preceding full run had one transient `SignedDiscoveryPreservesTcpPolicyAndBackboneMetadataAttachesNativeHdlcAdapter` timing failure; its detailed isolated rerun passed, then the full rerun passed without changes to discovery code. `dotnet publish src/DotReticulum.Applications/DotReticulum.Applications.csproj -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o artifacts/native-receiver-lease` succeeded; published `--help` and `dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj -c Release --no-build --filter FullyQualifiedName~NativeResourceTests --nologo -v quiet -- xUnit.MaxParallelThreads=1` with that native executable passed (1/1). These checks preserve existing packet observers and wire behavior; ecosystem adapter ownership acceptance follows after opting into the lease.
+
 ## Chronological milestones
 
 | Date | Milestone | Outcome |

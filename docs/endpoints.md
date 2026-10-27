@@ -50,8 +50,13 @@ not packet ordering. Pinned Python also starts a thread per packet callback
 the link lock in ingress order before asynchronous packet observers. It should
 only enqueue bounded application work and return promptly; blocking it blocks
 that router's ingress. Exceptions are reported and later packets still run.
-`SetPacketReceiver(null)` removes it. The adapter owns its queue and registration;
-the link does not own application workers.
+`SetPacketReceiver(null)` removes it. For exclusive ownership use
+`RegisterPacketReceiver(receiver)`: it atomically rejects an existing receiver
+and returns a disposable registration. While the lease is active, legacy setter
+replacement/removal is rejected. Disposing an old lease again cannot remove a
+later registration. The adapter owns its queue and lease; the link does not own
+application workers. Removal does not cancel a receiver invocation already
+captured by ingress, so adapter cleanup must tolerate an in-flight enqueue.
 
 `TrySend(data)` sends encrypted data without creating a receipt and returns
 whether the local bounded outbound queue accepted it. False means the link or
