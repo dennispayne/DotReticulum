@@ -31,7 +31,7 @@ Currently targeted: **RNS 1.5.7**, upstream commit `a29bfb51c468945c96a1ee22cae0
 - Multi-hop transport and the `rnsd` daemon, with shared instances, management and discovery
 - Interfaces: UDP, TCP client/server, serial, Auto, Backbone, Pipe, KISS/AX.25, RNode, Multi-RNode, I2P, Weave and Local, with IFAC authentication
 - The upstream utility set as one NativeAOT executable: `rnsd`, `rnstatus`, `rnpath`, `rnprobe`, `rnid`, `rncp`, `rnx`, `rnsh`, `rnodeconf`, plus `rngit`, `git-remote-rns` and `rngcs` for Git over Reticulum
-- LXMF messaging and a .NET-specific telemetry daemon
+- A .NET-specific telemetry daemon. LXMF now lives in [DotReticulum.Ecosystem](https://github.com/dennispayne/DotReticulum.Ecosystem) as DotLXMF
 - Idiomatic, trimming- and NativeAOT-friendly .NET: asynchronous I/O, cancellation, bounded resource use, no reflection-based serialization
 
 This is a target, not a claim of complete parity; see [Compatibility](#compatibility).
@@ -44,7 +44,6 @@ This is a target, not a claim of complete parity; see [Compatibility](#compatibi
 | `src/DotReticulum.Crypto` | Ed25519, X25519, HKDF, Reticulum tokens |
 | `src/DotReticulum.Transport` | Announces, routing, links, resources |
 | `src/DotReticulum.Interfaces` | Interface implementations |
-| `src/DotReticulum.Lxmf` | LXMF messages and router; see [LXMF](docs/lxmf.md) |
 | `src/DotReticulum.Applications` | Client runtime and the command-line utilities |
 
 Raw Curve25519 uses Bouncy Castle because .NET has no portable raw Ed25519/X25519 API; everything else uses `System.Security.Cryptography`. Reticulum tokens are binary `IV || ciphertext || HMAC`, not standard Fernet.
@@ -68,7 +67,7 @@ dotnet run --project src/DotReticulum.Applications -- rnsd --help
 | Daemon and runtime | [rnsd](docs/rnsd.md), [runtime operations](docs/runtime-operations.md), [runtime state](docs/runtime-state.md), [transport controls](docs/transport-controls.md), [interface policy](docs/interface-policy.md) |
 | Interfaces | [UDP](docs/udp-interface.md), [TCP/serial/stream](docs/stream-interfaces.md), [Auto](docs/auto-interface.md), [Backbone and Pipe](docs/backbone-pipe.md), [KISS/AX.25](docs/kiss-interfaces.md), [RNode](docs/rnode-interfaces.md), [I2P](docs/i2p-interface.md), [Weave](docs/weave-interface.md), [Local and Android](docs/interface-platforms.md), [packet PHY](docs/packet-phy.md) |
 | Protocol building blocks | [Endpoints](docs/endpoints.md), [application values](docs/application-values.md), [resources](docs/resources.md), [Channel and Buffer](docs/channel-buffer.md) |
-| Utilities | [rnid](docs/rnid.md), [rnstatus/rnpath/rnprobe](docs/network-utilities.md), [rncp and rnx](docs/rncp-rnx.md), [rnsh](docs/rnsh.md), [rnodeconf](docs/rnodeconf.md), [telemetry](docs/telemetry.md), [LXMF](docs/lxmf.md), [upstream placeholders](docs/upstream-placeholders.md) |
+| Utilities | [rnid](docs/rnid.md), [rnstatus/rnpath/rnprobe](docs/network-utilities.md), [rncp and rnx](docs/rncp-rnx.md), [rnsh](docs/rnsh.md), [rnodeconf](docs/rnodeconf.md), [telemetry](docs/telemetry.md), [upstream placeholders](docs/upstream-placeholders.md) |
 | Git over Reticulum | [rngit, git-remote-rns, rngcs](docs/rngit.md) |
 | Compatibility | [Contract reference](docs/compatibility-contracts.md), [mixed Python/.NET mesh](docs/compatibility-mesh.md) |
 | Project | [Installing](docs/installation.md), [Contributing](CONTRIBUTING.md), [TODO](TODO.md), [development history](.github/development-history.md) |
@@ -85,7 +84,7 @@ dotnet run --project src/DotReticulum.Applications -- rnsd --help
 | Runtime configuration, shared instances, management, discovery | Both roles tested against Python; persistence and restart covered |
 | Links, requests, resources, Channel, Buffer | Live both ways with multi-megabyte payloads, loss, retries and teardown recovery |
 | Auto, Backbone, Pipe, KISS, RNode, Weave, I2P | Software, process and simulator tests; live Python on Linux for Auto and Backbone. No over-the-air radio interoperability; I2P restart recovery not verified |
-| LXMF, `rncp`, `rnx`, telemetry | LXMF with Python `LXMRouter` and `lxmd` (propagation sync not implemented); `rncp`/`rnx` live both ways; telemetry is .NET-specific |
+| `rncp`, `rnx`, telemetry | `rncp`/`rnx` live both ways; telemetry is .NET-specific |
 | `rngit`, `git-remote-rns`, `rngcs` | Clone, fetch and push against the pinned Python server; hosting, releases, work documents, signing; verified fetch of the hosted upstream |
 | `rnid`, `rnstatus`, `rnpath`, `rnprobe`, `rnsh`, `rnodeconf` | Windows and Linux native-process tests against Python; `rnodeconf` identified a real RNode over USB, flashing/recovery not hardware-accepted |
 | Mixed mesh | Impaired transports, lost resource parts and a restarted .NET router; see [the mesh reference](docs/compatibility-mesh.md) |

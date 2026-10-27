@@ -167,17 +167,11 @@ differences, not exact Python help/spinner/REPL compatibility.
 
 ### Supported extension scope
 
-Existing LXMF and telemetry are regressions, not permission to expand RNS
-parity. `LxMessage`, `LxmRouter`, stamp/vector and live suites support
-opportunistic/direct/Resource delivery both directions with Python LXMRouter.
-Real `lxmd` evidence is separately **.NET-to-lxmd**, with its maximum accepted
-transfer size raised. **Partial/outside this RNS completion scope**: LXMF
-propagation synchronization, tickets, paper delivery and delivery-endpoint
-ratchets are absent; real lxmd reverse origination is not established merely
-by delivery to the daemon. [LXMF](lxmf.md) preserves these limits.
-Telemetry is **implemented .NET-only**, U/process/direct-and-.NET-hop evidence,
+LXMF is **outside this repository**: it lives in
+[DotReticulum.Ecosystem](https://github.com/dennispayne/DotReticulum.Ecosystem)
+as `DotLXMF`, which builds on this stack. Telemetry is **implemented .NET-only**, U/process/direct-and-.NET-hop evidence,
 not a pinned RNS wire protocol or a substitute for upstream management.
-Absent audio/video extensions and new LXMF functionality are **not applicable**
+Absent audio/video extensions are **not applicable**
 to this inventory's implementation authorization.
 
 ## Shipped example scenarios
