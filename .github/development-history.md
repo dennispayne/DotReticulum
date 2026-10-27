@@ -95,6 +95,14 @@ Windows gates: `dotnet test DotReticulum.slnx -c Release --settings tests/covera
 
 Production merged coverage from `tests/coverage_summary.ps1 TestResults/coverage-resource-drain-acfd`: Applications lines/branches 76.87%/63.75%, Core 96.64%/89.80%, Crypto 94.83%/94.00%, Interfaces 85.60%/76.16%, Transport 91.42%/79.52%; overall 21,984/26,459 lines (83.09%) and 15,908/22,821 branches (69.71%). No wire behavior or reference pin changed.
 
+WSL Ubuntu/Linux x64 follow-up at source commit `36dafd2`, using `/home/dennis/.dotreticulum-dotnet/dotnet`:
+
+- `dotnet test tests/DotReticulum.Transport.Tests/DotReticulum.Transport.Tests.csproj -c Release --artifacts-path /home/dennis/dotreticulum-ecosystem-acfd3d43/parent-stack-linux --filter "FullyQualifiedName~LinkTests|FullyQualifiedName~Parity5ResourceTests" --nologo -v quiet`: 89 passed, 8 skipped.
+- `dotnet publish src/DotReticulum.Applications/DotReticulum.Applications.csproj -c Release -r linux-x64 --artifacts-path /home/dennis/dotreticulum-ecosystem-acfd3d43/parent-stack-native-linux-build -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o /home/dennis/dotreticulum-ecosystem-acfd3d43/native/stack-final`: succeeded.
+- Published `--help` and `dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj -c Release --artifacts-path /home/dennis/dotreticulum-ecosystem-acfd3d43/parent-stack-linux --filter FullyQualifiedName~NativeResourceTests --nologo -v quiet -- xUnit.MaxParallelThreads=1` with `DOTRETICULUM_NATIVE_EXE` selecting that native output: 1 passed, zero skipped.
+
+This verifies the actual Linux runtime/native encrypted multi-megabyte flow, not physical hardware.
+
 ## Chronological milestones
 
 | Date | Milestone | Outcome |
