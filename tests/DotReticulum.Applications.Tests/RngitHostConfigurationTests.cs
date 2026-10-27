@@ -13,7 +13,7 @@ public sealed class RngitHostConfigurationTests : IDisposable
     private readonly string directory = Path.Combine(Directory.GetCurrentDirectory(), "rngit-host-config-" + Guid.NewGuid().ToString("N"));
 
     public RngitHostConfigurationTests() => Directory.CreateDirectory(directory);
-    public void Dispose() => Directory.Delete(directory, recursive: true);
+    public void Dispose() => TestDirectory.DeleteWithRetry(directory);
     private RngitHostConfiguration Load(string text, Action<string>? diagnostic = null)
     {
         File.WriteAllText(Path.Combine(directory, "config"), text);

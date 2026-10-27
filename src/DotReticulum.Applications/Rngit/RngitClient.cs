@@ -125,7 +125,25 @@ public sealed class RngitClient(ReticulumNode node, Identity identity, Action<st
                     File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
                 }
 
-                Directory.Delete(staging, recursive: true);
+                DeleteStaging(staging);
+            }
+        }
+    }
+
+    // Cleanup is best-effort: a scanner or indexer can briefly hold freshly written files, and a leftover
+    // staging directory must not turn a completed (or already failing) transfer into a different error.
+    private static void DeleteStaging(string staging)
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            try
+            {
+                if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(50 * (attempt + 1));
             }
         }
     }

@@ -232,7 +232,7 @@ internal sealed class PresentationProcessFixture : IDisposable
         {
             try
             {
-                System.IO.Directory.Delete(Directory, recursive: true);
+                TestDirectory.DeleteWithRetry(Directory);
                 return;
             }
             catch (Exception e) when (attempt < 50 && e is UnauthorizedAccessException or IOException)

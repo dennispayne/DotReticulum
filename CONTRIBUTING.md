@@ -61,7 +61,7 @@ Live Python harnesses require `DOTRETICULUM_UPSTREAM` to point at an unmodified 
 DotReticulum's version is the targeted upstream RNS version plus a git-height build number (see the README's Versioning section). Anyone may take the project to the next upstream release (for example 1.5.8):
 
 1. Fetch the new upstream with our own `rngit fetch` from `rns://7649a50d84610232d1416b41d2896aff/reticulum/reticulum`, verify the Git objects, and compare against the [GitHub mirror](https://github.com/markqvist/Reticulum). The mirror is for comparison, never the origin of a pin.
-2. Update `PINNED_RNS_SHA` (and the LXMF pin if needed) in `tests/Interop/reference_environment.py`, and the commit text in this file and the README.
+2. Update `PINNED_RNS_SHA` (and the LXMF version the harness checks, if needed) in `tests/Interop/reference_environment.py`, and the commit text in this file and the README. [DotReticulum.Ecosystem](https://github.com/dennispayne/DotReticulum.Ecosystem) keeps its own copy of that file and its own submodule pin; update it separately.
 3. Regenerate affected vectors by executing the new upstream, recording the new revision. Do not relabel older vectors.
 4. Review upstream changes since the old pin, update the code and `docs/compatibility-contracts.md`, and run the live suites.
 5. Edit `version.json` to the new upstream number (the build height resets) and update the "reference RNS x.y.z" strings in the applications' `--version`/help output.

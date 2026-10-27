@@ -40,7 +40,7 @@ public sealed class RngitTests
         {
             foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
                 File.SetAttributes(file, FileAttributes.Normal);
-            Directory.Delete(root, recursive: true);
+            TestDirectory.DeleteWithRetry(root);
         }
     }
 
@@ -208,7 +208,7 @@ public sealed class RngitTests
             {
                 File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
             }
-            Directory.Delete(root, recursive: true);
+            TestDirectory.DeleteWithRetry(root);
         }
     }
 

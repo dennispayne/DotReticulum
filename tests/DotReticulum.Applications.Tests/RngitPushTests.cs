@@ -187,7 +187,7 @@ public sealed class RngitPushTests
         {
             foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
                 File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
-            Directory.Delete(root, recursive: true);
+            TestDirectory.DeleteWithRetry(root);
         }
     }
 }

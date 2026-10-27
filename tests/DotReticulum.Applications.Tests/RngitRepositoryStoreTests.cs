@@ -25,7 +25,7 @@ public sealed partial class RngitRepositoryStoreTests : IDisposable
     {
         owner.Dispose();
         vectors.Dispose();
-        RngitRepositoryStore.DeleteOwnedDirectory(directory);
+        TestDirectory.DeleteWithRetry(directory);
     }
 
     private RngitHostConfiguration Config(bool blocked = false)

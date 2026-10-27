@@ -20,7 +20,7 @@ public sealed class RngitClientConfigurationTests : IDisposable
     private const string Hash = "0123456789abcdef0123456789abcdef";
 
     public RngitClientConfigurationTests() => Directory.CreateDirectory(directory);
-    public void Dispose() => Directory.Delete(directory, recursive: true);
+    public void Dispose() => TestDirectory.DeleteWithRetry(directory);
 
     private RngitClientConfiguration Load(string text)
     {

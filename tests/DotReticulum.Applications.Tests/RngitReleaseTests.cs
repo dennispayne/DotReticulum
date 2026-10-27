@@ -90,7 +90,7 @@ public sealed class RngitReleaseTests
                 });
             Assert.True(generated.Code == 0, generated.Error + Encoding.UTF8.GetString(generated.Output));
             // Recreate the independently hosted .NET fixture after upstream mutations.
-            Directory.Delete(fixture.Repository + ".releases", recursive: true);
+            TestDirectory.DeleteWithRetry(fixture.Repository + ".releases");
         }
         var file = Environment.GetEnvironmentVariable("DOTRETICULUM_GENERATE_RELEASE") == "1"
             ? Path.Combine(root, "tests", "DotReticulum.Applications.Tests", "Fixtures", "rngit-release-vectors.json")
@@ -412,7 +412,7 @@ public sealed class RngitReleaseTests
             Identity.Dispose();
             foreach (var path in Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories))
                 File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly);
-            Directory.Delete(Root, true);
+            TestDirectory.DeleteWithRetry(Root);
             return ValueTask.CompletedTask;
         }
     }

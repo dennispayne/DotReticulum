@@ -22,7 +22,7 @@ and safety decisions are documented separately.
 | Configuration defaults, startup, identity/state files and runtime lifecycle | `RNS/Reticulum.py` | `RNS/Config.py`, `RNS/Transport.py`, `RNS/Interfaces/*` |
 | TCP/UDP/serial/Backbone/Local/Pipe/Auto/KISS/RNode and other bearers | `RNS/Interfaces/` | Constructors/config consumers, frame codecs, child peer lifecycle |
 | Daemon and CLI observable behavior | `RNS/Utilities/` | Utility entry points, runtime APIs, argument parsing and process behavior |
-| LXMF behavior (separate application protocol) | `LXMF/` in the pinned environment | `RNS/Identity.py`, destinations, links/resources and live `lxmd` behavior |
+| LXMF behavior (separate application protocol; implemented in the DotReticulum.Ecosystem repository, not here) | `LXMF/` in the pinned environment | Reference environment only: used by this repo's harnesses and by DotReticulum.Ecosystem's DotLXMF tests |
 
 Do not assume a feature is wholly implemented by its named module. For example,
 an interface contract may span configuration parsing, a generic interface,

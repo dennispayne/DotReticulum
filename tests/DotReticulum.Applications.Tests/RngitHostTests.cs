@@ -48,7 +48,7 @@ public sealed class RngitHostTests
             Assert.Null(host.Store.Find("fixtures/blocked.git"));
             Assert.False(Directory.Exists(Path.Combine(fixture.Root, "repositories", "blocked.git")));
         }
-        finally { Directory.Delete(networkDirectory, true); }
+        finally { TestDirectory.DeleteWithRetry(networkDirectory); }
     }
 
     [LiveFact]
@@ -405,7 +405,7 @@ public sealed class RngitHostTests
         {
             foreach (var file in Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories))
                 File.SetAttributes(file, File.GetAttributes(file) & ~FileAttributes.ReadOnly);
-            Directory.Delete(Root, true);
+            TestDirectory.DeleteWithRetry(Root);
             return ValueTask.CompletedTask;
         }
     }

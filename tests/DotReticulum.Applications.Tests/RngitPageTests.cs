@@ -47,7 +47,7 @@ public sealed class RngitPageTests : IDisposable
         if (!Directory.Exists(directory)) return;
         foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
             File.SetAttributes(file, FileAttributes.Normal);
-        Directory.Delete(directory, recursive: true);
+        TestDirectory.DeleteWithRetry(directory);
     }
     private static object? Request(JsonElement element) => element.ValueKind switch
     {

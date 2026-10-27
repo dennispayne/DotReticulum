@@ -23,7 +23,7 @@ The Python code in the upstream repository is the Reference Implementation and, 
 - **GitHub mirror:** [github.com/markqvist/Reticulum](https://github.com/markqvist/Reticulum) is a public mirror of that repository ("all development is happening elsewhere"). It is the easy place to browse upstream's code; we use it only as a secondary comparison source, never as the origin of a new reference pin.
 - **Manual:** [reticulum.network/manual](https://reticulum.network/manual/).
 
-Currently targeted: **RNS 1.5.7**, upstream commit `a29bfb51c468945c96a1ee22cae0114e993e2391`, with LXMF 1.2.1.
+Currently targeted: **RNS 1.5.7**, upstream commit `a29bfb51c468945c96a1ee22cae0114e993e2391`, with LXMF 1.2.1 in the Python reference environment (used by the harnesses; LXMF itself is implemented in DotReticulum.Ecosystem).
 
 ## Notable features
 

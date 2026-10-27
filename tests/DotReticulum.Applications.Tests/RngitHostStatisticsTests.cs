@@ -27,7 +27,7 @@ public sealed class RngitHostStatisticsTests : IDisposable
         configuration = RngitHostConfiguration.Load(directory);
     }
 
-    public void Dispose() => Directory.Delete(directory, recursive: true);
+    public void Dispose() => TestDirectory.DeleteWithRetry(directory);
     private RngitHostStatistics Create(Action<string>? diagnostic = null) => new(configuration, diagnostic, clock);
     private static Dictionary<object, object?> Map(object? value) => Assert.IsType<Dictionary<object, object?>>(value);
     private static long Count(RngitHostStatistics statistics, params string[] path)

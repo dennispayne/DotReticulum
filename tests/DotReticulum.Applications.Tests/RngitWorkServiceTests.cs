@@ -66,7 +66,7 @@ public sealed class RngitWorkServiceTests
         public void Dispose()
         {
             Owner.Dispose();
-            Directory.Delete(Root, recursive: true);
+            TestDirectory.DeleteWithRetry(Root);
         }
 
         private static string FindRoot()
@@ -261,7 +261,7 @@ public sealed class RngitWorkServiceTests
         File.WriteAllText(Path.Combine(h.Work, "active", "2"), "not a directory");
         File.WriteAllText(Path.Combine(h.Work, "active", "3"), "not a directory");
         // A locked parent file representing a scope is an OS-independent unwritable path.
-        Directory.Delete(Path.Combine(h.Work, "active"), recursive: true);
+        TestDirectory.DeleteWithRetry(Path.Combine(h.Work, "active"));
         File.WriteAllText(Path.Combine(h.Work, "active"), "blocked");
         Status(await h.Create(), 255, "Error saving document");
         Assert.Equal("blocked", File.ReadAllText(Path.Combine(h.Work, "active")));
