@@ -40,11 +40,15 @@ concurrency:
   group: build-test-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
 jobs:
-  build-test:
-    name: ${{ matrix.os }} / ${{ matrix.rid }}
+  build:
+    name: Build / ${{ matrix.rid }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -58,11 +62,6 @@ jobs:
     defaults:
       run:
         shell: pwsh
-    env:
-      DOTNET_NOLOGO: 'true'
-      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
-      DOTRETICULUM_LIVE: '0'
-      COVERAGE_DIRECTORY: TestResults/coverage-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -87,32 +86,9 @@ jobs:
         run: dotnet restore DotReticulum.slnx
 
       - name: Build
-        id: build
         run: dotnet build DotReticulum.slnx -c Release --no-restore
 
-      - name: Test with production coverage
-        run: |
-          if (Test-Path -LiteralPath $env:COVERAGE_DIRECTORY) { throw 'Coverage directory must be fresh.' }
-          dotnet test DotReticulum.slnx -c Release --no-build -m:1 --settings tests/coverage.runsettings --collect:"XPlat Code Coverage" --results-directory $env:COVERAGE_DIRECTORY --logger trx -- xUnit.MaxParallelThreads=1
-
-      - name: Summarize test results
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          $summary = & ./tests/test_summary.ps1 -Path $env:COVERAGE_DIRECTORY -Title 'Unit and integration tests (${{ matrix.rid }})'
-          $summary
-          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
-
-      - name: Summarize merged coverage
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          $summary = & ./tests/coverage_summary.ps1 $env:COVERAGE_DIRECTORY
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $summary
-          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
-
       - name: Publish NativeAOT
-        id: publish
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           $publish = @('publish', 'src/DotReticulum.Applications/DotReticulum.Applications.csproj',
             '-c', 'Release', '-r', '${{ matrix.rid }}',
@@ -129,32 +105,114 @@ jobs:
             dotnet @publish
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $binary = Join-Path $PWD $(if ($IsWindows) { 'artifacts/native/DotReticulum.Applications.exe' } else { 'artifacts/native/DotReticulum.Applications' })
-          "DOTRETICULUM_NATIVE_EXE=$binary" | Add-Content -LiteralPath $env:GITHUB_ENV
 
-      - name: Run native help and encrypted resource flow
-        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+      - name: Smoke test and write build manifest
         run: |
-          & $env:DOTRETICULUM_NATIVE_EXE --help
+          $executable = if ($IsWindows) { 'DotReticulum.Applications.exe' } else { 'DotReticulum.Applications' }
+          & (Join-Path $PWD "artifacts/native/$executable") --help
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj -c Release --no-build --filter 'FullyQualifiedName~NativeResourceTests' --results-directory TestResults/native --logger trx -- xUnit.MaxParallelThreads=1
+          [ordered]@{ commit = $env:GITHUB_SHA; rid = '${{ matrix.rid }}'; executable = $executable } |
+            ConvertTo-Json | Set-Content -LiteralPath artifacts/native/build-manifest.json -Encoding utf8
+          "### Build (${{ matrix.rid }})`n`nNativeAOT executable built from ``$env:GITHUB_SHA`` with warnings as errors and ``--help`` verified. Test and Compatibility jobs reuse this exact binary." |
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload native build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-${{ matrix.rid }}
+          path: artifacts/native/
+          if-no-files-found: error
+          retention-days: 14
+
+  test:
+    name: Test / ${{ matrix.rid }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTRETICULUM_LIVE: '0'
+      COVERAGE_DIRECTORY: TestResults/coverage-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Download native build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-${{ matrix.rid }}
+          path: artifacts/native
+
+      - name: Verify native build
+        run: ./tests/use-native-build.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
+
+      - name: Restore
+        run: dotnet restore DotReticulum.slnx
+
+      - name: Build
+        id: build
+        run: dotnet build DotReticulum.slnx -c Release --no-restore
+
+      - name: Unit tests with production coverage
+        run: |
+          if (Test-Path -LiteralPath $env:COVERAGE_DIRECTORY) { throw 'Coverage directory must be fresh.' }
+          dotnet test DotReticulum.slnx -c Release --no-build -m:1 --filter 'Category=Unit' --settings tests/coverage.runsettings --collect:"XPlat Code Coverage" --results-directory "$env:COVERAGE_DIRECTORY/unit" --logger trx -- xUnit.MaxParallelThreads=1
+
+      - name: Integration tests with production coverage
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          dotnet test DotReticulum.slnx -c Release --no-build -m:1 --filter 'Category!=Unit&Category!=Live' --settings tests/coverage.runsettings --collect:"XPlat Code Coverage" --results-directory "$env:COVERAGE_DIRECTORY/integration" --logger trx -- xUnit.MaxParallelThreads=1
+
+      - name: Summarize unit test results
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          $summary = & ./tests/test_summary.ps1 -Path "$env:COVERAGE_DIRECTORY/unit" -Title 'Unit tests (${{ matrix.rid }})'
+          $summary
+          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+      - name: Summarize integration test results
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          $summary = & ./tests/test_summary.ps1 -Path "$env:COVERAGE_DIRECTORY/integration" -Title 'Integration tests (${{ matrix.rid }})'
+          $summary
+          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+      - name: Summarize merged coverage
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          $summary = & ./tests/coverage_summary.ps1 $env:COVERAGE_DIRECTORY
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $summary
+          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+      - name: Run native executable resource flow
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj -c Release --no-build --filter 'FullyQualifiedName~NativeResourceTests' --results-directory TestResults/native --logger trx -- xUnit.MaxParallelThreads=1
 
       - name: Run native CLI and installation checks
-        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
-          if (!(Get-Module -ListAvailable Pester | Where-Object Version -eq '5.7.1')) {
-            for ($attempt = 1; ; $attempt++) {
-              try {
-                if (!(Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) { Register-PSRepository -Default }
-                Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck -Repository PSGallery -ErrorAction Stop
-                break
-              } catch {
-                if ($attempt -ge 4) { throw }
-                Write-Warning "Pester install attempt $attempt failed: $($_.Exception.Message)"
-                Start-Sleep -Seconds (10 * $attempt)
-              }
-            }
-          }
+          ./tests/install-pester.ps1
           Import-Module Pester -RequiredVersion 5.7.1
           $configuration = New-PesterConfiguration
           $configuration.Run.Container = @('Coverage', 'Cli', 'Parity8Packaging') | ForEach-Object {
@@ -168,7 +226,7 @@ jobs:
           if ($result.FailedCount -gt 0 -or $result.Result -ne 'Passed' -or $result.PassedCount -eq 0) { exit 1 }
 
       - name: Summarize native test results
-        if: ${{ !cancelled() && steps.publish.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           $summary = & ./tests/test_summary.ps1 -Path TestResults/native, TestResults/native-cli.xml -Title 'Native executable tests (${{ matrix.rid }})'
           $summary
@@ -180,5 +238,53 @@ jobs:
         with:
           name: test-results-${{ matrix.rid }}-${{ github.run_attempt }}
           path: TestResults/
+          if-no-files-found: warn
+          retention-days: 14
+
+  compatibility:
+    name: Upstream Compatibility / ${{ matrix.rid }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download native build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: native-${{ matrix.rid }}
+          path: artifacts/native
+
+      - name: Verify native build
+        run: ./tests/use-native-build.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
+
+      - name: Install Pester
+        run: ./tests/install-pester.ps1
+
+      - name: Run compatibility suite against the native executable
+        run: ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}'
+
+      - name: Retain compatibility report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compatibility-${{ matrix.rid }}-${{ github.run_attempt }}
+          path: TestResults/compatibility/
           if-no-files-found: warn
           retention-days: 14
