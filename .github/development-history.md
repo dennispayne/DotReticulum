@@ -46,6 +46,31 @@ The following SHA-256 values fingerprint pinned RNS 1.5.7 source files used in l
 
 The original `e40191...` vectors retain their commit provenance; this history did not preserve a complete per-file SHA-256 ledger for that older source snapshot. Some fixture fingerprints are also preserved in their owning tests (for example retry-crypto fixture `59e2486a903a85a566dd539e522e4e547d53b44f3949a7fb06cb14edca46f9bd` and `rngit-push.json` fixture `941ae1dc34ea3425a428c03cb096738db84145c9999a2b5f1e7382697927752c`); these hash generated outputs, not upstream source files.
 
+## Incoming-link initialization ordering (2026-10-26)
+
+Ecosystem `lxmd` acceptance exposed a first-packet race: the responder marked a link active and asynchronously queued its destination initializer behind optional observers. Identification/data could then be proved before handlers were installed. Pinned RNS `a29bfb51c468945c96a1ee22cae0114e993e2391`, `RNS/Link.py:515-535`, invokes the owner callback inside RTT processing. The responder now runs this short initializer in ordered core-after-receive work, outside the link lock but before subsequent ingress. General link-established observers remain asynchronous. Initializer failures are reported through the protected diagnostic mechanism and do not stop later packets.
+
+Two deterministic regressions saturate every responder observer slot, establish a link, identify the initiator and immediately send/prove its first packet. Both failed before the fix and pass afterward, including an initializer that installs handlers and then throws. No protocol format, reference pin or transport interface changed.
+
+Windows validation:
+
+- `dotnet test tests/DotReticulum.Transport.Tests/DotReticulum.Transport.Tests.csproj -c Release --filter "FullyQualifiedName~LinkTests|FullyQualifiedName~Parity5ResourceTests"`: 85 passed, 9 opt-in cases skipped.
+- `dotnet test DotReticulum.slnx -c Release --settings tests/coverage.runsettings --collect:"XPlat Code Coverage" --logger trx --results-directory TestResults/coverage-ecosystem-link-acfd`: 1,819 passed, 79 skipped, zero failures; live mode disabled.
+- With the verified isolated Python/RNS environment and `DOTRETICULUM_LIVE=1`, `dotnet test tests/DotReticulum.Transport.Tests/DotReticulum.Transport.Tests.csproj -c Release --filter "FullyQualifiedName~LiveLinkTests.PythonInitiator_DotNetResponder_DataIdentifyRequestAndTeardown|FullyQualifiedName~LiveLinkTests.Resource_TransfersOverPythonInitiatedLink_AndFileResponseRequest"`: 2 passed, zero skipped.
+- `dotnet publish src/DotReticulum.Applications/DotReticulum.Applications.csproj -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o artifacts/native-ecosystem-link`: succeeded; published `--help` succeeded.
+- With `DOTRETICULUM_NATIVE_EXE` pointing to that binary, `dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj -c Release --filter FullyQualifiedName~NativeResourceTests -- xUnit.MaxParallelThreads=1`: 1 passed, zero skipped. The native listener decrypted/decompressed a 2,200,017-byte Resource and returned a compressed multi-megabyte response. This is native/managed feature execution, not a new native/Python or RF claim.
+
+`pwsh -NoProfile -File tests/coverage_summary.ps1 TestResults/coverage-ecosystem-link-acfd` merged production coverage without double-counting shared assemblies:
+
+| Project | Lines | Branches |
+|---|---:|---:|
+| Applications | 10551/13726 (76.87%) | 9140/14338 (63.75%) |
+| Core | 1784/1846 (96.64%) | 1082/1206 (89.72%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 4531/5291 (85.64%) | 2474/3243 (76.29%) |
+| Transport | 4978/5464 (91.11%) | 3150/3982 (79.11%) |
+| **Overall** | 21954/26443 (83.02%) | 15893/22819 (69.65%) |
+
 ## Chronological milestones
 
 | Date | Milestone | Outcome |
