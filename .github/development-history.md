@@ -4,8 +4,6 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
-### Consolidated compatibility results
-
 ### CI reference provisioning (implementation awaiting hosted acceptance)
 
 The first hosted fetch in run `40519261522` **retrieved 69,228 Git bundle bytes
@@ -17,7 +15,12 @@ environment were then provisioned and import-verified on the Linux runner.
 This establishes actual CI `rns://` retrieval, not publisher authentication.
 The run failed later because C# fixture/remote-command tests needed .NET 10 but
 the runner's default SDK was 8; setup-dotnet is now explicit in both reference
-and main compatibility jobs. Hosted compatibility acceptance remains pending.
+and main compatibility jobs. A second hosted run (`40520520527`) successfully
+executed all four matching pinned and all four retrieved-head CLI comparisons
+on Python and the native .NET binary. Its Git-helper fixture still failed because
+the application checkout was shallow and Nerdbank.GitVersioning requires history;
+both compatibility checkouts now request full history. Hosted full-suite
+acceptance remains pending.
 
 Added an explicit revision-scoped CLI adapter for drift comparisons; all existing
 reference adapters retain the default pin check. Four identical CLI acceptance
@@ -63,6 +66,8 @@ Local provisioning from a Git bundle of the existing verified checkout succeeded
 skipped **2**, with **16** unselected cases; contract results were **35 pass,
 2 skipped, 2 not covered**. This is local pinned-peer evidence, not hosted-network
 acceptance or an upstream-head differential comparison. Both remain outstanding.
+
+### Consolidated compatibility results
 
 Added `tests\compatibility_summary.ps1` and a final CI aggregation job that
 downloads each platform's compatibility JSON. All catalog rows retain their IDs,
