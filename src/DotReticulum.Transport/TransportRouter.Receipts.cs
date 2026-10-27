@@ -173,11 +173,32 @@ public sealed partial class TransportRouter
         }
     }
 
-    internal double FirstHopTimeout(ReadOnlySpan<byte> destinationHash)
+    /// <summary>Best-effort first-hop timeout in seconds, including the known next-hop serialization time.</summary>
+    public double FirstHopTimeout(ReadOnlySpan<byte> destinationHash)
     {
         var bitrate = Engine.GetPath(destinationHash)?.Interface?.Bitrate ?? 0;
         return 6 + (bitrate > 0 ? Packet.Mtu * 8.0 / bitrate : 0);
     }
+
+    /// <summary>Slowest known online interface bitrate in bits per second, or null when none is known.</summary>
+    public double? GetLowestInterfaceBitrate()
+    {
+        double? lowest = null;
+        foreach (var iface in _manager.Interfaces)
+        {
+            if (iface is IReconnectingPacketInterface { IsConnected: false }) continue;
+            if (iface is IPacketInterfaceDiagnostics diagnostics &&
+                diagnostics.GetDiagnostics().GetValueOrDefault("status") is false) continue;
+            var bitrate = iface.Bitrate;
+            if (bitrate > 0 && (lowest is null || bitrate < lowest)) lowest = bitrate;
+        }
+        return lowest;
+    }
+
+    /// <summary>Full-MTU round-trip estimate on the slowest online medium, in seconds; zero if unknown.</summary>
+    public double GetMediumPathTimeout() => GetLowestInterfaceBitrate() is { } bitrate
+        ? 2 * (Packet.Mtu * 8.0 / Math.Max(bitrate, 5)) + 6
+        : 0;
 
     private void LogReceiptFailure(string message)
     {

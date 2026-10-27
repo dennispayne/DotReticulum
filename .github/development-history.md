@@ -4,6 +4,31 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Public medium timing estimates for ecosystem scheduling
+
+Exposed the existing `TransportRouter.FirstHopTimeout(ReadOnlySpan<byte>)` and
+added `GetLowestInterfaceBitrate()` / `GetMediumPathTimeout()`. Read-only daemon
+management now reuses the router calculations instead of maintaining a second
+implementation. Rates are bits/second; timeout values are seconds, with explicit
+unknown-rate results and the source minimum-rate clamp. This unblocks LXMF
+slow-medium scheduling without making the application invent transport values.
+
+`GenerateMediumTimingVectors.py` executes pinned RNS
+`a29bfb51c468945c96a1ee22cae0114e993e2391` interface prioritization and timing
+methods. Its fixture records canonical source SHA-256 values, seven medium
+cases and four first-hop cases. Windows and WSL/Linux focused timing/receipt
+commands passed **14/14**, zero skips. Source metadata is fake and path latency
+is supplied to the actual Python method: this is reference calculation evidence,
+not RF timing measurement. Dynamic native online metadata refresh is immediate;
+Python caches its lowest rate during interface prioritization.
+
+`dotnet build DotReticulum.slnx -c Release` passed with zero warnings;
+`dotnet test DotReticulum.slnx -c Release --no-build` passed **1,830**, skipped
+**79** opt-in cases, failed zero. Strict Windows x64 NativeAOT publication with
+`ILLinkTreatWarningsAsErrors=true` and `IlcTreatWarningsAsErrors=true` passed.
+The published binary ran `--help` and the real CLI encrypted multi-megabyte
+send/fetch acceptance case (**1/1**, zero skips, 6.37 seconds).
+
 The authoritative upstream is the Reticulum-hosted repository at `rns://7649a50d84610232d1416b41d2896aff/reticulum/reticulum`; GitHub `markqvist/Reticulum` is a comparison mirror. New live tests and later reference executions use the verified, clean hosted checkout at **`a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7)**, tree **`24d4c393de9fd57b933836cea68891fd953ab060`**. The first upstream fetch was incremental: local history was seeded through parent `7f2b3b9b524c9386316379af1313b43a5e4f7a5d`; .NET `rngit` then transferred 11,502 bundle bytes, added 92 reachable objects, and passed strict Git fsck. This proves object consistency/reachability, not publisher authentication.
 
 | Reference revision / artifact | Provenance and evidence |

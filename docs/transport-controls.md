@@ -51,6 +51,17 @@ bounded queues, age expiry, destination rate penalties and newer-announcement
 replacement even when a queue is full. An unknown/zero bitrate has no fabricated
 airtime cap. These are scheduling estimates, not measurements of a physical link.
 
+`TransportRouter.FirstHopTimeout(destinationHash)` exposes the existing next-hop
+estimate in seconds. `GetLowestInterfaceBitrate()` returns the lowest positive
+online bearer bitrate in bits per second, or null; disconnected reconnecting
+bearers and diagnostics reporting offline are excluded. Bearers without optional
+online diagnostics are considered available while owned by the manager.
+`GetMediumPathTimeout()` returns zero if no rate is known; otherwise it estimates
+one full-MTU round trip at the slowest rate, clamped to the reference minimum of
+5 bits/second, plus six seconds. Authenticated management queries reuse these
+same calculations. Dynamic metadata changes are observed at query time rather
+than waiting for Python's interface-prioritization refresh.
+
 ## Receipts and resource-proof recovery
 
 `SendWithReceiptAsync` returns `null` for source-ineligible packet types/contexts,

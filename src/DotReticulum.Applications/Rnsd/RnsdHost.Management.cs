@@ -36,14 +36,6 @@ public sealed partial class RnsdHost
     {
         if (request.Operation != "get") throw new InvalidDataException("Remote management only permits read-only requests.");
         byte[] Hash(string key = "destination_hash") => (byte[])request.Arguments[key]!;
-        double? Bitrate(IPacketInterface? iface)
-        {
-            var fields = (iface as IPacketInterfaceDiagnostics)?.GetDiagnostics();
-            if (fields?.GetValueOrDefault("status") is false || fields?.GetValueOrDefault("bitrate") is not { } value) return null;
-            var bitrate = MsgPack.ToDouble(value);
-            return bitrate > 0 && double.IsFinite(bitrate) ? bitrate : null;
-        }
-        var lowest = _manager.Interfaces.Select(Bitrate).Where(b => b.HasValue).Min();
         return request.Path switch
         {
             "interface_stats" => GetStatistics(),
@@ -62,9 +54,9 @@ public sealed partial class RnsdHost
             }).ToArray(),
             "next_hop" => Router.Engine.GetNextHop(Hash()),
             "next_hop_if_name" => Router.Engine.GetPath(Hash())?.Interface is { } iface ? InterfaceName(iface) : "None",
-            "first_hop_timeout" => 6d + (Bitrate(Router.Engine.GetPath(Hash())?.Interface) is { } rate ? Packet.Mtu * 8 / rate : 0),
-            "lowest_interface_bitrate" => lowest,
-            "medium_path_timeout" => lowest is { } minimum ? 2 * (Packet.Mtu * 8 / Math.Max(minimum, 5)) + 6 : 0d,
+            "first_hop_timeout" => Router.FirstHopTimeout(Hash()),
+            "lowest_interface_bitrate" => Router.GetLowestInterfaceBitrate(),
+            "medium_path_timeout" => Router.GetMediumPathTimeout(),
             "link_count" => Router.LinkTableCount,
             "active_link_count" => Router.ActiveLinkTableCount,
             "packet_rssi" => _manager.GetPacketPhysicalLayer(Hash("packet_hash")).Rssi,

@@ -1,0 +1,111 @@
+{
+  "upstream": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "sourceSha256": {
+    "Reticulum.py": "0c7b611679943fbe9d41aa7181275630c383b8b32e23c799726e6b23724dc9a9",
+    "Transport.py": "60ba0eed08d8a9b4fb2bef45de2f7bef1d0f2241fbc0fc664b2edb0e1c57add8"
+  },
+  "cases": [
+    {
+      "name": "empty",
+      "interfaces": [],
+      "lowest": null,
+      "medium": 0
+    },
+    {
+      "name": "unknown",
+      "interfaces": [
+        {
+          "bitrate": 0,
+          "online": true
+        }
+      ],
+      "lowest": null,
+      "medium": 0
+    },
+    {
+      "name": "offline",
+      "interfaces": [
+        {
+          "bitrate": 1200,
+          "online": false
+        }
+      ],
+      "lowest": null,
+      "medium": 0
+    },
+    {
+      "name": "minimum-clamp",
+      "interfaces": [
+        {
+          "bitrate": 1,
+          "online": true
+        }
+      ],
+      "lowest": 1,
+      "medium": 1606.0
+    },
+    {
+      "name": "minimum",
+      "interfaces": [
+        {
+          "bitrate": 5,
+          "online": true
+        }
+      ],
+      "lowest": 5,
+      "medium": 1606.0
+    },
+    {
+      "name": "radio",
+      "interfaces": [
+        {
+          "bitrate": 1200,
+          "online": true
+        }
+      ],
+      "lowest": 1200,
+      "medium": 12.666666666666668
+    },
+    {
+      "name": "mixed",
+      "interfaces": [
+        {
+          "bitrate": 10000000,
+          "online": true
+        },
+        {
+          "bitrate": 1200,
+          "online": true
+        },
+        {
+          "bitrate": 5,
+          "online": false
+        },
+        {
+          "bitrate": 0,
+          "online": true
+        }
+      ],
+      "lowest": 1200,
+      "medium": 12.666666666666668
+    }
+  ],
+  "firstHops": [
+    {
+      "bitrate": null,
+      "timeout": 6
+    },
+    {
+      "bitrate": 5,
+      "timeout": 806.0
+    },
+    {
+      "bitrate": 1200,
+      "timeout": 9.333333333333334
+    },
+    {
+      "bitrate": 10000000,
+      "timeout": 6.0004
+    }
+  ]
+}
