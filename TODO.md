@@ -25,11 +25,11 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] Per-interface interoperability and hardware evidence; untested platforms/devices remain unverified
 - [ ] CI/CD and automation
   - [x] `ci-build-test.yml` (authorized early on 2026-10-26; green on all three OSes in run 40330280525)
-  - [ ] Consolidated compatibility report with every contract row and Linux/macOS/Windows columns
-  - [ ] Consolidated Unit/Integration/Native test tables with Linux/macOS/Windows columns
-  - [ ] Provision the separately fetched pinned Python reference for CI interoperability
-  - [ ] Native .NET `rngit` hosted-CI upstream retrieval and separate upstream-drift comparison
-  - [ ] Advertised-core functionality family and directly executed Upstream results alongside the three .NET platforms
+  - [x] Consolidated compatibility report with every contract row and Linux/macOS/Windows columns (run 40521069184)
+  - [x] Consolidated Unit/Integration/Native test tables with Linux/macOS/Windows columns (run 40521069184)
+  - [x] Provision the separately fetched pinned Python reference for CI interoperability (hosted run 40521067543, verified source imports and 129 passing native/Python cases)
+  - [x] Native .NET `rngit` hosted-CI upstream retrieval and separate upstream-drift comparison (runs 40519261522 / 40520520527; disclosed mirror-parent seed, nonzero network objects, no publisher-authentication claim)
+  - [x] Initial advertised-core functionality family and directly executed Upstream results alongside the three .NET platforms (eight bounded rows; unmapped acceptance stays explicit; run 40521069184)
   - [ ] `interop-test.yml`
   - [ ] `e2e-mesh-test.yml`
   - [ ] `codeql.yml`

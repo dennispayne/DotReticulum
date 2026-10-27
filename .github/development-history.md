@@ -4,7 +4,18 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
-### CI reference provisioning (implementation awaiting hosted acceptance)
+### CI reference provisioning and hosted acceptance
+
+Hosted end-to-end run **`40521067543` passed** after supplying .NET 10 and full
+application Git history. Our native `rngit` again retrieved **69,228** bundle
+bytes from the hosted upstream and passed object checks. Pinned native/Python
+compatibility passed **129**, failed/skipped **0**, with **16** unselected
+non-contract cases: **47 rows, 42 pass, 5 not covered**. Both the four pinned
+CLI comparisons and the four current-head comparisons passed on the actual
+Linux native binary and Python. The unchanged fetched head/tree are recorded
+below; this remains a seeded incremental fetch, not a full network clone or
+publisher-authentication result. Verified source and independent upstream
+results are now available as Actions artifacts for the three-platform jobs.
 
 The first hosted fetch in run `40519261522` **retrieved 69,228 Git bundle bytes
 using our native .NET stack** via `reticulum.thecryptosquid.com:4242`, after the
@@ -20,7 +31,7 @@ executed all four matching pinned and all four retrieved-head CLI comparisons
 on Python and the native .NET binary. Its Git-helper fixture still failed because
 the application checkout was shallow and Nerdbank.GitVersioning requires history;
 both compatibility checkouts now request full history. Hosted full-suite
-acceptance remains pending.
+acceptance was subsequently completed by run `40521067543` above.
 
 Added an explicit revision-scoped CLI adapter for drift comparisons; all existing
 reference adapters retain the default pin check. Four identical CLI acceptance
@@ -65,7 +76,8 @@ Local provisioning from a Git bundle of the existing verified checkout succeeded
 `tests\run-compatibility.ps1` with those newly provisioned paths passed **127**,
 skipped **2**, with **16** unselected cases; contract results were **35 pass,
 2 skipped, 2 not covered**. This is local pinned-peer evidence, not hosted-network
-acceptance or an upstream-head differential comparison. Both remain outstanding.
+acceptance or an upstream-head differential comparison; those were subsequently
+completed separately in hosted run `40521067543` above.
 
 ### Consolidated compatibility results
 
@@ -92,9 +104,15 @@ Markdown escaping and failure/skip details. The consolidated renderer also ran
 against all three real artifacts from Actions run `40463533001`.
 One full managed compatibility invocation failed waiting for the default-created
 daemon's ready log (`UTIL-RNSD-002`); this was not hidden as a summary pass.
-CI execution of the new aggregation jobs is pending. No upstream source or Python
-environment is vendored; reference provisioning and hosted-CI `rns://` retrieval
-are still outstanding.
+Actions run **`40521069184` passed all 11 jobs**, including the three Build,
+three Test, three Upstream Compatibility jobs and both consolidated summaries.
+Downloaded real platform reports were rendered again locally: all five mapped
+advertised-core cases passed on Linux, macOS and Windows. The directly executed
+Upstream addressing/crypto cells passed; the other advertised-core Upstream
+cells remain **Not run**, not inferred from peer evidence. All 47 rows are kept;
+the three newly catalogued routing/request/Channel cases remain **Not covered**.
+No upstream source or Python environment is vendored; separate hosted
+provisioning/retrieval acceptance is recorded above.
 
 ### Public medium timing estimates for ecosystem scheduling
 
