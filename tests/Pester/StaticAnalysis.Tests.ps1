@@ -96,6 +96,7 @@ Describe 'Static analysis reporting' -Tag Tooling {
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $analysis, '-Repository', $clean, '-Report', $report)
         $result.Code | Should -Be 0 -Because $result.Error
         $document = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+        $document.runs[0].automationDetails.id | Should -Be '/language:powershell/'
         $document.runs[0].results.Count | Should -Be 0
 
         $bad = Join-Path $TestDrive 'bad'

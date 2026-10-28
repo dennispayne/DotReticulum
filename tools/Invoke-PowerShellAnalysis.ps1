@@ -55,7 +55,7 @@ $sarif = @{
     version = '2.1.0'
     runs = @(@{
         tool = @{ driver = @{ name = 'PSScriptAnalyzer'; version = '1.24.0'; rules = $rules } }
-        automationDetails = @{ id = '/language:powershell' }
+        automationDetails = @{ id = '/language:powershell/' }
         invocations = @(@{ executionSuccessful = $true })
         results = $results
     })

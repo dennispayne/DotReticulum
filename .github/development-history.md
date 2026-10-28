@@ -70,6 +70,19 @@ syntax-error fixtures, absence/failure reporting and coverage JSON/Markdown
 round trips with complementary suite coverage that must not be added together.
 Hosted workflow/migration results are recorded below after execution.
 
+Static analysis run `40643125133` passed all five jobs, including actual CodeQL
+and PowerShell SARIF uploads and the consolidated summary. Default setup is now
+`not-configured`; advanced setup replaces it rather than running in parallel.
+The hosted summary preserves two existing Python warnings, with no C#/Actions
+or enabled-rule PowerShell findings. The user requested removing the C# overlay
+fallback warning without weakening analysis: the pinned action's
+`src/config-utils.ts` explicitly accepts `CODEQL_OVERLAY_DATABASE_MODE=none`.
+Set this for C# initialization only, retaining the manual real build and full
+database while allowing automatic overlay selection for other languages.
+PowerShell SARIF automation IDs now end with `/`, retaining the complete
+`/language:powershell` category in Code Scanning rather than an empty category.
+The actual-analyzer regression verifies that ID.
+
 ### PowerShell entry-point names, help and CodeQL configuration correction
 
 Standardized all 18 standalone PowerShell entry points on approved Verb-Noun

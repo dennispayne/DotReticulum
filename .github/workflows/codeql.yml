@@ -76,6 +76,9 @@ jobs:
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        env:
+          # Manual C# extraction needs a full database, not an overlay fallback.
+          CODEQL_OVERLAY_DATABASE_MODE: ${{ matrix.language == 'csharp' && 'none' || '' }}
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
