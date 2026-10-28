@@ -100,6 +100,16 @@ Five production reports were merged by source identity, without averaging
 project percentages or double-counting shared assemblies. These managed-suite
 figures do not incorporate the separately executed native/Python acceptance.
 
+Cross-platform acceptance: Actions run **`40634153580`** at **`3edc8eb`**
+passed all **12 jobs**. Native Linux x64, macOS ARM64, Windows x64 and the actual
+upstream Python baseline each passed **37/37 cases**, zero failed/skipped.
+These are 37 distinct cases executed four ways, not 148 distinct tests.
+Unlike the local no-fetch run, each candidate's hosted Git retrieval case ran;
+the pipeline retained candidate-owned missing-object acquisition and verified
+source provisioning before the remaining cases. Both summary jobs passed,
+as did the three full platform Test jobs. This accepts the bounded expanded
+shared suite across the four candidates, not the remaining broad claim scopes.
+
 The Windows rncp reference adapter retains the existing visible
 `shutil.move` to `copyfile` workaround so Python can preserve received files
 while its temporary resource remains open. Compression/segment observations
