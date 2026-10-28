@@ -4,6 +4,32 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Agent instructions aligned with executable compatibility and active CI
+
+Updated `.github/copilot-instructions.md` to make the current shared Pester
+acceptance model and authorized workflow architecture durable requirements.
+It distinguishes customer-facing capability claims from bugfix coverage,
+requires common executable scenarios with a fixed upstream peer and a separately
+executed upstream baseline, preserves exact quoted citations/stable IDs/actual
+Pester outcomes, and excludes hardware-dependent acceptance from runner-only CI.
+Local executable RNS topologies are explicitly valid live-node evidence; vectors
+and .NET-only round trips are not substitutes.
+
+The instructions now cover candidate-owned hosted reference retrieval, same-run
+artifact provenance/reuse, independent suite coverage and merged union counts,
+Build/Test/Compatibility separation, advanced CodeQL and pinned PowerShell
+analysis, warning-free full C# extraction, honest SARIF/summary failure handling,
+release/versioning boundaries, PowerShell help/naming, process isolation and
+cross-platform temporary-path/toolchain lessons. Removed stale "CI last/only
+Build authorized/no linter" guidance and current LXMF/telemetry obligations;
+historical scope stays labeled as such. Explicitly preserve concurrent edits
+and scope validation to the change rather than rebuilding for prose.
+
+Documentation-only: checked the instructions against current workflow files,
+claim discovery/catalog/reporting and reference acquisition scripts, reviewed
+the diff and ran `git diff --check`. No executable behavior changed; no build,
+test run, coverage collection or NativeAOT publication was needed.
+
 ### Advanced static analysis, suite coverage summaries and accessibility
 
 The user authorized replacing GitHub-managed CodeQL default setup with an
