@@ -53,6 +53,9 @@ function Get-CompatibilityTestMetadata {
             File = [IO.Path]::GetRelativePath($root, $test.ScriptBlock.File).Replace('\', '/')
             Line = $test.ScriptBlock.StartPosition.StartLine
             Citation = "$($claims[$claimIds[0]].citation.path):$($claims[$claimIds[0]].citation.lines)"
+            CitationUri = if ($claims[$claimIds[0]].citation.PSObject.Properties['uri']) {
+                $claims[$claimIds[0]].citation.uri
+            } else { $null }
             Tags = @($test.Tag)
             Test = $test
         }

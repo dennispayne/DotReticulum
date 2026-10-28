@@ -86,6 +86,11 @@ calculated claim-level verdict: each cell preserves Pester's test outcome.
 Claim text is a verbatim excerpt of the pinned upstream, not our interpretation;
 citations contain its file and exact line reference. Test descriptions and scope
 comments explain what is actually exercised without narrowing the quoted claim.
+Discovery's separate `CitationUri` is optional navigation metadata (`citation.uri`
+in the catalog): use the original website URL for website claims, or a verified
+NomadNet source link when available. It remains blank for current source claims
+until those links are verified; no GitHub mirror URL is substituted. Tests use
+the Reticulum-fetched pinned checkout regardless of browsing-link availability.
 Claims use stable IDs such as `C004`; individual tests use `T006`. Append new
 numeric IDs without renumbering existing cases. The catalog spells out the
 advertised claim, `Describe` names its group, and each `It` names the concrete

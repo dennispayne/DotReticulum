@@ -53,6 +53,11 @@ Describe 'Compatibility harness' {
                 foreach ($row in $joined) {
                     $row.Claim | Should -BeExactly $claim.claim
                     $row.Citation | Should -BeExactly "$($claim.citation.path):$($claim.citation.lines)"
+                    $row.PSObject.Properties.Name | Should -Contain 'CitationUri'
+                    if ($claim.citation.PSObject.Properties['uri']) {
+                        $row.CitationUri | Should -BeExactly $claim.citation.uri
+                    }
+                    else { $row.CitationUri | Should -BeNullOrEmpty }
                     $row.PSObject.Properties.Name | Should -Not -Contain 'UpstreamCitation'
                     $row.PSObject.Properties.Name | Should -Not -Contain 'Citations'
                     $claim.citation | Should -Not -BeOfType ([array])

@@ -11,6 +11,7 @@ foreach ($test in $tests) {
         Claim = $test.Claim
         Name = $test.Name
         Citation = $test.Citation
+        CitationUri = $test.CitationUri
         File = $test.File
         Line = $test.Line
         Tags = $test.Tags
@@ -25,6 +26,7 @@ if ($IncludeUncoveredClaims) {
             Claim = $claim.claim
             Name = $null
             Citation = "$($claim.citation.path):$($claim.citation.lines)"
+            CitationUri = if ($claim.citation.PSObject.Properties['uri']) { $claim.citation.uri } else { $null }
             File = $null
             Line = $null
             Tags = @()
