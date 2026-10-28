@@ -52,7 +52,7 @@ function Get-CompatibilityTestMetadata {
             Name = "$($test.Block.ExpandedPath) > $($test.ExpandedName)"
             File = [IO.Path]::GetRelativePath($root, $test.ScriptBlock.File).Replace('\', '/')
             Line = $test.ScriptBlock.StartPosition.StartLine
-            UpstreamCitation = $claims[$claimIds[0]].citations
+            Citation = "$($claims[$claimIds[0]].citation.path):$($claims[$claimIds[0]].citation.lines)"
             Tags = @($test.Tag)
             Test = $test
         }

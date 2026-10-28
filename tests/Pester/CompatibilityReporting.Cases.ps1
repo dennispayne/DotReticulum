@@ -26,8 +26,8 @@ Describe 'Per-test compatibility reporting' -Tag Tooling {
         $null = New-Item -ItemType Directory -Path $reportRoot
         $catalog = Join-Path $reportRoot 'catalog.json'
         @{ claims = @(
-            @{ id = 'C001'; claim = 'Shared advertised behavior'; citations = @() },
-            @{ id = 'C002'; claim = 'No executable case'; citations = @() }
+            @{ id = 'C001'; claim = 'Shared advertised behavior'; citation = @{ path = 'README.md'; lines = '1' } },
+            @{ id = 'C002'; claim = 'No executable case'; citation = @{ path = 'README.md'; lines = '2' } }
         ) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $catalog
     }
 

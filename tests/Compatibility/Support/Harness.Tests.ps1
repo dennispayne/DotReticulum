@@ -52,8 +52,10 @@ Describe 'Compatibility harness' {
                 $joined.Count | Should -BeGreaterThan 0
                 foreach ($row in $joined) {
                     $row.Claim | Should -BeExactly $claim.claim
-                    $row.UpstreamCitation | Should -BeExactly (($claim.citations |
-                        ForEach-Object { "$($_.path):$($_.lines)" }) -join '; ')
+                    $row.Citation | Should -BeExactly "$($claim.citation.path):$($claim.citation.lines)"
+                    $row.PSObject.Properties.Name | Should -Not -Contain 'UpstreamCitation'
+                    $row.PSObject.Properties.Name | Should -Not -Contain 'Citations'
+                    $claim.citation | Should -Not -BeOfType ([array])
                     if ($row.TestId) { $row.Name | Should -Not -BeNullOrEmpty }
                     else { $row.Name | Should -BeNullOrEmpty }
                 }

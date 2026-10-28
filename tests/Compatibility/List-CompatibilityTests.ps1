@@ -10,8 +10,7 @@ foreach ($test in $tests) {
         ClaimId = $test.ClaimId
         Claim = $test.Claim
         Name = $test.Name
-        UpstreamCitation = ($test.UpstreamCitation | ForEach-Object { "$($_.path):$($_.lines)" }) -join '; '
-        Citations = $test.UpstreamCitation
+        Citation = $test.Citation
         File = $test.File
         Line = $test.Line
         Tags = $test.Tags
@@ -25,8 +24,7 @@ if ($IncludeUncoveredClaims) {
             ClaimId = $claim.id
             Claim = $claim.claim
             Name = $null
-            UpstreamCitation = ($claim.citations | ForEach-Object { "$($_.path):$($_.lines)" }) -join '; '
-            Citations = $claim.citations
+            Citation = "$($claim.citation.path):$($claim.citation.lines)"
             File = $null
             Line = $null
             Tags = @()

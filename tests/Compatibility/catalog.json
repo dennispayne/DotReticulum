@@ -3,47 +3,47 @@
     {
       "id": "C001",
       "claim": "The ``rngit`` utility provides full Git repository hosting and interaction over Reticulum.",
-      "citations": [{"path": "docs/source/git.rst", "lines": "33"}]
+      "citation": {"path": "docs/source/git.rst", "lines": "33"}
     },
     {
       "id": "C002",
       "claim": "Coordination-less globally unique addressing and identification",
-      "citations": [{"path": "README.md", "lines": "39"}]
+      "citation": {"path": "README.md", "lines": "39"}
     },
     {
       "id": "C003",
       "claim": "Asymmetric X25519 encryption and Ed25519 signatures as a basis for all communication",
-      "citations": [{"path": "README.md", "lines": "46"}]
+      "citation": {"path": "README.md", "lines": "46"}
     },
     {
       "id": "C004",
       "claim": "Unforgeable packet delivery confirmations",
-      "citations": [{"path": "README.md", "lines": "54"}]
+      "citation": {"path": "README.md", "lines": "54"}
     },
     {
       "id": "C005",
       "claim": "Authentication and virtual network segmentation on all supported interface types",
-      "citations": [{"path": "README.md", "lines": "59"}]
+      "citation": {"path": "README.md", "lines": "59"}
     },
     {
       "id": "C006",
       "claim": "Reliable and efficient transfer of arbitrary amounts of data",
-      "citations": [{"path": "README.md", "lines": "63"}]
+      "citation": {"path": "README.md", "lines": "63"}
     },
     {
       "id": "C007",
       "claim": "Fully self-configuring multi-hop routing over heterogeneous carriers",
-      "citations": [{"path": "README.md", "lines": "40"}]
+      "citation": {"path": "README.md", "lines": "40"}
     },
     {
       "id": "C008",
       "claim": "Lightweight, flexible and expandable Request/Response mechanism",
-      "citations": [{"path": "README.md", "lines": "67"}]
+      "citation": {"path": "README.md", "lines": "67"}
     },
     {
       "id": "C009",
       "claim": "Reliable sequential delivery with Channel and Buffer mechanisms",
-      "citations": [{"path": "README.md", "lines": "71"}]
+      "citation": {"path": "README.md", "lines": "71"}
     }
   ]
 }
