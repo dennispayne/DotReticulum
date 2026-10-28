@@ -7,6 +7,20 @@ Packages, installs, discovers or uninstalls native DotReticulum utilities.
 Select an operation with -Action. Package requires Rid, PublishDirectory and
 OutputDirectory; Install uses PackageDirectory and InstallRoot. Discovery and
 uninstallation operate on InstallRoot.
+.PARAMETER Action
+Operation to perform: Package, Install, Uninstall or Discover.
+.PARAMETER Rid
+Target runtime identifier for Package: win-x64, linux-x64 or osx-arm64.
+.PARAMETER PublishDirectory
+Native publish directory containing the application and utility executables.
+Required for Package.
+.PARAMETER OutputDirectory
+Destination for the staged package and its manifest. Required for Package.
+.PARAMETER PackageDirectory
+Staged package directory to validate and install. Required for Install.
+.PARAMETER InstallRoot
+Installation directory for Install, Uninstall or Discover. Ownership manifests
+bound installation and removal to the managed package files.
 .EXAMPLE
 .\Invoke-DotReticulumPackaging.ps1 -Action Discover -InstallRoot C:\Tools\DotReticulum
 #>

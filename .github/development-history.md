@@ -4,6 +4,43 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Standalone PowerShell parameter help
+
+Added `.PARAMETER` descriptions for all **100 declared parameters** across the
+**20 standalone scripts** covered by the existing help-discovery check (the
+branding exporter has no declared parameters). Help explains purpose, defaults,
+environment-variable sources, prerequisites and relevant parameter-set boundaries.
+Extended the existing tooling regression to inspect each script's declared
+parameter AST and require a nonempty description from actual `Get-Help -Full`
+output; PowerShell common parameters are not script-owned documentation.
+
+Reviewed Build and test, Release and Static analysis workflow invocations.
+CI intentionally relies on several defaults: Pester version/retry count,
+compatibility gateway/output path, artifact commit from `GITHUB_SHA`,
+reference provenance beside the bundle, reference interpreter/checkout from
+`DOTRETICULUM_*`, report truncation limits and static-analysis paths/settings.
+These invocations and all script execution behavior remain unchanged.
+Corrected the compatibility runner's stale summary-help claim: its `Label`
+and `NoJobSummary` parameters are retained no-ops, since rendering is separate.
+Contract integration's similarly named parameters remain functional.
+
+Verification:
+- `pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+  **54 passed, 2 explicit reference-dependent skips**, zero failed using the
+  locally selected Pester **6.2.0**.
+- `pwsh -NoProfile -Command 'Import-Module Pester -RequiredVersion 5.7.1; $configuration = New-PesterConfiguration; $configuration.Run.Path = ".\tests\Pester\Coverage.Tests.ps1"; $configuration.Run.PassThru = $true; $configuration.Filter.FullName = "*help discoverable for every declared parameter"; $result = Invoke-Pester -Configuration $configuration; if ($result.FailedCount -gt 0 -or $result.PassedCount -ne 1) { exit 1 }'`:
+  the parameter-help regression passed with CI-pinned Pester **5.7.1**.
+  Running the entry point after preloading 5.7.1 locally encounters the existing
+  side-by-side 6.2.0 assembly conflict when its minimum-version import selects
+  the newer module; no claim of a full local 5.7.1 tooling run is made.
+- `pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
+  **60 tracked files, zero findings** with pinned PSScriptAnalyzer **1.24.0**.
+- Actual `Get-Help` inspection confirmed descriptions for all 100 declared
+  parameters, including `NoJobSummary`, `Implementation` and `FetchReference`.
+- `git diff --check`: passed. No production code, protocol behavior or workflow
+  changed; .NET builds, coverage collection and NativeAOT publication were not
+  needed. Hosted CI was not run in this pass.
+
 ### Agent instructions aligned with executable compatibility and active CI
 
 Updated `.github/copilot-instructions.md` to make the current shared Pester

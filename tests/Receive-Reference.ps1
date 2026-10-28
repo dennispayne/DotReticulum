@@ -7,6 +7,26 @@ Fetches pinned upstream Git objects over Reticulum and records provenance.
 Requires a fresh destination and either a native application or verified Python
 reference. Seeds older history from the GitHub mirror, then requires missing
 objects and nonzero bundle bytes from the hosted Reticulum repository.
+.PARAMETER Application
+Published native executable whose rngit client performs the fetch.
+Required in the Native parameter set; managed DLLs are rejected.
+.PARAMETER Python
+Python interpreter for the actual upstream Git helper.
+Required in the Python parameter set instead of Application.
+.PARAMETER Upstream
+Verified pinned Python reference checkout. Required in the Python parameter set.
+.PARAMETER Revision
+Python reference revision. Defaults to the canonical compatibility pin and must match it.
+.PARAMETER Directory
+Fresh destination for the fetched repository, bundle, configuration and provenance.
+.PARAMETER Gateway
+Reticulum TCP gateway hostname or IPv4 address.
+Defaults to reticulum.thecryptosquid.com.
+.PARAMETER Port
+Gateway TCP port, from 1 through 65535. Defaults to 4242.
+.PARAMETER TimeoutSeconds
+Timeout for Git subprocesses and the Reticulum fetch, from 1 through 3600 seconds.
+Defaults to 900; native fetch process cleanup is allowed an additional 30 seconds.
 .EXAMPLE
 .\Receive-Reference.ps1 -Application ..\artifacts\native\DotReticulum.Applications.exe -Directory ..\TestResults\reference-fetch
 #>

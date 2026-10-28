@@ -37,7 +37,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] Expand shared advertised-claim scenarios for heterogeneous routing, broader application request boundaries and Channel/Buffer
   - [x] Expand identity/cryptographic failures, forged delivery proofs, authenticated management requests and fixed-upstream-peer file-transfer/IFAC acceptance (37 distinct cases, 17 quoted claims; 37/37 passed for all four candidates, all 12 CI jobs green in run 40634153580)
   - [ ] Verified primary-source citation browsing links (Git destination resolved; derived NomadNet page link failed; external URI scheme and line anchors unverified; no GitHub fallback)
-  - [x] Approved Verb-Noun standalone PowerShell entry points, discoverable basic help and updated workflow/documentation callers
+  - [x] Approved Verb-Noun standalone PowerShell entry points, discoverable help for every declared parameter and updated workflow/documentation callers
   - [ ] `interop-test.yml`
   - [ ] `e2e-mesh-test.yml`
   - [x] Advanced Static analysis workflow: CodeQL (Actions, C#, Python), pinned PSScriptAnalyzer, SARIF and consolidated finding summary; replaces GitHub-managed default setup (all five jobs passed in run 40644131301; C# full-database selection avoids overlay fallback warnings)

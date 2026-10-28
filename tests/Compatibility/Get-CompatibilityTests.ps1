@@ -6,6 +6,9 @@ Lists compatibility cases and their quoted upstream claims.
 .DESCRIPTION
 Discovers tests without running candidates or fetching a reference. Use
 -IncludeUncoveredClaims to include claims with no acceptance case.
+.PARAMETER IncludeUncoveredClaims
+Also emits catalogued claims without an acceptance case. Their test-specific
+fields are empty; discovery still performs no downloads or node startup.
 .EXAMPLE
 .\Get-CompatibilityTests.ps1 -IncludeUncoveredClaims
 #>

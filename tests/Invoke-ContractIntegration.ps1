@@ -7,6 +7,22 @@ reports one row per catalogued contract.
 .DESCRIPTION
 Requires Pester 5.7.1+ and a built application. Supplying Python and Upstream enables
 reference-tagged cases. Saves results and optionally writes an Actions summary.
+.PARAMETER Application
+Application executable or managed DLL under test. Defaults to the built Release DLL.
+Supply the published native executable for native acceptance.
+.PARAMETER Python
+Python interpreter for reference-tagged cases. Defaults to DOTRETICULUM_PYTHON.
+Reference-tagged cases are excluded unless both Python and Upstream are supplied.
+.PARAMETER Upstream
+Verified pinned reference checkout. Defaults to DOTRETICULUM_UPSTREAM.
+.PARAMETER OutputDirectory
+Directory for contract-integration.xml and contract-integration.json.
+Defaults to TestResults\contract-integration beneath the repository root.
+.PARAMETER Label
+Optional label added to the report title, such as the tested runtime identifier.
+.PARAMETER NoJobSummary
+Prevents appending the Markdown report to GITHUB_STEP_SUMMARY.
+Console output and saved result files are unaffected.
 .EXAMPLE
 .\Invoke-ContractIntegration.ps1 -NoJobSummary
 #>

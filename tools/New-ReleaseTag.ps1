@@ -8,6 +8,13 @@ Creates the annotated release tag v<version> for the current commit without push
 The version comes from Nerdbank.GitVersioning (<upstream RNS version>.<build number>), so the tag
 matches the version embedded in the binaries. Pushing the tag starts the Release workflow; this
 script never pushes unless -Push is given.
+.PARAMETER Project
+Project passed to MSBuild to determine the embedded release version.
+Defaults to src/DotReticulum.Applications/DotReticulum.Applications.csproj,
+relative to the current directory.
+.PARAMETER Push
+Pushes the newly created tag to origin, triggering the Release workflow.
+When omitted, the tag is created locally only.
 .EXAMPLE
 .\tools\New-ReleaseTag.ps1
 #>

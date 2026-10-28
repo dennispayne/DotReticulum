@@ -7,6 +7,16 @@ Creates a verified pinned checkout and isolated Python environment.
 Validates the fetched bundle against its provenance, checks Git objects and
 installs reference dependencies into a new virtual environment. Requires Git,
 Python and a fresh destination. Exports reference paths in GitHub Actions.
+.PARAMETER Bundle
+Fetched reference.bundle file containing the canonical pinned commit.
+.PARAMETER Directory
+Fresh destination for the upstream checkout and isolated Python virtual environment.
+.PARAMETER Python
+Python command or interpreter path used to create the virtual environment.
+Defaults to python.
+.PARAMETER Provenance
+Retrieval provenance JSON used to validate the pin, tree and bundle digest.
+Defaults to reference-provenance.json beside Bundle.
 .EXAMPLE
 .\Initialize-Reference.ps1 -Bundle ..\TestResults\reference-fetch\reference.bundle -Directory ..\TestResults\reference-python
 #>

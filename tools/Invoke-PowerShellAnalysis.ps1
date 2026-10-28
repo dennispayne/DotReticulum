@@ -7,6 +7,15 @@ Analyzes tracked PowerShell files and writes a SARIF report.
 Requires PSScriptAnalyzer 1.24.0, installed explicitly before invocation.
 Uses repository settings and scans tracked scripts, modules and data files,
 including tests. Writes findings before returning exit code 1 for warnings/errors.
+.PARAMETER Repository
+Git working tree whose tracked PowerShell files are analyzed.
+Defaults to this script's parent directory, the repository root.
+.PARAMETER Settings
+PSScriptAnalyzer settings file. Defaults to PSScriptAnalyzerSettings.psd1 in
+this script's parent directory.
+.PARAMETER Report
+Output SARIF file. Parent directories are created as needed.
+Defaults to TestResults\analysis\powershell.sarif beneath the repository root.
 .EXAMPLE
 .\tools\Invoke-PowerShellAnalysis.ps1 -Report TestResults\analysis\powershell.sarif
 #>

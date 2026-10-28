@@ -92,7 +92,7 @@ Describe 'PowerShell coverage reporting' -Tag Tooling {
 }
 
 Describe 'PowerShell test runner' -Tag Tooling {
-    It 'keeps standalone script verbs approved and comment-based help discoverable' {
+    It 'keeps standalone script verbs approved and help discoverable for every declared parameter' {
         $root = Join-Path $PSScriptRoot '..\..'
         $directories = 'tests', 'tests\Compatibility', 'tests\Interop', 'tools', 'assets\branding'
         $approvedVerbs = (Get-Verb).Verb
@@ -106,6 +106,14 @@ Describe 'PowerShell test runner' -Tag Tooling {
             $help = Get-Help $script.FullName -Full
             $help.Description | Should -Not -BeNullOrEmpty -Because $script.Name
             $help.Examples.Example.Count | Should -BeGreaterThan 0 -Because $script.Name
+            $command = Get-Command $script.FullName
+            foreach ($parameter in $command.ScriptBlock.Ast.ParamBlock.Parameters) {
+                $name = $parameter.Name.VariablePath.UserPath
+                $parameterHelp = @($help.Parameters.Parameter | Where-Object Name -EQ $name)
+                $parameterHelp.Count | Should -Be 1 -Because "$($script.Name) -$name"
+                ($parameterHelp[0].Description.Text -join ' ').Trim() |
+                    Should -Not -BeNullOrEmpty -Because "$($script.Name) -$name"
+            }
         }
     }
 

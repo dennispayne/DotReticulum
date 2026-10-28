@@ -6,6 +6,23 @@ Runs tooling and application process tests with Pester.
 .DESCRIPTION
 Requires Pester 5.7.1+. Uses the built Release DLL unless -Application is supplied.
 -ToolingOnly needs no application. Git remote comparisons require Python and Upstream.
+.PARAMETER Application
+Application executable or managed DLL under test. Defaults to the built Release DLL.
+.PARAMETER ToolingOnly
+Runs only tooling/reporting tests without requiring an application build.
+Cannot be combined with GitRemote, GitHosting or NativePackaging.
+.PARAMETER GitRemote
+Adds live Git remote comparisons against the pinned Python reference.
+Requires Python and Upstream.
+.PARAMETER GitHosting
+Builds the presentation subprocess fixture and adds Git hosting, signing and media tests.
+.PARAMETER NativePackaging
+Adds installation and package process tests. Requires Application to be a published
+native executable rather than a managed DLL.
+.PARAMETER Python
+Python interpreter for reference-dependent cases. Defaults to DOTRETICULUM_PYTHON.
+.PARAMETER Upstream
+Verified pinned reference checkout. Defaults to DOTRETICULUM_UPSTREAM.
 .EXAMPLE
 .\Invoke-PesterTests.ps1 -ToolingOnly
 #>

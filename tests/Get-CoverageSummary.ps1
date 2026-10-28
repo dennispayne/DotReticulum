@@ -7,6 +7,12 @@ Summarizes merged production line and branch coverage as Markdown.
 Reads OpenCover reports from a results directory, deduplicates shared code and
 rejects missing production modules. Returns exit code 2 for invalid reports.
 Optionally saves deduplicated hit/total counts as JSON for cross-platform summaries.
+.PARAMETER Results
+Results directory searched recursively for coverage.opencover.xml reports.
+Reports must collectively contain every production module.
+.PARAMETER JsonPath
+Optional output file for deduplicated per-project and overall coverage counts.
+When omitted, only the Markdown summary is emitted.
 .EXAMPLE
 .\Get-CoverageSummary.ps1 -Results ..\TestResults\coverage-run
 #>

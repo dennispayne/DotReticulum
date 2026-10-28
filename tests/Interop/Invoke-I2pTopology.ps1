@@ -7,6 +7,52 @@ Starts an owned I2P router and runs bounded SAM or stream acceptance.
 Supports i2pd or an extracted Java I2P distribution. Public networking requires
 -AllowPublicNetwork; stream tests also require the verified Python reference.
 Owned processes are stopped on exit. -KeepArtifacts retains diagnostic files.
+.PARAMETER RouterBinary
+Path to the i2pd executable. Required in the default I2pd parameter set.
+.PARAMETER JavaExecutable
+Path to the Java executable. Required in the Java parameter set.
+.PARAMETER JavaRouterDirectory
+Extracted Java I2P distribution containing hosts.txt and the required libraries.
+Required with JavaExecutable.
+.PARAMETER SamEndpoint
+Owned IPv4 loopback address and port for SAM. Defaults to 127.0.0.1:17656.
+Java mode requires the host address 127.0.0.1.
+.PARAMETER TransportPort
+Router transport port, from 0 through 65535. Defaults to 0 to select a free port.
+.PARAMETER CertificatesDirectory
+Public router certificate directory required for public bootstrap.
+Java mode defaults to the certificates directory in JavaRouterDirectory.
+.PARAMETER SeedRouterInfoDirectory
+Optional public netDb seed directory containing bounded routerInfo files in their
+standard hash subdirectories. Requires AllowPublicNetwork.
+.PARAMETER DotnetExecutable
+Command or executable path for .NET used to run tests. Defaults to dotnet.
+.PARAMETER PythonExecutable
+Python reference interpreter. Defaults to DOTRETICULUM_PYTHON.
+Required for RunStreamTests or ReferenceRestartOnly.
+.PARAMETER UpstreamPath
+Verified pinned reference checkout. Defaults to DOTRETICULUM_UPSTREAM.
+Required for RunStreamTests or ReferenceRestartOnly.
+.PARAMETER AllowPublicNetwork
+Explicitly permits public I2P bootstrap/networking. Required for Java mode and
+stream/restart tests; without it, i2pd runs isolated SAM persistence acceptance.
+.PARAMETER RunStreamTests
+Runs actual-router stream tests in addition to SAM persistence acceptance.
+Requires public networking and the verified reference.
+.PARAMETER ReferenceRestartOnly
+Selects the upstream-only restart diagnostic test group.
+Requires public networking and the reference; cannot be combined with RunStreamTests.
+.PARAMETER SingleThreadedSam
+Enables i2pd's single-threaded SAM mode for diagnostics. Available only in I2pd mode.
+.PARAMETER NoBuild
+Uses the existing Release test build rather than building before execution.
+.PARAMETER KeepArtifacts
+Retains owned router configuration, logs and test results after success.
+Failed runs retain artifacts regardless of this switch.
+.PARAMETER StartupTimeoutSeconds
+Router SAM startup deadline, from 5 through 180 seconds. Defaults to 30.
+.PARAMETER TestTimeoutSeconds
+Overall test-process deadline, from 60 through 1800 seconds. Defaults to 1200.
 .EXAMPLE
 .\Invoke-I2pTopology.ps1 -RouterBinary C:\Tools\i2pd.exe
 #>

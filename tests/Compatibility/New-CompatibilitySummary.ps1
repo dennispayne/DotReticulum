@@ -5,6 +5,15 @@
 Creates a Markdown compatibility table from candidate reports.
 .DESCRIPTION
 Combines saved candidate outcomes with catalog metadata and commit-pinned test links.
+.PARAMETER ReportsDirectory
+Directory containing downloaded compatibility-<rid>-* artifacts and an optional
+upstream.json baseline. Missing candidates are reported as unavailable.
+.PARAMETER Catalog
+Claim catalog JSON used to validate reported claim IDs.
+Defaults to catalog.json beside this script.
+.PARAMETER Commit
+Exact tested commit SHA for test-code hyperlinks. Defaults to GITHUB_SHA,
+or the repository's current HEAD when that environment variable is empty.
 .EXAMPLE
 .\New-CompatibilitySummary.ps1 -ReportsDirectory ..\..\TestResults\compatibility
 #>

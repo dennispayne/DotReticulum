@@ -9,6 +9,17 @@ Writes counts per result file, then every failed test with a truncated message, 
 skipped tests with their distinct skip reasons. Passing tests are not listed individually so the
 output stays under the GitHub job-summary size limit. Output goes to stdout; the caller appends it
 to $env:GITHUB_STEP_SUMMARY.
+.PARAMETER Path
+Result files or directories to read. Directories are searched recursively for
+TRX and XML files; duplicate file paths are included only once.
+.PARAMETER Title
+Markdown heading for the summary. Defaults to Test results.
+.PARAMETER JsonPath
+Optional output file for counts, failures and skip reasons consumed by platform summaries.
+.PARAMETER MaxFailures
+Maximum number of individual failures displayed in Markdown. Defaults to 50.
+.PARAMETER MaxMessageLength
+Maximum message length before truncation and an appended ellipsis. Defaults to 600.
 .EXAMPLE
 .\Get-TestSummary.ps1 -Path ..\TestResults\tests.trx -JsonPath ..\TestResults\summary.json
 #>

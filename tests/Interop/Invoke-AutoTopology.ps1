@@ -6,6 +6,25 @@ Runs bounded AutoInterface interoperability in owned Linux network namespaces.
 .DESCRIPTION
 Requires Linux root, iproute2, .NET and a verified Python reference.
 Creates isolated network namespaces and removes owned topology resources on exit.
+.PARAMETER Dotnet
+Path to the .NET executable used inside the owned Linux network namespace.
+.PARAMETER Python
+Python interpreter for the verified reference peer.
+.PARAMETER Upstream
+Verified pinned reference checkout containing RNS/Interfaces/AutoInterface.py.
+.PARAMETER Repository
+DotReticulum working tree containing the test project and upstream adapter.
+Defaults to the repository root containing this script.
+.PARAMETER ResultsDirectory
+Fresh output directory inside Repository for TRX and scratch artifacts.
+Defaults to a unique TestResults/auto-live-* directory beneath Repository.
+.PARAMETER Build
+Builds the test project before execution. When omitted, uses the existing Release build.
+Neither mode restores dependencies.
+.PARAMETER MulticastSmoke
+Also runs the AutoInterface multicast smoke tests in the isolated topology.
+.PARAMETER TimeoutSeconds
+Overall test-process deadline, from 90 through 900 seconds. Defaults to 300.
 .EXAMPLE
 .\Invoke-AutoTopology.ps1 -Dotnet /usr/bin/dotnet -Python /reference/venv/bin/python -Upstream /reference/upstream -Build
 #>

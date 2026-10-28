@@ -7,6 +7,27 @@ Runs Release .NET tests with optional coverage, live reference and Pester suites
 Requires the .NET 10 SDK. -Live requires Python and Upstream. -Coverage requires
 an unfiltered suite and a fresh results directory. -Pester adds CLI/process tests.
 Restores process-level test environment variables on exit.
+.PARAMETER Live
+Enables opt-in live .NET tests and, with Pester, Git remote reference comparisons.
+Requires Python and Upstream.
+.PARAMETER Python
+Python interpreter for live reference tests. Defaults to DOTRETICULUM_PYTHON.
+.PARAMETER Upstream
+Verified pinned reference checkout for live tests. Defaults to DOTRETICULUM_UPSTREAM.
+.PARAMETER NativeExe
+Published native executable used by native feature tests and optional Pester suites.
+Defaults to DOTRETICULUM_NATIVE_EXE.
+.PARAMETER Coverage
+Collects production OpenCover coverage and renders its merged summary.
+Cannot be combined with Filter.
+.PARAMETER Pester
+Runs tooling and application process tests, including Git hosting, after .NET tests.
+With Live, also enables Git remote reference comparisons.
+.PARAMETER ResultsDirectory
+Fresh coverage output directory. Requires Coverage. When omitted, a unique
+coverage directory is created beneath the repository's TestResults directory.
+.PARAMETER Filter
+VSTest filter expression passed to dotnet test. Cannot be combined with Coverage.
 .EXAMPLE
 .\Invoke-Tests.ps1 -Coverage -Pester
 #>

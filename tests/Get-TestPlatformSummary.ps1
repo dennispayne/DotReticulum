@@ -6,6 +6,9 @@ Combines saved test summaries into cross-platform Markdown tables.
 .DESCRIPTION
 Reads summary JSON artifacts beneath ReportsDirectory and reports platform
 counts, failures and skips. Missing platforms remain explicitly unavailable.
+.PARAMETER ReportsDirectory
+Directory containing downloaded test-results-<rid>-* artifact directories with
+suite summary JSON and optional independent Unit/Integration coverage JSON.
 .EXAMPLE
 .\Get-TestPlatformSummary.ps1 -ReportsDirectory ..\TestResults\platforms
 #>

@@ -6,6 +6,14 @@ Validates a downloaded native build artifact and exports DOTRETICULUM_NATIVE_EXE
 .DESCRIPTION
 Checks the artifact manifest, runtime identifier, commit and executable. Writes
 the application path to GITHUB_ENV when running in GitHub Actions.
+.PARAMETER Directory
+Downloaded native artifact directory containing build-manifest.json and its executable.
+.PARAMETER Rid
+Expected runtime identifier, such as win-x64, linux-x64 or osx-arm64.
+Must match the artifact manifest.
+.PARAMETER Commit
+Expected source commit. Defaults to GITHUB_SHA. When empty, commit matching is
+not checked; runtime identifier and executable checks still run.
 .EXAMPLE
 .\Set-NativeBuild.ps1 -Directory ..\artifacts\native -Rid win-x64
 #>

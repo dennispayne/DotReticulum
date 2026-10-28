@@ -6,7 +6,35 @@ Runs shared advertised-claim acceptance against candidate executables.
 .DESCRIPTION
 Requires Pester 5.7.1+ and a verified pinned Python reference. Selects DotReticulum,
 Upstream or Both and saves individual outcomes. -FetchReference enables hosted
-Git retrieval; other cases use local peers. -NoJobSummary disables Actions output.
+Git retrieval; other cases use local peers. Results are saved without writing an
+Actions job summary; New-CompatibilitySummary.ps1 renders the combined table.
+.PARAMETER Application
+Path to the candidate executable or managed DLL. Defaults to the built Release DLL.
+Hosted reference retrieval requires a published native executable.
+.PARAMETER Python
+Python interpreter for the verified reference. Defaults to DOTRETICULUM_PYTHON.
+With FetchReference, the retrieved reference supplies this path.
+.PARAMETER Upstream
+Verified pinned reference checkout. Defaults to DOTRETICULUM_UPSTREAM.
+With FetchReference, the retrieved reference supplies this path.
+.PARAMETER OutputDirectory
+Fresh directory for candidate observations, NUnit XML and JSON reports.
+Defaults to TestResults\compatibility beneath the repository root.
+.PARAMETER Label
+Legacy label accepted for existing callers; currently has no effect on saved reports.
+.PARAMETER NoJobSummary
+Legacy switch accepted for existing callers; this runner never writes a job summary.
+.PARAMETER Implementation
+Candidate selection: Both, DotReticulum or Upstream. Defaults to Both.
+.PARAMETER FetchReference
+Enables hosted Git retrieval with the native candidate and provisions its reference.
+Requires ReferenceDirectory and cannot be used with Implementation Upstream alone.
+.PARAMETER ReferenceDirectory
+Reference artifact directory. Must be fresh when FetchReference is enabled;
+the upstream Git baseline uses the existing reference-provenance.json in this directory.
+.PARAMETER Gateway
+Reticulum TCP gateway hostname or IPv4 address for hosted reference retrieval.
+Defaults to reticulum.thecryptosquid.com.
 .EXAMPLE
 .\Invoke-CompatibilityTests.ps1 -Python C:\Reference\venv\Scripts\python.exe -Upstream C:\Reference\upstream
 #>

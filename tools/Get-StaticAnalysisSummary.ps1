@@ -7,6 +7,15 @@ Summarizes CodeQL and PSScriptAnalyzer SARIF artifacts as Markdown.
 Reports analysis job status separately from findings. Missing or failed analyses
 are explicitly incomplete, never counted as zero findings. Requires one SARIF
 run per expected category. Output can be appended to GITHUB_STEP_SUMMARY.
+.PARAMETER ReportsDirectory
+Directory searched recursively for CodeQL and PSScriptAnalyzer SARIF reports.
+Duplicate, unexpected or malformed analysis categories are rejected.
+.PARAMETER CodeQLStatus
+CodeQL workflow job result displayed separately from findings.
+Defaults to unknown; CI supplies the actual dependency job result.
+.PARAMETER PowerShellStatus
+PSScriptAnalyzer workflow job result displayed separately from findings.
+Defaults to unknown; CI supplies the actual dependency job result.
 .EXAMPLE
 .\tools\Get-StaticAnalysisSummary.ps1 -ReportsDirectory TestResults\analysis -CodeQLStatus success -PowerShellStatus success
 #>

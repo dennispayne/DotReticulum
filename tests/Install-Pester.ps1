@@ -5,6 +5,12 @@
 Installs a specified Pester version for the current user.
 .DESCRIPTION
 Retries bounded installation attempts. The default version is 5.7.1.
+.PARAMETER Version
+Exact Pester version to install for the current user. Defaults to 5.7.1.
+Returns without installing when that version is already available.
+.PARAMETER Attempts
+Number of Install-Module attempts before falling back to the direct package download.
+Defaults to 4, with increasing delays between failed attempts.
 .EXAMPLE
 .\Install-Pester.ps1 -Version 5.7.1
 #>
