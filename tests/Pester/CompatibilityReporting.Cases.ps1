@@ -17,7 +17,7 @@ Describe 'Per-test compatibility reporting' -Tag Tooling {
         }
         function Invoke-CompatibilitySummary([string] $Script = $summaryScript) {
             Invoke-TestProcess $pwsh @('-NoProfile', '-File', $Script, '-ReportsDirectory', $reportRoot,
-                '-Catalog', $catalog, '-Commit', $commit)
+                '-Catalog', $catalog, '-Commit', $commit) -Environment @{ NO_COLOR = '1'; TERM = 'dumb' }
         }
     }
 
@@ -156,7 +156,8 @@ Describe 'Per-test compatibility reporting' -Tag Tooling {
         Write-TestReport $Candidate @($row) $File
         $result = Invoke-CompatibilitySummary
         $result.Code | Should -Be 1
-        $result.Error | Should -Match 'does not match the canonical compatibility pin'
+        $diagnostic = $result.Error -replace '(?m)^\s*\|\s*', ''
+        $diagnostic | Should -Match 'does not match the canonical\s+compatibility\s+pin'
         $result.Output | Should -BeNullOrEmpty
     }
 

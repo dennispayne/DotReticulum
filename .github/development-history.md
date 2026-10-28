@@ -72,6 +72,17 @@ inferred pass from the native candidate. No reference-side shim was applied.
 The hosted upstream baseline runs on Linux; its results are separate evidence
 and do not establish Windows support for the Python Git helper.
 
+Actions run **`40626931637`** passed all four Compatibility candidate jobs and
+the table renderer. The Linux/macOS **Test** jobs exposed a reporting regression:
+PowerShell wraps a deliberate wrong-pin diagnostic at terminal width, breaking
+a literal-space assertion; ANSI error text then prevented Pester from exporting
+that failure as NUnit XML. The summary regression subprocess now requests plain
+text, and the assertion tolerates diagnostic line wrapping without changing the
+required rejection. A narrow-width (`COLUMNS=80`, `TERM=xterm-256color`) local
+Pester run passed **43** cases with **4 explicit environment-dependent skips**;
+its generated NUnit XML parsed successfully. Cross-platform revalidation remains
+required for this reporting-only correction.
+
 ### Candidate-owned retrieval, reused baseline and table-only reporting
 
 The user replaced the separate hosted fetch workflow with an advertised
