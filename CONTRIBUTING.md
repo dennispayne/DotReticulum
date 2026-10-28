@@ -83,6 +83,10 @@ displays Upstream, .NET Linux, .NET macOS and .NET Windows side by side.
 `tests\Compatibility\Claims\*.Tests.ps1` contains the readable acceptance cases,
 assertions and coverage boundaries. There is no Family classification or
 calculated claim-level verdict: each cell preserves Pester's test outcome.
+Claims use stable IDs such as `C004`; individual tests use `T006`. Append new
+numeric IDs without renumbering existing cases. The catalog spells out the
+advertised claim, `Describe` names its group, and each `It` names the concrete
+acceptance behavior.
 `tests\Compatibility\Run-CompatibilityTests.ps1` runs the **same scenario, inputs and assertions**
 against both candidates; only invocation adapters differ. For multi-node cases,
 upstream RNS is the fixed reference peer: upstream-to-upstream is the baseline,

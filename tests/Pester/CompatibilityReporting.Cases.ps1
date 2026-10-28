@@ -4,9 +4,9 @@ Describe 'Per-test compatibility reporting' -Tag Tooling {
         $canonical = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\Interop\reference_environment.py') -Raw
         $pin = [regex]::Match($canonical, '(?m)^PINNED_RNS_SHA\s*=\s*"([0-9a-f]{40})"').Groups[1].Value
         $commit = '0000000000000000000000000000000000000001'
-        function New-ReportRow([string] $Id = 'TEST-FIRST', [string] $Result = 'Passed') {
+        function New-ReportRow([string] $Id = 'T001', [string] $Result = 'Passed') {
             return @{
-                Id = $Id; ClaimId = 'FUNC-EXAMPLE'; Name = "Behavior $Id"; Result = $Result
+                Id = $Id; ClaimId = 'C001'; Name = "Behavior $Id"; Result = $Result
                 File = 'tests/Pester/Coverage.Tests.ps1'; Line = 1; Revision = $pin
             }
         }
@@ -26,15 +26,15 @@ Describe 'Per-test compatibility reporting' -Tag Tooling {
         $null = New-Item -ItemType Directory -Path $reportRoot
         $catalog = Join-Path $reportRoot 'catalog.json'
         @{ claims = @(
-            @{ id = 'FUNC-EXAMPLE'; claim = 'Shared advertised behavior'; citations = @() },
-            @{ id = 'FUNC-UNCOVERED'; claim = 'No executable case'; citations = @() }
+            @{ id = 'C001'; claim = 'Shared advertised behavior'; citations = @() },
+            @{ id = 'C002'; claim = 'No executable case'; citations = @() }
         ) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $catalog
     }
 
     It 'aligns individual cases by stable ID, links source lines, and emits only the six-column table' {
         $first = New-ReportRow
         $first.Name = "Behavior | with`na delimiter"
-        $second = New-ReportRow 'TEST-SECOND' 'Failed'
+        $second = New-ReportRow 'T002' 'Failed'
         Write-TestReport 'linux-x64' @($second, $first)
         $skipped = $first.Clone()
         $skipped.Result = 'Skipped'
@@ -47,19 +47,19 @@ Describe 'Per-test compatibility reporting' -Tag Tooling {
         $lines = @($result.Output.Trim() -split '\r?\n')
         $lines.Count | Should -Be 4
         $lines[0] | Should -Be '| Test ID | Behavior | Upstream | .NET Linux | .NET macOS | .NET Windows |'
-        $lines[2] | Should -Match '\[`TEST-FIRST`\]\(https://github.com/[^)]+/blob/0000000000000000000000000000000000000001/tests/Pester/Coverage.Tests.ps1#L1\)'
+        $lines[2] | Should -Match '\[`T001`\]\(https://github.com/[^)]+/blob/0000000000000000000000000000000000000001/tests/Pester/Coverage.Tests.ps1#L1\)'
         $lines[2] | Should -Match 'Behavior &#124; with a delimiter \| Failed \| Passed \| Skipped \| Unavailable \|$'
-        $lines[3] | Should -Match 'Behavior TEST-SECOND \| Not run \| Failed \| Unavailable \| Unavailable \|$'
-        $result.Output | Should -Not -Match 'Family|FUNC-UNCOVERED|Shared advertised|###|Reference:'
+        $lines[3] | Should -Match 'Behavior T002 \| Not run \| Failed \| Unavailable \| Unavailable \|$'
+        $result.Output | Should -Not -Match 'Family|C002|Shared advertised|###|Reference:'
     }
 
     It 'preserves every Pester outcome exactly instead of calculating claim verdicts' {
         $rows = @(
-            New-ReportRow 'TEST-PASSED' 'Passed'
-            New-ReportRow 'TEST-FAILED' 'Failed'
-            New-ReportRow 'TEST-SKIPPED' 'Skipped'
-            New-ReportRow 'TEST-NOTRUN' 'NotRun'
-            New-ReportRow 'TEST-INCONCLUSIVE' 'Inconclusive'
+            New-ReportRow 'T001' 'Passed'
+            New-ReportRow 'T002' 'Failed'
+            New-ReportRow 'T003' 'Skipped'
+            New-ReportRow 'T004' 'NotRun'
+            New-ReportRow 'T005' 'Inconclusive'
         )
         Write-TestReport 'linux-x64' $rows
         Write-TestReport 'upstream' $rows 'upstream.json'
@@ -78,8 +78,8 @@ Describe 'Per-test compatibility reporting' -Tag Tooling {
         Write-TestReport 'upstream' @($row) 'upstream.json'
         $result = Invoke-CompatibilitySummary
         $result.Code | Should -Be 0 -Because $result.Error
-        $result.Output | Should -Match '\| `TEST-FIRST` \| Behavior TEST-FIRST \| Passed \| Unavailable \| Unavailable \| Unavailable'
-        $result.Output | Should -Not -Match '\[`TEST-FIRST`\]|FUNC-UNCOVERED'
+        $result.Output | Should -Match '\| `T001` \| Behavior T001 \| Passed \| Unavailable \| Unavailable \| Unavailable'
+        $result.Output | Should -Not -Match '\[`T001`\]|C002'
         @($result.Output.Trim() -split '\r?\n').Count | Should -Be 3
     }
 
@@ -89,8 +89,8 @@ Describe 'Per-test compatibility reporting' -Tag Tooling {
         Write-TestReport 'win-x64' @($row)
         $result = Invoke-CompatibilitySummary
         $result.Code | Should -Be 0 -Because $result.Error
-        $result.Output | Should -Match '\[`TEST-FIRST`\]\(https://github.com/[^)]+/Coverage.Tests.ps1\)'
-        $result.Output | Should -Match 'Behavior TEST-FIRST \| Not run \| Unavailable \| Unavailable \| Passed'
+        $result.Output | Should -Match '\[`T001`\]\(https://github.com/[^)]+/Coverage.Tests.ps1\)'
+        $result.Output | Should -Match 'Behavior T001 \| Not run \| Unavailable \| Unavailable \| Passed'
         $result.Output | Should -Not -Match '#L'
     }
 
@@ -98,7 +98,7 @@ Describe 'Per-test compatibility reporting' -Tag Tooling {
         $result = Invoke-CompatibilitySummary
         $result.Code | Should -Be 0 -Because $result.Error
         @($result.Output.Trim() -split '\r?\n').Count | Should -Be 2
-        $result.Output | Should -Not -Match 'FUNC-|No executable|Shared advertised'
+        $result.Output | Should -Not -Match 'C00[12]|No executable|Shared advertised'
     }
 
     It 'rejects duplicate test IDs in a candidate report before emitting a table' {
@@ -119,8 +119,8 @@ Describe 'Per-test compatibility reporting' -Tag Tooling {
     }
 
     It 'rejects two baseline sources even when their test IDs are disjoint' {
-        Write-TestReport 'upstream' @((New-ReportRow 'TEST-FIRST')) 'upstream.json'
-        Write-TestReport 'linux-x64' @((New-ReportRow 'TEST-SECOND')) 'upstream.json'
+        Write-TestReport 'upstream' @((New-ReportRow 'T001')) 'upstream.json'
+        Write-TestReport 'linux-x64' @((New-ReportRow 'T002')) 'upstream.json'
         $result = Invoke-CompatibilitySummary
         $result.Code | Should -Be 1
         $result.Error | Should -Match 'Multiple upstream baseline reports'
@@ -161,7 +161,7 @@ Describe 'Per-test compatibility reporting' -Tag Tooling {
     }
 
     It 'rejects mixed revisions inside a candidate report' {
-        $wrong = New-ReportRow 'TEST-SECOND'
+        $wrong = New-ReportRow 'T002'
         $wrong.Revision = '0000000000000000000000000000000000000002'
         Write-TestReport 'linux-x64' @((New-ReportRow), $wrong)
         $result = Invoke-CompatibilitySummary
@@ -184,8 +184,9 @@ Describe 'Per-test compatibility reporting' -Tag Tooling {
     It 'rejects malformed <Problem> test records without a partial table' -ForEach @(
         @{ Problem = 'missing field'; Field = 'Name'; Value = $null; Remove = $true }
         @{ Problem = 'missing identity'; Field = 'Id'; Value = ''; Remove = $false }
-        @{ Problem = 'claim identity used as test identity'; Field = 'Id'; Value = 'FUNC-EXAMPLE'; Remove = $false }
-        @{ Problem = 'unknown claim'; Field = 'ClaimId'; Value = 'FUNC-UNKNOWN'; Remove = $false }
+        @{ Problem = 'claim identity used as test identity'; Field = 'Id'; Value = 'C001'; Remove = $false }
+        @{ Problem = 'unknown claim'; Field = 'ClaimId'; Value = 'C999'; Remove = $false }
+        @{ Problem = 'test identity without numeric suffix'; Field = 'Id'; Value = 'TEXAMPLE'; Remove = $false }
         @{ Problem = 'old aggregate status'; Field = 'Result'; Value = 'Pass'; Remove = $false }
         @{ Problem = 'array outcome'; Field = 'Result'; Value = @('Passed'); Remove = $false }
         @{ Problem = 'array revision'; Field = 'Revision'; Value = @('not-a-pin'); Remove = $false }

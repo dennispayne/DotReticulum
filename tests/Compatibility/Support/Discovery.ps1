@@ -27,23 +27,23 @@ function Get-CompatibilityTestMetadata {
     $catalog = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\catalog.json') -Raw | ConvertFrom-Json
     $claims = @{}
     foreach ($claim in $catalog.claims) {
-        if ($claim.id -cnotmatch '^FUNC-[A-Z0-9]+(?:-[A-Z0-9]+)*$') { throw "Invalid catalog claim: $($claim.id)" }
+        if ($claim.id -cnotmatch '^C[0-9]{3,}$') { throw "Invalid catalog claim: $($claim.id)" }
         if ($claims.ContainsKey($claim.id)) { throw "Duplicate catalog claim: $($claim.id)" }
         $claims[$claim.id] = $claim
     }
     $ids = @{}
     $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
     foreach ($test in $Tests) {
-        $testIds = @($test.Tag | Where-Object { $_ -like 'TEST-*' })
-        $claimIds = @($test.Tag | Where-Object { $_ -like 'FUNC-*' })
-        if ($testIds.Count -ne 1 -or $testIds[0] -cnotmatch '^TEST-[A-Z0-9]+(?:-[A-Z0-9]+)*$') {
-            throw "Test '$($test.ExpandedPath -join '.')' requires exactly one stable TEST- tag."
+        $testIds = @($test.Tag | Where-Object { $_ -cmatch '^T[0-9]' })
+        $claimIds = @($test.Tag | Where-Object { $_ -cmatch '^C[0-9]' })
+        if ($testIds.Count -ne 1 -or $testIds[0] -cnotmatch '^T[0-9]{3,}$') {
+            throw "Test '$($test.ExpandedPath -join '.')' requires exactly one stable Tnnn test tag."
         }
         $id = $testIds[0]
         if ($ids.ContainsKey($id)) { throw "Duplicate test ID: $id" }
         $ids[$id] = $true
-        if ($claimIds.Count -ne 1 -or $claimIds[0] -cnotmatch '^FUNC-[A-Z0-9]+(?:-[A-Z0-9]+)*$' -or !$claims.ContainsKey($claimIds[0])) {
-            throw "Test '$id' requires exactly one known FUNC- claim tag."
+        if ($claimIds.Count -ne 1 -or $claimIds[0] -cnotmatch '^C[0-9]{3,}$' -or !$claims.ContainsKey($claimIds[0])) {
+            throw "Test '$id' requires exactly one known Cnnn claim tag."
         }
         [pscustomobject]@{
             Id = $id

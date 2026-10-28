@@ -7,7 +7,7 @@ BeforeAll {
 }
 
 Describe 'Git over Reticulum reference retrieval' {
-    It 'retrieves initially missing pinned objects using the candidate rngit' -Tag 'TEST-GIT-REFERENCE-FETCH', 'FUNC-GIT-REFERENCE' {
+    It 'retrieves initially missing pinned objects using the candidate rngit' -Tag 'T001', 'C001' {
         if (!$Context.FetchReference -and !$Context.ReferenceDirectory) {
             Set-ItResult -Skipped -Because 'Hosted retrieval was not requested; supply -FetchReference or a candidate-owned -ReferenceDirectory.'
             return

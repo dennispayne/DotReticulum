@@ -51,14 +51,14 @@ Describe 'Compatibility harness' {
 
         It 'rejects missing stable test IDs' {
             $test = (Get-CompatibilityDiscovery)[0].Test
-            $test.Tag = @('FUNC-GIT-REFERENCE')
-            { Get-CompatibilityTestMetadata @($test) } | Should -Throw '*requires exactly one stable TEST-*'
+            $test.Tag = @('C001')
+            { Get-CompatibilityTestMetadata @($test) } | Should -Throw '*requires exactly one stable Tnnn*'
         }
 
         It 'rejects unknown claim IDs' {
             $test = (Get-CompatibilityDiscovery)[0].Test
-            $test.Tag = @('TEST-GIT-REFERENCE-FETCH', 'FUNC-UNKNOWN')
-            { Get-CompatibilityTestMetadata @($test) } | Should -Throw '*known FUNC-*'
+            $test.Tag = @('T001', 'C999')
+            { Get-CompatibilityTestMetadata @($test) } | Should -Throw '*known Cnnn*'
         }
     }
 
@@ -87,7 +87,7 @@ Describe 'Compatibility harness' {
             $result.Code | Should -Be 1
             $rows = @(Get-Content -LiteralPath (Join-Path $directory 'compatibility.json') -Raw | ConvertFrom-Json)
             $rows.Count | Should -Be 7
-            ($rows | Where-Object Id -EQ TEST-GIT-REFERENCE-FETCH).Result | Should -BeExactly Failed
+            ($rows | Where-Object Id -EQ T001).Result | Should -BeExactly Failed
             @($rows | Where-Object Result -EQ Passed).Count | Should -Be 0
             (Join-Path $reference 'reference-provenance.json') | Should -Not -Exist
             (Join-Path $directory 'DotReticulum\retrieval-provenance.json') | Should -Not -Exist
@@ -100,7 +100,7 @@ Describe 'Compatibility harness' {
             }
             foreach ($candidate in 'DotReticulum', 'Upstream') {
                 $directory = Join-Path $harnessWork "case-failure-$candidate"
-                $null = New-Item -ItemType Directory -Path (Join-Path $directory 'TEST-ADDRESSING-IDENTITY-IMPORT') -Force
+                $null = New-Item -ItemType Directory -Path (Join-Path $directory 'T002') -Force
                 $context = @{
                     Application = $harnessApplication; Python = $harnessPython; Upstream = $harnessUpstream
                     Revision = Get-CompatibilityReferenceRevision
@@ -112,8 +112,8 @@ Describe 'Compatibility harness' {
                 $path = Join-Path $directory 'results.json'
                 Export-CompatibilityResults $result $context.Revision $path
                 $rows = @(Get-Content -LiteralPath $path -Raw | ConvertFrom-Json)
-                ($rows | Where-Object Id -EQ TEST-ADDRESSING-IDENTITY-IMPORT).Result | Should -BeExactly Failed
-                ($rows | Where-Object Id -EQ TEST-ADDRESSING-DESTINATION-HASH).Result | Should -BeExactly Passed
+                ($rows | Where-Object Id -EQ T002).Result | Should -BeExactly Failed
+                ($rows | Where-Object Id -EQ T003).Result | Should -BeExactly Passed
             }
         }
 
@@ -129,7 +129,7 @@ Describe 'Compatibility harness' {
             (Join-Path $directory 'compatibility.json') | Should -Not -Exist
             $rows = @(Get-Content -LiteralPath (Join-Path $directory 'upstream.json') -Raw | ConvertFrom-Json)
             @($rows | Where-Object Result -EQ Passed).Count | Should -Be 6
-            ($rows | Where-Object Id -EQ TEST-GIT-REFERENCE-FETCH).Result | Should -BeExactly Skipped
+            ($rows | Where-Object Id -EQ T001).Result | Should -BeExactly Skipped
             (Join-Path $directory 'Upstream.nunit.xml') | Should -Exist
         }
     }

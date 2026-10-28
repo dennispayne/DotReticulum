@@ -54,6 +54,24 @@ Pester validation of the reorganized harness:
   seven real test declarations and five uncovered claims, including joined
   human-readable upstream citations, without test execution.
 
+Following readability feedback, compatibility claim IDs are now `C001` through
+`C009`, and the seven individual tests are `T001` through `T007`. These IDs are
+stable identifiers, not dynamic row numbers; new tests append IDs rather than
+renumbering old ones. Citation metadata retains the advertised claim text;
+Pester `Describe` names the group and `It` names the concrete acceptance case.
+The short-ID tooling run passed **45** cases with **2 explicit skips**, zero
+failed, and the native suite passed all **7** cases using this executable's fresh
+retrieval evidence. Four candidate executions do not multiply seven distinct
+tests into twenty-eight distinct tests.
+
+A local Windows upstream-only run of the new Pester harness passed the six
+core cases but failed the real Python Git-helper case with upstream's
+`Bundle verification failed for batch` after observing **79,669,382** received
+bundle bytes. This is retained as a real failure, not converted to a skip or
+inferred pass from the native candidate. No reference-side shim was applied.
+The hosted upstream baseline runs on Linux; its results are separate evidence
+and do not establish Windows support for the Python Git helper.
+
 ### Candidate-owned retrieval, reused baseline and table-only reporting
 
 The user replaced the separate hosted fetch workflow with an advertised

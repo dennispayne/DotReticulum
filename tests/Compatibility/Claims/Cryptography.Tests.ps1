@@ -9,8 +9,8 @@ BeforeAll {
 }
 
 Describe 'Cryptographic communication' {
-    It 'produces the independent detached Ed25519 signature bytes' -Tag 'TEST-CRYPTO-DETACHED-SIGNATURE', 'FUNC-CORE-CRYPTO' {
-        $directory = New-CompatibilityCaseDirectory $Context 'TEST-CRYPTO-DETACHED-SIGNATURE'
+    It 'produces the independent detached Ed25519 signature bytes' -Tag 'T004', 'C003' {
+        $directory = New-CompatibilityCaseDirectory $Context 'T004'
         $inputPath = Join-Path $directory 'input'
         [IO.File]::WriteAllBytes($inputPath, [Convert]::FromHexString($fixture.message))
         $result = Invoke-CompatibilityTool $Context rnid @('-M', $key, '-s', $inputPath)
@@ -19,8 +19,8 @@ Describe 'Cryptographic communication' {
         [Convert]::ToHexString([IO.File]::ReadAllBytes("$inputPath.rsg")).ToLowerInvariant() | Should -BeExactly $fixture.rsg
     }
 
-    It 'decrypts the independent authenticated identity ciphertext' -Tag 'TEST-CRYPTO-IDENTITY-DECRYPTION', 'FUNC-CORE-CRYPTO' {
-        $directory = New-CompatibilityCaseDirectory $Context 'TEST-CRYPTO-IDENTITY-DECRYPTION'
+    It 'decrypts the independent authenticated identity ciphertext' -Tag 'T005', 'C003' {
+        $directory = New-CompatibilityCaseDirectory $Context 'T005'
         $inputPath = Join-Path $directory 'input.rfe'
         $outputPath = Join-Path $directory 'output'
         [IO.File]::WriteAllBytes($inputPath, [Convert]::FromHexString($fixture.encrypted))

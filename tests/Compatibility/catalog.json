@@ -1,47 +1,47 @@
 {
   "claims": [
     {
-      "id": "FUNC-GIT-REFERENCE",
+      "id": "C001",
       "claim": "Git over Reticulum: fetch missing reference objects using the candidate's own rngit",
       "citations": [{"path": "docs/source/git.rst", "heading": "Git over Reticulum and rngit", "lines": "19-31"}]
     },
     {
-      "id": "FUNC-CORE-ADDRESSING",
+      "id": "C002",
       "claim": "Cryptographic addressing: derive the same destination from an imported identity and application name",
       "citations": [{"path": "README.md", "heading": "Notable Features: coordination-less globally unique addressing and identification", "lines": "38-39"}]
     },
     {
-      "id": "FUNC-CORE-CRYPTO",
+      "id": "C003",
       "claim": "Cryptographic communication: produce Ed25519 signatures and decrypt authenticated identity ciphertext",
       "citations": [{"path": "README.md", "heading": "Notable Features: X25519, Ed25519 and encrypted tokens", "lines": "46-53"}]
     },
     {
-      "id": "FUNC-CORE-RECEIPTS",
+      "id": "C004",
       "claim": "Delivery confirmations: accept a proof and time out when the upstream destination supplies no proof",
       "citations": [{"path": "README.md", "heading": "Notable Features: unforgeable packet delivery confirmations", "lines": "54"}]
     },
     {
-      "id": "FUNC-CORE-INTERFACES",
+      "id": "C005",
       "claim": "Authentication and virtual network segmentation on supported interfaces",
       "citations": [{"path": "README.md", "heading": "Notable Features", "lines": "55-59"}]
     },
     {
-      "id": "FUNC-CORE-RESOURCES",
+      "id": "C006",
       "claim": "Reliable bulk transfer with automatic sequencing, compression and checksumming",
       "citations": [{"path": "README.md", "heading": "Notable Features", "lines": "63-66"}]
     },
     {
-      "id": "FUNC-CORE-ROUTING",
+      "id": "C007",
       "claim": "Self-configuring multi-hop transport over heterogeneous carriers",
       "citations": [{"path": "README.md", "heading": "Notable Features", "lines": "40-43"}]
     },
     {
-      "id": "FUNC-CORE-REQUESTS",
+      "id": "C008",
       "claim": "Lightweight, flexible application request/response exchanges",
       "citations": [{"path": "README.md", "heading": "Notable Features", "lines": "67"}]
     },
     {
-      "id": "FUNC-CORE-CHANNEL",
+      "id": "C009",
       "claim": "Reliable sequential delivery through Channel and Buffer",
       "citations": [{"path": "README.md", "heading": "Notable Features", "lines": "71"}]
     }

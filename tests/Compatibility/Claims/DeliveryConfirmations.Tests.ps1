@@ -8,8 +8,8 @@ BeforeAll {
 }
 
 Describe 'Packet delivery confirmations with a fixed upstream peer' {
-    It 'confirms an upstream delivery proof and reports zero packet loss' -Tag 'TEST-RECEIPTS-PROOF', 'FUNC-CORE-RECEIPTS' {
-        $directory = New-CompatibilityCaseDirectory $Context 'TEST-RECEIPTS-PROOF'
+    It 'confirms an upstream delivery proof and reports zero packet loss' -Tag 'T006', 'C004' {
+        $directory = New-CompatibilityCaseDirectory $Context 'T006'
         $probe = Invoke-CompatibilityProbe $Context $directory
         $probe.Candidate.Code | Should -Be 0 -Because "$($probe.Candidate.Output) $($probe.Candidate.Error)"
         $probe.Candidate.Output | Should -Match 'Valid reply from'
@@ -21,8 +21,8 @@ Describe 'Packet delivery confirmations with a fixed upstream peer' {
         $probe.PeerError | Should -BeExactly ''
     }
 
-    It 'times out without a delivery proof and reports complete packet loss' -Tag 'TEST-RECEIPTS-MISSING-PROOF', 'FUNC-CORE-RECEIPTS' {
-        $directory = New-CompatibilityCaseDirectory $Context 'TEST-RECEIPTS-MISSING-PROOF'
+    It 'times out without a delivery proof and reports complete packet loss' -Tag 'T007', 'C004' {
+        $directory = New-CompatibilityCaseDirectory $Context 'T007'
         $probe = Invoke-CompatibilityProbe $Context $directory -WithoutProof
         $probe.Candidate.Code | Should -Be 2 -Because "$($probe.Candidate.Output) $($probe.Candidate.Error)"
         $probe.Candidate.Output | Should -Match 'Probe timed out'

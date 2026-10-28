@@ -17,7 +17,7 @@ if (!$catalogue.ContainsKey('claims') -or $catalogue.claims -isnot [array]) {
 }
 $claims = @{}
 foreach ($claim in $catalogue.claims) {
-    if ($claim.id -cnotmatch '^FUNC-[A-Z0-9]+(?:-[A-Z0-9]+)*$' -or $claims.ContainsKey($claim.id)) {
+    if ($claim.id -cnotmatch '^C[0-9]{3,}$' -or $claims.ContainsKey($claim.id)) {
         throw 'Invalid or duplicate claim ID in compatibility catalog.'
     }
     $claims[$claim.id] = $claim
@@ -47,11 +47,11 @@ function Read-TestReport([string] $Path, [string] $Candidate) {
         foreach ($field in 'Id', 'ClaimId', 'Name', 'Result', 'File', 'Line', 'Revision') {
             if (!$row.Contains($field)) { throw "Missing $field in $Candidate test record." }
         }
-        if ($row.Id -isnot [string] -or $row.Id -cnotmatch '^TEST-[A-Z0-9]+(?:-[A-Z0-9]+)*$') {
+        if ($row.Id -isnot [string] -or $row.Id -cnotmatch '^T[0-9]{3,}$') {
             throw "Invalid test ID in $Candidate report."
         }
         if ($tests.ContainsKey($row.Id)) { throw "Duplicate test ID $($row.Id) in $Candidate report." }
-        if ($row.ClaimId -isnot [string] -or $row.ClaimId -cnotmatch '^FUNC-[A-Z0-9]+(?:-[A-Z0-9]+)*$' -or !$claims.ContainsKey($row.ClaimId)) {
+        if ($row.ClaimId -isnot [string] -or $row.ClaimId -cnotmatch '^C[0-9]{3,}$' -or !$claims.ContainsKey($row.ClaimId)) {
             throw "Unknown claim ID for $($row.Id) in $Candidate report."
         }
         if ($row.Name -isnot [string] -or [string]::IsNullOrWhiteSpace($row.Name)) {
