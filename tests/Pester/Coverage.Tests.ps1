@@ -2,7 +2,7 @@ BeforeAll {
     . (Join-Path $PSScriptRoot 'TestProcess.ps1')
     $coverageScript = Join-Path $PSScriptRoot '..\coverage_summary.ps1'
     $runner = Join-Path $PSScriptRoot '..\run-tests.ps1'
-    $pwsh = Join-Path $PSHOME 'pwsh'
+    $pwsh = Join-Path $PSHOME $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
 }
 
 Describe 'PowerShell coverage reporting' -Tag Tooling {
@@ -87,10 +87,67 @@ Describe 'PowerShell test runner' -Tag Tooling {
                 '-ReportsDirectory', $directory.FullName, '-Catalog', $catalog)
             $result.Code | Should -Be 0 -Because $result.Error
             $result.Output | Should -Match '\| Upstream \| .NET Linux \| .NET macOS \| .NET Windows \|'
-            $result.Output | Should -Match 'Full first behavior &#124; with delimiter \| Pass \| Pass \| Skipped \| Unavailable'
+            $result.Output | Should -Match 'Full first behavior &#124; with delimiter \| Not run \| Pass \| Skipped \| Unavailable'
             $result.Output | Should -Match 'Full second behavior \| Not run \| Fail \| Unavailable \| Unavailable'
             $result.Output | Should -Match 'FIRST.*macOS: requires Linux'
             $result.Output | Should -Match 'SECOND.*Linux: wrong output'
+        }
+
+        It 'keeps a failed upstream baseline visible when other OS baselines pass and rejects a different pin' {
+            $directory = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'baselines')
+            $catalog = Join-Path $directory.FullName 'catalog.json'
+            @{
+                reference = @{ name = 'Test reference'; revision = 'test-pin' }
+                contracts = @(@{ id = 'CLAIM'; family = 'core'; title = 'Shared scenario' })
+            } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $catalog
+            foreach ($rid in 'linux-x64', 'osx-arm64', 'win-x64') {
+                $platform = New-Item -ItemType Directory -Path (Join-Path $directory.FullName "compatibility-$rid-1")
+                @(@{ Id = 'CLAIM'; Status = 'Pass' }) | ConvertTo-Json -AsArray |
+                    Set-Content -LiteralPath (Join-Path $platform.FullName 'compatibility.json')
+                @(@{ Id = 'CLAIM'; Status = $(if ($rid -eq 'win-x64') { 'Fail' } else { 'Pass' })
+                    Detail = 'reference failure'; Revision = 'test-pin' }) | ConvertTo-Json -AsArray |
+                    Set-Content -LiteralPath (Join-Path $platform.FullName 'upstream.json')
+            }
+            $script = Join-Path $PSScriptRoot '..\compatibility_summary.ps1'
+            $arguments = @('-NoProfile', '-File', $script, '-ReportsDirectory', $directory.FullName, '-Catalog', $catalog)
+            $result = Invoke-TestProcess $pwsh $arguments
+            $result.Code | Should -Be 0 -Because $result.Error
+            $result.Output | Should -Match 'Shared scenario \| Fail \| Pass \| Pass \| Pass'
+            $result.Output | Should -Match 'Upstream on Windows: Fail reference failure'
+            @(@{ Id = 'CLAIM'; Status = 'Pass'; Revision = 'wrong-pin' }) | ConvertTo-Json -AsArray |
+                Set-Content -LiteralPath (Join-Path $platform.FullName 'upstream.json')
+            $result = Invoke-TestProcess $pwsh $arguments
+            $result.Code | Should -Be 1
+            $result.Error | Should -Match 'does not match'
+        }
+
+        It 'requires an actual reference instead of treating mixed-peer integration reports as compatibility' {
+            $directory = Join-Path $TestDrive 'no-reference'
+            $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
+                (Join-Path $PSScriptRoot '..\run-compatibility.ps1'),
+                '-Python', '', '-Upstream', '', '-OutputDirectory', $directory)
+            $result.Code | Should -Be 1
+            $result.Error | Should -Match 'upstream-to-upstream baseline'
+            $rows = @(Get-Content -LiteralPath (Join-Path $directory 'compatibility.json') -Raw | ConvertFrom-Json)
+            @($rows | Where-Object Status -eq 'Needs reference').Count | Should -Be 3
+            @($rows | Where-Object Status -eq 'Not covered').Count | Should -Be 5
+            @($rows | Where-Object Status -eq 'Pass').Count | Should -Be 0
+        }
+
+        It 'propagates shared scenario failures through the compatibility entry point and retains both candidate results' {
+            $directory = Join-Path $TestDrive 'failed-scenarios'
+            $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
+                (Join-Path $PSScriptRoot '..\run-compatibility.ps1'),
+                '-Application', $pwsh, '-Python', $pwsh, '-Upstream', $TestDrive, '-OutputDirectory', $directory)
+            $result.Code | Should -Be 1
+            foreach ($file in 'compatibility.json', 'upstream.json') {
+                $rows = @(Get-Content -LiteralPath (Join-Path $directory $file) -Raw | ConvertFrom-Json)
+                @($rows | Where-Object Status -eq 'Fail').Count | Should -Be 3
+                @($rows | Where-Object Status -eq 'Not covered').Count | Should -Be 5
+            }
+            $cases = @(Get-Content -LiteralPath (Join-Path $directory 'scenarios.json') -Raw | ConvertFrom-Json)
+            @($cases | Where-Object Implementation -eq 'Upstream').Count | Should -Be 6
+            @($cases | Where-Object Implementation -eq 'DotReticulum').Count | Should -Be 6
         }
     }
 

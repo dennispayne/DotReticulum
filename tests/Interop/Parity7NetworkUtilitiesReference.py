@@ -6,9 +6,6 @@ from pathlib import Path
 
 from reference_environment import verify_reference
 
-verify_reference()
-import RNS
-
 
 def emit(**values):
     print(json.dumps(values), flush=True)
@@ -19,7 +16,14 @@ def main():
     parser.add_argument("--config", required=True)
     parser.add_argument("--probe-identity", required=True)
     parser.add_argument("--no-proof-identity", required=True)
+    parser.add_argument("--revision", default=None)
     args = parser.parse_args()
+
+    if args.revision:
+        verify_reference(expected_revision=args.revision)
+    else:
+        verify_reference()
+    import RNS
 
     config = Path(args.config).resolve(strict=True)
     probe_identity = RNS.Identity.from_file(args.probe_identity)

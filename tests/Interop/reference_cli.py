@@ -6,14 +6,15 @@ from reference_environment import verify_reference
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--revision", required=True)
-parser.add_argument("--tool", choices=["rnid"], required=True)
+parser.add_argument("--tool", choices=["rnid", "rnprobe"], required=True)
 parser.add_argument("arguments", nargs=argparse.REMAINDER)
 args = parser.parse_args()
 verify_reference(expected_revision=args.revision)
-from RNS.Utilities import rnid
+from RNS.Utilities import rnid, rnprobe
 
 arguments = args.arguments
 if arguments[:1] == ["--"]:
     arguments = arguments[1:]
 sys.argv = [args.tool, *arguments]
-rnid.main()
+tools = {"rnid": rnid.main, "rnprobe": rnprobe.main}
+tools[args.tool]()

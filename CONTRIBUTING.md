@@ -77,14 +77,27 @@ Live Python harnesses require `DOTRETICULUM_UPSTREAM` to point at an unmodified 
 
 ## Moving to a new upstream release
 
-The consolidated compatibility table preserves all contract rows and displays
-Upstream, .NET Linux, .NET macOS and .NET Windows side by side. The
-`advertised-core` family starts from the pinned upstream README's notable
-features; row-specific bounds distinguish a concrete acceptance case from the
-whole advertised capability. Unmapped rows are not covered. Upstream is marked
-passed only when the reference itself ran the corresponding acceptance case;
-using Python as the peer of a .NET test is not sufficient. Retrieved-head drift
-results are separate from this pinned table.
+The consolidated compatibility table preserves every advertised-claim row and
+displays Upstream, .NET Linux, .NET macOS and .NET Windows side by side.
+`tests\Compatibility\catalog.json` cites the pinned upstream README/documentation,
+defines shared acceptance scenarios and states each claim's tested bounds.
+`tests\run-compatibility.ps1` runs the **same scenario, inputs and assertions**
+against both candidates; only invocation adapters differ. For multi-node cases,
+upstream RNS is the fixed reference peer: upstream-to-upstream is the baseline,
+then .NET replaces only the candidate node on each OS. Using Python only as a
+peer does not pass the Upstream column. Baselines execute afresh on every OS;
+any baseline failure remains visible, and missing baselines prevent an overall
+Upstream pass. Retrieved-head drift results stay separate from the pinned table.
+
+The initial shared scenarios cover identity persistence/address derivation,
+fixture signatures/decryption and proof/no-proof packet delivery against a
+fixed upstream peer. The five other advertised claims remain **Not covered**;
+historical integration results do not silently pass them.
+`tests\Integration\catalog.json` and `tests\run-contract-integration.ps1` retain
+the behavioral, .NET-only and mixed-peer process checks. CI runs those under
+**Test**, including their results in the consolidated Native table, not
+Compatibility. The broader contract ledger remains implementation/integration
+evidence rather than a four-target compatibility report.
 
 CI's **Fetch upstream over Reticulum** workflow runs manually or weekly. It reuses
 a successful Linux native Build artifact, seeds only history through the pin's
@@ -93,12 +106,13 @@ missing objects over `rns://`. Nonzero network bundle bytes, strict fsck and the
 pin's absence before retrieval are required. The resulting source bundle and
 provenance are Actions artifacts, not tracked source or a venv.
 
-Compatibility jobs reuse that bundle, checking the recorded SHA-256 and pin,
+Test and Compatibility jobs reuse that bundle, checking the recorded SHA-256 and pin,
 then run `tests\prepare-reference.ps1` to create a fresh checkout and venv in
 runner temporary storage. Dependency versions are recorded in
 `tests\Interop\reference-requirements.txt`; actual imported modules are checked
-before testing. If no unexpired source artifact exists, cases needing Python
-remain explicitly unexecuted rather than passing. Object integrity does not
+before testing. If no unexpired source artifact exists, integration cases needing
+Python remain explicitly unexecuted, and Compatibility fails its missing-reference
+prerequisite with unexecuted rows rather than passing. Object integrity does not
 authenticate the publisher. Moving the compatibility pin remains a separate,
 explicit change; fetching current head does not change it.
 

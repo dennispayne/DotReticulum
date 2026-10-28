@@ -3,305 +3,79 @@
     "name": "Reticulum (RNS) 1.5.7",
     "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391"
   },
-  "note": "Each contract has a stable ID. Pester It blocks claim a contract with -Tag 'Contract:<ID>'; cases that need the pinned Python reference also carry the 'Reference' tag. Contracts with no tagged case are reported as Not covered. Add rows as the source inventory in docs/compatibility-contracts.md is converted into testable contracts.",
+  "note": "Only shared advertised-claim acceptance scenarios belong here. The same inputs and assertions run independently against upstream Python and .NET Linux/macOS/Windows. Multi-node scenarios keep upstream RNS as the fixed peer and replace only the candidate node; upstream-to-upstream is the baseline. Unimplemented scenarios remain visible, never inferred from integration tests.",
   "contracts": [
     {
       "id": "FUNC-CORE-ADDRESSING",
       "family": "advertised-core",
-      "title": "Cryptographic addressing: derive the expected destination address from a fixed identity and application name",
-      "source": "README.md:46-83 (Notable Features); RNS/Identity.py; RNS/Destination.py",
+      "title": "Cryptographic addressing: derive the same destination from an imported identity and application name",
+      "source": "README.md:38-39 (Notable Features: coordination-less globally unique addressing and identification)",
+      "scenarios": ["identity-import", "destination-hash"],
+      "acceptance": "Persist the exact fixed 64-byte identity, and derive the independent fixture's rns.id destination hash.",
       "boundary": "One deterministic identity/name fixture; not a statistical uniqueness proof."
     },
     {
       "id": "FUNC-CORE-CRYPTO",
       "family": "advertised-core",
-      "title": "Cryptographic communication: produce Ed25519 signatures and decrypt authenticated identity ciphertext matching independent fixtures",
-      "source": "README.md:46-83 (Notable Features); RNS/Identity.py; RNS/Cryptography",
+      "title": "Cryptographic communication: produce Ed25519 signatures and decrypt authenticated identity ciphertext",
+      "source": "README.md:46-53 (Notable Features: X25519, Ed25519 and encrypted tokens)",
+      "scenarios": ["detached-signature", "identity-decryption"],
+      "acceptance": "Match independent fixture signature bytes and decrypted plaintext using identical keys and input files.",
       "boundary": "Fixture-level functionality, not a cryptographic audit or complete forward-secrecy acceptance."
     },
     {
       "id": "FUNC-CORE-RECEIPTS",
       "family": "advertised-core",
-      "title": "Delivery confirmations: probe an actual Python proof destination and distinguish a destination that supplies no proof",
-      "source": "README.md:46-83 (Notable Features); RNS/Packet.py",
-      "boundary": "Loopback Python peer; not arbitrary-topology or forged-proof acceptance."
+      "title": "Delivery confirmations: accept a proof and time out when the upstream destination supplies no proof",
+      "source": "README.md:54 (Notable Features: unforgeable packet delivery confirmations)",
+      "scenarios": ["delivery-proof", "missing-delivery-proof"],
+      "acceptance": "Fixed upstream RNS peer receives 16-byte probes at both destinations; candidate reports valid reply/0% loss with exit 0, and timeout/100% loss with exit 2 without a proof.",
+      "boundary": "Direct loopback TCP; not a forged-proof, multi-hop or impaired-link acceptance test."
     },
     {
       "id": "FUNC-CORE-INTERFACES",
       "family": "advertised-core",
-      "title": "Interface authentication: reject wrong IFAC credentials and continue serving after malformed or disconnected peers",
-      "source": "README.md:46-83 (Notable Features); RNS/Reticulum.py; RNS/Transport.py",
-      "boundary": "Configured local software interfaces; not every interface or physical radio."
+      "title": "Authentication and virtual network segmentation on supported interfaces",
+      "source": "README.md:55-59 (Notable Features)",
+      "scenarios": [],
+      "acceptance": "Shared scenario not yet implemented.",
+      "boundary": "Existing .NET-only IFAC/failure-isolation checks remain integration evidence."
     },
     {
       "id": "FUNC-CORE-RESOURCES",
       "family": "advertised-core",
-      "title": "Reliable bulk data: send and fetch a multi-megabyte file between separately launched authenticated CLI processes",
-      "source": "README.md:46-83 (Notable Features); RNS/Resource.py",
-      "boundary": "Bounded multi-megabyte local transfer; not the advertised multi-gigabyte scale."
+      "title": "Reliable bulk transfer with automatic sequencing, compression and checksumming",
+      "source": "README.md:63-66 (Notable Features)",
+      "scenarios": [],
+      "acceptance": "Shared scenario not yet implemented.",
+      "boundary": "Existing native and mixed-peer resource flows remain integration evidence; not multi-gigabyte acceptance."
     },
     {
       "id": "FUNC-CORE-ROUTING",
       "family": "advertised-core",
       "title": "Self-configuring multi-hop transport over heterogeneous carriers",
-      "source": "README.md:46-83 (Notable Features); RNS/Transport.py",
-      "boundary": "Advertised-functionality case is not yet mapped; existing behavioral evidence does not automatically pass this row."
+      "source": "README.md:40-43 (Notable Features)",
+      "scenarios": [],
+      "acceptance": "Shared scenario not yet implemented.",
+      "boundary": "Existing mixed-mesh checks do not automatically pass this row."
     },
     {
       "id": "FUNC-CORE-REQUESTS",
       "family": "advertised-core",
-      "title": "Application request/response exchanges over encrypted links",
-      "source": "README.md:46-83 (Notable Features); RNS/Link.py",
-      "boundary": "Advertised-functionality case is not yet mapped."
+      "title": "Lightweight, flexible application request/response exchanges",
+      "source": "README.md:67 (Notable Features)",
+      "scenarios": [],
+      "acceptance": "Shared scenario not yet implemented.",
+      "boundary": "Requires the same request/response scenario against a fixed upstream peer."
     },
     {
       "id": "FUNC-CORE-CHANNEL",
       "family": "advertised-core",
       "title": "Reliable sequential delivery through Channel and Buffer",
-      "source": "README.md:46-83 (Notable Features); RNS/Channel.py; RNS/Buffer.py",
-      "boundary": "Advertised-functionality case is not yet mapped."
-    },
-    {
-      "id": "IFACE-I2P-001",
-      "family": "interfaces",
-      "title": "I2P router configuration rejects unsafe or inconsistent settings before launch",
-      "source": "RNS/Interfaces/I2PInterface.py"
-    },
-    {
-      "id": "IFACE-IFAC-001",
-      "family": "interfaces",
-      "title": "Wrong IFAC credentials rejected; service survives malformed and disconnected peers",
-      "source": "RNS/Reticulum.py; RNS/Transport.py"
-    },
-    {
-      "id": "IFACE-PIPE-001",
-      "family": "interfaces",
-      "title": "Pipe child starts and is joined during graceful shutdown",
-      "source": "RNS/Interfaces/PipeInterface.py"
-    },
-    {
-      "id": "IFACE-UDP-001",
-      "family": "interfaces",
-      "title": "File transfer over independently configured UDP interfaces",
-      "source": "RNS/Interfaces/UDPInterface.py"
-    },
-    {
-      "id": "RESOURCE-SPOOL-001",
-      "family": "resources",
-      "title": "Multipart files spool per receiver configuration; only expired owned cache is scavenged",
-      "source": "RNS/Resource.py"
-    },
-    {
-      "id": "RUNTIME-SHARED-001",
-      "family": "runtime",
-      "title": "Shared-instance owner election and local-client role",
-      "source": "RNS/Reticulum.py; RNS/Interfaces/LocalInterface.py"
-    },
-    {
-      "id": "RUNTIME-SHARED-002",
-      "family": "runtime",
-      "title": "Python RPC served and local client reconnects after daemon restart",
-      "source": "RNS/Reticulum.py",
-      "reference": true
-    },
-    {
-      "id": "UTIL-CLI-001",
-      "family": "cli",
-      "title": "Executables keep upstream names and dispatch all upstream utilities",
-      "source": "setup.py console scripts"
-    },
-    {
-      "id": "UTIL-NET-001",
-      "family": "network",
-      "title": "rnstatus, rnpath and rnprobe reject invalid options and inputs before runtime startup",
-      "source": "RNS/Utilities/rnstatus.py; rnpath.py; rnprobe.py"
-    },
-    {
-      "id": "UTIL-RNCP-001",
-      "family": "rncp",
-      "title": "File send and fetch with a Python peer",
-      "source": "RNS/Utilities/rncp.py",
-      "reference": true
-    },
-    {
-      "id": "UTIL-RNCP-002",
-      "family": "rncp",
-      "title": "Native send/fetch, rename, overwrite, jail and multi-megabyte transfer between CLI processes",
-      "source": "RNS/Utilities/rncp.py"
-    },
-    {
-      "id": "UTIL-RNGIT-001",
-      "family": "rngit",
-      "title": "Direct clone and fetch over Reticulum",
-      "source": "RNS/Utilities/rngit/client.py",
-      "reference": true
-    },
-    {
-      "id": "UTIL-RNGIT-002",
-      "family": "rngit",
-      "title": "git-remote-rns ordinary clone, fetch and push against the pinned Python server",
-      "source": "RNS/Utilities/rngit/client.py",
-      "reference": true
-    },
-    {
-      "id": "UTIL-RNGIT-003",
-      "family": "rngit",
-      "title": "Invalid client limits are rejected without creating a repository",
-      "source": "RNS/Utilities/rngit/client.py"
-    },
-    {
-      "id": "UTIL-RNGIT-004",
-      "family": "rngit",
-      "title": "Node hosting: create, refuse duplicates, ordinary clone/push and persisted identity across restart",
-      "source": "RNS/Utilities/rngit/server.py"
-    },
-    {
-      "id": "UTIL-RNGIT-005",
-      "family": "rngit",
-      "title": "Signed work documents, comments, scopes and authorized editor use",
-      "source": "RNS/Utilities/rngit/server.py"
-    },
-    {
-      "id": "UTIL-RNGIT-006",
-      "family": "rngit",
-      "title": "Repository permissions edited through authorized content; hidden state diagnosed",
-      "source": "RNS/Utilities/rngit/server.py"
-    },
-    {
-      "id": "UTIL-RNGIT-007",
-      "family": "rngit",
-      "title": "Signed releases: create, list, latest, offline verification, tamper diagnosis",
-      "source": "RNS/Utilities/rngit/server.py"
-    },
-    {
-      "id": "UTIL-RNID-001",
-      "family": "rnid",
-      "title": "Create and show identity; refuse destructive overwrite",
-      "source": "RNS/Utilities/rnid.py"
-    },
-    {
-      "id": "UTIL-RNID-002",
-      "family": "rnid",
-      "title": "Import, export, persist and reload identity keys",
-      "source": "RNS/Utilities/rnid.py"
-    },
-    {
-      "id": "UTIL-RNID-003",
-      "family": "rnid",
-      "title": "Detached signatures are byte-identical; recursive validation rejects tampering",
-      "source": "RNS/Utilities/rnid.py"
-    },
-    {
-      "id": "UTIL-RNID-004",
-      "family": "rnid",
-      "title": "Legacy signatures verify only with an explicit key",
-      "source": "RNS/Utilities/rnid.py"
-    },
-    {
-      "id": "UTIL-RNID-005",
-      "family": "rnid",
-      "title": "stdin/stdout, base256 wrapped RSM and authenticated metadata",
-      "source": "RNS/Utilities/rnid.py"
-    },
-    {
-      "id": "UTIL-RNID-006",
-      "family": "rnid",
-      "title": "Decrypt upstream-generated ciphertext; reject wrong identity and overwrite",
-      "source": "RNS/Utilities/rnid.py; RNS/Identity.py"
-    },
-    {
-      "id": "UTIL-RNID-007",
-      "family": "rnid",
-      "title": "Metadata specs, file messages and output extension rules",
-      "source": "RNS/Utilities/rnid.py"
-    },
-    {
-      "id": "UTIL-RNID-008",
-      "family": "rnid",
-      "title": "Editor use requires explicit authorization and is bounded (native difference)",
-      "source": "RNS/Utilities/rnid.py"
-    },
-    {
-      "id": "UTIL-RNID-009",
-      "family": "rnid",
-      "title": "Invalid encodings, exclusive arguments and nonfinite timeouts are rejected",
-      "source": "RNS/Utilities/rnid.py"
-    },
-    {
-      "id": "UTIL-RNID-010",
-      "family": "rnid",
-      "title": "File encryption interoperates with Python in both directions across 16 MiB",
-      "source": "RNS/Utilities/rnid.py; RNS/Identity.py",
-      "reference": true
-    },
-    {
-      "id": "UTIL-RNID-011",
-      "family": "rnid",
-      "title": "Request a Python identity over the network, retain it, announce back",
-      "source": "RNS/Utilities/rnid.py",
-      "reference": true
-    },
-    {
-      "id": "UTIL-RNIR-001",
-      "family": "rnir/rnpkg",
-      "title": "Upstream placeholder tools start and exit honestly with runtime initialization",
-      "source": "RNS/Utilities/rnir.py; rnpkg.py"
-    },
-    {
-      "id": "UTIL-RNODECONF-001",
-      "family": "rnodeconf",
-      "title": "Parser, maintenance scope and unsafe-operation rejection without hardware",
-      "source": "RNS/Utilities/rnodeconf.py"
-    },
-    {
-      "id": "UTIL-RNPATH-001",
-      "family": "rnpath",
-      "title": "Local and authenticated remote path table and path requests",
-      "source": "RNS/Utilities/rnpath.py"
-    },
-    {
-      "id": "UTIL-RNPROBE-001",
-      "family": "rnprobe",
-      "title": "Probe round trip, hops and exit codes",
-      "source": "RNS/Utilities/rnprobe.py",
-      "reference": true
-    },
-    {
-      "id": "UTIL-RNSD-001",
-      "family": "rnsd",
-      "title": "Daemon starts, logs and shuts down gracefully with documented exit codes",
-      "source": "RNS/Utilities/rnsd.py"
-    },
-    {
-      "id": "UTIL-RNSD-002",
-      "family": "rnsd",
-      "title": "Version reporting, config creation and strict validation of unsupported settings",
-      "source": "RNS/Utilities/rnsd.py; RNS/Reticulum.py"
-    },
-    {
-      "id": "UTIL-RNSH-001",
-      "family": "rnsh",
-      "title": "Remote shell sessions with a Python peer",
-      "source": "RNS/Utilities/rnsh/",
-      "reference": true
-    },
-    {
-      "id": "UTIL-RNSH-002",
-      "family": "rnsh",
-      "title": "Distinct shell command, destination validation and service-specific identities",
-      "source": "RNS/Utilities/rnsh/"
-    },
-    {
-      "id": "UTIL-RNSTATUS-001",
-      "family": "rnstatus",
-      "title": "Local and authenticated remote status queries",
-      "source": "RNS/Utilities/rnstatus.py"
-    },
-    {
-      "id": "UTIL-RNX-001",
-      "family": "rnx",
-      "title": "Remote command execution with explicit authorization",
-      "source": "RNS/Utilities/rnx.py"
+      "source": "README.md:71 (Notable Features)",
+      "scenarios": [],
+      "acceptance": "Shared scenario not yet implemented.",
+      "boundary": "Requires the same ordered-delivery scenario against a fixed upstream peer."
     }
   ]
 }

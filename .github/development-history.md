@@ -4,6 +4,61 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Shared advertised-claim compatibility and fixed upstream peers
+
+The user clarified that Compatibility means the same advertised, testable claim
+scenario independently exercised against upstream RNS and .NET Linux/macOS/Windows.
+For multi-node cases, upstream remains the fixed peer; upstream-to-upstream is the
+baseline and only the candidate node changes. The previous mixed 47-row reporting
+above is historical integration evidence, not proof of four-target compatibility.
+
+Preserved the 39 behavioral/native/mixed-peer contracts and all selected Pester
+cases in `tests\Integration\catalog.json` and `tests\run-contract-integration.ps1`.
+CI now runs them under Test and includes their NUnit results in the Native table.
+Compatibility's eight advertised-core rows have exact pinned README citations,
+shared scenario IDs, acceptance criteria and explicit boundaries. Six scenarios
+cover three rows: identity import/address derivation, fixture signature/decryption,
+and positive/absent packet delivery proofs. The other five rows remain Not covered
+on both implementations; existing integration tests do not pass them by inference.
+
+Both probe scenarios launch the same pinned upstream RNS server and use identical
+16-byte probes, candidate configurations, timeouts, peer observations and exit-code
+assertions. Upstream Python is itself a candidate, not merely the peer. The peer
+adapter accepts an explicit revision for separate head-drift runs; existing callers
+retain the default pin check. No upstream source shim or newly generated vector
+was introduced. Existing `parity7-rnid.json` expectations retain their provenance.
+An initial run exposed upstream's `0.0%`/`100.0%` formatting versus .NET's integer
+percentages; the shared assertion accepts equivalent numeric formatting without
+changing the required loss values or exit codes.
+
+Each compatibility matrix job now executes its own upstream baseline rather than
+copying prior upstream results from the source artifact. Consolidation preserves
+all eight rows and four target columns; a failing upstream baseline takes priority,
+missing baselines cannot produce Pass, and pin mismatches fail explicitly.
+Three added tooling regressions cover baseline aggregation/pin enforcement,
+missing-reference reporting and failure propagation through the entry point.
+
+Local verification:
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: zero warnings/errors.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet`:
+  Crypto 47, Core 171, Interfaces 314/23 skipped, Transport 543/16 skipped,
+  Applications 756/40 skipped; zero failures, opt-in xUnit live tests disabled.
+- `dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o TestResults\shared-claims-native --nologo -v quiet`
+  with MSVC environment setup in the same process: passed.
+- `pwsh -NoProfile -File tests\run-compatibility.ps1 -Application TestResults\shared-claims-native\DotReticulum.Applications.exe -Python TestResults\reference-provision-check\venv\Scripts\python.exe -Upstream TestResults\reference-provision-check\upstream -OutputDirectory TestResults\shared-claims-native-results -NoJobSummary`:
+  all six scenarios passed independently on Python and native Windows (12 executions);
+  three rows Pass and five Not covered on each candidate.
+- Pester `tests\Pester\Coverage.Tests.ps1`: 10 passed, zero failed/skipped.
+- `pwsh -NoProfile -File tests\run-contract-integration.ps1 -Application TestResults\shared-claims-native\DotReticulum.Applications.exe -OutputDirectory TestResults\reclassified-native-integration -NoJobSummary`
+  with the verified reference paths in the environment: 127 passed, two skipped,
+  16 unselected; 39 integration contracts (35 pass, two skipped, two not covered).
+  This also executes native authenticated multi-megabyte rncp transfers.
+
+Requested job titles are now Build, Test, Compatibility, Summarize Compatibility
+and Summarize Test. GitHub generates the graph's `Matrix:` prefix itself; changing
+workflow job names does not remove that UI-owned decoration. Build jobs still
+produce no summaries. No release/tag was created or dispatched.
+
 ### CI reference provisioning and hosted acceptance
 
 Hosted end-to-end run **`40521067543` passed** after supplying .NET 10 and full
@@ -329,7 +384,7 @@ This verifies the actual Linux runtime/native encrypted multi-megabyte flow, not
 
 ## Limitations at the last entry
 
-See [TODO.md](../TODO.md) for active scope. At the 2026-10-26 history boundary the roadmap remained incomplete: unresolved actual I2P stream/restart recovery; missing desktop RNode BLE, Darwin rnsh terminal backend and Android host/providers; no physical serial/TNC/RNode/Multi/Weave/RF acceptance; and remaining Python-router/crash restart, alternate-route, prolonged Channel/resource soak and impaired published-native/per-bearer matrices. Broader OS/device support is not implied by managed builds or macOS CI. The hosted workflow does not test live Python interoperability or mixed mesh. No publisher/release-signature authentication is claimed; RNS object consistency is not publisher provenance. Full RNS parity remains incomplete.
+See [TODO.md](../TODO.md) for active scope. At the 2026-10-26 history boundary the roadmap remained incomplete: unresolved actual I2P stream/restart recovery; missing desktop RNode BLE, Darwin rnsh terminal backend and Android host/providers; no physical serial/TNC/RNode/Multi/Weave/RF acceptance; and remaining Python-router/crash restart, alternate-route, prolonged Channel/resource soak and impaired published-native/per-bearer matrices. Broader OS/device support is not implied by managed builds or macOS CI. Hosted pinned-Python process interoperability is now exercised as recorded above; broader mixed-mesh acceptance remains separate. No publisher/release-signature authentication is claimed; RNS object consistency is not publisher provenance. Full RNS parity remains incomplete.
 
 ## Lessons and decisions worth retaining
 

@@ -68,17 +68,17 @@ jobs:
       - name: Verify the pinned Python environment from fetched objects
         run: ./tests/prepare-reference.ps1 -Bundle "$env:RUNNER_TEMP/hosted-reference/reference.bundle" -Directory "$env:RUNNER_TEMP/pinned-python" -Python python3
 
-      - name: Run pinned compatibility with the native binary and actual Python peers
+      - name: Run native contract integration with actual pinned Python peers
         id: compatibility
         continue-on-error: true
         run: |
           ./tests/install-pester.ps1
-          ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label 'linux-x64, Reticulum-fetched reference'
+          ./tests/run-contract-integration.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label 'linux-x64, Reticulum-fetched reference' -NoJobSummary
 
-      - name: Execute matching pinned upstream CLI cases
+      - name: Execute shared pinned advertised-claim scenarios
         run: |
           $pin = (Get-Content tests/Compatibility/catalog.json -Raw | ConvertFrom-Json).reference.revision
-          ./tests/compare-upstream.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Python $env:DOTRETICULUM_PYTHON -Upstream $env:DOTRETICULUM_UPSTREAM -Revision $pin -OutputDirectory TestResults/upstream-pinned -Label 'Pinned upstream CLI comparison'
+          ./tests/compare-upstream.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Python $env:DOTRETICULUM_PYTHON -Upstream $env:DOTRETICULUM_UPSTREAM -Revision $pin -OutputDirectory TestResults/upstream-pinned -Label 'Pinned advertised-claim comparison'
           Copy-Item -LiteralPath TestResults/upstream-pinned/upstream.json -Destination "$env:RUNNER_TEMP/hosted-reference/upstream.json"
 
       - name: Compare retrieved upstream head with the native implementation
@@ -88,9 +88,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Could not materialize retrieved head for drift comparison.' }
           ./tests/compare-upstream.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Python $env:DOTRETICULUM_PYTHON -Upstream $env:DOTRETICULUM_UPSTREAM -Revision $provenance.head -OutputDirectory TestResults/upstream-head
 
-      - name: Propagate pinned compatibility failure
+      - name: Propagate pinned integration failure
         if: ${{ !cancelled() && steps.compatibility.outcome == 'failure' }}
-        run: throw 'Pinned compatibility failed; see retained reports.'
+        run: throw 'Pinned integration failed; see retained reports.'
 
       - name: Retain verified reference and provenance
         if: ${{ !cancelled() }}
@@ -110,7 +110,7 @@ jobs:
         with:
           name: hosted-reference-compatibility
           path: |
-            TestResults/compatibility/
+            TestResults/contract-integration/
             TestResults/upstream-head/
             TestResults/upstream-pinned/
           if-no-files-found: warn

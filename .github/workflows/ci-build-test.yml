@@ -46,7 +46,7 @@ env:
 
 jobs:
   build:
-    name: Build / ${{ matrix.rid }}
+    name: Build
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -123,10 +123,13 @@ jobs:
           retention-days: 14
 
   test:
-    name: Test / ${{ matrix.rid }}
+    name: Test
     needs: build
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
     strategy:
       fail-fast: false
       matrix:
@@ -163,6 +166,18 @@ jobs:
 
       - name: Verify native build
         run: ./tests/use-native-build.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
+
+      - name: Provision pinned Python peers for integration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $directory = Join-Path $env:RUNNER_TEMP 'reference-artifact'
+          ./tests/download-reference.ps1 -Directory $directory
+          $bundle = Join-Path $directory 'reference.bundle'
+          if (Test-Path -LiteralPath $bundle) {
+            $python = if ($IsWindows) { 'python' } else { 'python3' }
+            ./tests/prepare-reference.ps1 -Bundle $bundle -Directory (Join-Path $env:RUNNER_TEMP 'pinned-python') -Python $python
+          }
 
       - name: Restore
         run: dotnet restore DotReticulum.slnx
@@ -211,7 +226,7 @@ jobs:
           ./tests/install-pester.ps1
           Import-Module Pester -RequiredVersion 5.7.1
           $configuration = New-PesterConfiguration
-          $configuration.Run.Container = @('Coverage', 'Cli', 'Parity8Packaging') | ForEach-Object {
+          $configuration.Run.Container = @('Coverage', 'Parity8Packaging') | ForEach-Object {
             New-PesterContainer -Path "tests/Pester/$_.Tests.ps1" -Data @{ Application = $env:DOTRETICULUM_NATIVE_EXE }
           }
           $configuration.Run.PassThru = $true
@@ -221,10 +236,14 @@ jobs:
           $result = Invoke-Pester -Configuration $configuration
           if ($result.FailedCount -gt 0 -or $result.Result -ne 'Passed' -or $result.PassedCount -eq 0) { exit 1 }
 
+      - name: Run native contract integration and mixed-peer checks
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ./tests/run-contract-integration.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary
+
       - name: Summarize native test results
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
-          $summary = & ./tests/test_summary.ps1 -Path TestResults/native, TestResults/native-cli.xml -Title 'Native executable tests (${{ matrix.rid }})' -JsonPath TestResults/summary-native.json
+          $summary = & ./tests/test_summary.ps1 -Path TestResults/native, TestResults/native-cli.xml, TestResults/contract-integration/contract-integration.xml -Title 'Native executable and contract integration tests (${{ matrix.rid }})' -JsonPath TestResults/summary-native.json
           $summary
 
       - name: Retain test diagnostics
@@ -237,7 +256,7 @@ jobs:
           retention-days: 14
 
   compatibility:
-    name: Upstream Compatibility / ${{ matrix.rid }}
+    name: Compatibility
     needs: build
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -273,14 +292,6 @@ jobs:
       - name: Verify native build
         run: ./tests/use-native-build.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
 
-      - name: Install Pester
-        run: ./tests/install-pester.ps1
-
-      - name: Set up .NET for C# test fixtures
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: global.json
-
       - name: Provision the pinned reference from Reticulum-fetched objects
         env:
           GH_TOKEN: ${{ github.token }}
@@ -294,7 +305,7 @@ jobs:
           }
 
       - name: Run compatibility suite against the native executable
-        run: ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary -UpstreamResults (Join-Path $env:RUNNER_TEMP 'reference-artifact/upstream.json')
+        run: ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary
 
       - name: Retain compatibility report
         if: ${{ !cancelled() }}
@@ -306,7 +317,7 @@ jobs:
           retention-days: 14
 
   compatibility-summary:
-    name: Upstream Compatibility / All platforms
+    name: Summarize Compatibility
     needs: compatibility
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
@@ -337,7 +348,7 @@ jobs:
           $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
   test-summary:
-    name: Test / All platforms
+    name: Summarize Test
     needs: test
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest

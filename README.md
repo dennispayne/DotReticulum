@@ -76,6 +76,14 @@ dotnet run --project src/DotReticulum.Applications -- rnsd --help
 
 "Live" means a real, unmodified Python reference node in the pinned environment; unit vectors and loopback tests are not live interoperability. The [contract reference](docs/compatibility-contracts.md) gives each upstream contract's status and evidence; open gaps are in [TODO.md](TODO.md).
 
+CI's Compatibility table runs shared, upstream-advertised acceptance scenarios on
+Python RNS and native .NET Linux/macOS/Windows. Multi-node scenarios keep upstream
+as the fixed peer, with upstream-to-upstream as the baseline. Behavioral/native-only
+checks remain under Test; uncovered advertised claims stay visible. The separate
+[Fetch upstream over Reticulum workflow](.github/workflows/upstream-reference.yml)
+retrieves missing reference objects using our native `rngit` over `rns://`;
+Test/Compatibility jobs reuse its verified source artifact.
+
 | Area | Status |
 | --- | --- |
 | Crypto, identities, tokens, packets, destinations | Reference-generated vectors including malformed and boundary input; exercised live |

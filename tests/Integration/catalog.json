@@ -1,0 +1,251 @@
+{
+  "reference": {
+    "name": "Reticulum (RNS) 1.5.7",
+    "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391"
+  },
+  "note": "Integration inventory, not the four-target advertised-claim compatibility suite. Pester It blocks use Contract:<ID> tags; Reference tags require the pinned Python peer. Native-only and mixed-peer tests remain integration evidence.",
+  "contracts": [
+    {
+      "id": "IFACE-I2P-001",
+      "family": "interfaces",
+      "title": "I2P router configuration rejects unsafe or inconsistent settings before launch",
+      "source": "RNS/Interfaces/I2PInterface.py"
+    },
+    {
+      "id": "IFACE-IFAC-001",
+      "family": "interfaces",
+      "title": "Wrong IFAC credentials rejected; service survives malformed and disconnected peers",
+      "source": "RNS/Reticulum.py; RNS/Transport.py"
+    },
+    {
+      "id": "IFACE-PIPE-001",
+      "family": "interfaces",
+      "title": "Pipe child starts and is joined during graceful shutdown",
+      "source": "RNS/Interfaces/PipeInterface.py"
+    },
+    {
+      "id": "IFACE-UDP-001",
+      "family": "interfaces",
+      "title": "File transfer over independently configured UDP interfaces",
+      "source": "RNS/Interfaces/UDPInterface.py"
+    },
+    {
+      "id": "RESOURCE-SPOOL-001",
+      "family": "resources",
+      "title": "Multipart files spool per receiver configuration; only expired owned cache is scavenged",
+      "source": "RNS/Resource.py"
+    },
+    {
+      "id": "RUNTIME-SHARED-001",
+      "family": "runtime",
+      "title": "Shared-instance owner election and local-client role",
+      "source": "RNS/Reticulum.py; RNS/Interfaces/LocalInterface.py"
+    },
+    {
+      "id": "RUNTIME-SHARED-002",
+      "family": "runtime",
+      "title": "Python RPC served and local client reconnects after daemon restart",
+      "source": "RNS/Reticulum.py",
+      "reference": true
+    },
+    {
+      "id": "UTIL-CLI-001",
+      "family": "cli",
+      "title": "Executables keep upstream names and dispatch all upstream utilities",
+      "source": "setup.py console scripts"
+    },
+    {
+      "id": "UTIL-NET-001",
+      "family": "network",
+      "title": "rnstatus, rnpath and rnprobe reject invalid options and inputs before runtime startup",
+      "source": "RNS/Utilities/rnstatus.py; rnpath.py; rnprobe.py"
+    },
+    {
+      "id": "UTIL-RNCP-001",
+      "family": "rncp",
+      "title": "File send and fetch with a Python peer",
+      "source": "RNS/Utilities/rncp.py",
+      "reference": true
+    },
+    {
+      "id": "UTIL-RNCP-002",
+      "family": "rncp",
+      "title": "Native send/fetch, rename, overwrite, jail and multi-megabyte transfer between CLI processes",
+      "source": "RNS/Utilities/rncp.py"
+    },
+    {
+      "id": "UTIL-RNGIT-001",
+      "family": "rngit",
+      "title": "Direct clone and fetch over Reticulum",
+      "source": "RNS/Utilities/rngit/client.py",
+      "reference": true
+    },
+    {
+      "id": "UTIL-RNGIT-002",
+      "family": "rngit",
+      "title": "git-remote-rns ordinary clone, fetch and push against the pinned Python server",
+      "source": "RNS/Utilities/rngit/client.py",
+      "reference": true
+    },
+    {
+      "id": "UTIL-RNGIT-003",
+      "family": "rngit",
+      "title": "Invalid client limits are rejected without creating a repository",
+      "source": "RNS/Utilities/rngit/client.py"
+    },
+    {
+      "id": "UTIL-RNGIT-004",
+      "family": "rngit",
+      "title": "Node hosting: create, refuse duplicates, ordinary clone/push and persisted identity across restart",
+      "source": "RNS/Utilities/rngit/server.py"
+    },
+    {
+      "id": "UTIL-RNGIT-005",
+      "family": "rngit",
+      "title": "Signed work documents, comments, scopes and authorized editor use",
+      "source": "RNS/Utilities/rngit/server.py"
+    },
+    {
+      "id": "UTIL-RNGIT-006",
+      "family": "rngit",
+      "title": "Repository permissions edited through authorized content; hidden state diagnosed",
+      "source": "RNS/Utilities/rngit/server.py"
+    },
+    {
+      "id": "UTIL-RNGIT-007",
+      "family": "rngit",
+      "title": "Signed releases: create, list, latest, offline verification, tamper diagnosis",
+      "source": "RNS/Utilities/rngit/server.py"
+    },
+    {
+      "id": "UTIL-RNID-001",
+      "family": "rnid",
+      "title": "Create and show identity; refuse destructive overwrite",
+      "source": "RNS/Utilities/rnid.py"
+    },
+    {
+      "id": "UTIL-RNID-002",
+      "family": "rnid",
+      "title": "Import, export, persist and reload identity keys",
+      "source": "RNS/Utilities/rnid.py"
+    },
+    {
+      "id": "UTIL-RNID-003",
+      "family": "rnid",
+      "title": "Detached signatures are byte-identical; recursive validation rejects tampering",
+      "source": "RNS/Utilities/rnid.py"
+    },
+    {
+      "id": "UTIL-RNID-004",
+      "family": "rnid",
+      "title": "Legacy signatures verify only with an explicit key",
+      "source": "RNS/Utilities/rnid.py"
+    },
+    {
+      "id": "UTIL-RNID-005",
+      "family": "rnid",
+      "title": "stdin/stdout, base256 wrapped RSM and authenticated metadata",
+      "source": "RNS/Utilities/rnid.py"
+    },
+    {
+      "id": "UTIL-RNID-006",
+      "family": "rnid",
+      "title": "Decrypt upstream-generated ciphertext; reject wrong identity and overwrite",
+      "source": "RNS/Utilities/rnid.py; RNS/Identity.py"
+    },
+    {
+      "id": "UTIL-RNID-007",
+      "family": "rnid",
+      "title": "Metadata specs, file messages and output extension rules",
+      "source": "RNS/Utilities/rnid.py"
+    },
+    {
+      "id": "UTIL-RNID-008",
+      "family": "rnid",
+      "title": "Editor use requires explicit authorization and is bounded (native difference)",
+      "source": "RNS/Utilities/rnid.py"
+    },
+    {
+      "id": "UTIL-RNID-009",
+      "family": "rnid",
+      "title": "Invalid encodings, exclusive arguments and nonfinite timeouts are rejected",
+      "source": "RNS/Utilities/rnid.py"
+    },
+    {
+      "id": "UTIL-RNID-010",
+      "family": "rnid",
+      "title": "File encryption interoperates with Python in both directions across 16 MiB",
+      "source": "RNS/Utilities/rnid.py; RNS/Identity.py",
+      "reference": true
+    },
+    {
+      "id": "UTIL-RNID-011",
+      "family": "rnid",
+      "title": "Request a Python identity over the network, retain it, announce back",
+      "source": "RNS/Utilities/rnid.py",
+      "reference": true
+    },
+    {
+      "id": "UTIL-RNIR-001",
+      "family": "rnir/rnpkg",
+      "title": "Upstream placeholder tools start and exit honestly with runtime initialization",
+      "source": "RNS/Utilities/rnir.py; rnpkg.py"
+    },
+    {
+      "id": "UTIL-RNODECONF-001",
+      "family": "rnodeconf",
+      "title": "Parser, maintenance scope and unsafe-operation rejection without hardware",
+      "source": "RNS/Utilities/rnodeconf.py"
+    },
+    {
+      "id": "UTIL-RNPATH-001",
+      "family": "rnpath",
+      "title": "Local and authenticated remote path table and path requests",
+      "source": "RNS/Utilities/rnpath.py"
+    },
+    {
+      "id": "UTIL-RNPROBE-001",
+      "family": "rnprobe",
+      "title": "Probe round trip, hops and exit codes",
+      "source": "RNS/Utilities/rnprobe.py",
+      "reference": true
+    },
+    {
+      "id": "UTIL-RNSD-001",
+      "family": "rnsd",
+      "title": "Daemon starts, logs and shuts down gracefully with documented exit codes",
+      "source": "RNS/Utilities/rnsd.py"
+    },
+    {
+      "id": "UTIL-RNSD-002",
+      "family": "rnsd",
+      "title": "Version reporting, config creation and strict validation of unsupported settings",
+      "source": "RNS/Utilities/rnsd.py; RNS/Reticulum.py"
+    },
+    {
+      "id": "UTIL-RNSH-001",
+      "family": "rnsh",
+      "title": "Remote shell sessions with a Python peer",
+      "source": "RNS/Utilities/rnsh/",
+      "reference": true
+    },
+    {
+      "id": "UTIL-RNSH-002",
+      "family": "rnsh",
+      "title": "Distinct shell command, destination validation and service-specific identities",
+      "source": "RNS/Utilities/rnsh/"
+    },
+    {
+      "id": "UTIL-RNSTATUS-001",
+      "family": "rnstatus",
+      "title": "Local and authenticated remote status queries",
+      "source": "RNS/Utilities/rnstatus.py"
+    },
+    {
+      "id": "UTIL-RNX-001",
+      "family": "rnx",
+      "title": "Remote command execution with explicit authorization",
+      "source": "RNS/Utilities/rnx.py"
+    }
+  ]
+}

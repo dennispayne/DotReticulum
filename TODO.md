@@ -30,6 +30,8 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Provision the separately fetched pinned Python reference for CI interoperability (hosted run 40521067543, verified source imports and 129 passing native/Python cases)
   - [x] Native .NET `rngit` hosted-CI upstream retrieval and separate upstream-drift comparison (runs 40519261522 / 40520520527; disclosed mirror-parent seed, nonzero network objects, no publisher-authentication claim)
   - [x] Initial advertised-core functionality family and directly executed Upstream results alongside the three .NET platforms (eight bounded rows; unmapped acceptance stays explicit; run 40521069184)
+  - [x] Separate integration evidence from shared advertised-claim compatibility scenarios; use upstream-to-upstream as the multi-node baseline and a fixed upstream peer for every .NET candidate (Windows native and Python locally verified; cross-platform CI evidence recorded in development history)
+  - [ ] Expand shared advertised-claim scenarios for interface authentication, bulk resources, heterogeneous routing, application requests and Channel/Buffer
   - [ ] `interop-test.yml`
   - [ ] `e2e-mesh-test.yml`
   - [ ] `codeql.yml`
