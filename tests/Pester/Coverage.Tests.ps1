@@ -28,20 +28,43 @@ Describe 'PowerShell coverage reporting' -Tag Tooling {
             "<CoverageSession><Modules>$($modules -join '')<Module><ModuleName>DotReticulum.Core.Tests</ModuleName></Module></Modules></CoverageSession>" |
                 Set-Content -LiteralPath (Join-Path $directory.FullName 'coverage.opencover.xml')
         }
-        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $coverageScript, $reports.FullName)
+        $json = Join-Path $TestDrive 'merged.json'
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $coverageScript, $reports.FullName, '-JsonPath', $json)
         $result.Code | Should -Be 0 -Because $result.Error
         $result.Output | Should -Match '\*\*Overall\*\* \| 2/2 \(100\.00%\) \| 2/2 \(100\.00%\)'
         $result.Output | Should -Not -Match 'Core.Tests'
+        $merged = Get-Content -LiteralPath $json -Raw | ConvertFrom-Json
+        $merged.ReportCount | Should -Be 2
+        $overall = $merged.Rows | Where-Object Name -EQ Overall
+        $overall.Lines.Hit | Should -Be 2
+        $overall.Branches.Total | Should -Be 2
+
+        $platforms = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'platforms')
+        $linux = New-Item -ItemType Directory -Path (Join-Path $platforms.FullName 'test-results-linux-x64-1')
+        foreach ($suite in 'unit', 'integration') {
+            $index = if ($suite -eq 'unit') { 0 } else { 1 }
+            $export = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $coverageScript,
+                (Join-Path $reports.FullName "report-$index"), '-JsonPath', (Join-Path $linux.FullName "coverage-$suite.json"))
+            $export.Code | Should -Be 0 -Because $export.Error
+            $export.Output | Should -Match '\*\*Overall\*\* \| 1/2 \(50\.00%\) \| 1/2 \(50\.00%\)'
+        }
+        $summary = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
+            (Join-Path $PSScriptRoot '..\Get-TestPlatformSummary.ps1'), '-ReportsDirectory', $platforms.FullName)
+        $summary.Code | Should -Be 0 -Because $summary.Error
+        [regex]::Matches($summary.Output, '\| Overall \| 1/2 \(50\.00%\) / 1/2 \(50\.00%\) \| Unavailable \| Unavailable \|').Count | Should -Be 2
+        $summary.Output | Should -Not -Match '100\.00%'
     }
 
     It 'rejects missing production modules without printing an overall percentage' {
         $directory = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'incomplete')
         '<CoverageSession><Modules><Module><ModuleName>DotReticulum.Core</ModuleName></Module></Modules></CoverageSession>' |
             Set-Content -LiteralPath (Join-Path $directory.FullName 'coverage.opencover.xml')
-        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $coverageScript, $directory.FullName)
+        $json = Join-Path $TestDrive 'invalid.json'
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $coverageScript, $directory.FullName, '-JsonPath', $json)
         $result.Code | Should -Be 2
         $result.Error | Should -Match 'missing modules'
         $result.Output | Should -Not -Match '\*\*Overall\*\*'
+        Test-Path -LiteralPath $json | Should -BeFalse
     }
 
     It 'reports malformed coverage as a failure instead of a partial summary' {
@@ -51,6 +74,20 @@ Describe 'PowerShell coverage reporting' -Tag Tooling {
         $result.Code | Should -Be 2
         $result.Error | Should -Not -BeNullOrEmpty
         $result.Output | Should -Not -Match '\*\*Overall\*\*'
+    }
+
+    It 'rejects invalid platform coverage rather than displaying a fabricated percentage' {
+        $directory = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'bad-platform-coverage')
+        $platform = New-Item -ItemType Directory -Path (Join-Path $directory.FullName 'test-results-linux-x64-1')
+        @{
+            ReportCount = 1
+            Rows = @(@{ Name = 'Overall'; Lines = @{ Hit = 2; Total = 1 }; Branches = @{ Hit = 0; Total = 0 } })
+        } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $platform.FullName 'coverage-unit.json')
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
+            (Join-Path $PSScriptRoot '..\Get-TestPlatformSummary.ps1'), '-ReportsDirectory', $directory.FullName)
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'Invalid coverage hit/total counts'
+        $result.Output | Should -Not -Match '200\.00%'
     }
 }
 

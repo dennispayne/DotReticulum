@@ -4,6 +4,72 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Advanced static analysis, suite coverage summaries and accessibility
+
+The user authorized replacing GitHub-managed CodeQL default setup with an
+editable Static analysis workflow containing CodeQL and PSScriptAnalyzer jobs
+and a consolidated summary. `.github/workflows/codeql.yml` preserves Actions,
+C# and Python with the default CodeQL query suite; C# extraction uses a real
+Release build with the pinned SDK. Relevant PR/push changes, Monday 05:00 UTC
+and manual dispatch run analysis. Action references use full commit SHAs.
+Read-only permissions are the default, with code-scanning upload permissions
+scoped to analysis jobs. Fork PRs retain reports without code-scanning uploads.
+
+PSScriptAnalyzer 1.24.0 is pinned and scans all tracked `.ps1`, `.psm1`, `.psd1`
+files, including tests and helpers, without executing them. Shared settings
+select twelve security/correctness/approved-verb rules, not a bulk style rewrite.
+Warnings and errors fail its job after writing SARIF. Two Markdown helpers now
+use an approved conversion verb. Two narrow, justified suppressions identify
+public IFAC test fixture values deliberately written to owned upstream configs.
+The new report converter handles parser errors as errors, relative URI paths,
+empty results, inherited CodeQL severity, missing/failed analyses, duplicate
+categories and malformed input. Analysis completion is separate from findings;
+existing CodeQL results are not hidden or treated as a zero-findings success.
+
+Build and Test exports separate deduplicated unit/integration coverage JSON and
+displays per-project and overall line/branch hit counts and percentages beneath
+each suite's cross-platform table. Missing platforms remain unavailable; the
+existing merged union report is retained. Independently measured percentages
+are not averaged or summed, and native subprocess execution is not claimed as
+instrumented managed coverage.
+
+Added a basic `ACCESSIBILITY.md`, linked from the README, describing CLI goals,
+known lack of formal/screen-reader verification and issue-reporting guidance
+without asserting compliance.
+
+Local evidence before hosted validation:
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: zero warnings/errors.
+- `dotnet test DotReticulum.slnx -c Release --no-build -m:1 --filter 'Category=Unit' --settings tests\coverage.runsettings --collect:'XPlat Code Coverage' --results-directory TestResults\coverage-analysis-ae5ee7713e614f768fef3d4291013e4a\unit --logger trx -- xUnit.MaxParallelThreads=1`:
+  **1,416 passed, 7 skipped**, zero failed.
+- The same command with `--filter 'Category!=Unit&Category!=Live'` and results
+  subdirectory `integration`: **415 passed, 15 skipped**, zero failed.
+  Opt-in live xUnit tests were not enabled; their exclusion is not a pass.
+- `tests\Get-CoverageSummary.ps1` on each subdirectory with `-JsonPath`, on the
+  merged root, and `tests\Get-TestPlatformSummary.ps1` on their exported platform
+  artifacts verified the actual data path. Unit **60.71% lines / 48.84% branches**;
+  integration **52.82% / 38.87%**; merged **83.11% / 69.84%**.
+
+| Production project | Unit lines / branches | Integration lines / branches | Merged lines / branches |
+|---|---|---|---|
+| Applications | 47.32% / 38.84% | 46.07% / 33.76% | 76.83% / 63.76% |
+| Core | 96.68% / 90.46% | 62.82% / 48.66% | 96.89% / 90.93% |
+| Crypto | 94.83% / 94.00% | 87.93% / 48.00% | 94.83% / 94.00% |
+| Interfaces | 50.10% / 38.61% | 58.72% / 53.93% | 85.58% / 76.23% |
+| Transport | 91.15% / 79.04% | 59.78% / 41.70% | 91.36% / 79.39% |
+
+`tools\Invoke-PowerShellAnalysis.ps1` analyzed **60 tracked PowerShell files**,
+zero enabled-rule findings. The summary was also exercised on actual SARIF
+downloaded from preceding CodeQL run `40637008141`, preserving its two Python
+findings rather than inventing a clean scan. `actionlint` 1.7.12 (downloaded
+official binary with verified release checksum) accepted both modified workflows.
+No production implementation changed and NativeAOT was not republished locally.
+`pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly` passed
+**54 tests**, with **2 explicit reference-dependent skips**, zero failed.
+Includes actual PSScriptAnalyzer execution against tracked clean, warning and
+syntax-error fixtures, absence/failure reporting and coverage JSON/Markdown
+round trips with complementary suite coverage that must not be added together.
+Hosted workflow/migration results are recorded below after execution.
+
 ### PowerShell entry-point names, help and CodeQL configuration correction
 
 Standardized all 18 standalone PowerShell entry points on approved Verb-Noun

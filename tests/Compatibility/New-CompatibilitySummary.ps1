@@ -42,7 +42,7 @@ $sourceUrl = "https://github.com/$repository/blob/$Commit"
 $platforms = [ordered]@{ 'linux-x64' = 'Linux'; 'osx-arm64' = 'macOS'; 'win-x64' = 'Windows' }
 $definitions = @{}
 
-function Escape-Cell([string] $Value) {
+function ConvertTo-MarkdownCell([string] $Value) {
     return ($Value.Replace('&', '&amp;').Replace('<', '&lt;').Replace('>', '&gt;') -replace '\|', '&#124;' -replace '[\r\n]+', ' ')
 }
 
@@ -128,5 +128,5 @@ foreach ($id in @($definitions.Keys | Sort-Object -CaseSensitive)) {
     $cells = foreach ($rid in $platforms.Keys) {
         if ($reports[$rid].ContainsKey($id)) { $reports[$rid][$id].Result } else { 'Unavailable' }
     }
-    "| $testId | $(Escape-Cell $test.Name) | $upstreamResult | $($cells -join ' | ') |"
+    "| $testId | $(ConvertTo-MarkdownCell $test.Name) | $upstreamResult | $($cells -join ' | ') |"
 }

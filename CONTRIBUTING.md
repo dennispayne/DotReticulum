@@ -45,12 +45,36 @@ PowerShell entry points (no Python required for the default suite or coverage re
 Standalone scripts use approved `Verb-Noun.ps1` names and provide comment-based
 help: `Get-Help .\tests\Invoke-Tests.ps1 -Full` shows usage without running tests.
 Renamed entry points replace the previous lowercase/underscore names; update
-local commands accordingly. PSScriptAnalyzer is not currently configured;
-tooling tests guard entry-point naming and help discovery.
+local commands accordingly. Tooling tests guard entry-point naming and help discovery.
 
-CodeQL is enabled through GitHub-managed **default setup** for Actions, C# and
-Python, including weekly scanning. Its dynamically generated workflow is not a
-file in this repository. PowerShell is not covered by that configuration.
+### Static analysis
+
+The [Static analysis workflow](.github/workflows/codeql.yml) uses CodeQL advanced
+setup for Actions, C# and Python, plus PSScriptAnalyzer for all tracked PowerShell
+scripts, modules and data files (including tests). It runs on relevant PR/push
+changes, weekly Monday at 05:00 UTC, or manually. CodeQL retains its default query
+suite; C# is built with the pinned SDK for extraction.
+
+Install the pinned analyzer explicitly, then run the same checks locally:
+
+```powershell
+Install-Module PSScriptAnalyzer -RequiredVersion 1.24.0 -Scope CurrentUser -Repository PSGallery
+.\tools\Invoke-PowerShellAnalysis.ps1
+```
+
+`PSScriptAnalyzerSettings.psd1` selects focused correctness/security rules and
+approved function verbs, not a blanket formatting policy. Enabled warnings and
+errors fail the PowerShell job after writing SARIF. Use narrow suppressions with
+a justification for genuine exceptions; public IFAC test fixture values are not
+production secrets. Basic entry-point help remains covered by Pester.
+
+The final workflow summary shows each analyzer/language, job status and finding
+counts, plus bounded finding details. CodeQL completion does not mean no findings;
+its results are handled through Code Scanning rather than an arbitrary zero-alert
+gate. Missing/failed analyses stay explicitly incomplete. SARIF artifacts are
+retained for 14 days. Fork PRs run analysis and reporting without uploading SARIF
+to Code Scanning. Do not re-enable GitHub-managed default setup alongside this
+advanced workflow.
 
 ```powershell
 pwsh -NoProfile -File tests\Invoke-Tests.ps1
@@ -82,6 +106,13 @@ pwsh -NoProfile -File tests/Get-CoverageSummary.ps1 TestResults/coverage-<unique
 ```
 
 Use a fresh results directory per run so stale reports cannot inflate coverage, and do not run other builds/tests against the same output directories while the collector is instrumenting assemblies. The summary counts shared lines and individual branch paths once across all test projects, excluding test assemblies, and rejects reports missing a production project. Record whether `DOTRETICULUM_LIVE=1` was enabled; the default suite skips Python interoperability tests. Coverage shows execution, not correctness. Prefer focused tests of uncovered failure behavior over coverage-only assertions.
+
+Build and Test reports production line and branch coverage separately beneath
+the Unit and Integration tables, with per-project and overall counts for Linux,
+macOS and Windows. Each suite is measured independently; percentages are not
+averaged or added. The existing merged coverage report still counts each line
+and branch covered by either suite once. These are managed test-process coverage
+measurements, not coverage of separately launched native executables.
 
 Live Python harnesses require `DOTRETICULUM_UPSTREAM` to point at an unmodified working checkout of the Reticulum-hosted upstream, currently `a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7), and `DOTRETICULUM_PYTHON` to select the reference venv. They verify the imported source and Git revision; LXMF harnesses also verify the pinned package version (1.2.1). Obtain updates with our .NET `rngit fetch`, verify the resulting objects and materialize a working checkout locally; the GitHub repository is only a secondary comparison mirror. See [rngit.md](docs/rngit.md). Existing vectors and their reproduction generators still identify the older revision that actually generated them; reproducing those requires that historical checkout rather than the current live pin. Disclose reference-side shims and non-default peer limits. Unsupported test modes must explicitly skip rather than return a false pass.
 

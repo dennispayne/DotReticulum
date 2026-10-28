@@ -40,5 +40,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Approved Verb-Noun standalone PowerShell entry points, discoverable basic help and updated workflow/documentation callers
   - [ ] `interop-test.yml`
   - [ ] `e2e-mesh-test.yml`
-  - [x] CodeQL via GitHub-managed default setup (Actions, C# and Python; weekly schedule; verified configured and recent runs green on 2026-10-28; no repository workflow file)
+  - [ ] Advanced Static analysis workflow: CodeQL (Actions, C#, Python), pinned PSScriptAnalyzer, SARIF and consolidated finding summary; replace GitHub-managed default setup
+  - [ ] Separate Unit/Integration production coverage in consolidated Build and Test platform summaries
+  - [x] Basic accessibility goals, limitations and reporting in `ACCESSIBILITY.md`
   - [ ] `stale.yml`

@@ -145,6 +145,7 @@ A release is a `v<version>` tag (for example `v1.5.7.42`) on `main`. Create it w
 ## Contributing
 
 Contributions are welcome; read [CONTRIBUTING.md](CONTRIBUTING.md). The [development history](.github/development-history.md) is a condensed historical reference.
+See [ACCESSIBILITY.md](ACCESSIBILITY.md) for accessibility goals, limitations and reporting.
 
 ## License
 

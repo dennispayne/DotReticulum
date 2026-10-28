@@ -14,6 +14,8 @@ on:
       - 'NuGet.Config'
       - 'global.json'
       - '.editorconfig'
+      - 'PSScriptAnalyzerSettings.psd1'
+      - 'assets/branding/*.ps1'
       - '!**/*.md'
       - '!docs/**'
   pull_request:
@@ -29,6 +31,8 @@ on:
       - 'NuGet.Config'
       - 'global.json'
       - '.editorconfig'
+      - 'PSScriptAnalyzerSettings.psd1'
+      - 'assets/branding/*.ps1'
       - '!**/*.md'
       - '!docs/**'
   workflow_dispatch:
@@ -215,6 +219,18 @@ jobs:
           $summary = & ./tests/Get-TestSummary.ps1 -Path "$env:COVERAGE_DIRECTORY/integration" -Title 'Integration tests (${{ matrix.rid }})' -JsonPath TestResults/summary-integration.json
           $summary
 
+      - name: Summarize unit production coverage
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          ./tests/Get-CoverageSummary.ps1 "$env:COVERAGE_DIRECTORY/unit" -JsonPath TestResults/coverage-unit.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Summarize integration production coverage
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          ./tests/Get-CoverageSummary.ps1 "$env:COVERAGE_DIRECTORY/integration" -JsonPath TestResults/coverage-integration.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Summarize merged coverage
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
@@ -232,7 +248,7 @@ jobs:
           ./tests/Install-Pester.ps1
           Import-Module Pester -RequiredVersion 5.7.1
           $configuration = New-PesterConfiguration
-          $configuration.Run.Container = @('Coverage', 'Parity8Packaging') | ForEach-Object {
+          $configuration.Run.Container = @('Coverage', 'StaticAnalysis', 'Parity8Packaging') | ForEach-Object {
             New-PesterContainer -Path "tests/Pester/$_.Tests.ps1" -Data @{ Application = $env:DOTRETICULUM_NATIVE_EXE }
           }
           $configuration.Run.PassThru = $true

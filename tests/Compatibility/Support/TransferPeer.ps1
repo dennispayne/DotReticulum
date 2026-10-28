@@ -12,6 +12,7 @@ function New-CompatibilityTransferEndpoint {
 }
 
 function New-CompatibilityTransferConfig {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', '', Justification = 'Public test-only IFAC fixture values are intentionally written to owned upstream config files.')]
     param([string] $Directory, [int] $Port, [switch] $Server,
         [string] $NetworkName, [string] $Passphrase)
     $null = New-Item -ItemType Directory -Path $Directory -Force
@@ -37,6 +38,7 @@ $authentication
 }
 
 function New-CompatibilityTransferPair {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', '', Justification = 'Public test-only IFAC fixture values are intentionally passed to owned upstream peers.')]
     param([hashtable] $Context, [string] $Directory, [string] $NetworkName, [string] $Passphrase)
     $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
     $listener.Start()

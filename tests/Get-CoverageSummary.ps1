@@ -6,13 +6,15 @@ Summarizes merged production line and branch coverage as Markdown.
 .DESCRIPTION
 Reads OpenCover reports from a results directory, deduplicates shared code and
 rejects missing production modules. Returns exit code 2 for invalid reports.
+Optionally saves deduplicated hit/total counts as JSON for cross-platform summaries.
 .EXAMPLE
 .\Get-CoverageSummary.ps1 -Results ..\TestResults\coverage-run
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory, Position = 0)]
-    [string] $Results
+    [string] $Results,
+    [string] $JsonPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -81,19 +83,33 @@ try {
     if ($missing.Count -gt 0) { throw "Incomplete production coverage; missing modules: $($missing -join ', ')" }
     if ($modules.Count -eq 0) { throw 'No DotReticulum production modules found in coverage reports' }
     $totals = @{ Lines = @(0L, 0L); Branches = @(0L, 0L) }
-    '| Project | Lines | Branches |'
-    '|---|---:|---:|'
+    $rows = [Collections.Generic.List[object]]::new()
     foreach ($name in ($modules.Keys | Sort-Object)) {
-        $cells = foreach ($kind in 'Lines', 'Branches') {
+        $row = [ordered]@{ Name = $name }
+        foreach ($kind in 'Lines', 'Branches') {
             $points = $modules[$name][$kind]
             $hit = @($points.Values | Where-Object { $_ }).Count
             $totals[$kind][0] += $hit
             $totals[$kind][1] += $points.Count
-            Format-Coverage $hit $points.Count
+            $row[$kind] = @{ Hit = $hit; Total = $points.Count }
         }
-        "| $name | $($cells -join ' | ') |"
+        $rows.Add($row)
     }
-    "| **Overall** | $(Format-Coverage ($totals.Lines[0]) ($totals.Lines[1])) | $(Format-Coverage ($totals.Branches[0]) ($totals.Branches[1])) |"
+    $rows.Add([ordered]@{
+        Name = 'Overall'
+        Lines = @{ Hit = $totals.Lines[0]; Total = $totals.Lines[1] }
+        Branches = @{ Hit = $totals.Branches[0]; Total = $totals.Branches[1] }
+    })
+    if ($JsonPath) {
+        @{ ReportCount = $reports.Count; Rows = @($rows.ToArray()) } |
+            ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $JsonPath -Encoding utf8
+    }
+    '| Project | Lines | Branches |'
+    '|---|---:|---:|'
+    foreach ($row in $rows) {
+        $name = if ($row.Name -eq 'Overall') { '**Overall**' } else { $row.Name }
+        "| $name | $(Format-Coverage $row.Lines.Hit $row.Lines.Total) | $(Format-Coverage $row.Branches.Hit $row.Branches.Total) |"
+    }
     "`nMerged $($reports.Count) reports; shared production code counted once."
 }
 catch {
