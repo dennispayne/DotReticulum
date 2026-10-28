@@ -8,8 +8,9 @@ foreach ($test in $tests) {
     [pscustomobject]@{
         TestId = $test.Id
         ClaimId = $test.ClaimId
+        Claim = $test.Claim
         Name = $test.Name
-        UpstreamCitation = ($test.UpstreamCitation | ForEach-Object { "$($_.path):$($_.lines) ($($_.heading))" }) -join '; '
+        UpstreamCitation = ($test.UpstreamCitation | ForEach-Object { "$($_.path):$($_.lines)" }) -join '; '
         Citations = $test.UpstreamCitation
         File = $test.File
         Line = $test.Line
@@ -22,8 +23,9 @@ if ($IncludeUncoveredClaims) {
         [pscustomobject]@{
             TestId = $null
             ClaimId = $claim.id
-            Name = $claim.claim
-            UpstreamCitation = ($claim.citations | ForEach-Object { "$($_.path):$($_.lines) ($($_.heading))" }) -join '; '
+            Claim = $claim.claim
+            Name = $null
+            UpstreamCitation = ($claim.citations | ForEach-Object { "$($_.path):$($_.lines)" }) -join '; '
             Citations = $claim.citations
             File = $null
             Line = $null

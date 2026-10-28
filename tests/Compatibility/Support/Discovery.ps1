@@ -48,6 +48,7 @@ function Get-CompatibilityTestMetadata {
         [pscustomobject]@{
             Id = $id
             ClaimId = $claimIds[0]
+            Claim = $claims[$claimIds[0]].claim
             Name = "$($test.Block.ExpandedPath) > $($test.ExpandedName)"
             File = [IO.Path]::GetRelativePath($root, $test.ScriptBlock.File).Replace('\', '/')
             Line = $test.ScriptBlock.StartPosition.StartLine

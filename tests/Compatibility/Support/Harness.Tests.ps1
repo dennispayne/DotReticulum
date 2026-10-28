@@ -44,6 +44,22 @@ Describe 'Compatibility harness' {
             @($rows | Where-Object TestId | Select-Object -ExpandProperty TestId -Unique).Count | Should -Be 7
         }
 
+        It 'joins quoted claim text and file-line citations without conflating them with test names' {
+            $rows = @(& (Join-Path $PSScriptRoot '..\List-CompatibilityTests.ps1') -IncludeUncoveredClaims)
+            $catalog = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\catalog.json') -Raw | ConvertFrom-Json
+            foreach ($claim in $catalog.claims) {
+                $joined = @($rows | Where-Object ClaimId -EQ $claim.id)
+                $joined.Count | Should -BeGreaterThan 0
+                foreach ($row in $joined) {
+                    $row.Claim | Should -BeExactly $claim.claim
+                    $row.UpstreamCitation | Should -BeExactly (($claim.citations |
+                        ForEach-Object { "$($_.path):$($_.lines)" }) -join '; ')
+                    if ($row.TestId) { $row.Name | Should -Not -BeNullOrEmpty }
+                    else { $row.Name | Should -BeNullOrEmpty }
+                }
+            }
+        }
+
         It 'rejects duplicate stable test IDs' {
             $tests = @(Get-CompatibilityDiscovery)
             { Get-CompatibilityTestMetadata @($tests[0].Test, $tests[0].Test) } | Should -Throw '*Duplicate test ID*'

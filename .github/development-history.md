@@ -83,6 +83,15 @@ Pester run passed **43** cases with **4 explicit environment-dependent skips**;
 its generated NUnit XML parsed successfully. Cross-platform revalidation remains
 required for this reporting-only correction.
 
+Claim catalog wording now quotes the pinned source verbatim instead of
+paraphrasing the bounded tests. All nine excerpts were checked against their
+exact cited source lines in the candidate-fetched pinned checkout. Citations
+are file/line references without redundant headings. Read-only discovery now
+exposes `Claim` separately from Pester's `Name`; uncovered claims have no test
+name. The joined-metadata regression and tooling suite passed **46** cases
+with **2 explicit reference-dependent skips**, zero failed. Quoted claims do
+not imply the current tests fully verify their scope.
+
 ### Candidate-owned retrieval, reused baseline and table-only reporting
 
 The user replaced the separate hosted fetch workflow with an advertised

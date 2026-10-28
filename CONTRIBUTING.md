@@ -83,6 +83,9 @@ displays Upstream, .NET Linux, .NET macOS and .NET Windows side by side.
 `tests\Compatibility\Claims\*.Tests.ps1` contains the readable acceptance cases,
 assertions and coverage boundaries. There is no Family classification or
 calculated claim-level verdict: each cell preserves Pester's test outcome.
+Claim text is a verbatim excerpt of the pinned upstream, not our interpretation;
+citations contain its file and exact line reference. Test descriptions and scope
+comments explain what is actually exercised without narrowing the quoted claim.
 Claims use stable IDs such as `C004`; individual tests use `T006`. Append new
 numeric IDs without renumbering existing cases. The catalog spells out the
 advertised claim, `Describe` names its group, and each `It` names the concrete
