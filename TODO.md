@@ -40,7 +40,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Approved Verb-Noun standalone PowerShell entry points, discoverable basic help and updated workflow/documentation callers
   - [ ] `interop-test.yml`
   - [ ] `e2e-mesh-test.yml`
-  - [ ] Advanced Static analysis workflow: CodeQL (Actions, C#, Python), pinned PSScriptAnalyzer, SARIF and consolidated finding summary; replace GitHub-managed default setup
-  - [ ] Separate Unit/Integration production coverage in consolidated Build and Test platform summaries
+  - [x] Advanced Static analysis workflow: CodeQL (Actions, C#, Python), pinned PSScriptAnalyzer, SARIF and consolidated finding summary; replaces GitHub-managed default setup (all five jobs passed in run 40644131301; C# full-database selection avoids overlay fallback warnings)
+  - [x] Separate Unit/Integration production coverage in consolidated Build and Test platform summaries (all 12 jobs passed in run 40644131484; six suite/platform coverage artifacts verified)
   - [x] Basic accessibility goals, limitations and reporting in `ACCESSIBILITY.md`
   - [ ] `stale.yml`

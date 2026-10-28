@@ -83,6 +83,28 @@ PowerShell SARIF automation IDs now end with `/`, retaining the complete
 `/language:powershell` category in Code Scanning rather than an empty category.
 The actual-analyzer regression verifies that ID.
 
+Final hosted acceptance:
+- Static analysis run **`40644131301`** passed all **five jobs**. C# initialization
+  logs explicit full-database selection from `CODEQL_OVERLAY_DATABASE_MODE`;
+  its check has no overlay warning annotation (only GitHub's runner-image
+  migration notice). Code Scanning records the full `/language:powershell`
+  category with zero findings. Existing Python findings remain visible.
+- Build and Test run **`40644131484`** passed all **12 jobs**, including all three
+  NativeAOT builds, native feature checks, shared candidate acceptance, upstream
+  baseline and both summary jobs. Downloaded all platform test artifacts and
+  executed `tests\Get-TestPlatformSummary.ps1` on them; verified all six
+  unit/integration coverage JSON files and populated platform coverage cells.
+  The preceding run `40643125165` was superseded/cancelled by this push, not a
+  test failure.
+
+| Hosted suite | Linux lines / branches | macOS lines / branches | Windows lines / branches |
+|---|---|---|---|
+| Unit | 61.92% / 49.24% | 60.64% / 48.69% | 60.75% / 48.81% |
+| Integration | 54.15% / 39.47% | 52.87% / 38.77% | 53.54% / 39.46% |
+
+These are independent production-code measurements from the recorded run,
+not additive percentages or proof of native subprocess coverage.
+
 ### PowerShell entry-point names, help and CodeQL configuration correction
 
 Standardized all 18 standalone PowerShell entry points on approved Verb-Noun
