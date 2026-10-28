@@ -1,4 +1,14 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Combines saved test summaries into cross-platform Markdown tables.
+.DESCRIPTION
+Reads summary JSON artifacts beneath ReportsDirectory and reports platform
+counts, failures and skips. Missing platforms remain explicitly unavailable.
+.EXAMPLE
+.\Get-TestPlatformSummary.ps1 -ReportsDirectory ..\TestResults\platforms
+#>
 [CmdletBinding()]
 param([Parameter(Mandatory)] [string] $ReportsDirectory)
 

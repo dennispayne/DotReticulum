@@ -1,6 +1,6 @@
 Describe 'Per-test compatibility reporting' -Tag Tooling {
     BeforeAll {
-        $summaryScript = Join-Path $PSScriptRoot '..\Compatibility\Create-CompatibilitySummary.ps1'
+        $summaryScript = Join-Path $PSScriptRoot '..\Compatibility\New-CompatibilitySummary.ps1'
         $canonical = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\Interop\reference_environment.py') -Raw
         $pin = [regex]::Match($canonical, '(?m)^PINNED_RNS_SHA\s*=\s*"([0-9a-f]{40})"').Groups[1].Value
         $commit = '0000000000000000000000000000000000000001'

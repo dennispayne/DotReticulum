@@ -86,7 +86,7 @@ shared scenarios. One verified source bundle is reused by Test and the subsequen
 Python baseline; there is no separate fetch workflow. Each table row is a real
 Pester test with its own outcome, not a calculated claim verdict, and its Test ID
 links to the shared test source. Readable cases live under
-`tests\Compatibility\Claims`; `tests\Compatibility\List-CompatibilityTests.ps1`
+`tests\Compatibility\Claims`; `tests\Compatibility\Get-CompatibilityTests.ps1`
 discovers tests and joins their upstream citations without executing them.
 The shared inventory now has **37 distinct tests across 17 quoted claims**,
 including malformed cryptography/proofs, authenticated requests, TCP IFAC
@@ -140,7 +140,7 @@ So `1.5.7.42` is the forty-second build aimed at RNS 1.5.7. A version number nam
 
 ### Releases
 
-A release is a `v<version>` tag (for example `v1.5.7.42`) on `main`. Create it with `pwsh tools/new-release-tag.ps1` and push it; the [Release workflow](.github/workflows/release.yml) then builds the NativeAOT packages for `linux-x64`, `win-x64` and `osx-arm64`, zips them with SHA-256 checksums, and attaches them to a GitHub release. A manual run of the workflow builds the zips as artifacts without publishing. Each zip is the output of `tools/dotreticulum-packaging.ps1` (see [installation](docs/installation.md)). Platform support is only as strong as the recorded evidence; macOS in particular is built but not verified.
+A release is a `v<version>` tag (for example `v1.5.7.42`) on `main`. Create it with `pwsh tools/New-ReleaseTag.ps1` and push it; the [Release workflow](.github/workflows/release.yml) then builds the NativeAOT packages for `linux-x64`, `win-x64` and `osx-arm64`, zips them with SHA-256 checksums, and attaches them to a GitHub release. A manual run of the workflow builds the zips as artifacts without publishing. Each zip is the output of `tools/Invoke-DotReticulumPackaging.ps1` (see [installation](docs/installation.md)). Platform support is only as strong as the recorded evidence; macOS in particular is built but not verified.
 
 ## Contributing
 

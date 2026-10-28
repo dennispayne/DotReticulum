@@ -41,7 +41,7 @@ Use `/fleet` for parallel subagents when a milestone has genuinely independent w
 - On Windows, ensure MSVC tools and `vswhere` are discoverable by NativeAOT; keep any toolchain environment setup and publish in the same process.
 - Prefer `dotnet` CLI scaffolding over hand-written project boilerplate. Use `gh` for GitHub operations.
 - Language ownership: C# implements and verifies our solution; PowerShell 7 builds and operates the development workflow; Python only bridges to the upstream Python reference. Keep general tooling, fixtures, assertions and topology orchestration in C#/PowerShell. Retain thin Python adapters for upstream API execution, callback observations, actual-import checks, independent vector generation and disclosed reference-side shims. Do not replace the reference with our own implementation, embed Python in PowerShell strings or generate Python files to disguise dependencies.
-- Use Pester 5.7.1+ for PowerShell tooling and CLI end-to-end tests under `tests/Pester`, with `tests/run-pester.ps1` as the entry point; xUnit owns protocol-level tests. Exercise separate application processes, outputs, exit codes and persisted results rather than only invoking internal C# methods. Keep dependencies explicit, process lifetimes bounded and cleanup limited to owned artifacts.
+- Use Pester 5.7.1+ for PowerShell tooling and CLI end-to-end tests under `tests/Pester`, with `tests/Invoke-PesterTests.ps1` as the entry point; xUnit owns protocol-level tests. Exercise separate application processes, outputs, exit codes and persisted results rather than only invoking internal C# methods. Keep dependencies explicit, process lifetimes bounded and cleanup limited to owned artifacts.
 
 ## Commands
 
@@ -50,16 +50,16 @@ dotnet restore DotReticulum.slnx
 dotnet build DotReticulum.slnx -c Release
 dotnet test DotReticulum.slnx -c Release
 dotnet test DotReticulum.slnx -c Release --settings tests/coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/coverage-<unique-run>
-pwsh -NoProfile -File tests/coverage_summary.ps1 TestResults/coverage-<unique-run>
-pwsh -NoProfile -File tests/run-tests.ps1 -Pester
-pwsh -NoProfile -File tests/run-pester.ps1 -ToolingOnly
+pwsh -NoProfile -File tests/Get-CoverageSummary.ps1 TestResults/coverage-<unique-run>
+pwsh -NoProfile -File tests/Invoke-Tests.ps1 -Pester
+pwsh -NoProfile -File tests/Invoke-PesterTests.ps1 -ToolingOnly
 dotnet test tests/DotReticulum.Core.Tests/DotReticulum.Core.Tests.csproj -c Release --filter "FullyQualifiedName~PacketTests"
 dotnet publish src/DotReticulum.Applications/DotReticulum.Applications.csproj -c Release -r <rid> -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true
 ```
 
 `<rid>` is `linux-x64`, `win-x64`, or `osx-arm64`. The published native binary must run `--help` as a basic smoke test and execute a representative feature flow, such as an encrypted multi-megabyte resource/file transfer that exercises links, crypto and compression. A successful publish or `--help` does not verify other native code paths; record which features actually ran. There is no separate linter; `.editorconfig` plus warnings-as-errors for nullable is the gate.
 
-Measure production-code coverage at milestone completion using Coverlet. Provide `tests/coverage.runsettings` for production-only OpenCover output and `tests/coverage_summary.ps1` for merging reports across test projects by source file/line and branch identity, counting coverage exercised by any suite without double-counting shared assemblies; do not average project percentages. Use a fresh results directory per run, reject missing production modules, and do not overlap collection with other builds/tests writing the same output directories. Report overall and per-project line and branch coverage where available, passed/skipped counts, and whether opt-in live tests were enabled. Use uncovered behavior to guide focused failure-path tests, not coverage-only assertions or arbitrary thresholds. Keep generated reports out of source control and summarize results in `.github/development-history.md`.
+Measure production-code coverage at milestone completion using Coverlet. Provide `tests/coverage.runsettings` for production-only OpenCover output and `tests/Get-CoverageSummary.ps1` for merging reports across test projects by source file/line and branch identity, counting coverage exercised by any suite without double-counting shared assemblies; do not average project percentages. Use a fresh results directory per run, reject missing production modules, and do not overlap collection with other builds/tests writing the same output directories. Report overall and per-project line and branch coverage where available, passed/skipped counts, and whether opt-in live tests were enabled. Use uncovered behavior to guide focused failure-path tests, not coverage-only assertions or arbitrary thresholds. Keep generated reports out of source control and summarize results in `.github/development-history.md`.
 
 ## Phase 0 — Bootstrap (blank repository)
 

@@ -1,6 +1,6 @@
 param(
     [string] $Application = [IO.Path]::Combine($PSScriptRoot, '..', '..', 'artifacts', 'native-parity7', 'DotReticulum.Applications.exe'),
-    [string] $PackagingScript = [IO.Path]::Combine($PSScriptRoot, '..', '..', 'tools', 'dotreticulum-packaging.ps1')
+    [string] $PackagingScript = [IO.Path]::Combine($PSScriptRoot, '..', '..', 'tools', 'Invoke-DotReticulumPackaging.ps1')
 )
 
 BeforeAll {

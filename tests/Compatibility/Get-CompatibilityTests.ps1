@@ -1,4 +1,14 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Lists compatibility cases and their quoted upstream claims.
+.DESCRIPTION
+Discovers tests without running candidates or fetching a reference. Use
+-IncludeUncoveredClaims to include claims with no acceptance case.
+.EXAMPLE
+.\Get-CompatibilityTests.ps1 -IncludeUncoveredClaims
+#>
 [CmdletBinding()]
 param([switch] $IncludeUncoveredClaims)
 $ErrorActionPreference = 'Stop'

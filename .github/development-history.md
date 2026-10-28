@@ -4,6 +4,47 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### PowerShell entry-point names, help and CodeQL configuration correction
+
+Standardized all 18 standalone PowerShell entry points on approved Verb-Noun
+names and added discoverable synopsis, description and examples. Existing
+approved names retain their verbs; the Pester installer filename is now
+`Install-Pester.ps1`. Updated current documentation, workflow steps, Pester
+callers and the AutoInterface C# harness. Historical commands below and the
+archived plan retain their original filenames. Old entry-point names are
+replaced, not retained as wrappers. Script parameters and operational behavior
+are unchanged. A tooling regression checks approved verbs, consistent casing
+and actual `Get-Help -Full` discovery. A blank line between `#Requires` and
+comment-based help is necessary for that discovery.
+
+PSScriptAnalyzer is not installed/configured in this checkout and no analysis
+workflow was added in this pass. GitHub API verification corrected the earlier
+assumption that a missing repository workflow meant CodeQL was disabled:
+`gh api repos/dennispayne/DotReticulum/code-scanning/default-setup` reports
+configured default setup for Actions, C# and Python, with weekly scanning.
+The dynamically generated CodeQL run `40637008141` succeeded. Its success
+indicates completed analysis, not absence of findings. No migration to advanced
+setup or change to repository security settings was performed.
+
+Verification:
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+  zero warnings/errors.
+- `dotnet test DotReticulum.slnx -c Release --nologo -v quiet`:
+  **1,831 passed, 79 skipped**, zero failed; opt-in live tests disabled.
+- `pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+  **49 passed, 2 explicit reference-dependent skips**, zero failed.
+- `Invoke-Pester` with `New-PesterContainer` for
+  `tests\Pester\Parity6Interfaces.Tests.ps1` and
+  `tests\Pester\Parity8Packaging.Tests.ps1`, supplying the existing published
+  `TestResults\compatibility-expanded-native\DotReticulum.Applications.exe`:
+  **18 passed**, zero failed/skipped. Exercises renamed I2P runner guards and
+  packaging/install/discovery/uninstall processes, including installed utilities.
+- All PowerShell scripts parsed without errors; renamed compatibility discovery
+  returned **37 cases**. No obsolete references remain in current tracked source,
+  configuration or documentation; historical records are intentionally excluded.
+- No production implementation changed; NativeAOT was not republished. The
+  existing native binary above was used for the relevant process flows.
+
 ### Expanded advertised acceptance and primary-source citation navigation
 
 The user requested substantially broader shared acceptance, not more copies of

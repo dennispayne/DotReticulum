@@ -1,4 +1,13 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Installs a specified Pester version for the current user.
+.DESCRIPTION
+Retries bounded installation attempts. The default version is 5.7.1.
+.EXAMPLE
+.\Install-Pester.ps1 -Version 5.7.1
+#>
 [CmdletBinding()]
 param([string] $Version = '5.7.1', [int] $Attempts = 4)
 

@@ -10,7 +10,7 @@ BeforeAll {
 Describe 'Parity 6 native interface processes' -Tag E2E, Interfaces {
     It 'rejects Java topology without public-network permission before launching Java' -Tag 'Contract:IFACE-I2P-001' {
         $pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
-        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\invoke-i2p-topology.ps1')).Path
+        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\Invoke-I2pTopology.ps1')).Path
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner,
             '-JavaExecutable', $pwsh, '-JavaRouterDirectory', $TestDrive) -Environment @{
                 DOTRETICULUM_PYTHON = $null; DOTRETICULUM_UPSTREAM = $null
@@ -35,7 +35,7 @@ Describe 'Parity 6 native interface processes' -Tag E2E, Interfaces {
             }
         }
         $pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
-        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\invoke-i2p-topology.ps1')).Path
+        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\Invoke-I2pTopology.ps1')).Path
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner,
             '-JavaExecutable', $pwsh, '-JavaRouterDirectory', $distribution,
             '-AllowPublicNetwork') -Environment @{
@@ -47,7 +47,7 @@ Describe 'Parity 6 native interface processes' -Tag E2E, Interfaces {
 
     It 'rejects mixing the Java and i2pd router parameter sets' -Tag 'Contract:IFACE-I2P-001' {
         $pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
-        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\invoke-i2p-topology.ps1')).Path
+        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\Invoke-I2pTopology.ps1')).Path
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner,
             '-RouterBinary', $pwsh, '-JavaExecutable', $pwsh,
             '-JavaRouterDirectory', $TestDrive, '-AllowPublicNetwork')
@@ -57,7 +57,7 @@ Describe 'Parity 6 native interface processes' -Tag E2E, Interfaces {
 
     It 'rejects public RouterInfo seeding without explicit network permission' -Tag 'Contract:IFACE-I2P-001' {
         $pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
-        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\invoke-i2p-topology.ps1')).Path
+        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\Invoke-I2pTopology.ps1')).Path
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner,
             '-RouterBinary', $pwsh, '-SeedRouterInfoDirectory', $TestDrive) -Environment @{
                 DOTRETICULUM_PYTHON = $null; DOTRETICULUM_UPSTREAM = $null
@@ -68,7 +68,7 @@ Describe 'Parity 6 native interface processes' -Tag E2E, Interfaces {
 
     It 'rejects a seed directory without public RouterInfos before starting a router' -Tag 'Contract:IFACE-I2P-001' {
         $pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
-        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\invoke-i2p-topology.ps1')).Path
+        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\Invoke-I2pTopology.ps1')).Path
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner,
             '-RouterBinary', $pwsh, '-AllowPublicNetwork', '-CertificatesDirectory', $TestDrive,
             '-SeedRouterInfoDirectory', $TestDrive) -Environment @{

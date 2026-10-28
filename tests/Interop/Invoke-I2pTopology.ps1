@@ -1,4 +1,15 @@
 #Requires -Version 7.3
+
+<#
+.SYNOPSIS
+Starts an owned I2P router and runs bounded SAM or stream acceptance.
+.DESCRIPTION
+Supports i2pd or an extracted Java I2P distribution. Public networking requires
+-AllowPublicNetwork; stream tests also require the verified Python reference.
+Owned processes are stopped on exit. -KeepArtifacts retains diagnostic files.
+.EXAMPLE
+.\Invoke-I2pTopology.ps1 -RouterBinary C:\Tools\i2pd.exe
+#>
 [CmdletBinding(DefaultParameterSetName = 'I2pd')]
 param(
     [Parameter(Mandatory, ParameterSetName = 'I2pd')][string] $RouterBinary,

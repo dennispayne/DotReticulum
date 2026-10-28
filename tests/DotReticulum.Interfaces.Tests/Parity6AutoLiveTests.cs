@@ -364,7 +364,7 @@ public sealed class AutoLiveTheoryAttribute : TheoryAttribute
     {
         if (Environment.GetEnvironmentVariable("DOTRETICULUM_AUTO_LIVE") != "1")
         {
-            Skip = "Real Python AutoInterface traffic is opt-in: run invoke-auto-topology.ps1 (DOTRETICULUM_AUTO_LIVE=1); self-echo/vector tests do not establish it.";
+            Skip = "Real Python AutoInterface traffic is opt-in: run Invoke-AutoTopology.ps1 (DOTRETICULUM_AUTO_LIVE=1); self-echo/vector tests do not establish it.";
             return;
         }
         if (!OperatingSystem.IsLinux()) { Skip = "This live test requires the coordinator-owned Linux namespace/veth topology."; return; }

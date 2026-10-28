@@ -1,4 +1,13 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Exports the repository branding SVG as application icons.
+.DESCRIPTION
+Requires Windows and System.Drawing. Writes generated assets beside the source SVG.
+.EXAMPLE
+pwsh -NoProfile -File assets\branding\Export-Icons.ps1
+#>
 [CmdletBinding()]
 param()
 

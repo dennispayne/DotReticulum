@@ -1,7 +1,7 @@
 BeforeAll {
     . (Join-Path $PSScriptRoot 'TestProcess.ps1')
-    $coverageScript = Join-Path $PSScriptRoot '..\coverage_summary.ps1'
-    $runner = Join-Path $PSScriptRoot '..\run-tests.ps1'
+    $coverageScript = Join-Path $PSScriptRoot '..\Get-CoverageSummary.ps1'
+    $runner = Join-Path $PSScriptRoot '..\Invoke-Tests.ps1'
     $pwsh = Join-Path $PSHOME $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
 }
 
@@ -55,6 +55,23 @@ Describe 'PowerShell coverage reporting' -Tag Tooling {
 }
 
 Describe 'PowerShell test runner' -Tag Tooling {
+    It 'keeps standalone script verbs approved and comment-based help discoverable' {
+        $root = Join-Path $PSScriptRoot '..\..'
+        $directories = 'tests', 'tests\Compatibility', 'tests\Interop', 'tools', 'assets\branding'
+        $approvedVerbs = (Get-Verb).Verb
+        $scripts = @($directories | ForEach-Object {
+            Get-ChildItem -LiteralPath (Join-Path $root $_) -File -Filter '*.ps1'
+        })
+        $scripts.Count | Should -BeGreaterThan 0
+        foreach ($script in $scripts) {
+            $script.BaseName | Should -Match '^[A-Z][a-z]+-[A-Z][A-Za-z0-9]+$'
+            $script.BaseName.Split('-')[0] | Should -BeIn $approvedVerbs -Because $script.Name
+            $help = Get-Help $script.FullName -Full
+            $help.Description | Should -Not -BeNullOrEmpty -Because $script.Name
+            $help.Examples.Example.Count | Should -BeGreaterThan 0 -Because $script.Name
+        }
+    }
+
     It 'isolates child test processes from the real Actions summary but allows explicit owned output paths' {
         $summary = Join-Path $TestDrive 'summary.md'
         $saved = $env:GITHUB_STEP_SUMMARY
@@ -99,11 +116,11 @@ Describe 'PowerShell test runner' -Tag Tooling {
 </results></test-suite></test-results>
 '@ | Set-Content -LiteralPath $input
         $export = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
-            (Join-Path $PSScriptRoot '..\test_summary.ps1'), '-Path', $input,
+            (Join-Path $PSScriptRoot '..\Get-TestSummary.ps1'), '-Path', $input,
             '-JsonPath', (Join-Path $linux.FullName 'summary-native.json'))
         $export.Code | Should -Be 0 -Because $export.Error
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
-            (Join-Path $PSScriptRoot '..\test_platform_summary.ps1'),
+            (Join-Path $PSScriptRoot '..\Get-TestPlatformSummary.ps1'),
             '-ReportsDirectory', $directory.FullName)
         $result.Code | Should -Be 0 -Because $result.Error
         $result.Output | Should -Match '\| cli \| 1 / 1 / 1 \| Unavailable \| Unavailable'

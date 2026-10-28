@@ -166,7 +166,7 @@ jobs:
           path: artifacts/native
 
       - name: Verify native build
-        run: ./tests/use-native-build.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
+        run: ./tests/Set-NativeBuild.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
 
       - name: Reuse the candidate-fetched reference
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -181,7 +181,7 @@ jobs:
           $bundle = Join-Path $directory 'reference.bundle'
           if (Test-Path -LiteralPath $bundle) {
             $python = if ($IsWindows) { 'python' } else { 'python3' }
-            ./tests/prepare-reference.ps1 -Bundle $bundle -Directory (Join-Path $env:RUNNER_TEMP 'pinned-python') -Python $python
+            ./tests/Initialize-Reference.ps1 -Bundle $bundle -Directory (Join-Path $env:RUNNER_TEMP 'pinned-python') -Python $python
           } else {
             Write-Warning 'Candidate retrieval produced no reference bundle; Python-peer integration cases will be explicitly unexecuted.'
           }
@@ -206,19 +206,19 @@ jobs:
       - name: Summarize unit test results
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
-          $summary = & ./tests/test_summary.ps1 -Path "$env:COVERAGE_DIRECTORY/unit" -Title 'Unit tests (${{ matrix.rid }})' -JsonPath TestResults/summary-unit.json
+          $summary = & ./tests/Get-TestSummary.ps1 -Path "$env:COVERAGE_DIRECTORY/unit" -Title 'Unit tests (${{ matrix.rid }})' -JsonPath TestResults/summary-unit.json
           $summary
 
       - name: Summarize integration test results
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
-          $summary = & ./tests/test_summary.ps1 -Path "$env:COVERAGE_DIRECTORY/integration" -Title 'Integration tests (${{ matrix.rid }})' -JsonPath TestResults/summary-integration.json
+          $summary = & ./tests/Get-TestSummary.ps1 -Path "$env:COVERAGE_DIRECTORY/integration" -Title 'Integration tests (${{ matrix.rid }})' -JsonPath TestResults/summary-integration.json
           $summary
 
       - name: Summarize merged coverage
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
-          $summary = & ./tests/coverage_summary.ps1 $env:COVERAGE_DIRECTORY
+          $summary = & ./tests/Get-CoverageSummary.ps1 $env:COVERAGE_DIRECTORY
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $summary
 
@@ -229,7 +229,7 @@ jobs:
       - name: Run native CLI and installation checks
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
-          ./tests/install-pester.ps1
+          ./tests/Install-Pester.ps1
           Import-Module Pester -RequiredVersion 5.7.1
           $configuration = New-PesterConfiguration
           $configuration.Run.Container = @('Coverage', 'Parity8Packaging') | ForEach-Object {
@@ -244,12 +244,12 @@ jobs:
 
       - name: Run native contract integration and mixed-peer checks
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: ./tests/run-contract-integration.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary
+        run: ./tests/Invoke-ContractIntegration.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary
 
       - name: Summarize native test results
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
-          $summary = & ./tests/test_summary.ps1 -Path TestResults/native, TestResults/native-cli.xml, TestResults/contract-integration/contract-integration.xml -Title 'Native executable and contract integration tests (${{ matrix.rid }})' -JsonPath TestResults/summary-native.json
+          $summary = & ./tests/Get-TestSummary.ps1 -Path TestResults/native, TestResults/native-cli.xml, TestResults/contract-integration/contract-integration.xml -Title 'Native executable and contract integration tests (${{ matrix.rid }})' -JsonPath TestResults/summary-native.json
           $summary
 
       - name: Retain test diagnostics
@@ -296,14 +296,14 @@ jobs:
           path: artifacts/native
 
       - name: Verify native build
-        run: ./tests/use-native-build.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
+        run: ./tests/Set-NativeBuild.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
 
       - name: Install Pester for shared acceptance tests
-        run: ./tests/install-pester.ps1
+        run: ./tests/Install-Pester.ps1
 
       - name: Run shared scenarios, retrieving the reference with this native candidate
         run: |
-          ./tests/Compatibility/Run-CompatibilityTests.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Implementation DotReticulum -FetchReference -ReferenceDirectory "$env:RUNNER_TEMP/candidate-reference" -Label '${{ matrix.rid }}' -NoJobSummary
+          ./tests/Compatibility/Invoke-CompatibilityTests.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Implementation DotReticulum -FetchReference -ReferenceDirectory "$env:RUNNER_TEMP/candidate-reference" -Label '${{ matrix.rid }}' -NoJobSummary
 
       - name: Retain one verified reference source bundle for this run
         if: ${{ !cancelled() && matrix.rid == 'linux-x64' }}
@@ -347,13 +347,13 @@ jobs:
           path: artifacts/reference
 
       - name: Provision the verified pinned reference
-        run: ./tests/prepare-reference.ps1 -Bundle artifacts/reference/reference.bundle -Directory "$env:RUNNER_TEMP/pinned-python" -Python python3
+        run: ./tests/Initialize-Reference.ps1 -Bundle artifacts/reference/reference.bundle -Directory "$env:RUNNER_TEMP/pinned-python" -Python python3
 
       - name: Install Pester for shared acceptance tests
-        run: ./tests/install-pester.ps1
+        run: ./tests/Install-Pester.ps1
 
       - name: Execute the same shared scenarios with upstream as the candidate
-        run: ./tests/Compatibility/Run-CompatibilityTests.ps1 -Implementation Upstream -ReferenceDirectory artifacts/reference -NoJobSummary
+        run: ./tests/Compatibility/Invoke-CompatibilityTests.ps1 -Implementation Upstream -ReferenceDirectory artifacts/reference -NoJobSummary
 
       - name: Retain upstream baseline evidence
         if: ${{ !cancelled() }}
@@ -390,7 +390,7 @@ jobs:
         run: |
           $directory = 'TestResults/compatibility-platforms'
           $null = New-Item -ItemType Directory -Force -Path $directory
-          $summary = & ./tests/Compatibility/Create-CompatibilitySummary.ps1 -ReportsDirectory $directory
+          $summary = & ./tests/Compatibility/New-CompatibilitySummary.ps1 -ReportsDirectory $directory
           $summary
           $summary | Set-Content -LiteralPath TestResults/compatibility-all-platforms.md -Encoding utf8
           $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
@@ -419,7 +419,7 @@ jobs:
         run: |
           $directory = 'TestResults/test-platforms'
           $null = New-Item -ItemType Directory -Force -Path $directory
-          $summary = & ./tests/test_platform_summary.ps1 -ReportsDirectory $directory
+          $summary = & ./tests/Get-TestPlatformSummary.ps1 -ReportsDirectory $directory
           $summary
           $summary | Set-Content -LiteralPath TestResults/tests-all-platforms.md -Encoding utf8
           $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY

@@ -1,8 +1,14 @@
 #Requires -Version 7.0
+
 <#
 .SYNOPSIS
 Runs the tagged contract-integration Pester cases against the native executable and
 reports one row per catalogued contract.
+.DESCRIPTION
+Requires Pester 5.7.1+ and a built application. Supplying Python and Upstream enables
+reference-tagged cases. Saves results and optionally writes an Actions summary.
+.EXAMPLE
+.\Invoke-ContractIntegration.ps1 -NoJobSummary
 #>
 [CmdletBinding()]
 param(

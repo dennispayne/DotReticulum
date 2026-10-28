@@ -1,4 +1,14 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Summarizes merged production line and branch coverage as Markdown.
+.DESCRIPTION
+Reads OpenCover reports from a results directory, deduplicates shared code and
+rejects missing production modules. Returns exit code 2 for invalid reports.
+.EXAMPLE
+.\Get-CoverageSummary.ps1 -Results ..\TestResults\coverage-run
+#>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory, Position = 0)]

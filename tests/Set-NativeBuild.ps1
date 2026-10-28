@@ -1,7 +1,13 @@
 #Requires -Version 7.0
+
 <#
 .SYNOPSIS
 Validates a downloaded native build artifact and exports DOTRETICULUM_NATIVE_EXE for later workflow steps.
+.DESCRIPTION
+Checks the artifact manifest, runtime identifier, commit and executable. Writes
+the application path to GITHUB_ENV when running in GitHub Actions.
+.EXAMPLE
+.\Set-NativeBuild.ps1 -Directory ..\artifacts\native -Rid win-x64
 #>
 [CmdletBinding()]
 param(

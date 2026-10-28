@@ -1,4 +1,14 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Runs tooling and application process tests with Pester.
+.DESCRIPTION
+Requires Pester 5.7.1+. Uses the built Release DLL unless -Application is supplied.
+-ToolingOnly needs no application. Git remote comparisons require Python and Upstream.
+.EXAMPLE
+.\Invoke-PesterTests.ps1 -ToolingOnly
+#>
 [CmdletBinding()]
 param(
     [string] $Application = (Join-Path $PSScriptRoot '..\src\DotReticulum.Applications\bin\Release\net10.0\DotReticulum.Applications.dll'),

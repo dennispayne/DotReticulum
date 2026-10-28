@@ -1,4 +1,5 @@
 #Requires -Version 7.0
+
 <#
 .SYNOPSIS
 Creates the annotated release tag v<version> for the current commit without pushing it.
@@ -7,6 +8,8 @@ Creates the annotated release tag v<version> for the current commit without push
 The version comes from Nerdbank.GitVersioning (<upstream RNS version>.<build number>), so the tag
 matches the version embedded in the binaries. Pushing the tag starts the Release workflow; this
 script never pushes unless -Push is given.
+.EXAMPLE
+.\tools\New-ReleaseTag.ps1
 #>
 [CmdletBinding()]
 param(

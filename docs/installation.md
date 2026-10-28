@@ -19,11 +19,11 @@ dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj `
   -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true `
   -o artifacts\native-win-x64
 
-pwsh -NoProfile -File tools\dotreticulum-packaging.ps1 -Action Package `
+pwsh -NoProfile -File tools\Invoke-DotReticulumPackaging.ps1 -Action Package `
   -Rid win-x64 -PublishDirectory artifacts\native-win-x64 `
   -OutputDirectory artifacts\package-win-x64
 
-pwsh -NoProfile -File tools\dotreticulum-packaging.ps1 -Action Install `
+pwsh -NoProfile -File tools\Invoke-DotReticulumPackaging.ps1 -Action Install `
   -PackageDirectory artifacts\package-win-x64 `
   -InstallRoot "$HOME\DotReticulum"
 ```
@@ -48,7 +48,7 @@ search when that directory is on `PATH`. `Discover` lists matching executables i
 install root and current `PATH`:
 
 ```powershell
-pwsh -NoProfile -File tools\dotreticulum-packaging.ps1 -Action Discover `
+pwsh -NoProfile -File tools\Invoke-DotReticulumPackaging.ps1 -Action Discover `
   -InstallRoot "$HOME\DotReticulum"
 ```
 
@@ -60,7 +60,7 @@ Unowned collisions, modified owned files, invalid manifests, path escapes and pa
 failures are errors rather than overwrite/delete requests:
 
 ```powershell
-pwsh -NoProfile -File tools\dotreticulum-packaging.ps1 -Action Uninstall `
+pwsh -NoProfile -File tools\Invoke-DotReticulumPackaging.ps1 -Action Uninstall `
   -InstallRoot "$HOME\DotReticulum"
 ```
 

@@ -16,11 +16,11 @@ Describe 'Git over Reticulum reference retrieval' {
         if ($Context.Implementation -eq 'Upstream') {
             Initialize-CompatibilityCandidate $Context
             $evidenceDirectory = Join-Path $Context.OutputDirectory 'upstream-retrieval'
-            & (Join-Path $PSScriptRoot '..\..\fetch-reference.ps1') -Python $Context.Python -Upstream $Context.Upstream `
+            & (Join-Path $PSScriptRoot '..\..\Receive-Reference.ps1') -Python $Context.Python -Upstream $Context.Upstream `
                 -Revision $Context.Revision -Directory $evidenceDirectory -Gateway $Context.Gateway
         }
         elseif ($Context.FetchReference) {
-            & (Join-Path $PSScriptRoot '..\..\fetch-reference.ps1') -Application $Context.Application `
+            & (Join-Path $PSScriptRoot '..\..\Receive-Reference.ps1') -Application $Context.Application `
                 -Directory $evidenceDirectory -Gateway $Context.Gateway
         }
         $evidence = Get-Content -LiteralPath (Join-Path $evidenceDirectory 'reference-provenance.json') -Raw | ConvertFrom-Json
@@ -55,7 +55,7 @@ Describe 'Git over Reticulum reference retrieval' {
             $bootstrapPython = if ($Context.Python) { $Context.Python } elseif ($IsWindows) { 'python' } else { 'python3' }
             $Context.Python = $null
             $Context.Upstream = $null
-            & (Join-Path $PSScriptRoot '..\..\prepare-reference.ps1') `
+            & (Join-Path $PSScriptRoot '..\..\Initialize-Reference.ps1') `
                 -Bundle (Join-Path $Context.ReferenceDirectory 'reference.bundle') `
                 -Directory $environmentDirectory -Python $bootstrapPython | Out-Host
             $Context.Python = Join-Path $environmentDirectory $(if ($IsWindows) { 'venv\Scripts\python.exe' } else { 'venv\bin\python' })

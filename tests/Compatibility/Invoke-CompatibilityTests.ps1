@@ -1,4 +1,15 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Runs shared advertised-claim acceptance against candidate executables.
+.DESCRIPTION
+Requires Pester 5.7.1+ and a verified pinned Python reference. Selects DotReticulum,
+Upstream or Both and saves individual outcomes. -FetchReference enables hosted
+Git retrieval; other cases use local peers. -NoJobSummary disables Actions output.
+.EXAMPLE
+.\Invoke-CompatibilityTests.ps1 -Python C:\Reference\venv\Scripts\python.exe -Upstream C:\Reference\upstream
+#>
 [CmdletBinding()]
 param(
     [string] $Application = (Join-Path $PSScriptRoot '..\..\src\DotReticulum.Applications\bin\Release\net10.0\DotReticulum.Applications.dll'),

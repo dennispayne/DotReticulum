@@ -1,4 +1,15 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Creates a verified pinned checkout and isolated Python environment.
+.DESCRIPTION
+Validates the fetched bundle against its provenance, checks Git objects and
+installs reference dependencies into a new virtual environment. Requires Git,
+Python and a fresh destination. Exports reference paths in GitHub Actions.
+.EXAMPLE
+.\Initialize-Reference.ps1 -Bundle ..\TestResults\reference-fetch\reference.bundle -Directory ..\TestResults\reference-python
+#>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [string] $Bundle,

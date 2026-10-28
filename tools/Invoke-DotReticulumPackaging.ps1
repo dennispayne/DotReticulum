@@ -1,4 +1,15 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Packages, installs, discovers or uninstalls native DotReticulum utilities.
+.DESCRIPTION
+Select an operation with -Action. Package requires Rid, PublishDirectory and
+OutputDirectory; Install uses PackageDirectory and InstallRoot. Discovery and
+uninstallation operate on InstallRoot.
+.EXAMPLE
+.\Invoke-DotReticulumPackaging.ps1 -Action Discover -InstallRoot C:\Tools\DotReticulum
+#>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]

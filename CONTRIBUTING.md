@@ -42,11 +42,21 @@ Keep production, test assertions, topology control and project-owned fixtures in
 
 PowerShell entry points (no Python required for the default suite or coverage reporting):
 
+Standalone scripts use approved `Verb-Noun.ps1` names and provide comment-based
+help: `Get-Help .\tests\Invoke-Tests.ps1 -Full` shows usage without running tests.
+Renamed entry points replace the previous lowercase/underscore names; update
+local commands accordingly. PSScriptAnalyzer is not currently configured;
+tooling tests guard entry-point naming and help discovery.
+
+CodeQL is enabled through GitHub-managed **default setup** for Actions, C# and
+Python, including weekly scanning. Its dynamically generated workflow is not a
+file in this repository. PowerShell is not covered by that configuration.
+
 ```powershell
-pwsh -NoProfile -File tests\run-tests.ps1
-pwsh -NoProfile -File tests\run-tests.ps1 -Coverage
-pwsh -NoProfile -File tests\run-tests.ps1 -Live -Python C:\Reference\venv\Scripts\python.exe -Upstream C:\Reference\Reticulum
-pwsh -NoProfile -File tests\run-tests.ps1 -Pester
+pwsh -NoProfile -File tests\Invoke-Tests.ps1
+pwsh -NoProfile -File tests\Invoke-Tests.ps1 -Coverage
+pwsh -NoProfile -File tests\Invoke-Tests.ps1 -Live -Python C:\Reference\venv\Scripts\python.exe -Upstream C:\Reference\Reticulum
+pwsh -NoProfile -File tests\Invoke-Tests.ps1 -Pester
 ```
 
 `-NativeExe <path>` additionally exercises the published NativeAOT peer. `-Filter <expression>` selects tests without coverage; `-Coverage` requires the full solution and uses a fresh results directory (optionally supplied with `-ResultsDirectory`). Live execution consumes an existing pinned reference checkout/venv; it does not install packages, change pins or fetch code automatically. The runner selects in-process `rnsd` for supported local-destination tests, fails on command errors and restores its environment overrides.
@@ -57,18 +67,18 @@ Use PowerShell 7 and Pester 5.7.1 or newer. If Pester is missing, install it exp
 
 ```powershell
 dotnet build DotReticulum.slnx -c Release
-pwsh -NoProfile -File tests\run-pester.ps1
-pwsh -NoProfile -File tests\run-pester.ps1 -ToolingOnly
-pwsh -NoProfile -File tests\run-pester.ps1 -Application C:\Publish\DotReticulum.Applications.exe
+pwsh -NoProfile -File tests\Invoke-PesterTests.ps1
+pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly
+pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -Application C:\Publish\DotReticulum.Applications.exe
 ```
 
-`run-pester.ps1` tests the built Release DLL by default, or the supplied published executable. Tooling cases cover coverage merging/exclusions, incomplete/malformed reports and runner input guards. CLI suites launch actual processes for identity persistence, runtime configuration/recovery, interface and resource behavior, Git errors and authenticated multi-megabyte rncp transfers. The suites also cover identity/signature/encryption, network utilities, shell, device-maintenance safety and transfer/execution cases. No public gateway is required; the default suite needs no Python. Supplying both `-Python` and `-Upstream` enables additional verified-reference process comparisons; unavailable reference modes explicitly skip. The suite uses isolated temporary directories, bounded process waits, captures stdout/stderr and terminates only processes it launched. Pester checks application boundaries; protocol-level interoperability assertions remain in xUnit. `run-tests.ps1 -Pester` runs these after the .NET suite, using `-NativeExe` as the Pester application when supplied.
+`Invoke-PesterTests.ps1` tests the built Release DLL by default, or the supplied published executable. Tooling cases cover coverage merging/exclusions, incomplete/malformed reports and runner input guards. CLI suites launch actual processes for identity persistence, runtime configuration/recovery, interface and resource behavior, Git errors and authenticated multi-megabyte rncp transfers. The suites also cover identity/signature/encryption, network utilities, shell, device-maintenance safety and transfer/execution cases. No public gateway is required; the default suite needs no Python. Supplying both `-Python` and `-Upstream` enables additional verified-reference process comparisons; unavailable reference modes explicitly skip. The suite uses isolated temporary directories, bounded process waits, captures stdout/stderr and terminates only processes it launched. Pester checks application boundaries; protocol-level interoperability assertions remain in xUnit. `Invoke-Tests.ps1 -Pester` runs these after the .NET suite, using `-NativeExe` as the Pester application when supplied.
 
 Measure production coverage with the existing Coverlet collector and merge reports across test projects:
 
 ```sh
 dotnet test DotReticulum.slnx -c Release --settings tests/coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/coverage-<unique-run>
-pwsh -NoProfile -File tests/coverage_summary.ps1 TestResults/coverage-<unique-run>
+pwsh -NoProfile -File tests/Get-CoverageSummary.ps1 TestResults/coverage-<unique-run>
 ```
 
 Use a fresh results directory per run so stale reports cannot inflate coverage, and do not run other builds/tests against the same output directories while the collector is instrumenting assemblies. The summary counts shared lines and individual branch paths once across all test projects, excluding test assemblies, and rejects reports missing a production project. Record whether `DOTRETICULUM_LIVE=1` was enabled; the default suite skips Python interoperability tests. Coverage shows execution, not correctness. Prefer focused tests of uncovered failure behavior over coverage-only assertions.
@@ -97,7 +107,7 @@ Claims use stable IDs such as `C004`; individual tests use `T006`. Append new
 numeric IDs without renumbering existing cases. The catalog spells out the
 advertised claim, `Describe` names its group, and each `It` names the concrete
 acceptance behavior.
-`tests\Compatibility\Run-CompatibilityTests.ps1` runs the **same scenario, inputs and assertions**
+`tests\Compatibility\Invoke-CompatibilityTests.ps1` runs the **same scenario, inputs and assertions**
 against both candidates; only invocation adapters differ. For multi-node cases,
 upstream RNS is the fixed reference peer: upstream-to-upstream is the baseline,
 then .NET replaces only the candidate node on each OS. Using Python only as a
@@ -115,8 +125,8 @@ Discover tests and join their metadata with upstream citations without fetching,
 starting peers or running tests:
 
 ```powershell
-pwsh -NoProfile -File tests\Compatibility\List-CompatibilityTests.ps1
-pwsh -NoProfile -File tests\Compatibility\List-CompatibilityTests.ps1 -IncludeUncoveredClaims
+pwsh -NoProfile -File tests\Compatibility\Get-CompatibilityTests.ps1
+pwsh -NoProfile -File tests\Compatibility\Get-CompatibilityTests.ps1 -IncludeUncoveredClaims
 ```
 
 The shared inventory contains 37 distinct tests and 17 quoted claims. Cases
@@ -141,7 +151,7 @@ an external clickable URI scheme nor source-line anchors were established.
 `CitationUri` therefore remains blank rather than inventing links or falling
 back to the GitHub mirror. See the exact reproduction and limitation in the
 development history.
-`tests\Integration\catalog.json` and `tests\run-contract-integration.ps1` retain
+`tests\Integration\catalog.json` and `tests\Invoke-ContractIntegration.ps1` retain
 the behavioral, .NET-only and mixed-peer process checks. CI runs those under
 **Test**, including their results in the consolidated Native table, not
 Compatibility. The broader contract ledger remains implementation/integration

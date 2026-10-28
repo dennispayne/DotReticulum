@@ -1,4 +1,5 @@
 #Requires -Version 7.0
+
 <#
 .SYNOPSIS
 Summarizes xUnit/VSTest TRX and Pester (NUnit 2.5/3) result files as Markdown.
@@ -8,6 +9,8 @@ Writes counts per result file, then every failed test with a truncated message, 
 skipped tests with their distinct skip reasons. Passing tests are not listed individually so the
 output stays under the GitHub job-summary size limit. Output goes to stdout; the caller appends it
 to $env:GITHUB_STEP_SUMMARY.
+.EXAMPLE
+.\Get-TestSummary.ps1 -Path ..\TestResults\tests.trx -JsonPath ..\TestResults\summary.json
 #>
 [CmdletBinding()]
 param(

@@ -1,6 +1,6 @@
 name: Release
 
-# Runs only for a pushed v<major>.<minor>.<patch>.<build> tag (create it with tools/new-release-tag.ps1)
+# Runs only for a pushed v<major>.<minor>.<patch>.<build> tag (create it with tools/New-ReleaseTag.ps1)
 # or a manual dispatch. A manual dispatch builds and uploads the zips as workflow artifacts without
 # publishing a GitHub release.
 on:
@@ -70,7 +70,7 @@ jobs:
       - name: Summarize test results
         if: ${{ !cancelled() }}
         run: |
-          $summary = & ./tests/test_summary.ps1 -Path TestResults/release -Title 'Release tests (${{ matrix.rid }})'
+          $summary = & ./tests/Get-TestSummary.ps1 -Path TestResults/release -Title 'Release tests (${{ matrix.rid }})'
           $summary
           $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
@@ -102,7 +102,7 @@ jobs:
         run: |
           $version = if ('${{ github.ref_type }}' -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { "dispatch-$($env:GITHUB_SHA.Substring(0, 12))" }
           $name = "DotReticulum-$version-${{ matrix.rid }}"
-          & ./tools/dotreticulum-packaging.ps1 -Action Package -Rid '${{ matrix.rid }}' -PublishDirectory artifacts/native -OutputDirectory "artifacts/$name"
+          & ./tools/Invoke-DotReticulumPackaging.ps1 -Action Package -Rid '${{ matrix.rid }}' -PublishDirectory artifacts/native -OutputDirectory "artifacts/$name"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Path artifacts/release | Out-Null
           $zip = Join-Path $PWD "artifacts/release/$name.zip"

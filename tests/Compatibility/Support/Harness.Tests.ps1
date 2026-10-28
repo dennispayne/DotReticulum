@@ -9,7 +9,7 @@ Describe 'Compatibility harness' {
         . (Join-Path $PSScriptRoot 'Discovery.ps1')
         . (Join-Path $PSScriptRoot 'Export.ps1')
         . (Join-Path $PSScriptRoot '..\..\Pester\TestProcess.ps1')
-        $harnessRunner = Join-Path $PSScriptRoot '..\Run-CompatibilityTests.ps1'
+        $harnessRunner = Join-Path $PSScriptRoot '..\Invoke-CompatibilityTests.ps1'
         $harnessWork = Join-Path $PSScriptRoot "..\..\..\TestResults\compatibility-harness-$([guid]::NewGuid().ToString('N'))"
         $null = New-Item -ItemType Directory -Path $harnessWork
         $harnessApplication = if ($Application) { (Resolve-Path -LiteralPath $Application).Path } else { $null }
@@ -39,7 +39,7 @@ Describe 'Compatibility harness' {
         It 'discovers all real tests and exposes uncovered catalog claims without executing anything' {
             $metadata = @(Get-CompatibilityDiscovery)
             $claims = @(Get-CompatibilityClaims)
-            $rows = @(& (Join-Path $PSScriptRoot '..\List-CompatibilityTests.ps1') -IncludeUncoveredClaims)
+            $rows = @(& (Join-Path $PSScriptRoot '..\Get-CompatibilityTests.ps1') -IncludeUncoveredClaims)
             @($rows | Where-Object TestId).Count | Should -Be $metadata.Count
             @($rows | Where-Object { !$_.TestId }).Count | Should -Be @($claims | Where-Object id -NotIn $metadata.ClaimId).Count
             @($rows | Where-Object { $_.PSObject.Properties.Name -contains 'Result' }).Count | Should -Be 0
@@ -47,7 +47,7 @@ Describe 'Compatibility harness' {
         }
 
         It 'joins quoted claim text and file-line citations without conflating them with test names' {
-            $rows = @(& (Join-Path $PSScriptRoot '..\List-CompatibilityTests.ps1') -IncludeUncoveredClaims)
+            $rows = @(& (Join-Path $PSScriptRoot '..\Get-CompatibilityTests.ps1') -IncludeUncoveredClaims)
             $catalog = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\catalog.json') -Raw | ConvertFrom-Json
             foreach ($claim in $catalog.claims) {
                 $joined = @($rows | Where-Object ClaimId -EQ $claim.id)

@@ -1,4 +1,15 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Fetches pinned upstream Git objects over Reticulum and records provenance.
+.DESCRIPTION
+Requires a fresh destination and either a native application or verified Python
+reference. Seeds older history from the GitHub mirror, then requires missing
+objects and nonzero bundle bytes from the hosted Reticulum repository.
+.EXAMPLE
+.\Receive-Reference.ps1 -Application ..\artifacts\native\DotReticulum.Applications.exe -Directory ..\TestResults\reference-fetch
+#>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory, ParameterSetName = 'Native')] [string] $Application,

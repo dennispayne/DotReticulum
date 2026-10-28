@@ -1,4 +1,15 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Runs Release .NET tests with optional coverage, live reference and Pester suites.
+.DESCRIPTION
+Requires the .NET 10 SDK. -Live requires Python and Upstream. -Coverage requires
+an unfiltered suite and a fresh results directory. -Pester adds CLI/process tests.
+Restores process-level test environment variables on exit.
+.EXAMPLE
+.\Invoke-Tests.ps1 -Coverage -Pester
+#>
 [CmdletBinding()]
 param(
     [switch] $Live,
@@ -44,11 +55,11 @@ try {
     & dotnet @arguments
     if ($LASTEXITCODE -ne 0) { throw 'The .NET test suite failed.' }
     if ($Coverage) {
-        & (Join-Path $PSHOME 'pwsh') -NoProfile -File (Join-Path $PSScriptRoot 'coverage_summary.ps1') $ResultsDirectory
+        & (Join-Path $PSHOME 'pwsh') -NoProfile -File (Join-Path $PSScriptRoot 'Get-CoverageSummary.ps1') $ResultsDirectory
         if ($LASTEXITCODE -ne 0) { throw 'Coverage reporting failed.' }
     }
     if ($Pester) {
-        $pesterArguments = @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'run-pester.ps1'), '-GitHosting')
+        $pesterArguments = @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'Invoke-PesterTests.ps1'), '-GitHosting')
         if ($NativeExe) { $pesterArguments += @('-Application', $env:DOTRETICULUM_NATIVE_EXE) }
         if ($Live) {
             $pesterArguments += @('-GitRemote', '-Python', $env:DOTRETICULUM_PYTHON, '-Upstream', $env:DOTRETICULUM_UPSTREAM)

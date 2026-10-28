@@ -1,4 +1,13 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Creates a Markdown compatibility table from candidate reports.
+.DESCRIPTION
+Combines saved candidate outcomes with catalog metadata and commit-pinned test links.
+.EXAMPLE
+.\New-CompatibilitySummary.ps1 -ReportsDirectory ..\..\TestResults\compatibility
+#>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [string] $ReportsDirectory,

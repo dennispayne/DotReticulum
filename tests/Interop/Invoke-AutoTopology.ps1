@@ -1,4 +1,14 @@
 #Requires -Version 7.0
+
+<#
+.SYNOPSIS
+Runs bounded AutoInterface interoperability in owned Linux network namespaces.
+.DESCRIPTION
+Requires Linux root, iproute2, .NET and a verified Python reference.
+Creates isolated network namespaces and removes owned topology resources on exit.
+.EXAMPLE
+.\Invoke-AutoTopology.ps1 -Dotnet /usr/bin/dotnet -Python /reference/venv/bin/python -Upstream /reference/upstream -Build
+#>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [string] $Dotnet,
