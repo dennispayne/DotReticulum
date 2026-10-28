@@ -32,7 +32,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Initial advertised-core functionality family and directly executed Upstream results alongside the three .NET platforms (eight bounded rows; unmapped acceptance stays explicit; run 40521069184)
   - [x] Separate integration evidence from shared advertised-claim compatibility scenarios; use upstream-to-upstream as the multi-node baseline and a fixed upstream peer for every .NET candidate (Windows native and Python locally verified; cross-platform CI evidence recorded in development history)
   - [x] Make candidate-owned reference retrieval an advertised Git compatibility scenario; reuse one verified source bundle for the subsequent upstream baseline and Test, replacing the standalone fetch workflow (all 12 jobs passed in run 40621550584)
-  - [ ] Readable Pester compatibility claim tests, citation-only catalog, read-only discovery and individual Pester outcomes across four candidates
+  - [x] Readable Pester compatibility claim tests, citation-only catalog, read-only discovery and individual Pester outcomes across four candidates (all four Compatibility jobs and renderer passed in runs 40626931637 and 40628676024; later discovery-only metadata cleanup locally verified)
   - [x] Table-only Compatibility summary with commit-pinned test-code hyperlinks, no Family column, and isolated child-process Actions output
   - [ ] Expand shared advertised-claim scenarios for interface authentication, bulk resources, heterogeneous routing, application requests and Channel/Buffer
   - [ ] `interop-test.yml`

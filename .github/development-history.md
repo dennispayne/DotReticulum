@@ -92,6 +92,19 @@ name. The joined-metadata regression and tooling suite passed **46** cases
 with **2 explicit reference-dependent skips**, zero failed. Quoted claims do
 not imply the current tests fully verify their scope.
 
+Each claim now stores one `citation` object, not an array. Discovery exposes
+only `Citation` (`file:line`) rather than duplicate readable/structured columns.
+`pwsh -NoProfile -File tests\run-pester.ps1 -ToolingOnly` passed **46** cases
+with **2 explicit reference-dependent skips** after that simplification.
+
+Actions run **`40628676024`** confirmed the portable reporting correction:
+all four Compatibility jobs, both summary jobs, Windows Test and Linux Test
+passed. The remaining macOS Test failure is a discovery announcement timeout in
+the unchanged `Parity4DiscoveryControlsTests.ControlledHdlcAutoconnectAppliesIfacAndDiscoveredRoutingOverrides`;
+this is not a Compatibility case or reporting failure. Full-run acceptance is
+therefore not claimed. The Pester harness itself is cross-platform accepted;
+discovery-only claim/citation metadata cleanup was subsequently verified locally.
+
 ### Candidate-owned retrieval, reused baseline and table-only reporting
 
 The user replaced the separate hosted fetch workflow with an advertised
