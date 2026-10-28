@@ -298,9 +298,12 @@ jobs:
       - name: Verify native build
         run: ./tests/use-native-build.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
 
+      - name: Install Pester for shared acceptance tests
+        run: ./tests/install-pester.ps1
+
       - name: Run shared scenarios, retrieving the reference with this native candidate
         run: |
-          ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Implementation DotReticulum -FetchReference -ReferenceDirectory "$env:RUNNER_TEMP/candidate-reference" -Label '${{ matrix.rid }}' -NoJobSummary
+          ./tests/Compatibility/Run-CompatibilityTests.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Implementation DotReticulum -FetchReference -ReferenceDirectory "$env:RUNNER_TEMP/candidate-reference" -Label '${{ matrix.rid }}' -NoJobSummary
 
       - name: Retain one verified reference source bundle for this run
         if: ${{ !cancelled() && matrix.rid == 'linux-x64' }}
@@ -346,8 +349,11 @@ jobs:
       - name: Provision the verified pinned reference
         run: ./tests/prepare-reference.ps1 -Bundle artifacts/reference/reference.bundle -Directory "$env:RUNNER_TEMP/pinned-python" -Python python3
 
+      - name: Install Pester for shared acceptance tests
+        run: ./tests/install-pester.ps1
+
       - name: Execute the same shared scenarios with upstream as the candidate
-        run: ./tests/run-compatibility.ps1 -Implementation Upstream -ReferenceDirectory artifacts/reference -NoJobSummary
+        run: ./tests/Compatibility/Run-CompatibilityTests.ps1 -Implementation Upstream -ReferenceDirectory artifacts/reference -NoJobSummary
 
       - name: Retain upstream baseline evidence
         if: ${{ !cancelled() }}
@@ -380,11 +386,11 @@ jobs:
           pattern: compatibility-*-${{ github.run_attempt }}
           path: TestResults/compatibility-platforms
 
-      - name: Summarize all contract rows across platforms
+      - name: Summarize Pester test outcomes across platforms
         run: |
           $directory = 'TestResults/compatibility-platforms'
           $null = New-Item -ItemType Directory -Force -Path $directory
-          $summary = & ./tests/compatibility_summary.ps1 -ReportsDirectory $directory
+          $summary = & ./tests/Compatibility/Create-CompatibilitySummary.ps1 -ReportsDirectory $directory
           $summary
           $summary | Set-Content -LiteralPath TestResults/compatibility-all-platforms.md -Encoding utf8
           $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY

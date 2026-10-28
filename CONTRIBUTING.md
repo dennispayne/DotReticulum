@@ -77,25 +77,38 @@ Live Python harnesses require `DOTRETICULUM_UPSTREAM` to point at an unmodified 
 
 ## Moving to a new upstream release
 
-The consolidated compatibility table preserves every advertised-claim row and
+The consolidated compatibility table has one row per Pester `It` case and
 displays Upstream, .NET Linux, .NET macOS and .NET Windows side by side.
-`tests\Compatibility\catalog.json` cites the pinned upstream README/documentation,
-defines shared acceptance scenarios and states each claim's tested bounds.
-`tests\run-compatibility.ps1` runs the **same scenario, inputs and assertions**
+`tests\Compatibility\catalog.json` maps claim IDs to upstream citations;
+`tests\Compatibility\Claims\*.Tests.ps1` contains the readable acceptance cases,
+assertions and coverage boundaries. There is no Family classification or
+calculated claim-level verdict: each cell preserves Pester's test outcome.
+`tests\Compatibility\Run-CompatibilityTests.ps1` runs the **same scenario, inputs and assertions**
 against both candidates; only invocation adapters differ. For multi-node cases,
 upstream RNS is the fixed reference peer: upstream-to-upstream is the baseline,
 then .NET replaces only the candidate node on each OS. Using Python only as a
 peer does not pass the Upstream column. A single upstream-to-upstream baseline
 runs after the three native candidates, reusing one verified candidate-fetched
 source bundle. Missing baseline results never imply an Upstream pass.
-The table links implemented Test IDs to shared test code at the executing commit;
-unimplemented claims have plain IDs. Family and explanatory prose are omitted
-from the summary; bounds, provenance and failure details remain in this catalog,
-logs and JSON artifacts.
+The table links stable Test IDs to the actual test source line at the executing
+commit. Descriptions and assertions belong to Pester, not duplicated catalog
+entries. Helpers under `Support` handle invocation, reference nodes and lifecycle;
+Python adapters under `Interop` execute upstream APIs, not acceptance assertions.
+The summary contains only the table; diagnostics and provenance remain in logs,
+NUnit XML and per-test JSON artifacts.
+
+Discover tests and join their metadata with upstream citations without fetching,
+starting peers or running tests:
+
+```powershell
+pwsh -NoProfile -File tests\Compatibility\List-CompatibilityTests.ps1
+pwsh -NoProfile -File tests\Compatibility\List-CompatibilityTests.ps1 -IncludeUncoveredClaims
+```
 
 The initial shared scenarios cover identity persistence/address derivation,
 fixture signatures/decryption and proof/no-proof packet delivery against a
-fixed upstream peer. The five other advertised claims remain **Not covered**;
+fixed upstream peer. The five other advertised claims remain coverage gaps in
+the discovery inventory, not fabricated Pester results or summary rows;
 historical integration results do not silently pass them.
 `tests\Integration\catalog.json` and `tests\run-contract-integration.ps1` retain
 the behavioral, .NET-only and mixed-peer process checks. CI runs those under
@@ -122,17 +135,18 @@ sizes and delegates request/fetch processing to upstream, without a wire shim.
 The other fetched repositories are temporary; no standalone fetch workflow or
 historical artifact lookup remains. Dependency versions are recorded in
 `tests\Interop\reference-requirements.txt`; actual imported modules are checked
-before testing. A failed native retrieval fails its Git claim and leaves dependent
-claims explicitly unexecuted. If the canonical source bundle is unavailable,
+before testing. A failed native retrieval fails its Pester Git test and leaves dependent
+tests explicitly unexecuted. If the canonical source bundle is unavailable,
 the upstream baseline cannot pass and Python-peer integration cases explicitly
 skip; non-reference Test cases can still run. Object integrity does not
 authenticate the publisher. Moving the compatibility pin remains a separate,
 explicit change; fetching current head does not change it.
 
-Retrieved-head differential comparisons remain available explicitly through
-`tests\compare-upstream.ps1 -Revision <exact-head-sha>`; these are not pinned
-compatibility evidence. The former separately scheduled fetch/drift workflow has
-been removed rather than keeping a second reference acquisition path.
+Compatibility always uses the canonical pin in
+`tests\Interop\reference_environment.py`; it does not treat the retrieved remote
+head as an alternate reference. The former separately scheduled fetch/drift
+workflow and switch-based comparison runner have been removed rather than
+keeping a second reference acquisition or acceptance path.
 
 DotReticulum's version is the targeted upstream RNS version plus a git-height build number (see the README's Versioning section). Anyone may take the project to the next upstream release (for example 1.5.8):
 

@@ -15,8 +15,10 @@ $ErrorActionPreference = 'Stop'
 if ($Gateway -notmatch '^[a-zA-Z0-9.-]+$') { throw 'Gateway must be a DNS hostname or IPv4 address.' }
 if (Test-Path -LiteralPath $Directory) { throw 'Fetch directory must be fresh.' }
 . (Join-Path $PSScriptRoot 'Pester\TestProcess.ps1')
-$catalog = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Compatibility\catalog.json') -Raw | ConvertFrom-Json
-if (!$Revision) { $Revision = $catalog.reference.revision }
+. (Join-Path $PSScriptRoot 'Compatibility\Support\Reference.ps1')
+$pin = Get-CompatibilityReferenceRevision
+if (!$Revision) { $Revision = $pin }
+if ($Revision -ne $pin) { throw 'Reference retrieval revision must match the canonical pin.' }
 $applicationPath = if ($Application) { (Resolve-Path -LiteralPath $Application).Path }
 if ($Application -and [IO.Path]::GetExtension($applicationPath) -eq '.dll') { throw 'Hosted reference retrieval requires the published native executable.' }
 $null = New-Item -ItemType Directory -Path $Directory
@@ -37,7 +39,7 @@ $null = Invoke-Git @('init', '--bare', '--initial-branch=main', $repository)
 $null = Invoke-Git @('--git-dir', $repository, 'fetch', '--no-tags',
     'https://github.com/markqvist/Reticulum.git', $seed)
 $null = Invoke-Git @('--git-dir', $repository, 'update-ref', 'refs/heads/main', $seed)
-$missing = Invoke-TestProcess git @('--git-dir', $repository, 'cat-file', '-e', "$($catalog.reference.revision)^{commit}")
+$missing = Invoke-TestProcess git @('--git-dir', $repository, 'cat-file', '-e', "$pin^{commit}")
 if ($missing.Code -eq 0) { throw 'The target pin must be absent before the Reticulum fetch.' }
 @"
 [reticulum]
@@ -132,9 +134,9 @@ if ($bytes -le 0) {
 $null = Invoke-Git @('--git-dir', $repository, 'fsck', '--full', '--strict')
 $headCommit = Invoke-Git @('--git-dir', $repository, 'rev-parse', 'HEAD')
 $headTree = Invoke-Git @('--git-dir', $repository, 'rev-parse', 'HEAD^{tree}')
-$null = Invoke-Git @('--git-dir', $repository, 'cat-file', '-e', "$($catalog.reference.revision)^{commit}")
-$pinTree = Invoke-Git @('--git-dir', $repository, 'rev-parse', "$($catalog.reference.revision)^{tree}")
-$null = Invoke-Git @('--git-dir', $repository, 'update-ref', 'refs/heads/pinned-reference', $catalog.reference.revision)
+$null = Invoke-Git @('--git-dir', $repository, 'cat-file', '-e', "$pin^{commit}")
+$pinTree = Invoke-Git @('--git-dir', $repository, 'rev-parse', "$pin^{tree}")
+$null = Invoke-Git @('--git-dir', $repository, 'update-ref', 'refs/heads/pinned-reference', $pin)
 $bundle = Join-Path $root 'reference.bundle'
 $null = Invoke-Git @('--git-dir', $repository, 'bundle', 'create', $bundle, '--all')
 [ordered]@{
@@ -142,8 +144,9 @@ $null = Invoke-Git @('--git-dir', $repository, 'bundle', 'create', $bundle, '--a
     gateway = $Gateway
     seed = $seed
     seedSource = 'GitHub comparison mirror; only history through the parent of the pin'
-    pin = $catalog.reference.revision
+    pin = $pin
     pinTree = $pinTree
+    pinInitiallyMissing = ($missing.Code -ne 0)
     head = $headCommit
     tree = $headTree
     networkBundleBytes = $bytes

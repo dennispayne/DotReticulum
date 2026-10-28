@@ -79,12 +79,15 @@ dotnet run --project src/DotReticulum.Applications -- rnsd --help
 CI's Compatibility table runs shared, upstream-advertised acceptance scenarios on
 Python RNS and native .NET Linux/macOS/Windows. Multi-node scenarios keep upstream
 as the fixed peer, with upstream-to-upstream as the baseline. Behavioral/native-only
-checks remain under Test; uncovered advertised claims stay visible. The
+checks remain under Test; uncovered advertised claims stay visible in the discovery inventory. The
 [Compatibility jobs](.github/workflows/ci-build-test.yml) retrieve missing reference
 objects using each native candidate's own `rngit` over `rns://`, then run the
 shared scenarios. One verified source bundle is reused by Test and the subsequent
-Python baseline; there is no separate fetch workflow. Implemented Test IDs link
-to the shared test code in the consolidated table.
+Python baseline; there is no separate fetch workflow. Each table row is a real
+Pester test with its own outcome, not a calculated claim verdict, and its Test ID
+links to the shared test source. Readable cases live under
+`tests\Compatibility\Claims`; `tests\Compatibility\List-CompatibilityTests.ps1`
+discovers tests and joins their upstream citations without executing them.
 
 | Area | Status |
 | --- | --- |

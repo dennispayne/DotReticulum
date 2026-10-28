@@ -4,6 +4,56 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Readable Pester compatibility cases and citation discovery
+
+Compatibility is being reorganized around real Pester `It` cases under
+`tests\Compatibility\Claims`, with shared operational helpers under `Support`.
+The citation catalog inventories upstream claims without duplicating test
+descriptions, scenario mappings or source paths. Stable test tags identify
+individual cases; claim tags join them to citations. Family is removed.
+`Run-CompatibilityTests.ps1` executes the cases, `List-CompatibilityTests.ps1`
+discovers them without starting nodes or fetching reference objects, and
+`Create-CompatibilitySummary.ps1` aligns the actual Pester outcomes across
+Upstream/Linux/macOS/Windows. There is no calculated claim-level pass/fail.
+Unimplemented advertised claims remain discovery coverage gaps, not synthetic
+test results. Existing fixture provenance and the reference pin are unchanged.
+
+The preceding candidate-owned retrieval implementation (`4672202`) passed all
+**12 jobs** in Actions run **`40621550584`**, including all native retrieval
+candidates, the subsequent upstream baseline, Test and both aggregation jobs.
+This closes the earlier pending cross-platform acquisition acceptance; it does
+not verify the subsequent Pester reorganization.
+
+Local baseline before the reorganization:
+`dotnet build DotReticulum.slnx -c Release --nologo -v quiet` completed with zero
+warnings/errors, and
+`dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet` passed
+**1,831** cases with **79 skipped**, zero failed; opt-in live tests were disabled.
+NativeAOT:
+`dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o TestResults\compatibility-pester-native --nologo -v quiet`
+passed with MSVC setup in the same process. The binary ran `--help`;
+`dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --filter 'FullyQualifiedName~NativeResourceTests' --nologo -v quiet`
+passed its native encrypted resource-transfer case.
+
+Pester validation of the reorganized harness:
+- `pwsh -NoProfile -File tests\run-pester.ps1 -ToolingOnly`: **44 passed,
+  2 explicit skips**, zero failed. Skips require actual candidate/reference
+  arguments; they are exercised in the parameterized run below.
+- `Invoke-Pester` with a `New-PesterContainer` for
+  `tests\Compatibility\Support\Harness.Tests.ps1`, supplying the published
+  Windows executable and candidate-fetched Python checkout/venv:
+  **10 passed**, zero failed/skipped. Includes missing reference, failed
+  retrieval, real per-case failure isolation for both candidates and
+  upstream-only output.
+- `pwsh -NoProfile -File tests\Compatibility\Run-CompatibilityTests.ps1 -Application TestResults\compatibility-pester-native\DotReticulum.Applications.exe -Implementation DotReticulum -FetchReference -ReferenceDirectory TestResults\pester-compatibility-reference -OutputDirectory TestResults\pester-compatibility-network -NoJobSummary`:
+  **7 passed**, zero failed/skipped, including an actual **79,683-byte** native
+  hosted fetch and the fixed-upstream-peer proof/no-proof cases. Retrieved head
+  and pin/tree match the preceding candidate-owned evidence above; no pin move
+  or publisher-authentication claim.
+- `pwsh -NoProfile -File tests\Compatibility\List-CompatibilityTests.ps1 -IncludeUncoveredClaims`:
+  seven real test declarations and five uncovered claims, including joined
+  human-readable upstream citations, without test execution.
+
 ### Candidate-owned retrieval, reused baseline and table-only reporting
 
 The user replaced the separate hosted fetch workflow with an advertised

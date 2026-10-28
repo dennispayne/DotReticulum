@@ -8,10 +8,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$catalog = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Compatibility\catalog.json') -Raw | ConvertFrom-Json
+. (Join-Path $PSScriptRoot 'Compatibility\Support\Reference.ps1')
+$pin = Get-CompatibilityReferenceRevision
 $bundlePath = (Resolve-Path -LiteralPath $Bundle).Path
 $provenanceData = Get-Content -LiteralPath $Provenance -Raw | ConvertFrom-Json
-if ($provenanceData.pin -ne $catalog.reference.revision -or $provenanceData.networkBundleBytes -le 0 -or
+if ($provenanceData.pin -ne $pin -or $provenanceData.networkBundleBytes -le 0 -or
     $provenanceData.bundleSha256 -ne (Get-FileHash -LiteralPath $bundlePath -Algorithm SHA256).Hash) {
     throw 'Reference provenance pin, network transfer evidence or bundle digest is invalid.'
 }
@@ -24,7 +25,7 @@ $venv = Join-Path $directoryPath 'venv'
 if ($LASTEXITCODE -ne 0) { throw 'Reference bundle clone failed.' }
 & git -C $checkout fsck --full --strict
 if ($LASTEXITCODE -ne 0) { throw 'Reference object integrity check failed.' }
-& git -C $checkout -c advice.detachedHead=false checkout --detach $catalog.reference.revision
+& git -C $checkout -c advice.detachedHead=false checkout --detach $pin
 if ($LASTEXITCODE -ne 0) { throw 'Reference bundle does not contain the pinned revision.' }
 $pinTree = & git -C $checkout rev-parse 'HEAD^{tree}'
 if ($LASTEXITCODE -ne 0 -or $provenanceData.pinTree -ne $pinTree) { throw 'Reference pinned tree does not match retrieval provenance.' }
@@ -49,4 +50,4 @@ if ($env:GITHUB_ENV) {
     "DOTRETICULUM_PYTHON=$interpreter" | Add-Content -LiteralPath $env:GITHUB_ENV
     "DOTRETICULUM_UPSTREAM=$checkout" | Add-Content -LiteralPath $env:GITHUB_ENV
 }
-[pscustomobject]@{ Python = $interpreter; Upstream = $checkout; Revision = $catalog.reference.revision }
+[pscustomobject]@{ Python = $interpreter; Upstream = $checkout; Revision = $pin }

@@ -1,94 +1,49 @@
 {
-  "reference": {
-    "name": "Reticulum (RNS) 1.5.7",
-    "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391"
-  },
-  "note": "Only shared advertised-claim acceptance scenarios belong here. The same inputs and assertions run independently against upstream Python and .NET Linux/macOS/Windows. Multi-node scenarios keep upstream RNS as the fixed peer and replace only the candidate node. The upstream-to-upstream baseline reuses one verified candidate-fetched source bundle after candidate jobs finish. Unimplemented scenarios remain visible, never inferred from integration tests.",
-  "contracts": [
+  "claims": [
     {
       "id": "FUNC-GIT-REFERENCE",
-      "code": "tests/fetch-reference.ps1",
-      "family": "advertised-git",
-      "title": "Git over Reticulum: fetch missing reference objects using the candidate's own rngit",
-      "source": "docs/source/git.rst:19-31 (Git over Reticulum and rngit)",
-      "scenarios": ["reference-fetch"],
-      "acceptance": "Fetch the advertised default branch from the hosted upstream over rns:// after seeding only the pin's parent; require the initially missing pin, nonzero received bundle bytes and strict Git object integrity.",
-      "boundary": "Seeded incremental retrieval, not a full network clone or publisher authentication. Check the exact pinned commit/tree; retrieved head may advance between candidates."
+      "claim": "Git over Reticulum: fetch missing reference objects using the candidate's own rngit",
+      "citations": [{"path": "docs/source/git.rst", "heading": "Git over Reticulum and rngit", "lines": "19-31"}]
     },
     {
       "id": "FUNC-CORE-ADDRESSING",
-      "code": "tests/Compatibility/Scenarios.ps1",
-      "family": "advertised-core",
-      "title": "Cryptographic addressing: derive the same destination from an imported identity and application name",
-      "source": "README.md:38-39 (Notable Features: coordination-less globally unique addressing and identification)",
-      "scenarios": ["identity-import", "destination-hash"],
-      "acceptance": "Persist the exact fixed 64-byte identity, and derive the independent fixture's rns.id destination hash.",
-      "boundary": "One deterministic identity/name fixture; not a statistical uniqueness proof."
+      "claim": "Cryptographic addressing: derive the same destination from an imported identity and application name",
+      "citations": [{"path": "README.md", "heading": "Notable Features: coordination-less globally unique addressing and identification", "lines": "38-39"}]
     },
     {
       "id": "FUNC-CORE-CRYPTO",
-      "code": "tests/Compatibility/Scenarios.ps1",
-      "family": "advertised-core",
-      "title": "Cryptographic communication: produce Ed25519 signatures and decrypt authenticated identity ciphertext",
-      "source": "README.md:46-53 (Notable Features: X25519, Ed25519 and encrypted tokens)",
-      "scenarios": ["detached-signature", "identity-decryption"],
-      "acceptance": "Match independent fixture signature bytes and decrypted plaintext using identical keys and input files.",
-      "boundary": "Fixture-level functionality, not a cryptographic audit or complete forward-secrecy acceptance."
+      "claim": "Cryptographic communication: produce Ed25519 signatures and decrypt authenticated identity ciphertext",
+      "citations": [{"path": "README.md", "heading": "Notable Features: X25519, Ed25519 and encrypted tokens", "lines": "46-53"}]
     },
     {
       "id": "FUNC-CORE-RECEIPTS",
-      "code": "tests/Compatibility/Scenarios.ps1",
-      "family": "advertised-core",
-      "title": "Delivery confirmations: accept a proof and time out when the upstream destination supplies no proof",
-      "source": "README.md:54 (Notable Features: unforgeable packet delivery confirmations)",
-      "scenarios": ["delivery-proof", "missing-delivery-proof"],
-      "acceptance": "Fixed upstream RNS peer receives 16-byte probes at both destinations; candidate reports valid reply/0% loss with exit 0, and timeout/100% loss with exit 2 without a proof.",
-      "boundary": "Direct loopback TCP; not a forged-proof, multi-hop or impaired-link acceptance test."
+      "claim": "Delivery confirmations: accept a proof and time out when the upstream destination supplies no proof",
+      "citations": [{"path": "README.md", "heading": "Notable Features: unforgeable packet delivery confirmations", "lines": "54"}]
     },
     {
       "id": "FUNC-CORE-INTERFACES",
-      "family": "advertised-core",
-      "title": "Authentication and virtual network segmentation on supported interfaces",
-      "source": "README.md:55-59 (Notable Features)",
-      "scenarios": [],
-      "acceptance": "Shared scenario not yet implemented.",
-      "boundary": "Existing .NET-only IFAC/failure-isolation checks remain integration evidence."
+      "claim": "Authentication and virtual network segmentation on supported interfaces",
+      "citations": [{"path": "README.md", "heading": "Notable Features", "lines": "55-59"}]
     },
     {
       "id": "FUNC-CORE-RESOURCES",
-      "family": "advertised-core",
-      "title": "Reliable bulk transfer with automatic sequencing, compression and checksumming",
-      "source": "README.md:63-66 (Notable Features)",
-      "scenarios": [],
-      "acceptance": "Shared scenario not yet implemented.",
-      "boundary": "Existing native and mixed-peer resource flows remain integration evidence; not multi-gigabyte acceptance."
+      "claim": "Reliable bulk transfer with automatic sequencing, compression and checksumming",
+      "citations": [{"path": "README.md", "heading": "Notable Features", "lines": "63-66"}]
     },
     {
       "id": "FUNC-CORE-ROUTING",
-      "family": "advertised-core",
-      "title": "Self-configuring multi-hop transport over heterogeneous carriers",
-      "source": "README.md:40-43 (Notable Features)",
-      "scenarios": [],
-      "acceptance": "Shared scenario not yet implemented.",
-      "boundary": "Existing mixed-mesh checks do not automatically pass this row."
+      "claim": "Self-configuring multi-hop transport over heterogeneous carriers",
+      "citations": [{"path": "README.md", "heading": "Notable Features", "lines": "40-43"}]
     },
     {
       "id": "FUNC-CORE-REQUESTS",
-      "family": "advertised-core",
-      "title": "Lightweight, flexible application request/response exchanges",
-      "source": "README.md:67 (Notable Features)",
-      "scenarios": [],
-      "acceptance": "Shared scenario not yet implemented.",
-      "boundary": "Requires the same request/response scenario against a fixed upstream peer."
+      "claim": "Lightweight, flexible application request/response exchanges",
+      "citations": [{"path": "README.md", "heading": "Notable Features", "lines": "67"}]
     },
     {
       "id": "FUNC-CORE-CHANNEL",
-      "family": "advertised-core",
-      "title": "Reliable sequential delivery through Channel and Buffer",
-      "source": "README.md:71 (Notable Features)",
-      "scenarios": [],
-      "acceptance": "Shared scenario not yet implemented.",
-      "boundary": "Requires the same ordered-delivery scenario against a fixed upstream peer."
+      "claim": "Reliable sequential delivery through Channel and Buffer",
+      "citations": [{"path": "README.md", "heading": "Notable Features", "lines": "71"}]
     }
   ]
 }
