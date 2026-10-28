@@ -7,11 +7,11 @@
 A native C# / .NET 10 implementation of the [Reticulum Network Stack](https://reticulum.network) (RNS), built to interoperate with the Python reference implementation: discover, link with, route for and exchange data with upstream Reticulum nodes. It targets high-fidelity feature and behavioral parity with the pinned upstream RNS repository, using idiomatic, well-architected native .NET rather than a line-by-line Python translation.
 
 > [!WARNING]
-> DotReticulum is an **experiment in having an LLM build a Reticulum implementation**, started in the spirit of doing odd things in .NET just to see whether they work. Almost all of its code, tests and documentation were written by AI coding agents under human direction. It is experimental, **not** audited, and **not** for production or security-critical use. Be careful with it.
+> DotReticulum is an **experiment in having an LLM build a Reticulum implementation**. It is as much about developing skills in AI agent wrangling and using CI to improve coding outcomes as it is about doing odd things in .NET just to see whether they work. Almost all of its code, tests and documentation were written by AI coding agents under human direction. It is experimental, audited as much as this human is capable of (i.e. not nearly enough), and **not** for production or security-critical use. Be careful with it.
 >
 > It is **not** an official, endorsed or community-recognized Reticulum implementation, and it is not the work of the Reticulum project or its maintainer. Do not treat it as a known-good implementation; those are listed in the [upstream README](https://github.com/markqvist/Reticulum#community-implementations).
 >
-> The upstream project takes a strict but fair view of LLM-generated implementations, documentation and licensing claims; see the [Brandolini's Reference](https://reticulum.network/manual/brandolinis.html) chapter of the manual. DotReticulum acknowledges that position and makes no attempt to influence it, to seek recognition, or to claim anything on upstream's behalf.
+> The upstream project takes a strict but fair view of LLM-generated implementations, documentation and licensing claims; see the [Brandolini's Reference](https://reticulum.network/manual/brandolinis.html) chapter of the manual. DotReticulum acknowledges that position and makes no attempt to influence it, to seek recognition, or to claim anything on upstream's behalf. The upstream author's opinions are shared here, and this is a good faith effort to comply with them.
 >
 > In keeping with it, this project keeps the [Reticulum License](LICENSE) and its copyright notice intact and does not relicense or assert its own license over derived work. Compatibility claims here are exactly as strong as the recorded evidence.
 
