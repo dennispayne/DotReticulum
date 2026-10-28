@@ -85,9 +85,13 @@ defines shared acceptance scenarios and states each claim's tested bounds.
 against both candidates; only invocation adapters differ. For multi-node cases,
 upstream RNS is the fixed reference peer: upstream-to-upstream is the baseline,
 then .NET replaces only the candidate node on each OS. Using Python only as a
-peer does not pass the Upstream column. Baselines execute afresh on every OS;
-any baseline failure remains visible, and missing baselines prevent an overall
-Upstream pass. Retrieved-head drift results stay separate from the pinned table.
+peer does not pass the Upstream column. A single upstream-to-upstream baseline
+runs after the three native candidates, reusing one verified candidate-fetched
+source bundle. Missing baseline results never imply an Upstream pass.
+The table links implemented Test IDs to shared test code at the executing commit;
+unimplemented claims have plain IDs. Family and explanatory prose are omitted
+from the summary; bounds, provenance and failure details remain in this catalog,
+logs and JSON artifacts.
 
 The initial shared scenarios cover identity persistence/address derivation,
 fixture signatures/decryption and proof/no-proof packet delivery against a
@@ -99,22 +103,36 @@ the behavioral, .NET-only and mixed-peer process checks. CI runs those under
 Compatibility. The broader contract ledger remains implementation/integration
 evidence rather than a four-target compatibility report.
 
-CI's **Fetch upstream over Reticulum** workflow runs manually or weekly. It reuses
-a successful Linux native Build artifact, seeds only history through the pin's
-parent from the GitHub comparison mirror, and uses our native `rngit` to fetch
-missing objects over `rns://`. Nonzero network bundle bytes, strict fsck and the
-pin's absence before retrieval are required. The resulting source bundle and
-provenance are Actions artifacts, not tracked source or a venv.
+CI's **Compatibility** jobs exercise advertised Git-over-Reticulum functionality:
+each native candidate retrieves its own reference using its own `rngit`, then
+uses the fetched checkout for the remaining shared scenarios. Each fetch seeds
+only history through the pin's parent from the GitHub comparison mirror, requires
+the pin to be initially absent, receives nonzero Git bundle bytes over `rns://`,
+and verifies strict fsck and the exact pinned commit/tree. This is a seeded
+incremental fetch, not a full network clone. Retrieved head/tree are recorded
+independently and can advance between candidates; they never move the pin.
 
-Test and Compatibility jobs reuse that bundle, checking the recorded SHA-256 and pin,
-then run `tests\prepare-reference.ps1` to create a fresh checkout and venv in
-runner temporary storage. Dependency versions are recorded in
+Only one source bundle (from the Linux candidate) is retained for the run, with
+each candidate's provenance/results kept separately. **Compatibility / Upstream**
+and **Test** reuse that same-run bundle, checking SHA-256, network evidence and
+the pinned commit/tree before provisioning their temporary checkouts/venvs.
+The upstream baseline uses the actual Python Git helper for the same retrieval
+scenario, plus the same six core scenarios; its adapter only observes bundle
+sizes and delegates request/fetch processing to upstream, without a wire shim.
+The other fetched repositories are temporary; no standalone fetch workflow or
+historical artifact lookup remains. Dependency versions are recorded in
 `tests\Interop\reference-requirements.txt`; actual imported modules are checked
-before testing. If no unexpired source artifact exists, integration cases needing
-Python remain explicitly unexecuted, and Compatibility fails its missing-reference
-prerequisite with unexecuted rows rather than passing. Object integrity does not
+before testing. A failed native retrieval fails its Git claim and leaves dependent
+claims explicitly unexecuted. If the canonical source bundle is unavailable,
+the upstream baseline cannot pass and Python-peer integration cases explicitly
+skip; non-reference Test cases can still run. Object integrity does not
 authenticate the publisher. Moving the compatibility pin remains a separate,
 explicit change; fetching current head does not change it.
+
+Retrieved-head differential comparisons remain available explicitly through
+`tests\compare-upstream.ps1 -Revision <exact-head-sha>`; these are not pinned
+compatibility evidence. The former separately scheduled fetch/drift workflow has
+been removed rather than keeping a second reference acquisition path.
 
 DotReticulum's version is the targeted upstream RNS version plus a git-height build number (see the README's Versioning section). Anyone may take the project to the next upstream release (for example 1.5.8):
 

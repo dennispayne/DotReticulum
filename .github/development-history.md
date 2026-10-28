@@ -4,6 +4,70 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Candidate-owned retrieval, reused baseline and table-only reporting
+
+The user replaced the separate hosted fetch workflow with an advertised
+Compatibility scenario: each native OS candidate now retrieves the reference
+through its own `rngit`, then provisions the fetched pin for the shared tests.
+`FUNC-GIT-REFERENCE` cites the upstream Git-over-Reticulum manual and requires
+the pin to be missing before retrieval, positive received bundle bytes, strict
+fsck and the exact pinned commit/tree. Native evidence includes the executable
+SHA-256. A changing remote head is recorded, not silently adopted as the pin.
+
+The native jobs run first; one Linux source bundle is retained as the same-run
+`reference-source` artifact. Test and the subsequent **Compatibility / Upstream**
+job reuse that bundle, rather than looking up historical fetch runs or retaining
+three source archives. Other fetched repositories/venvs are runner-temporary.
+The standalone `upstream-reference.yml` and historical artifact downloader are
+removed. Retrieved-head comparisons remain explicitly available through
+`compare-upstream.ps1`, not a separately scheduled acquisition pipeline.
+
+The upstream baseline runs the same six core scenarios once after the native
+candidates, plus the same hosted retrieval acceptance using the real Python
+`git-remote-rns`. Its thin adapter only observes received bundle file sizes;
+upstream still performs discovery, requests, resources and Git unbundling.
+No reference wire/file-retention shim was added. The Python helper must run
+without inherited `GIT_DIR`, otherwise the import verifier checks the seeded
+fetch repository instead of the selected reference checkout. The adapter also
+follows the advertised symbolic HEAD rather than assuming `main`; the actual
+hosted upstream advertises `refs/heads/master`.
+
+The compatibility summary now contains only the nine-row table, with a
+commit-pinned linked Test ID, full behavior and Upstream/Linux/macOS/Windows
+columns. Family, redundant title and before/after commentary are removed.
+Unimplemented claims keep plain IDs; no nonexistent test link is fabricated.
+Failure/boundary/provenance detail remains in logs, the catalog and JSON.
+
+An intentionally failing tooling regression leaked its fake CLI diagnostics
+into the real Test job summary because child scripts inherited
+`GITHUB_STEP_SUMMARY`. `Start-TestProcess` now removes Actions summary/env/output/
+path/state file variables by default, while allowing explicit owned-path
+overrides. A regression verifies both isolation and deliberate overrides.
+Only the two aggregation jobs write main-workflow summaries; per-platform
+coverage output stays in logs/artifacts.
+
+Local verification so far:
+- `pwsh -NoProfile -File tests\run-compatibility.ps1 -Application TestResults\shared-claims-native\DotReticulum.Applications.exe -Implementation DotReticulum -FetchReference -ReferenceDirectory TestResults\rf-native -OutputDirectory TestResults\compatibility-rngit-native -NoJobSummary`:
+  actual native Windows retrieval of **79,683** bundle bytes, strict fsck and
+  source-import verification passed; all seven candidate scenarios passed
+  (four claim rows Pass, five Not covered).
+- Retrieved head `ca6451a02aead88734e47193dc228055d42c9854`, tree
+  `a3b5484c6f56df70832deeaf725a42bda8abb63b`; unchanged pin
+  `a29bfb51c468945c96a1ee22cae0114e993e2391`, pinned tree
+  `24d4c393de9fd57b933836cea68891fd953ab060`. Mirror-parent seed remains
+  `7f2b3b9b524c9386316379af1313b43a5e4f7a5d`; no publisher authentication.
+- Pester `tests\Pester\Coverage.Tests.ps1`: **13 passed**, zero failed/skipped;
+  includes linked IDs/table-only output, single-baseline reuse/duplicate and
+  wrong-pin rejection, retrieval failure reporting, baseline-only execution
+  and real Actions summary isolation.
+
+The preceding shared-scenario/title change (`a1d05c9`) passed all 11 jobs in
+Actions run **`40619781254`**, including all native OS candidates and both
+summaries. The summary leak shown by the user came from intentionally failing
+tooling cases, not those passing real candidate scenarios; the isolation change
+above addresses it. That run predates candidate-owned retrieval and the single
+post-candidate upstream baseline, which require new cross-platform acceptance.
+
 ### Shared advertised-claim compatibility and fixed upstream peers
 
 The user clarified that Compatibility means the same advertised, testable claim

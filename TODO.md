@@ -31,6 +31,8 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Native .NET `rngit` hosted-CI upstream retrieval and separate upstream-drift comparison (runs 40519261522 / 40520520527; disclosed mirror-parent seed, nonzero network objects, no publisher-authentication claim)
   - [x] Initial advertised-core functionality family and directly executed Upstream results alongside the three .NET platforms (eight bounded rows; unmapped acceptance stays explicit; run 40521069184)
   - [x] Separate integration evidence from shared advertised-claim compatibility scenarios; use upstream-to-upstream as the multi-node baseline and a fixed upstream peer for every .NET candidate (Windows native and Python locally verified; cross-platform CI evidence recorded in development history)
+  - [ ] Make candidate-owned reference retrieval an advertised Git compatibility scenario; reuse one verified source bundle for the subsequent upstream baseline and Test, replacing the standalone fetch workflow (native Windows verified; full cross-platform acceptance pending)
+  - [x] Table-only Compatibility summary with commit-pinned test-code hyperlinks, no Family column, and isolated child-process Actions output
   - [ ] Expand shared advertised-claim scenarios for interface authentication, bulk resources, heterogeneous routing, application requests and Channel/Buffer
   - [ ] `interop-test.yml`
   - [ ] `e2e-mesh-test.yml`

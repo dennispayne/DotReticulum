@@ -5,6 +5,9 @@ function Start-TestProcess {
     $info.RedirectStandardOutput = $true
     $info.RedirectStandardError = $true
     $info.RedirectStandardInput = $true
+    foreach ($key in 'GITHUB_STEP_SUMMARY', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STATE') {
+        $null = $info.Environment.Remove($key)
+    }
     if ($WorkingDirectory) { $info.WorkingDirectory = $WorkingDirectory }
     foreach ($argument in $Arguments) { $info.ArgumentList.Add($argument) }
     foreach ($key in $Environment.Keys) {

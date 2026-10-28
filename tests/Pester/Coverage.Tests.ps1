@@ -55,6 +55,22 @@ Describe 'PowerShell coverage reporting' -Tag Tooling {
 }
 
 Describe 'PowerShell test runner' -Tag Tooling {
+    It 'isolates child test processes from the real Actions summary but allows explicit owned output paths' {
+        $summary = Join-Path $TestDrive 'summary.md'
+        $saved = $env:GITHUB_STEP_SUMMARY
+        $command = 'if ($env:GITHUB_STEP_SUMMARY) { [IO.File]::WriteAllText($env:GITHUB_STEP_SUMMARY, "child output") }'
+        try {
+            $env:GITHUB_STEP_SUMMARY = $summary
+            $result = Invoke-TestProcess $pwsh @('-NoProfile', '-Command', $command)
+            $result.Code | Should -Be 0 -Because $result.Error
+            Test-Path -LiteralPath $summary | Should -BeFalse
+            $result = Invoke-TestProcess $pwsh @('-NoProfile', '-Command', $command) -Environment @{ GITHUB_STEP_SUMMARY = $summary }
+            $result.Code | Should -Be 0 -Because $result.Error
+            Get-Content -LiteralPath $summary -Raw | Should -Be 'child output'
+        }
+        finally { $env:GITHUB_STEP_SUMMARY = $saved }
+    }
+
     It 'rejects filtered coverage before starting a partial suite' {
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner, '-Coverage', '-Filter', 'Example')
         $result.Code | Should -Be 1
@@ -68,7 +84,7 @@ Describe 'PowerShell test runner' -Tag Tooling {
             @{
                 reference = @{ name = 'Test reference'; revision = 'test-pin' }
                 contracts = @(
-                    @{ id = 'FIRST'; family = 'example'; title = 'Full first behavior | with delimiter' },
+                    @{ id = 'FIRST'; family = 'example'; title = 'Full first behavior | with delimiter'; code = 'tests/Compatibility/Scenarios.ps1' },
                     @{ id = 'SECOND'; family = 'example'; title = 'Full second behavior' }
                 )
             } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $catalog
@@ -84,16 +100,21 @@ Describe 'PowerShell test runner' -Tag Tooling {
                 ConvertTo-Json -AsArray | Set-Content -LiteralPath (Join-Path $mac.FullName 'compatibility.json')
             $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
                 (Join-Path $PSScriptRoot '..\compatibility_summary.ps1'),
-                '-ReportsDirectory', $directory.FullName, '-Catalog', $catalog)
+                '-ReportsDirectory', $directory.FullName, '-Catalog', $catalog, '-Commit', '0000000000000000000000000000000000000001')
             $result.Code | Should -Be 0 -Because $result.Error
             $result.Output | Should -Match '\| Upstream \| .NET Linux \| .NET macOS \| .NET Windows \|'
-            $result.Output | Should -Match 'Full first behavior &#124; with delimiter \| Not run \| Pass \| Skipped \| Unavailable'
+            $result.Output | Should -Match '\| Test ID \| Behavior \|'
+            $result.Output | Should -Not -Match '\| Family \|'
+            $result.Output | Should -Match '\[`FIRST`\]\(https://github.com/[^)]+/blob/0000000000000000000000000000000000000001/tests/Compatibility/Scenarios.ps1\)'
+            $result.Output | Should -Not -Match '\[`SECOND`\]'
+            $result.Output | Should -Match 'Full first behavior &#124; with delimiter \| Pass \| Pass \| Skipped \| Unavailable'
             $result.Output | Should -Match 'Full second behavior \| Not run \| Fail \| Unavailable \| Unavailable'
-            $result.Output | Should -Match 'FIRST.*macOS: requires Linux'
-            $result.Output | Should -Match 'SECOND.*Linux: wrong output'
+            $result.Output.Trim() | Should -Match '^\| Test ID \|'
+            $result.Output | Should -Not -Match '###|Reference:|requires Linux|wrong output'
+            @($result.Output.Trim() -split '\r?\n').Count | Should -Be 4
         }
 
-        It 'keeps a failed upstream baseline visible when other OS baselines pass and rejects a different pin' {
+        It 'uses one reusable upstream baseline, preserves failures and rejects duplicate or wrong-pin evidence' {
             $directory = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'baselines')
             $catalog = Join-Path $directory.FullName 'catalog.json'
             @{
@@ -104,18 +125,23 @@ Describe 'PowerShell test runner' -Tag Tooling {
                 $platform = New-Item -ItemType Directory -Path (Join-Path $directory.FullName "compatibility-$rid-1")
                 @(@{ Id = 'CLAIM'; Status = 'Pass' }) | ConvertTo-Json -AsArray |
                     Set-Content -LiteralPath (Join-Path $platform.FullName 'compatibility.json')
-                @(@{ Id = 'CLAIM'; Status = $(if ($rid -eq 'win-x64') { 'Fail' } else { 'Pass' })
-                    Detail = 'reference failure'; Revision = 'test-pin' }) | ConvertTo-Json -AsArray |
-                    Set-Content -LiteralPath (Join-Path $platform.FullName 'upstream.json')
             }
+            $baseline = New-Item -ItemType Directory -Path (Join-Path $directory.FullName 'compatibility-upstream-1')
+            @(@{ Id = 'CLAIM'; Status = 'Fail'; Detail = 'reference failure'; Revision = 'test-pin' }) | ConvertTo-Json -AsArray |
+                Set-Content -LiteralPath (Join-Path $baseline.FullName 'upstream.json')
             $script = Join-Path $PSScriptRoot '..\compatibility_summary.ps1'
             $arguments = @('-NoProfile', '-File', $script, '-ReportsDirectory', $directory.FullName, '-Catalog', $catalog)
             $result = Invoke-TestProcess $pwsh $arguments
             $result.Code | Should -Be 0 -Because $result.Error
             $result.Output | Should -Match 'Shared scenario \| Fail \| Pass \| Pass \| Pass'
-            $result.Output | Should -Match 'Upstream on Windows: Fail reference failure'
+            $result.Output | Should -Not -Match 'reference failure'
+            Copy-Item -LiteralPath (Join-Path $baseline.FullName 'upstream.json') -Destination (Join-Path $platform.FullName 'upstream.json')
+            $result = Invoke-TestProcess $pwsh $arguments
+            $result.Code | Should -Be 1
+            $result.Error | Should -Match 'Duplicate upstream baseline'
+            Remove-Item -LiteralPath (Join-Path $platform.FullName 'upstream.json')
             @(@{ Id = 'CLAIM'; Status = 'Pass'; Revision = 'wrong-pin' }) | ConvertTo-Json -AsArray |
-                Set-Content -LiteralPath (Join-Path $platform.FullName 'upstream.json')
+                Set-Content -LiteralPath (Join-Path $baseline.FullName 'upstream.json')
             $result = Invoke-TestProcess $pwsh $arguments
             $result.Code | Should -Be 1
             $result.Error | Should -Match 'does not match'
@@ -129,7 +155,7 @@ Describe 'PowerShell test runner' -Tag Tooling {
             $result.Code | Should -Be 1
             $result.Error | Should -Match 'upstream-to-upstream baseline'
             $rows = @(Get-Content -LiteralPath (Join-Path $directory 'compatibility.json') -Raw | ConvertFrom-Json)
-            @($rows | Where-Object Status -eq 'Needs reference').Count | Should -Be 3
+            @($rows | Where-Object Status -eq 'Needs reference').Count | Should -Be 4
             @($rows | Where-Object Status -eq 'Not covered').Count | Should -Be 5
             @($rows | Where-Object Status -eq 'Pass').Count | Should -Be 0
         }
@@ -146,8 +172,35 @@ Describe 'PowerShell test runner' -Tag Tooling {
                 @($rows | Where-Object Status -eq 'Not covered').Count | Should -Be 5
             }
             $cases = @(Get-Content -LiteralPath (Join-Path $directory 'scenarios.json') -Raw | ConvertFrom-Json)
-            @($cases | Where-Object Implementation -eq 'Upstream').Count | Should -Be 6
-            @($cases | Where-Object Implementation -eq 'DotReticulum').Count | Should -Be 6
+            @($cases | Where-Object Implementation -eq 'Upstream').Count | Should -Be 7
+            @($cases | Where-Object Implementation -eq 'DotReticulum').Count | Should -Be 7
+        }
+
+        It 'reports retrieval failure as a failed claim instead of losing the table or passing dependent scenarios' {
+            $directory = Join-Path $TestDrive 'failed-retrieval'
+            $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
+                (Join-Path $PSScriptRoot '..\run-compatibility.ps1'),
+                '-Application', $pwsh, '-Implementation', 'DotReticulum', '-FetchReference',
+                '-ReferenceDirectory', (Join-Path $TestDrive 'reference'), '-Gateway', 'invalid gateway',
+                '-OutputDirectory', $directory)
+            $result.Code | Should -Be 1
+            $rows = @(Get-Content -LiteralPath (Join-Path $directory 'compatibility.json') -Raw | ConvertFrom-Json)
+            ($rows | Where-Object Id -eq 'FUNC-GIT-REFERENCE').Status | Should -Be 'Fail'
+            @($rows | Where-Object Status -eq 'Needs reference').Count | Should -Be 3
+            @($rows | Where-Object Status -eq 'Pass').Count | Should -Be 0
+        }
+
+        It 'executes only the selected reusable baseline without requiring or reporting a native candidate' {
+            $directory = Join-Path $TestDrive 'baseline-only'
+            $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
+                (Join-Path $PSScriptRoot '..\run-compatibility.ps1'), '-Implementation', 'Upstream',
+                '-Python', $pwsh, '-Upstream', $TestDrive, '-OutputDirectory', $directory)
+            $result.Code | Should -Be 1
+            Test-Path -LiteralPath (Join-Path $directory 'compatibility.json') | Should -BeFalse
+            $rows = @(Get-Content -LiteralPath (Join-Path $directory 'upstream.json') -Raw | ConvertFrom-Json)
+            @($rows | Where-Object Status -eq 'Fail').Count | Should -Be 3
+            $cases = @(Get-Content -LiteralPath (Join-Path $directory 'scenarios.json') -Raw | ConvertFrom-Json)
+            @($cases | Where-Object Implementation -eq 'DotReticulum').Count | Should -Be 0
         }
     }
 

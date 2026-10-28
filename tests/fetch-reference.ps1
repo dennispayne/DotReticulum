@@ -1,7 +1,10 @@
 #Requires -Version 7.0
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)] [string] $Application,
+    [Parameter(Mandatory, ParameterSetName = 'Native')] [string] $Application,
+    [Parameter(Mandatory, ParameterSetName = 'Python')] [string] $Python,
+    [Parameter(Mandatory, ParameterSetName = 'Python')] [string] $Upstream,
+    [Parameter(ParameterSetName = 'Python')] [string] $Revision,
     [Parameter(Mandatory)] [string] $Directory,
     [string] $Gateway = 'reticulum.thecryptosquid.com',
     [ValidateRange(1, 65535)] [int] $Port = 4242,
@@ -13,8 +16,9 @@ if ($Gateway -notmatch '^[a-zA-Z0-9.-]+$') { throw 'Gateway must be a DNS hostna
 if (Test-Path -LiteralPath $Directory) { throw 'Fetch directory must be fresh.' }
 . (Join-Path $PSScriptRoot 'Pester\TestProcess.ps1')
 $catalog = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Compatibility\catalog.json') -Raw | ConvertFrom-Json
-$applicationPath = (Resolve-Path -LiteralPath $Application).Path
-if ([IO.Path]::GetExtension($applicationPath) -eq '.dll') { throw 'Hosted reference retrieval requires the published native executable.' }
+if (!$Revision) { $Revision = $catalog.reference.revision }
+$applicationPath = if ($Application) { (Resolve-Path -LiteralPath $Application).Path }
+if ($Application -and [IO.Path]::GetExtension($applicationPath) -eq '.dll') { throw 'Hosted reference retrieval requires the published native executable.' }
 $null = New-Item -ItemType Directory -Path $Directory
 $root = (Resolve-Path -LiteralPath $Directory).Path
 $repository = Join-Path $root 'repository.git'
@@ -46,19 +50,90 @@ enable_transport = no
     target_host = $Gateway
     target_port = $Port
 "@ | Set-Content -LiteralPath (Join-Path $config 'config') -Encoding utf8
-$fetch = Invoke-TestProcess $applicationPath @('rngit', 'fetch', $url, $repository,
-    '--config', $config, '--timeout', "$TimeoutSeconds", '--single-branch') -TimeoutSeconds ($TimeoutSeconds + 30)
-$fetch.Output
-$fetch.Error | Write-Host
-if ($fetch.Code -ne 0) { throw "Native rngit fetch failed with exit $($fetch.Code)." }
-if ($fetch.Output -notmatch 'Received (\d+) bundle bytes over Reticulum' -or [long] $Matches[1] -le 0) {
+if ($Application) {
+    $fetch = Invoke-TestProcess $applicationPath @('rngit', 'fetch', $url, $repository,
+        '--config', $config, '--timeout', "$TimeoutSeconds", '--single-branch') -TimeoutSeconds ($TimeoutSeconds + 30)
+    $fetch.Output | Write-Host
+    $fetch.Error | Write-Host
+    if ($fetch.Code -ne 0) { throw "Native rngit fetch failed with exit $($fetch.Code)." }
+    if ($fetch.Output -notmatch 'Received (\d+) bundle bytes over Reticulum') {
+        throw 'Native rngit did not report received bundle bytes.'
+    }
+    $bytes = [long] $Matches[1]
+}
+else {
+    $info = [Diagnostics.ProcessStartInfo]::new((Resolve-Path -LiteralPath $Python).Path)
+    $info.UseShellExecute = $false
+    $info.WorkingDirectory = $repository
+    $info.RedirectStandardInput = $true
+    $info.RedirectStandardOutput = $true
+    $info.RedirectStandardError = $true
+    $observations = Join-Path $root 'bundle-observations.jsonl'
+    foreach ($argument in @('-u', (Join-Path $PSScriptRoot 'Interop\reference_git_remote.py'),
+            '--revision', $Revision, '--url', $url, '--observations', $observations)) {
+        $info.ArgumentList.Add($argument)
+    }
+    $reference = (Resolve-Path -LiteralPath $Upstream).Path
+    $info.Environment['DOTRETICULUM_UPSTREAM'] = $reference
+    $info.Environment['PYTHONPATH'] = $reference
+    $info.Environment['PYTHONIOENCODING'] = 'utf-8'
+    foreach ($key in 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES') {
+        $null = $info.Environment.Remove($key)
+    }
+    $info.Environment['RNS_CONFIG'] = $config
+    $info.Environment['RNGIT_CONFIG'] = Join-Path $root 'rngit'
+    $process = [Diagnostics.Process]::Start($info)
+    $errorTask = $process.StandardError.ReadToEndAsync()
+    try {
+        $process.StandardInput.WriteLine('list')
+        $process.StandardInput.Flush()
+        $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+        $headRef = $null
+        $remoteRefs = @{}
+        $advertisement = [Collections.Generic.List[string]]::new()
+        $listed = $false
+        for ($count = 0; $count -lt 10000; $count++) {
+            $remaining = $deadline - [DateTime]::UtcNow
+            if ($remaining.TotalSeconds -le 0) { throw 'Upstream Git helper timed out listing refs.' }
+            $line = $process.StandardOutput.ReadLineAsync().WaitAsync($remaining).GetAwaiter().GetResult()
+            if ($null -eq $line) { throw "Upstream Git helper exited before listing refs: $($errorTask.GetAwaiter().GetResult())" }
+            if ($line -eq '') { $listed = $true; break }
+            $advertisement.Add($line)
+            if ($line -match '^@(refs/heads/\S+) HEAD$') { $headRef = $Matches[1] }
+            elseif ($line -match '^([0-9a-f]{40}) (refs/heads/\S+)$') { $remoteRefs[$Matches[2]] = $Matches[1] }
+        }
+        $advertisement | Set-Content -LiteralPath (Join-Path $root 'advertised-refs.txt') -Encoding utf8
+        if (!$listed -or !$headRef -or !$remoteRefs.ContainsKey($headRef)) { throw 'Upstream Git helper did not advertise a valid default branch.' }
+        $remoteHead = $remoteRefs[$headRef]
+        $null = Invoke-Git @('--git-dir', $repository, 'update-ref', $headRef, $seed)
+        $process.StandardInput.WriteLine("fetch $remoteHead $headRef")
+        $process.StandardInput.WriteLine('')
+        $process.StandardInput.Close()
+        $outputTask = $process.StandardOutput.ReadToEndAsync()
+        $remaining = [Math]::Max(1, ($deadline - [DateTime]::UtcNow).TotalMilliseconds)
+        if (!$process.WaitForExit([int] $remaining)) { throw 'Upstream Git helper timed out fetching objects.' }
+        if ($process.ExitCode -ne 0) { throw "Upstream Git helper failed: $($errorTask.GetAwaiter().GetResult())" }
+        $outputTask.GetAwaiter().GetResult() | Write-Host
+        $null = Invoke-Git @('--git-dir', $repository, 'update-ref', $headRef, $remoteHead)
+        $null = Invoke-Git @('--git-dir', $repository, 'symbolic-ref', 'HEAD', $headRef)
+    }
+    finally {
+        if (!$process.HasExited) { $process.Kill($true); $process.WaitForExit() }
+        $errorTask.GetAwaiter().GetResult() | Set-Content -LiteralPath (Join-Path $root 'helper-stderr.txt') -Encoding utf8
+        $process.Dispose()
+    }
+    $bytes = [long] ((Get-Content -LiteralPath $observations | ForEach-Object {
+        ($_ | ConvertFrom-Json).bundle_bytes
+    } | Measure-Object -Sum).Sum)
+}
+if ($bytes -le 0) {
     throw 'Reference retrieval requires nonzero Git bundle bytes over Reticulum.'
 }
-$bytes = [long] $Matches[1]
 $null = Invoke-Git @('--git-dir', $repository, 'fsck', '--full', '--strict')
 $headCommit = Invoke-Git @('--git-dir', $repository, 'rev-parse', 'HEAD')
 $headTree = Invoke-Git @('--git-dir', $repository, 'rev-parse', 'HEAD^{tree}')
 $null = Invoke-Git @('--git-dir', $repository, 'cat-file', '-e', "$($catalog.reference.revision)^{commit}")
+$pinTree = Invoke-Git @('--git-dir', $repository, 'rev-parse', "$($catalog.reference.revision)^{tree}")
 $null = Invoke-Git @('--git-dir', $repository, 'update-ref', 'refs/heads/pinned-reference', $catalog.reference.revision)
 $bundle = Join-Path $root 'reference.bundle'
 $null = Invoke-Git @('--git-dir', $repository, 'bundle', 'create', $bundle, '--all')
@@ -68,9 +143,12 @@ $null = Invoke-Git @('--git-dir', $repository, 'bundle', 'create', $bundle, '--a
     seed = $seed
     seedSource = 'GitHub comparison mirror; only history through the parent of the pin'
     pin = $catalog.reference.revision
+    pinTree = $pinTree
     head = $headCommit
     tree = $headTree
     networkBundleBytes = $bytes
     bundleSha256 = (Get-FileHash -LiteralPath $bundle -Algorithm SHA256).Hash
     publisherAuthenticated = $false
+    candidate = if ($Application) { 'DotReticulum' } else { 'Upstream' }
+    applicationSha256 = if ($Application) { (Get-FileHash -LiteralPath $applicationPath -Algorithm SHA256).Hash } else { $null }
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $root 'reference-provenance.json') -Encoding utf8

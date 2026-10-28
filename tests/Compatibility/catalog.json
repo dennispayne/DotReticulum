@@ -3,10 +3,21 @@
     "name": "Reticulum (RNS) 1.5.7",
     "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391"
   },
-  "note": "Only shared advertised-claim acceptance scenarios belong here. The same inputs and assertions run independently against upstream Python and .NET Linux/macOS/Windows. Multi-node scenarios keep upstream RNS as the fixed peer and replace only the candidate node; upstream-to-upstream is the baseline. Unimplemented scenarios remain visible, never inferred from integration tests.",
+  "note": "Only shared advertised-claim acceptance scenarios belong here. The same inputs and assertions run independently against upstream Python and .NET Linux/macOS/Windows. Multi-node scenarios keep upstream RNS as the fixed peer and replace only the candidate node. The upstream-to-upstream baseline reuses one verified candidate-fetched source bundle after candidate jobs finish. Unimplemented scenarios remain visible, never inferred from integration tests.",
   "contracts": [
     {
+      "id": "FUNC-GIT-REFERENCE",
+      "code": "tests/fetch-reference.ps1",
+      "family": "advertised-git",
+      "title": "Git over Reticulum: fetch missing reference objects using the candidate's own rngit",
+      "source": "docs/source/git.rst:19-31 (Git over Reticulum and rngit)",
+      "scenarios": ["reference-fetch"],
+      "acceptance": "Fetch the advertised default branch from the hosted upstream over rns:// after seeding only the pin's parent; require the initially missing pin, nonzero received bundle bytes and strict Git object integrity.",
+      "boundary": "Seeded incremental retrieval, not a full network clone or publisher authentication. Check the exact pinned commit/tree; retrieved head may advance between candidates."
+    },
+    {
       "id": "FUNC-CORE-ADDRESSING",
+      "code": "tests/Compatibility/Scenarios.ps1",
       "family": "advertised-core",
       "title": "Cryptographic addressing: derive the same destination from an imported identity and application name",
       "source": "README.md:38-39 (Notable Features: coordination-less globally unique addressing and identification)",
@@ -16,6 +27,7 @@
     },
     {
       "id": "FUNC-CORE-CRYPTO",
+      "code": "tests/Compatibility/Scenarios.ps1",
       "family": "advertised-core",
       "title": "Cryptographic communication: produce Ed25519 signatures and decrypt authenticated identity ciphertext",
       "source": "README.md:46-53 (Notable Features: X25519, Ed25519 and encrypted tokens)",
@@ -25,6 +37,7 @@
     },
     {
       "id": "FUNC-CORE-RECEIPTS",
+      "code": "tests/Compatibility/Scenarios.ps1",
       "family": "advertised-core",
       "title": "Delivery confirmations: accept a proof and time out when the upstream destination supplies no proof",
       "source": "README.md:54 (Notable Features: unforgeable packet delivery confirmations)",

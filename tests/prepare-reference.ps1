@@ -3,12 +3,18 @@
 param(
     [Parameter(Mandatory)] [string] $Bundle,
     [Parameter(Mandatory)] [string] $Directory,
-    [string] $Python = 'python'
+    [string] $Python = 'python',
+    [string] $Provenance = (Join-Path (Split-Path $Bundle -Parent) 'reference-provenance.json')
 )
 
 $ErrorActionPreference = 'Stop'
 $catalog = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Compatibility\catalog.json') -Raw | ConvertFrom-Json
 $bundlePath = (Resolve-Path -LiteralPath $Bundle).Path
+$provenanceData = Get-Content -LiteralPath $Provenance -Raw | ConvertFrom-Json
+if ($provenanceData.pin -ne $catalog.reference.revision -or $provenanceData.networkBundleBytes -le 0 -or
+    $provenanceData.bundleSha256 -ne (Get-FileHash -LiteralPath $bundlePath -Algorithm SHA256).Hash) {
+    throw 'Reference provenance pin, network transfer evidence or bundle digest is invalid.'
+}
 if (Test-Path -LiteralPath $Directory) { throw 'Reference directory must be fresh.' }
 $null = New-Item -ItemType Directory -Path $Directory
 $directoryPath = (Resolve-Path -LiteralPath $Directory).Path
@@ -20,6 +26,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Reference bundle clone failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Reference object integrity check failed.' }
 & git -C $checkout -c advice.detachedHead=false checkout --detach $catalog.reference.revision
 if ($LASTEXITCODE -ne 0) { throw 'Reference bundle does not contain the pinned revision.' }
+$pinTree = & git -C $checkout rev-parse 'HEAD^{tree}'
+if ($LASTEXITCODE -ne 0 -or $provenanceData.pinTree -ne $pinTree) { throw 'Reference pinned tree does not match retrieval provenance.' }
 & $Python -m venv $venv
 if ($LASTEXITCODE -ne 0) { throw 'Reference venv creation failed.' }
 $interpreter = Join-Path $venv $(if ($IsWindows) { 'Scripts\python.exe' } else { 'bin\python' })

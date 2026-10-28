@@ -124,7 +124,8 @@ jobs:
 
   test:
     name: Test
-    needs: build
+    needs: [build, compatibility]
+    if: ${{ always() && !cancelled() && needs.build.result == 'success' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     permissions:
@@ -167,16 +168,22 @@ jobs:
       - name: Verify native build
         run: ./tests/use-native-build.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
 
+      - name: Reuse the candidate-fetched reference
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true
+        with:
+          name: reference-source-${{ github.run_attempt }}
+          path: artifacts/reference
+
       - name: Provision pinned Python peers for integration
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          $directory = Join-Path $env:RUNNER_TEMP 'reference-artifact'
-          ./tests/download-reference.ps1 -Directory $directory
+          $directory = Join-Path $PWD 'artifacts/reference'
           $bundle = Join-Path $directory 'reference.bundle'
           if (Test-Path -LiteralPath $bundle) {
             $python = if ($IsWindows) { 'python' } else { 'python3' }
             ./tests/prepare-reference.ps1 -Bundle $bundle -Directory (Join-Path $env:RUNNER_TEMP 'pinned-python') -Python $python
+          } else {
+            Write-Warning 'Candidate retrieval produced no reference bundle; Python-peer integration cases will be explicitly unexecuted.'
           }
 
       - name: Restore
@@ -214,7 +221,6 @@ jobs:
           $summary = & ./tests/coverage_summary.ps1 $env:COVERAGE_DIRECTORY
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $summary
-          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
       - name: Run native executable resource flow
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -292,20 +298,20 @@ jobs:
       - name: Verify native build
         run: ./tests/use-native-build.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
 
-      - name: Provision the pinned reference from Reticulum-fetched objects
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Run shared scenarios, retrieving the reference with this native candidate
         run: |
-          $directory = Join-Path $env:RUNNER_TEMP 'reference-artifact'
-          ./tests/download-reference.ps1 -Directory $directory
-          $bundle = Join-Path $directory 'reference.bundle'
-          if (Test-Path -LiteralPath $bundle) {
-            $python = if ($IsWindows) { 'python' } else { 'python3' }
-            ./tests/prepare-reference.ps1 -Bundle $bundle -Directory (Join-Path $env:RUNNER_TEMP 'pinned-python') -Python $python
-          }
+          ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Implementation DotReticulum -FetchReference -ReferenceDirectory "$env:RUNNER_TEMP/candidate-reference" -Label '${{ matrix.rid }}' -NoJobSummary
 
-      - name: Run compatibility suite against the native executable
-        run: ./tests/run-compatibility.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary
+      - name: Retain one verified reference source bundle for this run
+        if: ${{ !cancelled() && matrix.rid == 'linux-x64' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reference-source-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/candidate-reference/reference.bundle
+            ${{ runner.temp }}/candidate-reference/reference-provenance.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Retain compatibility report
         if: ${{ !cancelled() }}
@@ -316,9 +322,45 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  upstream-baseline:
+    name: Compatibility / Upstream
+    needs: compatibility
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Reuse the candidate-fetched reference
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: reference-source-${{ github.run_attempt }}
+          path: artifacts/reference
+
+      - name: Provision the verified pinned reference
+        run: ./tests/prepare-reference.ps1 -Bundle artifacts/reference/reference.bundle -Directory "$env:RUNNER_TEMP/pinned-python" -Python python3
+
+      - name: Execute the same shared scenarios with upstream as the candidate
+        run: ./tests/run-compatibility.ps1 -Implementation Upstream -ReferenceDirectory artifacts/reference -NoJobSummary
+
+      - name: Retain upstream baseline evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compatibility-upstream-${{ github.run_attempt }}
+          path: TestResults/compatibility/
+          if-no-files-found: warn
+          retention-days: 14
+
   compatibility-summary:
     name: Summarize Compatibility
-    needs: compatibility
+    needs: [compatibility, upstream-baseline]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
