@@ -86,6 +86,8 @@ calculated claim-level verdict: each cell preserves Pester's test outcome.
 Claim text is a verbatim excerpt of the pinned upstream, not our interpretation;
 citations contain its file and exact line reference. Test descriptions and scope
 comments explain what is actually exercised without narrowing the quoted claim.
+Candidate initialization verifies every quoted source excerpt at those lines
+against the fetched, import-verified pin; stale quotations fail explicitly.
 Discovery's separate `CitationUri` is optional navigation metadata (`citation.uri`
 in the catalog): use the original website URL for website claims, or a verified
 NomadNet source link when available. It remains blank for current source claims
@@ -117,11 +119,28 @@ pwsh -NoProfile -File tests\Compatibility\List-CompatibilityTests.ps1
 pwsh -NoProfile -File tests\Compatibility\List-CompatibilityTests.ps1 -IncludeUncoveredClaims
 ```
 
-The initial shared scenarios cover identity persistence/address derivation,
-fixture signatures/decryption and proof/no-proof packet delivery against a
-fixed upstream peer. The five other advertised claims remain coverage gaps in
-the discovery inventory, not fabricated Pester results or summary rows;
-historical integration results do not silently pass them.
+The shared inventory contains 37 distinct tests and 17 quoted claims. Cases
+cover identity generation/persistence/import/export, valid and corrupted
+signatures, authenticated decryption failures, public-only restrictions,
+proof/no-proof/forged-proof delivery, authenticated management requests,
+bidirectional multi-megabyte rncp transfers, automatic compression, authorized
+fetches, authorization failure/recovery and TCP IFAC mismatches. Assertions
+check persisted bytes and actual peer observations, not only exit success.
+Heterogeneous multi-hop routing and Channel/Buffer remain uncovered claims in
+this shared inventory, not fabricated results; historical integration results
+do not silently pass them. TCP IFAC does not establish authentication on every
+bearer; direct transfers do not establish impaired-link or sustained-soak
+acceptance. On Windows the rncp reference adapter uses the existing disclosed
+`shutil.move` to `copyfile` retention workaround; those cases are not evidence
+of unmodified-upstream Windows file-retention behavior. Unix uses no retention shim.
+
+NomadNet browsing remains unverified: the Git destination resolved, but the
+derived page destination could not establish a link through our .NET stack.
+The browser accepts destination/page addresses and pinned blob fields; neither
+an external clickable URI scheme nor source-line anchors were established.
+`CitationUri` therefore remains blank rather than inventing links or falling
+back to the GitHub mirror. See the exact reproduction and limitation in the
+development history.
 `tests\Integration\catalog.json` and `tests\run-contract-integration.ps1` retain
 the behavioral, .NET-only and mixed-peer process checks. CI runs those under
 **Test**, including their results in the consolidated Native table, not

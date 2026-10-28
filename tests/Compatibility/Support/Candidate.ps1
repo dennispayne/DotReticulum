@@ -1,4 +1,5 @@
 . (Join-Path $PSScriptRoot '..\..\Pester\TestProcess.ps1')
+. (Join-Path $PSScriptRoot 'Catalog.ps1')
 
 function Initialize-CompatibilityCandidate {
     param([hashtable] $Context)
@@ -15,12 +16,13 @@ function Initialize-CompatibilityCandidate {
     $verification = Invoke-TestProcess $Context.Python @((Join-Path $PSScriptRoot '..\..\Interop\verify_reference.py')) `
         -Environment $Context.PeerEnvironment
     if ($verification.Code -ne 0) { throw "Reference verification failed: $($verification.Error) $($verification.Output)" }
+    Assert-CompatibilitySourceCitations $Context.Upstream
     $Context.Executable = if ($Context.Implementation -eq 'Upstream') { $Context.Python }
         elseif ([IO.Path]::GetExtension($Context.Application) -eq '.dll') { 'dotnet' }
         else { $Context.Application }
-    $Context.Prefix = if ($Context.Implementation -eq 'Upstream') {
+    $Context.Prefix = @(if ($Context.Implementation -eq 'Upstream') {
         @((Join-Path $PSScriptRoot '..\..\Interop\reference_cli.py'), '--revision', $Context.Revision, '--tool')
-    } else { @(if ($Context.Executable -eq 'dotnet') { $Context.Application }) }
+    } elseif ($Context.Executable -eq 'dotnet') { $Context.Application })
     $Context.ToolSeparator = @(if ($Context.Implementation -eq 'Upstream') { '--' })
     $Context.Environment = if ($Context.Implementation -eq 'Upstream') { $Context.PeerEnvironment } else { @{} }
 }

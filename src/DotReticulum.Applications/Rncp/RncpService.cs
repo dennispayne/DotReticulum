@@ -255,11 +255,11 @@ public static class RncpClient
 
         try
         {
-            link.Identify(identity);
             var size = new FileInfo(path).Length;
             var segments = new System.Collections.Concurrent.ConcurrentDictionary<int, long>();
             var done = new TaskCompletionSource<ResourceStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
             link.Closed = _ => done.TrySetResult(ResourceStatus.Failed);
+            link.Identify(identity);
             link.SendResourceFile(path, FileSaver.Metadata(Path.GetFileName(path)), autoCompress, r => done.TrySetResult(r.Status),
                 r => { segments[r.SegmentIndex] = r.Size; progress?.Invoke(r.Progress); }, cancellationToken: cancellationToken);
             var status = await done.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -270,6 +270,10 @@ public static class RncpClient
                 ResourceStatus.Rejected => new RncpResult(false, "File was not accepted by " + CliSupport.PrettyHex(destinationHash)),
                 _ => new RncpResult(false, "The transfer failed"),
             };
+        }
+        catch (InvalidOperationException) when (link.Status == LinkStatus.Closed)
+        {
+            return new RncpResult(false, "The transfer failed");
         }
         finally
         {
@@ -338,6 +342,10 @@ public static class RncpClient
             }
             catch (TimeoutException) { return new RncpResult(false, "The transfer failed"); }
             return await concluded.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException) when (link.Status == LinkStatus.Closed)
+        {
+            return new RncpResult(false, "The transfer failed");
         }
         finally
         {

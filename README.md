@@ -88,6 +88,15 @@ Pester test with its own outcome, not a calculated claim verdict, and its Test I
 links to the shared test source. Readable cases live under
 `tests\Compatibility\Claims`; `tests\Compatibility\List-CompatibilityTests.ps1`
 discovers tests and joins their upstream citations without executing them.
+The shared inventory now has **37 distinct tests across 17 quoted claims**,
+including malformed cryptography/proofs, authenticated requests, TCP IFAC
+isolation and bidirectional multi-megabyte transfers with compression and
+authorization/recovery checks. This is bounded evidence, not comprehensive
+parity: heterogeneous multi-hop and Channel/Buffer still lack shared acceptance
+cases. Source quotations are checked against the fetched pin; `CitationUri`
+stays blank until primary-source navigation is verified (no GitHub fallback).
+Windows rncp peer cases disclose a file-retention workaround in
+[Contributing](CONTRIBUTING.md#moving-to-a-new-upstream-release).
 
 | Area | Status |
 | --- | --- |

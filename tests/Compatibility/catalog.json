@@ -44,6 +44,46 @@
       "id": "C009",
       "claim": "Reliable sequential delivery with Channel and Buffer mechanisms",
       "citation": {"path": "README.md", "lines": "71"}
+    },
+    {
+      "id": "C010",
+      "claim": "With the ``rnid`` utility, you can generate, manage and view Reticulum Identities.",
+      "citation": {"path": "docs/source/using.rst", "lines": "386"}
+    },
+    {
+      "id": "C011",
+      "claim": "import Reticulum identity in hex, base32 or base64 format",
+      "citation": {"path": "docs/source/using.rst", "lines": "459"}
+    },
+    {
+      "id": "C012",
+      "claim": "Saves the public identity to a file.",
+      "citation": {"path": "RNS/Identity.py", "lines": "675"}
+    },
+    {
+      "id": "C013",
+      "claim": "Validates the signature of a signed message.",
+      "citation": {"path": "RNS/Identity.py", "lines": "930"}
+    },
+    {
+      "id": "C020",
+      "claim": "Resources can auto-compress data",
+      "citation": {"path": "docs/source/understanding.rst", "lines": "421"}
+    },
+    {
+      "id": "C021",
+      "claim": "Run rncp on the receiving system, specifying which identities are allowed to send files:",
+      "citation": {"path": "docs/source/using.rst", "lines": "622"}
+    },
+    {
+      "id": "C022",
+      "claim": "allow authenticated clients to fetch files",
+      "citation": {"path": "docs/source/using.rst", "lines": "676"}
+    },
+    {
+      "id": "C030",
+      "claim": "When using ``-R`` to query a remote transport instance, you must also specify ``-i`` with the path to a management identity file that is authorized for remote management on the target system.",
+      "citation": {"path": "docs/source/using.rst", "lines": "381"}
     }
   ]
 }

@@ -36,12 +36,14 @@ Describe 'Compatibility harness' {
             { Get-CompatibilityTestMetadata @() } | Should -Throw '*No compatibility tests*'
         }
 
-        It 'discovers seven real tests and exposes five uncovered claims without executing anything' {
+        It 'discovers all real tests and exposes uncovered catalog claims without executing anything' {
+            $metadata = @(Get-CompatibilityDiscovery)
+            $claims = @(Get-CompatibilityClaims)
             $rows = @(& (Join-Path $PSScriptRoot '..\List-CompatibilityTests.ps1') -IncludeUncoveredClaims)
-            @($rows | Where-Object TestId).Count | Should -Be 7
-            @($rows | Where-Object { !$_.TestId }).Count | Should -Be 5
+            @($rows | Where-Object TestId).Count | Should -Be $metadata.Count
+            @($rows | Where-Object { !$_.TestId }).Count | Should -Be @($claims | Where-Object id -NotIn $metadata.ClaimId).Count
             @($rows | Where-Object { $_.PSObject.Properties.Name -contains 'Result' }).Count | Should -Be 0
-            @($rows | Where-Object TestId | Select-Object -ExpandProperty TestId -Unique).Count | Should -Be 7
+            @($rows | Where-Object TestId | Select-Object -ExpandProperty TestId -Unique).Count | Should -Be $metadata.Count
         }
 
         It 'joins quoted claim text and file-line citations without conflating them with test names' {
@@ -83,6 +85,29 @@ Describe 'Compatibility harness' {
             $test.Tag = @('T001', 'C999')
             { Get-CompatibilityTestMetadata @($test) } | Should -Throw '*known Cnnn*'
         }
+
+        It 'verifies quoted claims at their exact source lines and rejects a stale citation' {
+            $source = Join-Path $TestDrive 'citation-source'
+            $null = New-Item -ItemType Directory -Path $source
+            @('Other text', '- Exact upstream claim', 'Another line') |
+                Set-Content -LiteralPath (Join-Path $source 'README.md')
+            $catalog = Join-Path $source 'catalog.json'
+            $claim = @{ id = 'C001'; claim = 'Exact upstream claim'; citation = @{ path = 'README.md'; lines = '2' } }
+            @{ claims = @($claim) } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $catalog
+            { Assert-CompatibilitySourceCitations $source $catalog } | Should -Not -Throw
+            $claim.citation.lines = '1'
+            @{ claims = @($claim) } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $catalog
+            { Assert-CompatibilitySourceCitations $source $catalog } | Should -Throw '*not a verbatim excerpt*'
+        }
+
+        It 'rejects multiple citation objects instead of selecting an arbitrary source' {
+            $catalog = Join-Path $TestDrive 'multiple-citations.json'
+            @{ claims = @(@{
+                id = 'C001'; claim = 'Exact upstream claim'
+                citation = @(@{ path = 'README.md'; lines = '2' }, @{ path = 'README.md'; lines = '3' })
+            }) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $catalog
+            { Get-CompatibilityClaims $catalog } | Should -Throw '*one file/line citation*'
+        }
     }
 
     Context 'Compatibility runner failure and candidate isolation' {
@@ -93,7 +118,7 @@ Describe 'Compatibility harness' {
                 '-Implementation', 'DotReticulum', '-Python', '', '-Upstream', '', '-OutputDirectory', $directory, '-NoJobSummary')
             $result.Code | Should -Be 1
             $rows = @(Get-Content -LiteralPath (Join-Path $directory 'compatibility.json') -Raw | ConvertFrom-Json)
-            $rows.Count | Should -Be 7
+            $rows.Count | Should -Be @(Get-CompatibilityDiscovery).Count
             @($rows | Where-Object Result -EQ Passed).Count | Should -Be 0
             @($rows | Where-Object Result -EQ Failed).Count | Should -BeGreaterThan 0
             (Join-Path $directory 'DotReticulum.nunit.xml') | Should -Exist
@@ -109,7 +134,7 @@ Describe 'Compatibility harness' {
                 '-Gateway', 'invalid/gateway', '-OutputDirectory', $directory, '-NoJobSummary')
             $result.Code | Should -Be 1
             $rows = @(Get-Content -LiteralPath (Join-Path $directory 'compatibility.json') -Raw | ConvertFrom-Json)
-            $rows.Count | Should -Be 7
+            $rows.Count | Should -Be @(Get-CompatibilityDiscovery).Count
             ($rows | Where-Object Id -EQ T001).Result | Should -BeExactly Failed
             @($rows | Where-Object Result -EQ Passed).Count | Should -Be 0
             (Join-Path $reference 'reference-provenance.json') | Should -Not -Exist
@@ -147,11 +172,11 @@ Describe 'Compatibility harness' {
             }
             $directory = Join-Path $harnessWork 'baseline-only'
             $result = Invoke-TestProcess pwsh @('-NoProfile', '-File', $harnessRunner, '-Implementation', 'Upstream',
-                '-Python', $harnessPython, '-Upstream', $harnessUpstream, '-OutputDirectory', $directory, '-NoJobSummary')
+                '-Python', $harnessPython, '-Upstream', $harnessUpstream, '-OutputDirectory', $directory, '-NoJobSummary') -TimeoutSeconds 300
             $result.Code | Should -Be 0 -Because "$($result.Error) $($result.Output)"
             (Join-Path $directory 'compatibility.json') | Should -Not -Exist
             $rows = @(Get-Content -LiteralPath (Join-Path $directory 'upstream.json') -Raw | ConvertFrom-Json)
-            @($rows | Where-Object Result -EQ Passed).Count | Should -Be 6
+            @($rows | Where-Object Result -EQ Passed).Count | Should -Be (@(Get-CompatibilityDiscovery).Count - 1)
             ($rows | Where-Object Id -EQ T001).Result | Should -BeExactly Skipped
             (Join-Path $directory 'Upstream.nunit.xml') | Should -Exist
         }

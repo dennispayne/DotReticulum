@@ -4,6 +4,133 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Expanded advertised acceptance and primary-source citation navigation
+
+The user requested substantially broader shared acceptance, not more copies of
+the same test per OS. Work extends the readable Pester cases with independent
+identity/cryptographic failures, malicious delivery-proof inputs and transfers
+against fixed upstream peers. Tests retain direct Pester outcomes; a test count
+is a count of distinct `It` cases, not the sum of candidate executions.
+Claim text remains a verbatim pinned-source quotation. The harness now checks
+those quotations at the stated source lines against the verified fetched
+checkout, rejecting stale citations rather than accepting metadata on trust.
+Discovery remains read-only and does not fetch files or start nodes.
+
+Actions run **`40630370168`** passed all **12 jobs**, clearing the previously
+recorded macOS timeout on that rerun. This is preceding-harness evidence, not
+acceptance of the new expanded cases.
+
+Baseline for this expansion:
+`dotnet build DotReticulum.slnx -c Release --nologo -v quiet` completed with
+zero warnings/errors;
+`dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet` passed
+**1,831** cases with **79 skipped**, zero failed, opt-in live tests disabled.
+
+The expanded inventory has **37 distinct tests** (previously 7) and **17 quoted
+claims** (previously 9). Fifteen claims have at least one case; heterogeneous
+multi-hop routing and Channel/Buffer still have no shared acceptance cases.
+Having a case does not establish a broad claim in full. New cases cover:
+identity generation/reload/overwrite refusal and encoded import/export;
+canonical/raw signature validation and corrupted message/signature rejection;
+IV/ciphertext/tag tampering, wrong keys and truncation without plaintext;
+public-only key restrictions; forged/truncated/wrong-hash delivery proofs;
+authenticated management requests and denied identities; multi-megabyte rncp
+upload/receive/fetch, actual compression and segmentation observations; missing
+file and authorization recovery; and absent/wrong-name/wrong-passphrase TCP IFAC.
+All existing IDs remain stable. New quotes identify narrower advertised
+contracts where appropriate; no synthetic claim verdicts or platform-multiplied
+test totals were added. Existing vector provenance and the live pin are unchanged.
+
+The new failure cases exposed and fixed two production defects. Remote
+management's private deadline raised an uncaught `TaskCanceledException`;
+`WaitAsync(timeout, callerToken)` now distinguishes timeout from caller
+cancellation, and rnstatus reports unsuccessful remote status with exit 2,
+matching the actual upstream CLI. An unauthorized rncp peer can close the link
+between identification and resource creation; the client now installs its close
+observer before identifying and converts only closed-link
+`InvalidOperationException` failures to the existing failed-transfer result.
+Fetch handles the same close race. The tests retain failed exit codes,
+no-output-file checks and subsequent authorized recovery rather than accepting
+the previous native process crashes. Candidate invocation also preserves an
+array prefix when running a managed DLL through `dotnet`.
+
+Local acceptance:
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: zero warnings/errors.
+- `dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 -o TestResults\compatibility-expanded-native -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true --nologo -v quiet`:
+  passed with MSVC setup and `vswhere` discovery in the same process;
+  the published executable ran `--help` and all native scenarios below.
+- `tests\Compatibility\Run-CompatibilityTests.ps1 -Application TestResults\compatibility-expanded-native\DotReticulum.Applications.exe -Python TestResults\pester-compatibility-reference\python\venv\Scripts\python.exe -Upstream TestResults\pester-compatibility-reference\python\upstream -Implementation Both -OutputDirectory TestResults\compatibility-expanded-8bab640b43c5467ea0adb7700db66c17 -NoJobSummary`:
+  **36 passed, 1 explicitly skipped per candidate**, zero failed. The skipped
+  Git case did not request another hosted fetch; preceding fresh retrieval
+  evidence is separate. This exercised the published native crypto, links,
+  requests, compression, multi-segment resources and persisted transfer bytes,
+  not merely publication or help.
+- `pwsh -NoProfile -File tests\run-pester.ps1 -ToolingOnly`:
+  **48 passed, 2 explicit reference-dependent skips**, zero failed.
+- `Invoke-Pester` with `New-PesterContainer` for
+  `tests\Compatibility\Support\Harness.Tests.ps1`, supplying the new native
+  executable and verified Python checkout/venv: **13 passed**, zero failed/skipped.
+  Includes exact/stale source quotation handling, rejection of multiple
+  citations, missing/failed references, actual failure isolation and the
+  expanded upstream-only baseline after final claim/tag integration.
+- `Assert-CompatibilitySourceCitations` against the fetched checkout and
+  `tests\Compatibility\List-CompatibilityTests.ps1 -IncludeUncoveredClaims`:
+  all 17 exact quotations verified; 37 tests, two uncovered claims; no network
+  retrieval or test execution during discovery.
+- `dotnet test DotReticulum.slnx -c Release --no-build -m:1 --settings tests\coverage.runsettings --collect:'XPlat Code Coverage' --results-directory TestResults\coverage-compat-final-a3c9a2cea8a34cfb80c9f7c1de2cebf7 --nologo -v quiet`
+  and `tests\coverage_summary.ps1 TestResults\coverage-compat-final-a3c9a2cea8a34cfb80c9f7c1de2cebf7`:
+  **1,831 passed, 79 skipped**, zero failed, opt-in live xUnit tests disabled.
+  An earlier uninstrumented full run hit the unchanged host-statistics
+  concurrency case (its isolated and Applications-suite reruns passed); the
+  first instrumented run hit the unchanged descendant-process timeout.
+  Final project-serialized coverage passed. A concurrent diagnostic run
+  accidentally overlapped instrumentation and reported a missing assembly;
+  that invalid diagnostic is not acceptance evidence.
+
+| Production project | Line coverage | Branch coverage |
+|---|---:|---:|
+| Applications | 76.88% | 63.80% |
+| Core | 96.89% | 90.85% |
+| Crypto | 94.83% | 94.00% |
+| Interfaces | 85.64% | 76.29% |
+| Transport | 91.27% | 79.26% |
+| **Merged overall** | **83.13%** | **69.84%** |
+
+Five production reports were merged by source identity, without averaging
+project percentages or double-counting shared assemblies. These managed-suite
+figures do not incorporate the separately executed native/Python acceptance.
+
+The Windows rncp reference adapter retains the existing visible
+`shutil.move` to `copyfile` workaround so Python can preserve received files
+while its temporary resource remains open. Compression/segment observations
+wrap upstream callbacks and invoke the originals; acceptance assertions remain
+in Pester. Unix has no retention shim. Windows results therefore do not
+establish unmodified-upstream Windows retention behavior. Direct TCP tests do
+not cover every bearer, packet loss, sustained soak, alternate-route recovery,
+or all request size/concurrency/cancellation boundaries.
+
+Primary-source navigation investigation:
+`dotnet run --file tests\Interop\CheckNomadCitation.cs -- TestResults\nomad-citation-page-check-20261028 TestResults\pester-compatibility-reference\python\upstream`
+built successfully and resolved the actual hosted Git destination through the
+.NET stack. The derived NomadNet page destination
+`a8d24177d946de4f1f0a0fe1af9a1338` could not establish a link
+(`IOException: Could not establish link`), so no blob page was retrieved.
+Owned runtime state was cleaned up. The attempted browser address was:
+
+```text
+a8d24177d946de4f1f0a0fe1af9a1338:/page/blob.mu`g=reticulum|r=reticulum|ref=a29bfb51c468945c96a1ee22cae0114e993e2391|path=README.md|raw=y
+```
+
+Pinned upstream `RNS/Utilities/rngit/pages.py:137,179,709-720,787-836` and
+`server.py:2052-2057` distinguish the optional page service from Git and support
+the pinned blob fields. NomadNet `Browser.py:1459-1495` at
+`b2f852c9e0efc68d89d9185939f42ec0c2fee125` accepts bare destination/page
+addresses with backtick-separated fields. No external clickable URI scheme or
+source-line anchors were established. All current `CitationUri` values remain
+null, with no GitHub fallback. Git resolution does not prove that the optional
+page service is enabled, reachable or serves the selected pin; this failed
+navigation check is not a compatibility pass or publisher authentication.
+
 ### Readable Pester compatibility cases and citation discovery
 
 Compatibility is being reorganized around real Pester `It` cases under
@@ -99,10 +226,11 @@ with **2 explicit reference-dependent skips** after that simplification.
 
 Actions run **`40628676024`** confirmed the portable reporting correction:
 all four Compatibility jobs, both summary jobs, Windows Test and Linux Test
-passed. The remaining macOS Test failure is a discovery announcement timeout in
+passed. That run's macOS Test failure was a discovery announcement timeout in
 the unchanged `Parity4DiscoveryControlsTests.ControlledHdlcAutoconnectAppliesIfacAndDiscoveredRoutingOverrides`;
-this is not a Compatibility case or reporting failure. Full-run acceptance is
-therefore not claimed. The Pester harness itself is cross-platform accepted;
+this was not a Compatibility case or reporting failure. Subsequent run
+**`40630370168`** passed all 12 jobs, resolving that pending run-level acceptance.
+The Pester harness itself is cross-platform accepted;
 discovery-only claim/citation metadata cleanup was subsequently verified locally.
 
 ### Candidate-owned retrieval, reused baseline and table-only reporting

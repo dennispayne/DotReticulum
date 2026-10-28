@@ -1,4 +1,5 @@
 . (Join-Path $PSScriptRoot 'Reference.ps1')
+. (Join-Path $PSScriptRoot 'Catalog.ps1')
 
 function Initialize-CompatibilityPester {
     Import-Module Pester -MinimumVersion 5.7.1 -ErrorAction Stop
@@ -24,11 +25,8 @@ function New-CompatibilityConfiguration {
 function Get-CompatibilityTestMetadata {
     param([object[]] $Tests)
     if (!$Tests.Count) { throw 'No compatibility tests were discovered.' }
-    $catalog = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\catalog.json') -Raw | ConvertFrom-Json
     $claims = @{}
-    foreach ($claim in $catalog.claims) {
-        if ($claim.id -cnotmatch '^C[0-9]{3,}$') { throw "Invalid catalog claim: $($claim.id)" }
-        if ($claims.ContainsKey($claim.id)) { throw "Duplicate catalog claim: $($claim.id)" }
+    foreach ($claim in @(Get-CompatibilityClaims)) {
         $claims[$claim.id] = $claim
     }
     $ids = @{}

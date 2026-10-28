@@ -1,5 +1,8 @@
 function Invoke-CompatibilityProbe {
-    param([hashtable] $Context, [string] $Directory, [switch] $WithoutProof)
+    param(
+        [hashtable] $Context, [string] $Directory, [switch] $WithoutProof,
+        [ValidateSet('missing', 'invalid-signature', 'wrong-hash', 'truncated')] [string] $ProofMode = 'missing'
+    )
     $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
     $listener.Start()
     try { $port = $listener.LocalEndpoint.Port } finally { $listener.Stop() }
@@ -42,7 +45,7 @@ target_port = $port
     $info.RedirectStandardError = $true
     foreach ($argument in @('-u', (Join-Path $PSScriptRoot '..\..\Interop\Parity7NetworkUtilitiesReference.py'),
             '--revision', $Context.Revision, '--config', $peerConfig, '--probe-identity', $probeIdentity,
-            '--no-proof-identity', $noProofIdentity)) { $info.ArgumentList.Add($argument) }
+            '--no-proof-identity', $noProofIdentity, '--proof-mode', $ProofMode)) { $info.ArgumentList.Add($argument) }
     foreach ($entry in $Context.PeerEnvironment.GetEnumerator()) { $info.Environment[$entry.Key] = $entry.Value }
     $peer = [Diagnostics.Process]::Start($info)
     $errorTask = $peer.StandardError.ReadToEndAsync()
@@ -54,9 +57,10 @@ target_port = $port
         $ready = $line | ConvertFrom-Json
         if ($ready.event -ne 'ready') { throw "Upstream peer was not ready: $line" }
         $outputTask = $peer.StandardOutput.ReadToEndAsync()
-        $destination = if ($WithoutProof) { $ready.no_proof } else { $ready.probe }
+        $unproved = $WithoutProof -or $ProofMode -ne 'missing'
+        $destination = if ($unproved) { $ready.no_proof } else { $ready.probe }
         if ($destination -notmatch '^[0-9a-f]{32}$') { throw 'Upstream peer supplied an invalid destination.' }
-        $timeout = if ($WithoutProof) { '1' } else { '8' }
+        $timeout = if ($unproved) { '1' } else { '8' }
         $candidate = Start-TestProcess $Context.Executable ($Context.Prefix + @('rnprobe') + $Context.ToolSeparator +
             @('--config', $candidateConfig, '--timeout', $timeout, 'app.aspect', $destination)) -Environment $Context.Environment
         Start-Sleep -Milliseconds 300

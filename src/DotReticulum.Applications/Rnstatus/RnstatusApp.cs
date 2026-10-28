@@ -174,7 +174,12 @@ public static class RnstatusApp
 
                 Dictionary<object, object?>? stats;
                 try { stats = await GetStatusAsync(node, remote, options, stop).ConfigureAwait(false); }
-                catch (Exception ex) when (remote is not null && (ex is IOException or TimeoutException or InvalidDataException))
+                catch (TimeoutException) when (remote is not null)
+                {
+                    error.WriteLine($"rnstatus: could not get RNS status from remote transport instance {Pretty(ParseHash(options.Remote!))}");
+                    return 2;
+                }
+                catch (Exception ex) when (remote is not null && (ex is IOException or InvalidDataException))
                 {
                     error.WriteLine($"rnstatus: {ex.Message}");
                     return 10;
@@ -183,7 +188,7 @@ public static class RnstatusApp
                 {
                     error.WriteLine(options.Remote is null ? "rnstatus: could not get RNS status" :
                         $"rnstatus: could not get RNS status from remote transport instance {Pretty(ParseHash(options.Remote))}");
-                    return options.Remote is null ? 2 : 20;
+                    return 2;
                 }
                 if (options.Json)
                 {

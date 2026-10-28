@@ -18,8 +18,7 @@ foreach ($test in $tests) {
     }
 }
 if ($IncludeUncoveredClaims) {
-    $catalog = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'catalog.json') -Raw | ConvertFrom-Json
-    foreach ($claim in $catalog.claims | Where-Object { $_.id -notin $tests.ClaimId }) {
+    foreach ($claim in Get-CompatibilityClaims | Where-Object { $_.id -notin $tests.ClaimId }) {
         [pscustomobject]@{
             TestId = $null
             ClaimId = $claim.id

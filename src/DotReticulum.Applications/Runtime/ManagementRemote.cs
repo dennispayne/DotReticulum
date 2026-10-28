@@ -88,9 +88,7 @@ public sealed class ManagementRemoteClient : IDisposable
         token.ThrowIfCancellationRequested();
         var receipt = link.Request(path, data, timeout: timeout.TotalSeconds, maxResponseSize: ManagementConnection.MaximumMessageBytes, cancellationToken: token)
             ?? throw new IOException("Remote management link is closed.");
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
-        deadline.CancelAfter(timeout);
-        return await receipt.ResponseTask.WaitAsync(deadline.Token).ConfigureAwait(false);
+        return await receipt.ResponseTask.WaitAsync(timeout, token).ConfigureAwait(false);
     }
     public void Dispose() => link.Teardown();
 }
