@@ -75,7 +75,7 @@ public sealed class RnshSession : IAsyncDisposable
             await SendAsync(command, handshake.Token).ConfigureAwait(false);
         }
         var input = PumpInputAsync(stdin, stdout, interactive, lifetime.Token);
-        var resize = window is null ? Task.CompletedTask : PumpWindowAsync(window, lifetime.Token);
+        var resize = window is null ? Task.CompletedTask : PumpWindowAsync(command.Window, window, lifetime.Token);
         try
         {
             while (true)
@@ -104,18 +104,21 @@ public sealed class RnshSession : IAsyncDisposable
         }
     }
 
-    private async Task PumpWindowAsync(Func<RnshWindow> window, CancellationToken token)
+    private async Task PumpWindowAsync(RnshWindow initial, Func<RnshWindow> window, CancellationToken token)
     {
-        var last = window().Pack();
+        var last = initial.Pack();
+        long? lastSent = null;
         while (true)
         {
-            await Task.Delay(TimeSpan.FromSeconds(Math.Max(0.1, (_link.Rtt ?? 0.1) * 25)), token).ConfigureAwait(false);
+            await Task.Delay(TimeSpan.FromMilliseconds(100), token).ConfigureAwait(false);
             var size = window();
             var current = size.Pack();
-            if (!last.AsSpan().SequenceEqual(current))
+            if (!last.AsSpan().SequenceEqual(current) &&
+                (lastSent is null || Stopwatch.GetElapsedTime(lastSent.Value).TotalSeconds >= (_link.Rtt ?? 0.1) * 25))
             {
                 await SendAsync(size, token).ConfigureAwait(false);
                 last = current;
+                lastSent = Stopwatch.GetTimestamp();
             }
         }
     }

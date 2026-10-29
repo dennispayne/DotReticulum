@@ -217,6 +217,99 @@ public sealed class RnshTests
     }
 
     [Fact]
+    public async Task BufferedTerminalOutputPreservesUnreadBytesAndReadFailures()
+    {
+        var data = Enumerable.Range(0, 100_003).Select(i => (byte)i).ToArray();
+        await using (var buffered = new RnshBufferedReader(new MemoryStream(data)))
+        {
+            using var output = new MemoryStream();
+            await buffered.CopyToAsync(output);
+            Assert.Equal(data, output.ToArray());
+        }
+        var unread = new MemoryStream(data);
+        await using (var buffered = new RnshBufferedReader(unread))
+        {
+            Assert.True(unread.Position < unread.Length, "Unread output must apply bounded backpressure.");
+            await buffered.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.False(unread.CanRead);
+        }
+        await using (var buffered = new RnshBufferedReader(new FailingOutput()))
+            Assert.Equal("terminal read failed", (await Assert.ThrowsAsync<IOException>(
+                () => buffered.ReadAsync(new byte[1]).AsTask())).Message);
+        var failedDrain = new RnshBufferedReader(new FailingOutput(), discard: true);
+        await Assert.ThrowsAsync<IOException>(() => failedDrain.DisposeAsync().AsTask());
+        await using var waiting = new RnshBufferedReader(new WaitingOutput());
+        await waiting.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(2));
+    }
+
+    private sealed class FailingOutput : MemoryStream
+    {
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            ValueTask.FromException<int>(new IOException("terminal read failed"));
+    }
+
+    private sealed class WaitingOutput : MemoryStream
+    {
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return 0;
+        }
+    }
+
+    [Fact]
+    public async Task WindowChangedDuringHandshakeIsSentAgainstTheOriginalCommandSize()
+    {
+        var (server, client, dir) = ReticulumNodeTests.Pair();
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        try
+        {
+            using var identity = server.LoadOrCreateIdentity("rnsh-window");
+            var destination = Destination.Create(DestinationType.Single, "rnsh", [], identity);
+            var resized = new TaskCompletionSource<RnshWindow>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var local = new LocalDestination(identity, destination)
+            {
+                AcceptLinks = true,
+                LinkEstablished = link => link.GetChannel(channel =>
+                {
+                    RnshMessage.Register(channel);
+                    channel.AddMessageHandler(message =>
+                    {
+                        if (message is RnshVersion) channel.Send(new RnshVersion());
+                        if (message is RnshWindow size)
+                        {
+                            resized.TrySetResult(size);
+                            channel.Send(new RnshExited { ReturnCode = 0 });
+                        }
+                        return true;
+                    });
+                }),
+            };
+            server.Router.RegisterLocalDestination(local);
+            await server.StartAsync(deadline.Token);
+            await client.StartAsync(deadline.Token);
+            await server.Router.AnnounceAsync(local, cancellationToken: deadline.Token);
+            var connection = await ClientLinks.ConnectAsync(client, destination.Hash, TimeSpan.FromSeconds(10), deadline.Token);
+            Assert.NotNull(connection.Link);
+            await using var session = new RnshSession(connection.Link);
+            Assert.Equal(0, await session.InitiateAsync(new RnshExecute
+            {
+                Window = new RnshWindow { Rows = 31, Columns = 97 },
+            }, Stream.Null, Stream.Null, Stream.Null, TimeSpan.FromSeconds(5), deadline.Token,
+                window: () => new RnshWindow { Rows = 45, Columns = 120 }));
+            var actual = await resized.Task.WaitAsync(deadline.Token);
+            Assert.Equal(45, actual.Rows);
+            Assert.Equal(120, actual.Columns);
+        }
+        finally
+        {
+            await client.DisposeAsync();
+            await server.DisposeAsync();
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
     public async Task ChannelSessionExecutesAndRejectsRemoteCommandWithoutAffectingNextLink()
     {
         var (server, client, dir) = ReticulumNodeTests.Pair();

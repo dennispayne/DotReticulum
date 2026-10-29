@@ -11,16 +11,18 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
     private readonly FileStream _master;
     private readonly bool _stdinPipe;
     private readonly SafeFileHandle? _replica;
+    private readonly Stream? _unusedTerminalOutput;
     private readonly Task<int> _exit;
     private readonly object _disposeGate = new();
     private Task? _dispose;
     private UnixRnshTerminal(int pid, FileStream master, Stream input, Stream output, Stream error, bool stdinPipe,
-        SafeFileHandle? replica)
+        SafeFileHandle? replica, Stream? unusedTerminalOutput)
     {
         _pid = pid;
         _master = master;
         Input = input; Output = output; Error = error; _stdinPipe = stdinPipe;
         _replica = replica;
+        _unusedTerminalOutput = unusedTerminalOutput;
         _exit = Task.Run(() =>
         {
             int result, status;
@@ -59,8 +61,8 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
             if (darwin && (!command.PipeStdin || !command.PipeStdout || !command.PipeStderr))
             {
                 // XNU rejects extended master ioctls until a replica has opened.
-                // Retain it until exited-child output drains; XNU flushes the
-                // output queue when the final replica closes.
+                // Retain it while the owned reader drains output; XNU drains
+                // the controlling terminal during session-leader exit.
                 initialSlave = open(slave, 2 | DarwinRnshNative.NoControllingTerminal);
                 if (initialSlave < 0) throw ErrorFor("open PTY replica");
                 owned.Add(initialSlave);
@@ -138,20 +140,28 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
             {
                 if (exited?.IsCompleted == true) retainedReplica?.Dispose();
             }
+            Stream TerminalOutput(bool discard = false)
+            {
+                var duplicate = dup(master);
+                if (duplicate < 0) throw ErrorFor("dup");
+                var reader = new RnshNativeReader(new SafeFileHandle(duplicate, true), true, true, ReleaseDrainedReplica);
+                return darwin ? new RnshBufferedReader(reader, discard) : reader;
+            }
             Stream Parent(int index)
             {
                 if (!pipes[index])
                 {
+                    if (index != 0) return TerminalOutput();
                     var duplicate = dup(master);
                     if (duplicate < 0) throw ErrorFor("dup");
-                    return index == 0 ? StreamFor(duplicate) : new RnshNativeReader(new SafeFileHandle(duplicate, true),
-                        true, true, ReleaseDrainedReplica);
+                    return StreamFor(duplicate);
                 }
                 var fd = parents[index]; owned.Remove(fd);
                 return index == 0 ? StreamFor(fd) : new RnshNativeReader(new SafeFileHandle(fd, true), true);
             }
             var terminal = new UnixRnshTerminal(pid, masterStream, Parent(0), Parent(1),
-                pipes[2] ? Parent(2) : command.PipeStdout ? Parent(2) : Stream.Null, command.PipeStdin, retainedReplica);
+                pipes[2] ? Parent(2) : command.PipeStdout ? Parent(2) : Stream.Null, command.PipeStdin, retainedReplica,
+                darwin && !pipes[0] && pipes[1] && pipes[2] ? TerminalOutput(discard: true) : null);
             exited = terminal._exit;
             replicaTransferred = true;
             return terminal;
@@ -191,7 +201,14 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
         finally
         {
             kill(-_pid, 9);
-            Input.Dispose(); Output.Dispose(); Error.Dispose(); _replica?.Dispose(); _master.Dispose();
+            try
+            {
+                Input.Dispose();
+                await Output.DisposeAsync().ConfigureAwait(false);
+                await Error.DisposeAsync().ConfigureAwait(false);
+                if (_unusedTerminalOutput is not null) await _unusedTerminalOutput.DisposeAsync().ConfigureAwait(false);
+            }
+            finally { _replica?.Dispose(); _master.Dispose(); }
         }
     }
     private static IOException ErrorFor(string operation) => new($"{operation}: {new Win32Exception(Marshal.GetLastPInvokeError()).Message}");

@@ -4,6 +4,69 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Darwin exit draining and the first rnsh window change
+
+Full interop **40918584672**, exact source **291bc7d**, completed **failed**.
+All Builds, all four Compatibility candidates, Windows/Linux Test and both
+renderers passed. Actual macOS TRX passed the three original Darwin-specific
+cases, mode restoration, redirected exit, the previously empty mixed stdout-pipe
+/ terminal-stderr case, native terminal initiation and the deterministic Git
+deadline regression. The delayed-first-read and stdin-only terminal cases
+instead timed out awaiting child exit. The live shell also printed its initial
+size twice, losing the requested resize.
+
+Primary XNU **f6217f891ac0bb64f3d375211650a4c1ff8ca1ea**,
+`bsd/kern/kern_exit.c:2286-2336`, explicitly calls `ttywait` on a session leader's
+controlling terminal before revoking it. `tty.c:1745-1796` waits for queued output
+to drain. Retaining a replica alone cannot support waiting for exit before the
+first read. Darwin terminal output now has an immediately started owned reader
+with a bounded **16 x 4096-byte** queue; full queues apply backpressure. When only
+stdin uses the terminal, unused primary output is drained without misreporting
+it as either redirected output stream. Cancellation joins the pump, and read
+failures propagate through the output or owned-drain disposal. Linux and Windows
+terminal backends are unchanged. The actual Darwin correction remains pending
+hosted execution, not accepted from Windows evidence.
+
+The lost resize has a separate source-grounded cause: after the handshake,
+`PumpWindowAsync` sampled the *current* size as its baseline rather than the
+dimensions actually sent in `RnshExecute`. A change during that handshake was
+then invisible. Its first changed size now sends promptly against the original
+command dimensions; subsequent updates retain upstream's **RTT x 25** rate
+limit (`rnsh/initiator.py:437-444`, where the first `last_winch` starts at zero).
+No wire codec or reference shim changes. A real linked-session regression
+requires the first changed WindowSize message. Buffered-reader tests cover
+exact unread bytes, bounded backpressure, cancellation while full or awaiting
+input, and visible reader/unused-drain failures.
+
+Final local gates:
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: **zero warnings/errors**.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --settings tests\coverage.runsettings --collect:'XPlat Code Coverage' --results-directory TestResults\coverage-darwin-buffer-window-final-20261029 --logger trx -- xUnit.MaxParallelThreads=1`: **1853 passed / 85 explicit skips / zero failures**, live disabled.
+- `tests\Get-CoverageSummary.ps1 TestResults\coverage-darwin-buffer-window-final-20261029`: Applications **76.69% / 63.51%**, Core **96.89% / 90.85%**, Crypto **94.83% / 94.00%**, Interfaces **82.19% / 72.99%**, Transport **91.22% / 79.26%** line/branch coverage; deduplicated overall **82.29% / 69.20%**.
+- Strict Windows NativeAOT publish with `ILLinkTreatWarningsAsErrors=true` and `IlcTreatWarningsAsErrors=true`, then published `--help`: passed. `artifacts\native-darwin-buffer-window\DotReticulum.Applications.exe` SHA-256 **bc2da1065b7a76fd80bd75c0fe4b4af6e665b477725a01abe91bc5f69b694576**.
+- `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --filter 'FullyQualifiedName~RnshLiveTests|FullyQualifiedName~RnshNativeTests|FullyQualifiedName~NativeResourceTests' --logger 'console;verbosity=normal' --results-directory TestResults\darwin-buffer-window-live --logger trx -- xUnit.MaxParallelThreads=1`: **3/3 passed**, no skips; fresh published-native terminal initiation, encrypted/compressed multi-megabyte resource and actual pinned Linux/WSL Python shell roles, including resize. Reference imports verified; pin unchanged.
+
+The initial parallel baseline had an unrelated concurrent Git-statistics failure;
+its isolated rerun passed. The first parallel coverage run then hit an unrelated
+Windows file-sharing cleanup failure in `RnodeconfFirmwareTests`. Its focused
+rerun and both subsequent complete serialized suites passed, without altering
+those tests or assertions. Final coverage above is from the final source.
+
+The same hosted interop still failed an impaired resource after .NET-router
+restart: **9 dropped / 6 retried** total, three unrepaired first-window parts,
+one received part, receiver EIFR **6710.629817095229 bit/s**, SDU **16348**,
+resource RTT **0.2431962490081787**, **16 retries left**, then actual upstream
+link timeout. That implies roughly **117 seconds** before the receiver's first
+repair under `Resource.py:601-612`; it is evidence for further upstream-only
+investigation, not a confirmed root cause or resource fix.
+
+Static analysis **40918584135** completed all five jobs successfully. Its actual
+rendered report has zero Actions/C#/PowerShell findings and **two Python
+warnings**: clear-text fixture configuration at `live_auto_node.py:100` and
+the upstream-format 1024-bit RSA fixture generator at
+`GenerateRnodeconfSigningVectors.py:21`. Successful scan execution is not
+reported as zero findings.
+
 ### Repeated-mesh reporting preserves iteration identity and actual failures
 
 Repeated mesh **40915647175**, exact source **52dc6f0**, completed **failed**.
