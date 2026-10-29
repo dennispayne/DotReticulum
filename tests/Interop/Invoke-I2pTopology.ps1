@@ -5,7 +5,7 @@
 Starts an owned I2P router and runs bounded SAM or stream acceptance.
 .DESCRIPTION
 Supports i2pd or an extracted Java I2P distribution. Public networking requires
--AllowPublicNetwork; stream tests also require the verified Python reference.
+-AllowPublicNetwork; mixed-peer stream tests also require the verified Python reference.
 Owned processes are stopped on exit. -KeepArtifacts retains diagnostic files.
 .PARAMETER RouterBinary
 Path to the i2pd executable. Required in the default I2pd parameter set.
@@ -45,6 +45,11 @@ Requires public networking and the reference; cannot be combined with RunStreamT
 .PARAMETER NativeRestartOnly
 Selects only the native persisted-bearer restart and bidirectional DATA test.
 Requires public networking; cannot be combined with the other test selections.
+.PARAMETER PublishedFeatureOnly
+Runs the published-native rnprobe cold-start encrypted DATA/proof flow using the Applications
+test project. Requires AllowPublicNetwork and an existing DOTRETICULUM_NATIVE_EXE;
+cannot be combined with other test selections. This is native integration,
+not a Python baseline or a public-overlay claim.
 .PARAMETER JavaLocalDestinationRouting
 Retains Java I2P's default local-to-local destination delivery instead of forcing
 same-router traffic through public tunnels. This is actual SAM/stream delivery,
@@ -68,6 +73,9 @@ Overall test-process deadline, from 60 through 1800 seconds. Defaults to 1200.
 .\Invoke-I2pTopology.ps1 -RouterBinary C:\Tools\i2pd.exe
 .EXAMPLE
 .\Invoke-I2pTopology.ps1 -JavaExecutable C:\Java\bin\java.exe -JavaRouterDirectory C:\I2P -AllowPublicNetwork -NativeRestartOnly -JavaLocalDestinationRouting -TestAssemblyPath C:\Git\DotReticulum\TestResults\isolated\DotReticulum.Interfaces.Tests.dll
+.EXAMPLE
+$env:DOTRETICULUM_NATIVE_EXE = 'C:\Git\DotReticulum\artifacts\native\DotReticulum.Applications.exe'
+.\Invoke-I2pTopology.ps1 -JavaExecutable C:\Java\bin\java.exe -JavaRouterDirectory C:\I2P -AllowPublicNetwork -JavaLocalDestinationRouting -PublishedFeatureOnly -NoBuild
 #>
 [CmdletBinding(DefaultParameterSetName = 'I2pd')]
 param(
@@ -85,6 +93,7 @@ param(
     [switch] $RunStreamTests,
     [switch] $ReferenceRestartOnly,
     [switch] $NativeRestartOnly,
+    [switch] $PublishedFeatureOnly,
     [Parameter(ParameterSetName = 'Java')][switch] $JavaLocalDestinationRouting,
     [Parameter(ParameterSetName = 'I2pd')][switch] $SingleThreadedSam,
     [switch] $NoBuild,
@@ -123,6 +132,14 @@ if ($ReferenceRestartOnly) {
 if ($NativeRestartOnly) {
     if (-not $AllowPublicNetwork) { throw 'NativeRestartOnly requires explicit -AllowPublicNetwork.' }
     if ($RunStreamTests -or $ReferenceRestartOnly) { throw 'NativeRestartOnly selects a separate test group.' }
+}
+if ($PublishedFeatureOnly) {
+    if (-not $AllowPublicNetwork) { throw 'PublishedFeatureOnly requires explicit -AllowPublicNetwork.' }
+    if ($RunStreamTests -or $ReferenceRestartOnly -or $NativeRestartOnly) { throw 'PublishedFeatureOnly selects a separate test group.' }
+    if ([string]::IsNullOrWhiteSpace($env:DOTRETICULUM_NATIVE_EXE) -or
+        -not (Test-Path -LiteralPath $env:DOTRETICULUM_NATIVE_EXE -PathType Leaf)) {
+        throw 'PublishedFeatureOnly requires DOTRETICULUM_NATIVE_EXE pointing at an existing published executable.'
+    }
 }
 if (-not [string]::IsNullOrWhiteSpace($TestAssemblyPath)) {
     if ($NoBuild) { throw 'TestAssemblyPath and NoBuild select separate execution modes.' }
@@ -443,7 +460,9 @@ yggdrasil = false
     }
     finally { $transportCheck.Dispose() }
     }
-    $filter = if ($ReferenceRestartOnly) {
+    $filter = if ($PublishedFeatureOnly) {
+        'FullyQualifiedName~I2pNativeTests.PublishedProbeExchangesEncryptedDataAndValidatedProofsAcrossFreshProcesses'
+    } elseif ($ReferenceRestartOnly) {
         'FullyQualifiedName~Parity6I2pReferenceRecoveryTests'
     } elseif ($NativeRestartOnly) {
         'FullyQualifiedName~Parity6I2pLiveTests.ActualRouterNativeStreamsAreBidirectionalAndPersistAcrossBearerRestart'
@@ -453,8 +472,9 @@ yggdrasil = false
         'FullyQualifiedName~Parity6I2pLiveTests.ActualRouterSamDestinationPersistenceWithoutOverlay'
     }
     $arguments = if ([string]::IsNullOrWhiteSpace($TestAssemblyPath)) {
+        $project = if ($PublishedFeatureOnly) { 'DotReticulum.Applications.Tests' } else { 'DotReticulum.Interfaces.Tests' }
         @(
-            'test', (Join-Path $root 'tests\DotReticulum.Interfaces.Tests\DotReticulum.Interfaces.Tests.csproj'),
+            'test', (Join-Path $root "tests\$project\$project.csproj"),
             '-c', 'Release', '--filter', $filter, '--results-directory', $result,
             '--logger', 'trx;LogFileName=i2p-live.trx'
         )
@@ -463,7 +483,7 @@ yggdrasil = false
             '--Logger:trx;LogFileName=i2p-live.trx')
     }
     if ($NoBuild) { $arguments += '--no-build' }
-    $environment = @{ DOTRETICULUM_I2P_SAM = $SamEndpoint }
+    $environment = @{ DOTRETICULUM_I2P_SAM = $SamEndpoint; I2P_SAM_ADDRESS = $SamEndpoint }
     if (-not [string]::IsNullOrWhiteSpace($PythonExecutable)) { $environment.DOTRETICULUM_PYTHON = $PythonExecutable }
     if (-not [string]::IsNullOrWhiteSpace($UpstreamPath)) { $environment.DOTRETICULUM_UPSTREAM = $UpstreamPath }
     $runner = Start-OwnedProcess -FileName $DotnetExecutable -Arguments $arguments -Prefix 'tests' -EnvironmentVariables $environment

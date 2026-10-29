@@ -4,6 +4,78 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Actual-router published-native I2P cold-start DATA and proofs
+
+Added opt-in Applications integration case
+`I2pNativeTests.PublishedProbeExchangesEncryptedDataAndValidatedProofsAcrossFreshProcesses`
+and the owned topology runner's documented **-PublishedFeatureOnly** selector.
+It requires an existing **DOTRETICULUM_NATIVE_EXE**, explicit network permission
+and an owned IPv4 SAM endpoint; conflicting selections and missing candidates
+fail before router launch. The runner explicitly supplies **I2P_SAM_ADDRESS**
+to the test/native children. No Python implementation or alternate bearer is
+used by this case.
+
+Actual **Windows x64 / Java I2P 2.14.0 / SAM 3.1** execution passed **1/1,
+zero skips, 63 seconds**. The unchanged native artifact
+`artifacts\native-darwin-startup\DotReticulum.Applications.exe` has SHA-256
+**7d2bfbd78e440aa0b31a584b73248302c3a3abd0351d0a5e7d5da95534b8efe2**.
+Two separate native **rnprobe** processes with independently initialized
+configuration/storage each encrypted **257-byte** DATA. The managed receiver
+decrypted both on their respective real accepted **I2pPacketPeer** instances;
+both native senders validated signed delivery proofs. Sole-I2P configurations
+disable shared instances; no TCP/UDP fallback. The receiver emits a normal
+signed announce after each actual stream connects, not a preseeded identity/path.
+Both child processes have **110-second** deadlines and **64-KiB** combined output
+bounds inside the unchanged **four-minute** test budget.
+
+This is bounded **cold-start NativeAOT integration**, not a shared Compatibility
+claim, Python interoperation, persisted candidate recovery, router restart,
+public-tunnel or separate-router acceptance. Java default local-destination
+delivery was explicitly enabled; three-hop client defaults, certificate
+verification and transit-disabled router ownership remain unchanged.
+
+Failed exploratory executions are retained as limitations, not relabeled passes:
+an unannounced receiver timed out on the first cold path request; after adding
+connected-peer announcements, candidate one passed but candidate two, reusing
+candidate one's state, sent its single probe via a restored path and timed out
+awaiting proof. The latter run did not print a new path request; sending before
+asynchronous stream readiness is a source-consistent hypothesis, not a directly
+observed timestamped cause. `TransportRouter.HasPath` checks its path
+table and `I2pPacketPeer.SendAsync` discards offline writes, as documented in its
+existing upstream-derived behavior. Pinned upstream
+`RNS/Transport.py:407-441` restores matching cached paths and
+`RNS/Utilities/rnprobe.py:45-155` performs discovery/probing; no new
+upstream executable comparison established equivalent persisted-candidate
+failure. No production readiness fix or changed retry policy is claimed.
+The accepted case explicitly uses fresh storage for each process; persisted
+published-candidate readiness stays unchecked in **TODO.md**.
+
+Exact successful command:
+`$env:DOTRETICULUM_NATIVE_EXE = (Resolve-Path artifacts\native-darwin-startup\DotReticulum.Applications.exe).Path; & tests\Interop\Invoke-I2pTopology.ps1 -JavaExecutable (Join-Path $PWD 'TestResults\i2p-tools-java-win\jdk-21.0.12.1+1-jre\bin\java.exe') -JavaRouterDirectory (Join-Path $PWD 'TestResults\i2p-tools-java-win\router') -AllowPublicNetwork -JavaLocalDestinationRouting -PublishedFeatureOnly -NoBuild -SamEndpoint 127.0.0.1:17657 -TestTimeoutSeconds 360 -KeepArtifacts`.
+TRX: ignored owned directory
+`TestResults\i2p-topology-25648b0f67cc4c04812aa77db8886efc\results\i2p-live.trx`.
+Router/test processes were stopped by the coordinator. Retained raw router
+state/logs remain private and are neither committed nor uploaded.
+
+Validation:
+`dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+**zero warnings/errors**.
+`dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --results-directory TestResults\published-i2p-managed-20261029 --logger trx`:
+**1,849 passed, 84 explicit skips** without opt-in live/native prerequisites.
+Repeated after the final cold-start implementation with
+`--results-directory TestResults\published-i2p-managed-final-20261029`:
+the same **1,849 passed / 84 skipped**, with a warning-free full build.
+Focused Pester configuration combining `Coverage.Tests.ps1` and
+`Parity6Interfaces.Tests.ps1`, filtering
+`*rejects published I2P selection*` and `*keeps standalone script verbs*`:
+**5 passed, zero failures/skips** (Pester **6.2.0**). Four separate script
+processes rejected unauthorized, missing-candidate, nonexistent-candidate and
+conflicting-selection inputs; the fifth verified discoverable parameter help.
+`pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
+**63 tracked PowerShell files, zero findings**.
+No production changes: the previously exercised strict native publication was
+reused; no redundant production coverage or native publish was performed.
+
 ### Source-grounded Darwin PTY initialization and stricter hosted-regression probes
 
 The completed corrected mesh run **40894852888** was inspected rather than

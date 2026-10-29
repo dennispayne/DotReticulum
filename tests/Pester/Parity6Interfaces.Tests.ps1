@@ -8,6 +8,25 @@ BeforeAll {
 }
 
 Describe 'Parity 6 native interface processes' -Tag E2E, Interfaces {
+    It 'rejects published I2P selection <Case> before starting a router' -Tag 'Contract:IFACE-I2P-001', I2pTopology -ForEach @(
+        @{ Case = 'without network permission'; Extra = @(); Native = $null; Expected = 'PublishedFeatureOnly requires explicit -AllowPublicNetwork' }
+        @{ Case = 'without a native candidate'; Extra = @('-AllowPublicNetwork'); Native = $null; Expected = 'PublishedFeatureOnly requires DOTRETICULUM_NATIVE_EXE' }
+        @{ Case = 'with a missing native candidate'; Extra = @('-AllowPublicNetwork'); Native = 'missing'; Expected = 'PublishedFeatureOnly requires DOTRETICULUM_NATIVE_EXE' }
+        @{ Case = 'with conflicting stream selection'; Extra = @('-AllowPublicNetwork', '-RunStreamTests'); Native = $null; Expected = 'PublishedFeatureOnly selects a separate test group' }
+    ) {
+        $pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
+        $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\Invoke-I2pTopology.ps1')).Path
+        $candidate = if ($Native) { Join-Path $TestDrive 'missing-native-executable' } else { $null }
+        $result = Invoke-TestProcess $pwsh (@('-NoProfile', '-File', $runner,
+            '-RouterBinary', $pwsh, '-PublishedFeatureOnly') + $Extra) -Environment @{
+                DOTRETICULUM_NATIVE_EXE = $candidate
+                DOTRETICULUM_PYTHON = $null
+                DOTRETICULUM_UPSTREAM = $null
+            }
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match $Expected
+    }
+
     It 'rejects Java topology without public-network permission before launching Java' -Tag 'Contract:IFACE-I2P-001' {
         $pwsh = (Get-Command pwsh -CommandType Application | Select-Object -First 1).Source
         $runner = (Resolve-Path (Join-Path $PSScriptRoot '..\Interop\Invoke-I2pTopology.ps1')).Path

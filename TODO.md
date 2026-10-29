@@ -16,7 +16,8 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Authorized RAK4631 receive-only managed/native startup, live configuration echoes, radio-off control, serial reopen and unchanged EEPROM
   - [ ] Android USB/Bluetooth permission/adaptor contracts and on-device execution (deferred by user)
   - [x] Actual Java I2P local-destination bidirectional DATA before/after persisted bearer restart, independently for .NET and pinned upstream
-  - [ ] I2P public-tunnel delivery after persisted bearer restart (still fails for both .NET and pinned upstream); separate-router overlay and published-native acceptance remain outstanding
+  - [x] Windows published-native cold-start I2P encrypted DATA and validated proofs over actual Java local-destination streams
+  - [ ] I2P public-tunnel delivery after persisted bearer restart (still fails for both .NET and pinned upstream); separate-router overlay, persisted native-candidate readiness and broader published-native acceptance remain outstanding
   - [ ] Authorized physical serial/TNC/RNode/Multi/Weave and Android USB/Bluetooth/RF acceptance (one Windows RAK receive-only startup/reconfiguration/off/reopen verified; one radio only, RF acceptance explicitly retained as unverified; remaining devices/platform access/settings unavailable; see development history)
 - [ ] Parity 7 - Upstream utility coverage (software accepted; physical device acceptance outstanding)
   - [x] Authorized RAK4631 native rnodeconf USB-triggered DFU, same-version reflash, changed-port recovery and reversible EEPROM-setting persistence/restoration

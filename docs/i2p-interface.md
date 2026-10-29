@@ -71,6 +71,13 @@ unchanged four-minute deadline, persisted-key comparison, stable initiating chil
 and exact packet assertions still apply. `-ReferenceRestartOnly` separately
 selects the pinned-Python process-restart counterexample.
 
+Use `-PublishedFeatureOnly` with `DOTRETICULUM_NATIVE_EXE` pointing to an existing
+published executable to run cold-start NativeAOT `rnprobe` acceptance. This
+selects the Applications test project and requires explicit
+`-AllowPublicNetwork`; it does not require Python. The receiver announces only
+after each actual I2P stream connects. Each candidate has isolated fresh state:
+this case does not establish persisted-candidate startup readiness.
+
 For concurrent development, first copy the complete Release test-output directory
 into an owned directory under `TestResults`, then supply its
 `DotReticulum.Interfaces.Tests.dll` via `-TestAssemblyPath`. The runner invokes
@@ -125,8 +132,26 @@ This is a concrete router/topology recovery blocker shared by the tested
 implementations, not evidence that a native-only framing or persistence change
 would fix public-overlay recovery.
 
+On 2026-10-29, the published Windows x64 executable passed the cold-start case
+in 63 seconds against actual Java I2P 2.14.0 with local-destination routing.
+Two independently initialized native `rnprobe` processes each sent encrypted
+257-byte DATA; the receiver decrypted each on its respective accepted I2P child,
+and both senders validated signed delivery proofs. The configurations contained
+only I2P, without shared-instance, TCP or UDP fallback. This is native integration,
+not Python interoperability or public-overlay acceptance.
+
+An earlier reuse of the first native candidate's configuration failed:
+the second process used a restored path without requesting a new one and
+timed out awaiting its one probe's proof. Whether it sent before stream readiness
+was not directly observed. Native offline sends are discarded;
+the cold-start case must not be cited as persisted-candidate recovery evidence.
+An earlier unannounced receiver also timed out during discovery. Explicit
+connected-peer announcements are part of the accepted scenario, not a discovery
+retry fix or a preseeded path/identity.
+
 Historical forced-public-tunnel restart attempts on i2pd and Java remain separate
 failed evidence; local-route success does not resolve them. Impaired-network,
-IFAC/routing, published-native I2P, remote-router and router-process restart
-acceptance remain unverified. Tests target RNS 1.5.7 at
+IFAC/routing, persisted published-candidate readiness, other native platforms,
+remote-router and router-process restart acceptance remain unverified.
+Tests target RNS 1.5.7 at
 `a29bfb51c468945c96a1ee22cae0114e993e2391` and LXMF 1.2.1.
