@@ -33,7 +33,6 @@ public sealed class RnshLiveTests(ITestOutputHelper log)
         Task peerPump = Task.CompletedTask;
         var events = System.Threading.Channels.Channel.CreateUnbounded<JsonElement>();
         var peerOutput = new System.Text.StringBuilder();
-        JsonElement? latestSessions = null;
         try
         {
             using var identity = server.LoadOrCreateIdentity("rnsh");
@@ -84,8 +83,7 @@ public sealed class RnshLiveTests(ITestOutputHelper log)
                         lock (peerOutput) peerOutput.AppendLine(line);
                         if (!line.StartsWith("@@")) continue;
                         var item = JsonDocument.Parse(line[2..]).RootElement.Clone();
-                        if (item.GetProperty("event").GetString() == "sessions") latestSessions = item;
-                        else await events.Writer.WriteAsync(item);
+                        if (item.GetProperty("event").GetString() != "sessions") await events.Writer.WriteAsync(item);
                     }
                     events.Writer.TryComplete();
                 }
@@ -134,16 +132,30 @@ public sealed class RnshLiveTests(ITestOutputHelper log)
                 connected.Link!.Identify(identity);
                 using var eofDeadline = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token);
                 eofDeadline.CancelAfter(TimeSpan.FromSeconds(8));
-                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => session.InitiateAsync(new RnshExecute
+                using var eof = new ObservedEof();
+                try
                 {
-                    Command = ["/usr/bin/python3", "-c", "import os; os.read(0,1)"],
-                    PipeStdin = true, PipeStdout = true, PipeStderr = true,
-                }, Stream.Null, Stream.Null, Stream.Null, TimeSpan.FromSeconds(5), eofDeadline.Token));
-                Assert.NotNull(latestSessions);
-                var stalled = latestSessions.Value.GetProperty("sessions").EnumerateArray().Last();
-                Assert.Equal("LSSTATE_RUNNING", stalled.GetProperty("state").GetString());
-                Assert.Equal(JsonValueKind.Null, stalled.GetProperty("return_code").ValueKind);
-                log.WriteLine("Unmodified pinned EOF defect: RUNNING without exit callback; bounded cancellation then fresh link.");
+                    Assert.Equal(0, await session.InitiateAsync(new RnshExecute
+                    {
+                        Command = ["/usr/bin/python3", "-c",
+                            "import os; os.write(1,b'stdin-ready\\n'); d=os.read(0,1); os.write(1,b'eof:'+str(len(d)).encode()+b'\\n')"],
+                        PipeStdin = true, PipeStdout = true, PipeStderr = true,
+                    }, eof, eof, Stream.Null, TimeSpan.FromSeconds(5), eofDeadline.Token));
+                    log.WriteLine("Unmodified pinned EOF completed with its actual CommandExited response.");
+                }
+                catch (OperationCanceledException) when (eofDeadline.IsCancellationRequested && !timeout.IsCancellationRequested)
+                {
+                    await python.StandardInput.WriteLineAsync("{\"op\":\"session_status\"}");
+                    await python.StandardInput.FlushAsync(timeout.Token);
+                    var status = await Event("session_status");
+                    var stalled = Assert.Single(status.GetProperty("sessions").EnumerateArray(),
+                        item => item.GetProperty("link_id").GetString() == connected.Link.LinkIdHex);
+                    Assert.Equal("LSSTATE_RUNNING", stalled.GetProperty("state").GetString());
+                    Assert.Equal(JsonValueKind.Null, stalled.GetProperty("return_code").ValueKind);
+                    Assert.False(stalled.GetProperty("running").GetBoolean());
+                    log.WriteLine("Unmodified pinned EOF callback race: child exited after true EOF, but its listener remains RUNNING without a return code; bounded cancellation then fresh link.");
+                }
+                Assert.Equal("stdin-ready\neof:0\n"u8.ToArray(), eof.ToArray());
             }
             {
                 var connected = await ClientLinks.ConnectAsync(server, remote, TimeSpan.FromSeconds(25), timeout.Token);
@@ -230,6 +242,23 @@ public sealed class RnshLiveTests(ITestOutputHelper log)
             if (File.Exists(candidate)) return candidate;
         }
         throw new FileNotFoundException("live_rnsh_node.py");
+    }
+
+    private sealed class ObservedEof : MemoryStream
+    {
+        private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await _ready.Task.WaitAsync(cancellationToken);
+            return 0;
+        }
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Write(buffer.Span);
+            if (GetBuffer().AsSpan(0, checked((int)Length)).StartsWith("stdin-ready\n"u8)) _ready.TrySetResult();
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class WaitingInput : Stream

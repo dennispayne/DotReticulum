@@ -4,6 +4,99 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Source-grounded Darwin PTY initialization and stricter hosted-regression probes
+
+The completed corrected mesh run **40894852888** was inspected rather than
+assuming every previous failure persisted: Windows failed only the duplicate
+resource-part fixture selection corrected by **72d066e**; macOS retained the
+**13** PTY startup failures. The previous interop run **40890841836** additionally
+had the PNG/WebP assumption, a nondeterministic EOF-race expectation and one
+narrow-MTU forward-resource timeout.
+
+The Darwin failure is grounded in Apple's XNU revision
+**f6217f891ac0bb64f3d375211650a4c1ff8ca1ea**,
+`bsd/kern/tty_dev.c` Git blob **9deb01fa73be0256dcd749008cc319f3c25516e4**:
+`ptcopen` sets **TS_IOCTL_NOT_OK** at line **516**; `ptsopen` clears it at
+**308**; `ptyioctl` disables extended master ioctls at **989-996** and returns
+**ENOTTY** at **1156-1158** until a replica has opened. Our initial window ioctl
+ran before any replica open. The parent now opens an owned **O_RDWR|O_NOCTTY**
+replica first, holds it through child spawn, and closes it through existing
+ownership cleanup. Child endpoints still open before acquiring their own
+controlling terminal via the existing literal-argv bootstrap. Linux behavior,
+the Darwin arm64 ioctl ABI, deadlines and fatal initialization errors remain
+unchanged. Existing real-macOS tests fail without this correction; Windows
+execution cannot establish the corrected Darwin behavior.
+
+Native hosting now explicitly configures **[pages] media_conversion=no** for
+its strict byte-exact PNG branch, instead of assuming no automatically available
+encoder when `DOTRETICULUM_MEDIA_BACKEND` is absent. Its explicitly configured
+FFmpeg branch retains **media_conversion=yes** and strict WebP validation.
+Pin/source: **a29bfb51c468945c96a1ee22cae0114e993e2391**,
+`RNS/Utilities/rngit/pages.py:161,176-177,1861`. No production conversion default
+or format assertion was weakened.
+
+The rnsh probe no longer mandates the reference's intermittent EOF defect on
+every OS. It waits for real child readiness, then closes stdin and requires
+exact child output **stdin-ready\neof:0\n**, proving a zero-byte read.
+A normal response must return **0**. Its original **8-second** cancellation is
+accepted only with a fresh observation correlated to the actual link:
+child **not running**, listener **LSSTATE_RUNNING**, return code **null**.
+Unexplained timeout, live child, missing bytes or another session's observation
+fails. The adapter only exposes actual reference state; no upstream patch.
+Reference race source: `rnsh/process.py:542-550,639-653`,
+`rnsh/session.py:281-289`. Subsequent fresh-session recovery remains required.
+The separate narrow-MTU failure is **not claimed fixed**: its unchanged
+90-second resource wait now reports status, progress, segment/part/window,
+RTT, link state and loss count on timeout.
+
+Prepared an isolated **WSL Ubuntu / Python 3.14.4** environment using
+`tests/Interop/reference-requirements.txt` and the existing verified fetched
+objects. Linux Git correctly rejected the Windows CRLF checkout as modified;
+an owned LF-only checkout was materialized at the same exact pin and passed
+`git fsck --full --strict`, tracked-source and actual-import verification.
+Missing LXMF was then installed explicitly from the pinned requirements.
+Verified interpreter/source remain under the owned ignored
+`TestResults\wsl-rnsh-reference-20261029`; original checkout was not changed and
+the guard was not relaxed. Imported RNS **1.5.7**, LXMF **1.2.1**.
+
+Local validation:
+`dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+**zero warnings/errors**.
+`dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --settings tests\coverage.runsettings --collect:'XPlat Code Coverage' --results-directory TestResults\coverage-darwin-startup-20261029 --logger trx`:
+**1,849 passed, 83 explicit skips**, live modes disabled.
+`pwsh -NoProfile -File tests\Get-CoverageSummary.ps1 TestResults\coverage-darwin-startup-20261029`
+merged collected reports and their TRX copies by production source point:
+
+| Project | Lines | Branches |
+|---|---:|---:|
+| Applications | 76.78% | 63.67% |
+| Core | 96.89% | 90.93% |
+| Crypto | 94.83% | 94.00% |
+| Interfaces | 82.32% | 73.05% |
+| Transport | 91.40% | 79.59% |
+| **Overall** | **82.42%** | **69.38%** |
+
+`dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 -o artifacts\native-darwin-startup -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true --nologo -v quiet`
+passed under MSVC; native `--help` passed. Exercised executable SHA-256:
+**7d2bfbd78e440aa0b31a584b73248302c3a3abd0351d0a5e7d5da95534b8efe2**.
+With that exact binary, verified Windows Python and the isolated WSL rnsh peer:
+
+```powershell
+dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v normal --filter 'FullyQualifiedName~RnshLiveTests|FullyQualifiedName~RnshNativeTests|FullyQualifiedName~NativeResourceTests|FullyQualifiedName~RngitNativeHostingTests' --results-directory TestResults\darwin-regression-native-live-20261029 --logger trx -- xUnit.MaxParallelThreads=1
+```
+
+**4 passed, zero failed/skipped**, **38 seconds**: fresh native ConPTY shell,
+encrypted/compressed multi-megabyte native resource, native Git-host
+collaboration/pages/byte-exact media, and both actual POSIX reference rnsh roles
+with controlled EOF, loss/retry, resize, identification/spawn/cancellation and
+new-session recovery. This WSL execution positively observed the missing-return
+callback race after exact EOF acknowledgement, not clean upstream EOF completion.
+An earlier focused `RngitNativeHostingTests|Parity5TransferLiveTests` selection
+passed **3/3**, zero skips, **3m9s**, with the previous unchanged Windows native
+artifact; both negotiated-MTU mixed transfer modes passed locally.
+macOS execution acceptance and the unexplained earlier macOS narrow-MTU
+timeout remain pending hosted follow-through; no broader box is checked here.
+
 ### Forced actual Python-router crash/restart with surviving leaves and distinct-part loss
 
 Extended the existing bounded mesh case rather than inflating shared claim/test

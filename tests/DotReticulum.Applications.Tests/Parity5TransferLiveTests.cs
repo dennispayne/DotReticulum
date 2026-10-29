@@ -119,8 +119,14 @@ public sealed class Parity5TransferLiveTests(ITestOutputHelper output)
             var sent = new TaskCompletionSource<ResourceStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
             var inputPath = Path.Combine(directory, "stream-input.bin");
             await File.WriteAllBytesAsync(inputPath, resourcePayload);
-            link.SendResourceFile(inputPath, autoCompress: false, concluded: resource => sent.TrySetResult(resource.Status));
-            Assert.Equal(ResourceStatus.Complete, await sent.Task.WaitAsync(Patience));
+            var sending = link.SendResourceFile(inputPath, autoCompress: false, concluded: resource => sent.TrySetResult(resource.Status));
+            try { Assert.Equal(ResourceStatus.Complete, await sent.Task.WaitAsync(Patience)); }
+            catch (TimeoutException error)
+            {
+                throw new TimeoutException($"Forward resource at MTU {mtu}: status={sending.Status}, progress={sending.Progress:P2}, " +
+                    $"segment={sending.SegmentIndex}/{sending.TotalSegments}, parts={sending.TotalParts}, " +
+                    $"window={sending.WindowSize}/{sending.WindowMaxSize}, RTT={sending.Rtt}, link={link.Status}, dropped={bridge.Dropped}.", error);
+            }
             var resourceDone = await leaf.NextAsync("resource_done", resourceBefore, Patience);
             Assert.Equal(resourcePayload.Length, resourceDone.GetProperty("size").GetInt32());
             Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(resourcePayload)), resourceDone.GetProperty("sha256").GetString());

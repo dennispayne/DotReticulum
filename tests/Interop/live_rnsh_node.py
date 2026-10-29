@@ -67,14 +67,19 @@ async def main():
             await session.ListenerSession.pump_all()
             await asyncio.sleep(0.005)
     pumping = asyncio.create_task(pump())
+    def emit_sessions(event):
+        emit(event, sessions=[{
+            "state": item.state.name, "authenticated": item.authenticated,
+            "terminated": item.terminated, "process": item.process.pid if item.process else None,
+            "return_code": item.return_code, "stdout": len(item.stdout_buf), "stderr": len(item.stderr_buf),
+            "link_id": item.outlet.link.link_id.hex(),
+            "running": item.process.running if item.process else False,
+        } for item in session.ListenerSession.sessions])
+
     async def observe():
         while True:
             await asyncio.sleep(2)
-            emit("sessions", sessions=[{
-                "state": item.state.name, "authenticated": item.authenticated,
-                "terminated": item.terminated, "process": item.process.pid if item.process else None,
-                "return_code": item.return_code, "stdout": len(item.stdout_buf), "stderr": len(item.stderr_buf),
-            } for item in session.ListenerSession.sessions])
+            emit_sessions("sessions")
     observing = asyncio.create_task(observe())
     destination.announce()
     emit("ready", dest=destination.hexhash, identity=identity.hexhash,
@@ -87,6 +92,9 @@ async def main():
             if command["op"] == "announce":
                 destination.announce()
                 emit("announced")
+                continue
+            if command["op"] == "session_status":
+                emit_sessions("session_status")
                 continue
             if command["op"] != "execute":
                 raise ValueError("Unknown operation")

@@ -50,6 +50,14 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
         {
             if (grantpt(master) != 0 || unlockpt(master) != 0) throw ErrorFor("grantpt/unlockpt");
             var slave = Marshal.PtrToStringUTF8(ptsname(master)) ?? throw ErrorFor("ptsname");
+            if (darwin && (!command.PipeStdin || !command.PipeStdout || !command.PipeStderr))
+            {
+                // XNU rejects extended master ioctls until a replica has opened.
+                // Keep it open until spawn installs the child's terminal endpoints.
+                var initialSlave = open(slave, 2 | DarwinRnshNative.NoControllingTerminal);
+                if (initialSlave < 0) throw ErrorFor("open PTY replica");
+                owned.Add(initialSlave);
+            }
             Check(posix_spawn_file_actions_init(actions)); actionsReady = true;
             Check(posix_spawnattr_init(attr)); attrReady = true;
             Check(posix_spawnattr_setflags(attr, darwin
@@ -173,6 +181,7 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
     [DllImport("libc", SetLastError = true)] private static extern int grantpt(int fd);
     [DllImport("libc", SetLastError = true)] private static extern int unlockpt(int fd);
     [DllImport("libc", SetLastError = true)] private static extern IntPtr ptsname(int fd);
+    [DllImport("libc", SetLastError = true, CharSet = CharSet.Ansi)] private static extern int open(string path, int flags);
     [DllImport("libc", SetLastError = true)] private static extern int close(int fd);
     [DllImport("libc", SetLastError = true)] private static extern int dup(int fd);
     [DllImport("libc", SetLastError = true)] private static extern int pipe([Out] int[] fds);

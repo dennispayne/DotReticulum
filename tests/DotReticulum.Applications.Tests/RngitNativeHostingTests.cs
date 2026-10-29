@@ -29,8 +29,11 @@ public sealed class RngitNativeHostingTests
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(120));
         using var caller = Identity.Generate();
         using var blocked = Identity.Generate();
+        var backend = Environment.GetEnvironmentVariable("DOTRETICULUM_MEDIA_BACKEND");
+        var convertMedia = backend is { Length: > 0 };
         var configPath = Path.Combine(fixture.Config, "config");
-        var hostConfiguration = (await File.ReadAllTextAsync(configPath)).Replace("serve_nomadnet = no", "serve_nomadnet = yes", StringComparison.Ordinal)
+        var hostConfiguration = (await File.ReadAllTextAsync(configPath)).Replace("serve_nomadnet = no",
+            $"serve_nomadnet = yes\nmedia_conversion = {(convertMedia ? "yes" : "no")}", StringComparison.Ordinal)
             .Replace("admin:all", "admin:all, stats:all", StringComparison.Ordinal)
             .Replace("record_stats = yes", $"record_stats = yes\nnode_name = Native acceptance node\nblocked_identities = {blocked.HexHash}", StringComparison.Ordinal);
         await File.WriteAllTextAsync(configPath, hostConfiguration);
@@ -76,7 +79,7 @@ public sealed class RngitNativeHostingTests
             return Convert.FromHexString(match.Groups[1].Value);
         }
         var environment = new Dictionary<string, string>();
-        if (Environment.GetEnvironmentVariable("DOTRETICULUM_MEDIA_BACKEND") is { Length: > 0 } backend)
+        if (backend is { Length: > 0 })
         {
             environment["PATH"] = Path.GetDirectoryName(backend) + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
             environment["RNGIT_MEDIA_BACKEND"] = "ffmpeg";
@@ -151,7 +154,7 @@ public sealed class RngitNativeHostingTests
             ["key"] = "owned", ["path"] = "/media/fixtures/sample.git/HEAD/image.png",
         }, deadline.Token)).Data;
         Assert.NotEmpty(media);
-        if (environment.Count > 0) Assert.NotNull(RngitMedia.WebpInfo(media));
+        if (convertMedia) Assert.NotNull(RngitMedia.WebpInfo(media));
         else Assert.Equal(png, media);
         await using var reference = await PyLinkNode.StartAsync("published-host-reference", rnsdPort: port,
             harness: "live_rngit_client.py", extraArguments:
