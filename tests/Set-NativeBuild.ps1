@@ -2,7 +2,7 @@
 
 <#
 .SYNOPSIS
-Validates a downloaded native build artifact and exports DOTRETICULUM_NATIVE_EXE for later workflow steps.
+Validates a downloaded native build artifact and exports its path for later workflow steps.
 .DESCRIPTION
 Checks the artifact manifest, runtime identifier, commit and executable. Writes
 the application path to GITHUB_ENV when running in GitHub Actions.
@@ -14,6 +14,9 @@ Must match the artifact manifest.
 .PARAMETER Commit
 Expected source commit. Defaults to GITHUB_SHA. When empty, commit matching is
 not checked; runtime identifier and executable checks still run.
+.PARAMETER EnvironmentVariable
+Workflow environment variable receiving the verified executable path. Defaults
+to DOTRETICULUM_NATIVE_EXE; use DOTRETICULUM_BUFFER_CONSUMER for the SDK fixture.
 .EXAMPLE
 .\Set-NativeBuild.ps1 -Directory ..\artifacts\native -Rid win-x64
 #>
@@ -21,7 +24,9 @@ not checked; runtime identifier and executable checks still run.
 param(
     [Parameter(Mandatory)] [string] $Directory,
     [Parameter(Mandatory)] [string] $Rid,
-    [string] $Commit = $env:GITHUB_SHA
+    [string] $Commit = $env:GITHUB_SHA,
+    [ValidateSet('DOTRETICULUM_NATIVE_EXE', 'DOTRETICULUM_BUFFER_CONSUMER')]
+    [string] $EnvironmentVariable = 'DOTRETICULUM_NATIVE_EXE'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,5 +39,5 @@ if ($Commit -and $manifest.commit -ne $Commit) { throw "Artifact was built from 
 $binary = Join-Path (Resolve-Path -LiteralPath $Directory).Path $manifest.executable
 if (!(Test-Path -LiteralPath $binary)) { throw "Executable $binary is missing from the artifact." }
 if (!$IsWindows) { chmod +x $binary; if ($LASTEXITCODE -ne 0) { throw 'chmod failed.' } }
-if ($env:GITHUB_ENV) { "DOTRETICULUM_NATIVE_EXE=$binary" | Add-Content -LiteralPath $env:GITHUB_ENV }
+if ($env:GITHUB_ENV) { "$EnvironmentVariable=$binary" | Add-Content -LiteralPath $env:GITHUB_ENV }
 Write-Host "Using native build $($manifest.commit) ($Rid): $binary"

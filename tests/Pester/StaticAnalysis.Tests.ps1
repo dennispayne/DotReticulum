@@ -39,6 +39,44 @@ BeforeAll {
     }
 }
 
+Describe 'Same-run native artifact selection' -Tag Tooling {
+    It 'exports the verified <Variable> executable' -ForEach @(
+        @{ Variable = 'DOTRETICULUM_NATIVE_EXE' }
+        @{ Variable = 'DOTRETICULUM_BUFFER_CONSUMER' }
+    ) {
+        $directory = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path $directory
+        $binary = Join-Path $directory 'candidate.exe'
+        Set-Content -LiteralPath $binary -Value 'Not executed by artifact validation.'
+        @{ rid = 'test-rid'; commit = 'verified-commit'; executable = 'candidate.exe' } |
+            ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'build-manifest.json')
+        $environmentFile = Join-Path $directory 'github-env'
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', (Join-Path $PSScriptRoot '..\Set-NativeBuild.ps1'),
+            '-Directory', $directory, '-Rid', 'test-rid', '-Commit', 'verified-commit', '-EnvironmentVariable', $Variable) `
+            -Environment @{ GITHUB_ENV = $environmentFile }
+        $result.Code | Should -Be 0 -Because $result.Error
+        (Get-Content -LiteralPath $environmentFile -Raw).Trim() | Should -Be "$Variable=$binary"
+    }
+
+    It 'rejects a consumer artifact with <Problem> before exporting it' -ForEach @(
+        @{ Problem = 'a mismatched source commit'; Commit = 'other-commit'; Binary = $true; Expected = 'Artifact was built from' }
+        @{ Problem = 'a missing executable'; Commit = 'verified-commit'; Binary = $false; Expected = 'is missing from the artifact' }
+    ) {
+        $directory = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path $directory
+        if ($Binary) { Set-Content -LiteralPath (Join-Path $directory 'candidate.exe') -Value 'Not executed.' }
+        @{ rid = 'test-rid'; commit = $Commit; executable = 'candidate.exe' } |
+            ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'build-manifest.json')
+        $environmentFile = Join-Path $directory 'github-env'
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', (Join-Path $PSScriptRoot '..\Set-NativeBuild.ps1'),
+            '-Directory', $directory, '-Rid', 'test-rid', '-Commit', 'verified-commit', '-EnvironmentVariable', 'DOTRETICULUM_BUFFER_CONSUMER') `
+            -Environment @{ GITHUB_ENV = $environmentFile }
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match $Expected
+        Test-Path -LiteralPath $environmentFile | Should -BeFalse
+    }
+}
+
 Describe 'Static analysis reporting' -Tag Tooling {
     It 'reports findings separately from successful jobs and uses rule-default severity' {
         $directory = Join-Path $TestDrive 'reports'

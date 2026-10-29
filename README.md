@@ -97,8 +97,8 @@ bidirectional Channel stream delivery through actual CLI consumers. Management
 requests additionally check intact nested responses on both sides of the
 negotiated packet-size boundary, accepted by all four hosted candidates in
 run 40956389129. An authorized `rnx` case also persists large request input and
-returns its exact output through resource-sized requests and responses; that
-new case has local Windows native/reference evidence, with hosted execution pending. This is
+returns its exact output through resource-sized requests and responses; all four
+hosted candidates passed in run 40961479281. This is
 bounded evidence, not comprehensive parity: the Channel case covers Buffer
 message encoding, not general reader/writer APIs, loss or soak; routing cases
 do not establish alternate routes, RF or impaired meshes.

@@ -29,14 +29,19 @@ public sealed class NativeResourceTests
         public NativePeer(params string[] args) : this(null, args) { }
 
         public NativePeer(IReadOnlyDictionary<string, string>? environment, params string[] args)
+            : this(Environment.GetEnvironmentVariable("DOTRETICULUM_NATIVE_EXE")!, environment, args) { }
+
+        public NativePeer(string executable, IReadOnlyDictionary<string, string>? environment, params string[] args)
         {
-            var info = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTRETICULUM_NATIVE_EXE")!)
+            var info = new ProcessStartInfo(executable)
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
             foreach (var argument in args) info.ArgumentList.Add(argument);
+            foreach (var key in new[] { "GITHUB_STEP_SUMMARY", "GITHUB_ENV", "GITHUB_OUTPUT", "GITHUB_PATH", "GITHUB_STATE" })
+                info.Environment.Remove(key);
             if (environment is not null)
                 foreach (var (key, value) in environment) info.Environment[key] = value;
             _process = Process.Start(info) ?? throw new InvalidOperationException("Could not launch native peer.");

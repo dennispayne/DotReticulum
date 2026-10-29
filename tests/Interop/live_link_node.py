@@ -137,7 +137,11 @@ class TextMessage(CHANNEL.MessageBase):
 def configure_channel(link):
     channel = link.get_channel()
     channel.register_message_type(TextMessage)
+    acc = {"data": bytearray(), "done": False, "compressed_chunks": 0, "plain_chunks": 0}
+
     def on_message(message):
+        if isinstance(message, BUFFER.StreamDataMessage) and message.stream_id == 1 and message.data:
+            acc["compressed_chunks" if message.compressed else "plain_chunks"] += 1
         if not isinstance(message, TextMessage):
             return False
         emit({"event": "channel_msg", "text": message.text})
@@ -145,7 +149,6 @@ def configure_channel(link):
     channel.add_message_handler(on_message)
 
     raw_reader = BUFFER.RawChannelReader(1, channel)
-    acc = {"data": bytearray(), "done": False}
 
     lock = threading.Lock()
 
@@ -156,7 +159,8 @@ def configure_channel(link):
                 acc["data"].extend(chunk)
             if raw_reader._eof and not raw_reader._buffer and not acc["done"]:
                 acc["done"] = True
-                emit({"event": "buffer_done", "size": len(acc["data"]), "sha256": sha256(bytes(acc["data"]))})
+                emit({"event": "buffer_done", "size": len(acc["data"]), "sha256": sha256(bytes(acc["data"])),
+                      "compressed_chunks": acc["compressed_chunks"], "plain_chunks": acc["plain_chunks"]})
 
     raw_reader.add_ready_callback(on_ready)
 

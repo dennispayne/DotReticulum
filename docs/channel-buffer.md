@@ -50,6 +50,19 @@ Actual pinned Python nodes exercise direct upgraded-MTU Channel traffic in both 
 
 ## Native ownership and intentional API differences
 
+`tests/Fixtures/ChannelBufferConsumer` is a separately published consumer of
+the public `ReticulumNode`, `ChannelBuffer`, `RawChannelReader` and
+`RawChannelWriter` APIs, not a production CLI mode. Windows NativeAOT acceptance
+exchanges exactly 340,000 outbound bytes and 200,000 returned bytes with the
+import-verified pinned Python peer in each of two cases. The peer observes both
+compressed and plain nonempty outbound chunks; separate compressible and random
+return streams exercise native reader decoding. Both peers must observe stream
+EOF, and the consumer requires its link still be active before teardown, so
+disconnect cannot masquerade as EOF. This is Integration, not a new shared
+Compatibility claim or passing loss/soak acceptance. CI publishes the consumer
+in Build, records its commit/RID/executable manifest and reuses that same-run
+artifact in Test; Linux/macOS execution is pending.
+
 `RawChannelReader` uses one lazily allocated circular byte buffer. Its default
 unread-byte capacity is 1 MiB; callers may select `maxBufferedBytes` on the
 constructor or factory. Reads do not copy/reallocate the remaining buffer.

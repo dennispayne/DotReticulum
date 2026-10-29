@@ -4,6 +4,70 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Native public Buffer SDK consumer and four-candidate large-request acceptance
+
+Added `tests/Fixtures/ChannelBufferConsumer`, a minimal separately published
+public API consumer, without adding a production CLI/debug mode or changing
+the protocol. `NativeBufferTests` drives actual pinned Python Buffer APIs over
+loopback TCP: exactly **340,000 outbound bytes** (190,000 compressible and
+150,000 random) and **200,000 returned bytes** in each of two cases, one
+compressible and one random. Exact persisted length and SHA-256 must match
+both ways. An ordinary upstream Channel observer records compressed/plain
+nonempty received chunks before the original RawChannelReader; both must occur.
+No reference protocol method or timer is replaced. Upstream must observe EOF,
+and the native consumer requires incoming EOF while its link is still Active,
+then awaits its actual teardown write.
+
+The shared native process helper accepts an explicit executable and removes
+inherited Actions command-file variables before applying any explicitly owned
+environment. Missing live/native prerequisites explicitly skip locally; a
+configured missing binary fails. CI publishes this SDK consumer in Build with
+strict AOT/trimming warnings, its own commit/RID/executable manifest, and
+reuses the same-run binary in Test. The artifact selector can export the
+consumer's dedicated variable; four real child-process Pester cases exercise
+both supported exports and reject a wrong commit or missing consumer binary.
+Native resource and Buffer results use separate directories and parent-qualified
+labels; summarizing actual TRX files verified two distinct assembly rows.
+Normal CI requires the same-run verified reference for this new native flow.
+This is bounded **Integration**, not shared Compatibility or loss/soak evidence.
+Cross-platform hosted consumer acceptance remains pending.
+
+Validation:
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+  zero warnings/errors.
+- `DOTRETICULUM_LIVE=0 dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --logger trx --results-directory TestResults\native-buffer-final-baseline -- xUnit.MaxParallelThreads=1`:
+  **1,864 passed / 90 explicit skips / zero failures**.
+- In the same MSVC-configured process,
+  `dotnet publish tests\Fixtures\ChannelBufferConsumer\ChannelBufferConsumer.csproj -c Release -r win-x64 -o artifacts\native-buffer-consumer -p:PublishAot=true -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true --nologo -v quiet`:
+  strict publication passed; native `--help` passed. Executable SHA-256
+  **9f7bbf3bdb3c18be6c51092b36684d270e9d970872d0f7637e4e507e92f10e66**.
+- With `DOTRETICULUM_LIVE=1`, the existing import-verified RNS 1.5.7/LXMF 1.2.1
+  environment and `DOTRETICULUM_BUFFER_CONSUMER` set to that native binary,
+  `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~NativeBufferTests' --logger trx --results-directory TestResults\native-buffer-both-modes -- xUnit.MaxParallelThreads=1`:
+  **two passed / zero skips**.
+- Before splitting return modes, the native consumer, existing published-native
+  encrypted/compressed **2,200,017-byte** resource and terminal flow, plus the
+  managed live bidirectional Buffer case passed together:
+  `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~NativeBufferTests|FullyQualifiedName~NativeResourceTests|FullyQualifiedName~RnshNativeTests|FullyQualifiedName~Channel_MessagesAndBufferStreamsInteroperate_BothWays' --logger trx --results-directory TestResults\native-buffer-final-live -- xUnit.MaxParallelThreads=1`:
+  **four passed / zero skips**.
+- `pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+  **65 passed / two prerequisite skips / zero failures**.
+- `pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
+  **66 tracked scripts / zero findings**.
+- `Get-Help .\tests\Set-NativeBuild.ps1 -Full` discovers the added environment
+  variable parameter description. No production source changed, and separately
+  launched NativeAOT processes are not managed Coverlet coverage.
+
+Separately, downloaded all four actual Compatibility reports from exact-source
+**67eaa41**, **40961479281**: **42/42 passed on Upstream, Linux, macOS and
+Windows**, including **T059**. The actual Summarize Compatibility job
+**123759309158** renders T057/T058/T059 Passed for all four candidates with
+commit-pinned test-code links. This resolves the earlier T059 hosted-pending
+statement; the older b716cc6 external-reference failure remains recorded.
+The full extended interop/Test workflow is still running, so its checklist
+item is not yet checked off.
+
 ### Accepted three-repeat mixed-mesh workflow on all desktop targets
 
 Exact-source **86a9b72**, **40956389129**, completed successfully with all

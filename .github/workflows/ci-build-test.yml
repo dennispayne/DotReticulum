@@ -126,21 +126,27 @@ jobs:
 
       - name: Publish NativeAOT
         run: |
-          $publish = @('publish', 'src/DotReticulum.Applications/DotReticulum.Applications.csproj',
-            '-c', 'Release', '-r', '${{ matrix.rid }}',
-            '-p:ILLinkTreatWarningsAsErrors=true', '-p:IlcTreatWarningsAsErrors=true',
-            '-o', 'artifacts/native')
           if ($IsWindows) {
             $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer'
             $env:PATH = "$installer;$env:PATH"
             $installation = & (Join-Path $installer 'vswhere.exe') -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
             if (!$installation) { throw 'MSVC NativeAOT tools are unavailable.' }
             $setup = Join-Path $installation 'VC/Auxiliary/Build/vcvars64.bat'
-            & $env:ComSpec /c "call `"$setup`" >nul && dotnet $($publish -join ' ')"
-          } else {
-            dotnet @publish
           }
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($target in @(
+            @{ Project = 'src/DotReticulum.Applications/DotReticulum.Applications.csproj'; Directory = 'artifacts/native' },
+            @{ Project = 'tests/Fixtures/ChannelBufferConsumer/ChannelBufferConsumer.csproj'; Directory = 'artifacts/native/buffer-consumer' }
+          )) {
+            $publish = @('publish', $target.Project, '-c', 'Release', '-r', '${{ matrix.rid }}',
+              '-p:PublishAot=true', '-p:ILLinkTreatWarningsAsErrors=true', '-p:IlcTreatWarningsAsErrors=true',
+              '-o', $target.Directory)
+            if ($IsWindows) {
+              & $env:ComSpec /c "call `"$setup`" >nul && dotnet $($publish -join ' ')"
+            } else {
+              dotnet @publish
+            }
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Smoke test and write build manifest
         run: |
@@ -149,6 +155,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           [ordered]@{ commit = $env:GITHUB_SHA; rid = '${{ matrix.rid }}'; executable = $executable } |
             ConvertTo-Json | Set-Content -LiteralPath artifacts/native/build-manifest.json -Encoding utf8
+          $consumer = if ($IsWindows) { 'ChannelBufferConsumer.exe' } else { 'ChannelBufferConsumer' }
+          & (Join-Path $PWD "artifacts/native/buffer-consumer/$consumer") --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          [ordered]@{ commit = $env:GITHUB_SHA; rid = '${{ matrix.rid }}'; executable = $consumer } |
+            ConvertTo-Json | Set-Content -LiteralPath artifacts/native/buffer-consumer/build-manifest.json -Encoding utf8
 
       - name: Upload native build
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -202,7 +213,9 @@ jobs:
           path: artifacts/native
 
       - name: Verify native build
-        run: ./tests/Set-NativeBuild.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
+        run: |
+          ./tests/Set-NativeBuild.ps1 -Directory artifacts/native -Rid ${{ matrix.rid }}
+          ./tests/Set-NativeBuild.ps1 -Directory artifacts/native/buffer-consumer -Rid ${{ matrix.rid }} -EnvironmentVariable DOTRETICULUM_BUFFER_CONSUMER
 
       - name: Reuse the candidate-fetched reference
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -272,7 +285,17 @@ jobs:
 
       - name: Run native executable resource flow
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj -c Release --no-build --filter 'FullyQualifiedName~NativeResourceTests' --results-directory TestResults/native --logger trx -- xUnit.MaxParallelThreads=1
+        run: dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj -c Release --no-build --filter 'FullyQualifiedName~NativeResourceTests' --results-directory TestResults/native/resources --logger trx -- xUnit.MaxParallelThreads=1
+
+      - name: Run native public Buffer consumer against pinned Python
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          DOTRETICULUM_LIVE: '1'
+        run: |
+          if (!$env:DOTRETICULUM_PYTHON -or !$env:DOTRETICULUM_UPSTREAM) {
+            throw 'Native Buffer acceptance requires the same-run candidate-fetched, verified reference.'
+          }
+          dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj -c Release --no-build --filter 'FullyQualifiedName~NativeBufferTests' --results-directory TestResults/native/buffer --logger trx -- xUnit.MaxParallelThreads=1
 
       - name: Run native CLI and installation checks
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -334,7 +357,7 @@ jobs:
       - name: Summarize native test results
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
-          $summary = & ./tests/Get-TestSummary.ps1 -Path TestResults/native, TestResults/native-cli.xml, TestResults/contract-integration/contract-integration.xml -Title 'Native executable and contract integration tests (${{ matrix.rid }})' -JsonPath TestResults/summary-native.json
+          $summary = & ./tests/Get-TestSummary.ps1 -Path TestResults/native, TestResults/native-cli.xml, TestResults/contract-integration/contract-integration.xml -IncludeParentDirectory -Title 'Native executable and contract integration tests (${{ matrix.rid }})' -JsonPath TestResults/summary-native.json
           $summary
 
       - name: Retain test diagnostics

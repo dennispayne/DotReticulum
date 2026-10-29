@@ -89,7 +89,7 @@ runtime effect is implemented.
 | Requests/responses/receipts/progress/limits and owned callback work; `Link.py:473–510,804–918,1324–1498`, `Destination.py:320–390` | **Implemented** bounded V/U/L: `Parity5RequestTests`, `Parity5TransferLiveTests`. Preinstalled limits, small/resource responses, denial/list/identified policies, cancellation and core settlement without observers. Explicit bounded handlers/queues and overflow diagnostics are intentional; arbitrary blocking synchronous user callbacks cannot be force-cancelled. |
 | Resources, metadata/compression/hashes/parts/HMU/proofs/queue/cancel and multipart file storage; `Resource.py:169–514,576–1123,1138–1379` | **Implemented** bounded V/U/L/P/N: `Parity5ResourceTests`, `Parity5ResourceStorageTests`, `Parity5TransferLiveTests`, `NativeResourceTests`, resource/rncp Pester. Seekable/forward-only input, spooling, mandatory teardown joins, malformed metadata/decompression bounds and next-queue release covered. Explicit size/concurrency/storage limits differ from upstream. Cross-link/restart arbitrary-offset resume is **not applicable**: no such pinned protocol exists. Source-generated XOR resource fixtures do not prove encryption. |
 | Channel envelope/order/window/retry/receipts/exhaustion; `Channel.py:113–148,175–245,303–608` | **Implemented** bounded V/U/L coverage and rnsh N: `ChannelResilienceTests`, `Parity5ChannelTests`, `Parity5ChannelRetryCryptoTests`, mixed transfers/rnsh. Wrap/reorder/RTT boundaries have independent reference evidence, not live 65536-message wrap-under-loss evidence. Retries preserve envelope/sequence but use fresh encryption/hash/receipt. Prolonged impaired soak is **unverified**. |
-| Buffer stream IDs/compression/EOF/flow/closure/callbacks; `Buffer.py:44–379` | **Implemented native equivalent** V/U/L coverage and rnsh N: `Parity5ChannelBufferTests`, mixed transfer/rnsh. Bounded slow-reader failure, outstanding-read settlement and concurrent close/write covered. Native blocking async reads, internal-handler precedence, bounded callbacks and 15-second close deadline intentionally differ from Python's nonblocking stream API and RTT-based close. |
+| Buffer stream IDs/compression/EOF/flow/closure/callbacks; `Buffer.py:44–379` | **Implemented native equivalent** V/U/L coverage, rnsh N and Windows published public-API consumer N: `Parity5ChannelBufferTests`, `NativeBufferTests`, mixed transfer/rnsh. Exact compressed/binary streams and active-link EOF accepted; broader native platform/loss/soak acceptance remains unverified. Bounded slow-reader failure, outstanding-read settlement and concurrent close/write covered. Native blocking async reads, internal-handler precedence, bounded callbacks and 15-second close deadline intentionally differ from Python's nonblocking stream API and RTT-based close. |
 
 Shared advertised-claim cases **T053/T058 / C008** drive the actual candidate
 **rnstatus CLI** against the same pinned upstream management endpoint.
@@ -112,8 +112,10 @@ bytes and returned output, authenticated identity, actual request-resource
 advertisement/ID, and both packed request and response above the observed MDU.
 The thin observer delegates to the original command generator and uses normal
 resource callbacks; it does not replace protocol methods, timers or responses.
-Windows published-native and upstream-to-upstream executions passed locally;
-fresh hosted acceptance remains pending. This does not establish arbitrary
+Windows published-native and upstream-to-upstream executions passed locally,
+then all four hosted candidates passed in **40961479281**, exact source
+**67eaa41**. All four actual reports contain **42 passed / zero failed**.
+This does not establish arbitrary
 application values, multiline console-byte equivalence, concurrent requests,
 timeouts/cancellation or general remote-execution parity.
 
