@@ -161,11 +161,12 @@ def configure_channel(link):
 
 
 def resource_observation(resource):
-    return {name: getattr(resource, name, None) for name in (
+    return dict(observed_at=time.time(), **{name: getattr(resource, name, None) for name in (
         "rtt", "max_retries", "retries_left", "outstanding_parts", "received_count",
         "receiving_part", "watchdog_lock", "waiting_for_hmu", "consecutive_completed_height",
         "req_resp_rtt_rate", "req_data_rtt_rate", "eifr", "sdu", "window", "window_min",
-        "window_max", "req_sent", "req_resp", "last_activity", "sent_parts", "total_parts")}
+        "window_max", "req_sent", "req_resp", "last_activity", "sent_parts", "total_parts",
+        "part_timeout_factor")})
 
 
 def configure_link(link, role, identity_box):

@@ -4,6 +4,77 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Independent cold-window reference failure and explicit measured-window recovery
+
+Executed a real **all-upstream** control: two pinned Python transports, two
+Python leaves and the existing owned C# impairment bridge, with no .NET
+forwarder and no upstream algorithm/timer/MTU patch. The thin transport adapter
+now supports a server-only root by omitting its optional client configuration;
+existing server/client and client-only roles are unchanged. The source remains
+**a29bfb51c468945c96a1ee22cae0114e993e2391**, with verified actual imports.
+Actual imported Windows `RNS\Resource.py` SHA-256:
+**9e4543ee19255ab7269d8861a2d977587319968b7986f4846d75ee7dba453699**.
+
+Both control cases negotiate **16384-byte MTU**, prove an actual DATA receipt,
+then drop three initial resource-window parts. Without added latency, the
+**220019-byte** resource completes with the exact peer hash and **3/3**
+loss/retry. At **120 ms/frame**, both resource callbacks report **FAILED (7)**:
+receiver still **ACTIVE (2)**, **one received / three outstanding**, **16 retries
+left**, **zero retries observed**, SDU **16348**, EIFR
+**6524.248129251539 bit/s**, RTT **0.25014376640319824**. Actual upstream DEBUG
+reports **Resource timed out waiting for part requests**. Receiver's earliest
+first repair is about **120 seconds** after its last part, but the sender
+cancels after about **102 seconds**, matching its actual **0.25481247901916504**
+resource RTT and reference sender budget. This establishes a pinned reference
+limitation independent of .NET forwarding; it does not prove that it is the
+sole cause of earlier macOS link timeouts.
+
+The initial exploratory **80 ms/frame** control actually **recovered** with
+three retries, correctly failing the provisional negative assertion. The
+120 ms control was chosen from the source timing inequality, not by increasing
+a test wait or changing a reference timer. `Resource.py:561-571` derives cold
+EIFR from establishment cost / RTT; `601-612` uses that estimate for receiver
+repair, while `642-649` independently bounds sender wait. Throughput is only
+measured after a complete initial window (`842-940`).
+
+Added a clearly named **negative reference integration control**, not a shared
+Compatibility claim or passing recovery result. It requires the healthy
+zero-latency control, both actual failed callbacks, the sender's specific
+diagnostic, an active receiver, exact cold-window state and the observed
+repair/cancellation inequality. No unexplained timeout or alternate unexpected
+outcome passes. Ordinary non-live execution explicitly skips it.
+
+The strict mixed recovery case now explicitly injects loss **after each first
+complete four-part window**. This changes its bounded acceptance to
+**measured-window recovery**, not cold recovery; the latter remains unchecked
+in TODO and explicitly negative in the mesh documentation. All five resources
+still require exact bytes/hash/status, exactly one conclusion and **15/15**
+distinct dropped/retried parts. It additionally requires exactly **20 passed
+initial parts**, retaining capacity-one backpressure, **20 ms/frame** latency,
+both router restarts and the interrupted active-link assertions. No loss count,
+MTU, production protocol, retry policy or timeout is relaxed. A focused fixture
+test checks that initial-window passes do not consume the distinct-loss budget.
+
+Final validation:
+
+- Verified-reference `DOTRETICULUM_LIVE=1`,
+  `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --filter 'FullyQualifiedName~Parity8CompatibilityLiveTests|FullyQualifiedName~Parity8ResourceLossFixtureTests|FullyQualifiedName~LiveMixedTransportTests' --results-directory TestResults\reference-resource-boundaries-final --logger trx --logger 'console;verbosity=minimal' -- xUnit.MaxParallelThreads=1`: **5 passed / zero skips**, **2m38s**, including the explicitly negative reference control.
+- Actual measured-window recovery: **42.42s**, **15 dropped / 15 retried**,
+  **20 initial parts passed**, **210 backpressure waits**, **four TCP sessions**;
+  surviving leaves, both persisted-identity router restarts, forced Python crash,
+  interrupted old session and distinct recovered session all exercised.
+- Re-executed the final negative control, including its specific sender-log
+  assertion: **1/1 passed / no skips**, **1m51s**,
+  `TestResults\reference-resource-negative-assertions-final`.
+- `DOTRETICULUM_LIVE=0 dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --logger trx --results-directory TestResults\reference-resource-boundaries-full-final -- xUnit.MaxParallelThreads=1`: **1854 passed / 86 explicit skips / zero failures**.
+
+This slice changes tests/adapters and truthful acceptance boundaries, not
+production code. The preceding strict native/coverage gates remain the evidence
+for unchanged production source; no redundant native publication is claimed.
+Full interop **40926579478** still tests earlier **f568802**, without this later
+measured-window/negative-control separation. Cross-platform acceptance of this
+slice and repeated mesh reporting remain pending actual hosted execution.
+
 ### Darwin exit draining and the first rnsh window change
 
 Full interop **40918584672**, exact source **291bc7d**, completed **failed**.

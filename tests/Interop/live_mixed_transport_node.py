@@ -1,7 +1,7 @@
 """Isolated mixed-transport regression peer; no upstream monkeypatches.
 
 Reticulum-hosted RNS snapshot pinned by reference_environment.py.
-Both ports: real Python transport with TCP server and client. Client port only:
+Server port: real Python transport, with an optional TCP client. Client port only:
 leaf. All interfaces are loopback, shared instance disabled, gateway discovery
 enabled on the transport interfaces. Nothing announces until commanded.
 Driven through PyLinkNode by LiveMixedTransportTests (DOTRETICULUM_LIVE=1).
@@ -38,10 +38,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     parser.add_argument("--tcp-server-port", type=int, default=0)
-    parser.add_argument("--rnsd-port", type=int, required=True)
+    parser.add_argument("--rnsd-port", type=int, default=0)
     parser.add_argument("--network-name", default="")
     parser.add_argument("--network-key", default="")
     args = parser.parse_args()
+    if not args.tcp_server_port and not args.rnsd_port:
+        parser.error("A TCP server or client port is required")
     verify_reference()
     transport = bool(args.tcp_server_port)
     os.makedirs(args.config, exist_ok=True)
@@ -60,13 +62,7 @@ def main():
     listen_port = {args.tcp_server_port}
 {ifac}
 """ if transport else ""
-    with open(os.path.join(args.config, "config"), "w", encoding="utf-8") as config:
-        config.write(f"""[reticulum]
-  enable_transport = {"yes" if transport else "no"}
-  share_instance = no
-[logging]
-  loglevel = 4
-[interfaces]
+    client = f"""
   [[ToDotNet]]
     type = TCPClientInterface
     enabled = yes
@@ -74,6 +70,15 @@ def main():
     target_host = 127.0.0.1
     target_port = {args.rnsd_port}
 {ifac}
+""" if args.rnsd_port else ""
+    with open(os.path.join(args.config, "config"), "w", encoding="utf-8") as config:
+        config.write(f"""[reticulum]
+  enable_transport = {"yes" if transport else "no"}
+  share_instance = no
+[logging]
+  loglevel = 4
+[interfaces]
+{client}
 {server}""")
     RNS.Reticulum(configdir=args.config, loglevel=RNS.LOG_WARNING)
     identity = RNS.Identity()

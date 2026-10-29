@@ -141,7 +141,10 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             var before = receiver.Count("resource_done");
             var lostBefore = bridge.Dropped;
             var retryBefore = bridge.Retried;
-            bridge.LoseResourceParts(fromPython, 3);
+            var primedBefore = bridge.PassedBeforeLoss;
+            // Pinned Resource.py:842-940 only measures throughput after its first
+            // complete four-part window. Cold-window failure is a separate negative control.
+            bridge.LoseResourceParts(fromPython, 3, afterParts: 4);
             var sent = await sender.Command($"resource {size} {seed} random", "resource_sent", TransferTimeout);
             var received = await receiver.NextAsync("resource_done", before, Patience);
             Assert.True(sent.GetProperty("status").GetInt32() == 6,
@@ -152,6 +155,7 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             Assert.False(sent.GetProperty("compressed").GetBoolean());
             Assert.Equal(lostBefore + 3, bridge.Dropped);
             Assert.Equal(retryBefore + 3, bridge.Retried);
+            Assert.Equal(primedBefore + 4, bridge.PassedBeforeLoss);
             Assert.Single(receiver.Events("resource_done").Skip(before));
         }
 
@@ -239,9 +243,11 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             Assert.True(bridge.BackpressureWaits > 0, "The capacity-one bearer queue must actually apply backpressure.");
             Assert.Equal(15, bridge.Dropped);
             Assert.Equal(15, bridge.Retried);
+            Assert.Equal(20, bridge.PassedBeforeLoss);
             output.WriteLine($"A(Python leaf) -- Python transport -- impaired TCP -- .NET transport -- B(Python leaf); " +
                 $"2.2 MB incompressible resources both ways, 20 ms/frame latency, capacity-one bearer queues, " +
                 $"router inbound capacities=2; dropped/retransmitted parts={bridge.Dropped}/{bridge.Retried}, " +
+                $"first complete resource windows passed before loss={bridge.PassedBeforeLoss} parts; " +
                 $"backpressure waits={bridge.BackpressureWaits}, TCP sessions={bridge.Sessions}; " +
                 "proved packets after TCP reconnect, persisted-identity .NET restart and forced Python-router crash/restart; " +
                 "crash interrupted an active proved link, detached its .NET forwarding state and prevented further delivery; " +
@@ -265,7 +271,89 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
         }
     }
 
-    internal sealed class ResourceLossBridge(int targetPort) : IAsyncDisposable
+    [Trait("Category", "Live")]
+    [LiveFact]
+    public async Task PinnedUpstreamOnlyColdWindowLossNegativeControlCancelsBeforeItsFirstRepair()
+    {
+        foreach (var latency in new[] { 0, 120 })
+        {
+            var rootPort = Port();
+            var leftPort = Port();
+            await using var bridge = new ResourceLossBridge(rootPort, latency);
+            var peers = new List<PyLinkNode>();
+            try
+            {
+                var root = await PyLinkNode.StartAsync("reference-root", tcpServerPort: rootPort,
+                    harness: "live_mixed_transport_node.py");
+                peers.Add(root);
+                bridge.Start();
+                var left = await PyLinkNode.StartAsync("reference-left", tcpServerPort: leftPort, rnsdPort: bridge.Port,
+                    harness: "live_mixed_transport_node.py");
+                peers.Add(left);
+                var a = await PyLinkNode.StartAsync("a", rnsdPort: leftPort, harness: "parity8_transport_node.py");
+                peers.Add(a);
+                var b = await PyLinkNode.StartAsync("b", rnsdPort: rootPort, harness: "parity8_transport_node.py");
+                peers.Add(b);
+                foreach (var router in new[] { root, left })
+                    Assert.True(Assert.Single(router.Events("ready")).GetProperty("transport").GetBoolean());
+                Assert.True((await a.Command($"request_path {b.HashHex} 60", "path", Patience)).GetProperty("has_path").GetBoolean());
+                Assert.True((await b.Command($"request_path {a.HashHex} 60", "path", Patience)).GetProperty("has_path").GetBoolean());
+                Assert.Equal(3, (await a.Command($"path {b.HashHex}", "path", Patience)).GetProperty("hops").GetInt32());
+                var acceptedBefore = b.Count("link_up");
+                var connected = await a.Command($"connect {b.HashHex}", "link_up", Patience);
+                var accepted = await b.NextAsync("link_up", acceptedBefore, Patience);
+                Assert.Equal(connected.GetProperty("link_id").GetString(), accepted.GetProperty("link_id").GetString());
+                Assert.Equal(16384, connected.GetProperty("mtu").GetInt32());
+                Assert.True((await a.Command("send 7265666572656e63652d636f6e74726f6c", "sent", Patience))
+                    .GetProperty("delivered").GetBoolean());
+                Assert.Equal("7265666572656e63652d636f6e74726f6c",
+                    Assert.Single(b.Events("data")).GetProperty("payload").GetString());
+                output.WriteLine($"Actual upstream-only routers, {latency} ms/frame, sender {await a.Command("stat", "stat", Patience)}, " +
+                    $"receiver {await b.Command("stat", "stat", Patience)}.");
+                var before = b.Count("resource_done");
+                bridge.LoseResourceParts(fromPython: true, 3);
+                var sent = await a.Command("resource 220019 reference-cold-window random", "resource_sent", TransferTimeout);
+                var received = await b.NextAsync("resource_done", before, Patience);
+                output.WriteLine($"Actual upstream-only result, {latency} ms/frame: sender={sent}; receiver={received}; " +
+                    $"dropped={bridge.Dropped}, retried={bridge.Retried}.");
+                Assert.Equal(3, bridge.Dropped);
+                if (latency == 0)
+                {
+                    Assert.Equal(6, sent.GetProperty("status").GetInt32());
+                    Assert.Equal(6, received.GetProperty("status").GetInt32());
+                    Assert.Equal(220019, received.GetProperty("size").GetInt32());
+                    Assert.Equal(sent.GetProperty("sha256").GetString(), received.GetProperty("sha256").GetString());
+                    Assert.Equal(3, bridge.Retried);
+                }
+                else
+                {
+                    // This is a negative reference observation, never successful recovery acceptance.
+                    Assert.Equal(7, sent.GetProperty("status").GetInt32());
+                    Assert.Equal(7, received.GetProperty("status").GetInt32());
+                    Assert.Equal(2, received.GetProperty("link_status").GetInt32());
+                    Assert.Contains("Resource timed out waiting for part requests", a.Log);
+                    Assert.Equal(0, bridge.Retried);
+                    var state = received.GetProperty("state");
+                    Assert.Equal(1, state.GetProperty("received_count").GetInt32());
+                    Assert.Equal(3, state.GetProperty("outstanding_parts").GetInt32());
+                    Assert.Equal(16, state.GetProperty("retries_left").GetInt32());
+                    Assert.Equal(0, state.GetProperty("req_data_rtt_rate").GetDouble());
+                    var firstRepairWait = state.GetProperty("part_timeout_factor").GetDouble() * 3 *
+                        state.GetProperty("sdu").GetDouble() * 8 / state.GetProperty("eifr").GetDouble();
+                    var observedAge = state.GetProperty("observed_at").GetDouble() - state.GetProperty("last_activity").GetDouble();
+                    Assert.True(firstRepairWait > observedAge,
+                        $"Expected first repair after {firstRepairWait:F3}s, but cancellation occurred at {observedAge:F3}s.");
+                }
+            }
+            finally
+            {
+                foreach (var peer in peers) output.WriteLine(peer.Name + ":\n" + peer.Log);
+                await Task.WhenAll(peers.Select(peer => peer.DisposeAsync().AsTask()));
+            }
+        }
+    }
+
+    internal sealed class ResourceLossBridge(int targetPort, int latencyMilliseconds = 20) : IAsyncDisposable
     {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
         private readonly CancellationTokenSource _stop = new();
@@ -273,16 +361,20 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
         private readonly ConcurrentDictionary<string, byte> _lostParts = new();
         private TcpClient? _incoming, _outgoing;
         private Task _running = Task.CompletedTask;
-        private int _sessions, _dropped, _retried, _backpressureWaits, _dropUp, _dropDown;
+        private int _sessions, _dropped, _retried, _backpressureWaits, _dropUp, _dropDown, _passUp, _passDown, _passedBeforeLoss;
         public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
         public int Sessions => Volatile.Read(ref _sessions);
         public int Dropped => Volatile.Read(ref _dropped);
         public int Retried => Volatile.Read(ref _retried);
         public int BackpressureWaits => Volatile.Read(ref _backpressureWaits);
+        public int PassedBeforeLoss => Volatile.Read(ref _passedBeforeLoss);
 
         public void Start() { _listener.Start(1); _running = Run(); }
-        public void LoseResourceParts(bool fromPython, int count) =>
+        public void LoseResourceParts(bool fromPython, int count, int afterParts = 0)
+        {
+            Interlocked.Exchange(ref (fromPython ? ref _passUp : ref _passDown), afterParts);
             Interlocked.Exchange(ref (fromPython ? ref _dropUp : ref _dropDown), count);
+        }
         public void Disconnect() { lock (_gate) { _incoming?.Dispose(); _outgoing?.Dispose(); } }
 
         internal bool DropResourcePart(bool fromPython, string hash)
@@ -295,7 +387,15 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
                 return false;
             }
             ref var remaining = ref (fromPython ? ref _dropUp : ref _dropDown);
-            if (Volatile.Read(ref remaining) <= 0 || !_lostParts.TryAdd(key, 0)) return false;
+            if (Volatile.Read(ref remaining) <= 0) return false;
+            ref var passing = ref (fromPython ? ref _passUp : ref _passDown);
+            if (Volatile.Read(ref passing) > 0)
+            {
+                Interlocked.Decrement(ref passing);
+                Interlocked.Increment(ref _passedBeforeLoss);
+                return false;
+            }
+            if (!_lostParts.TryAdd(key, 0)) return false;
             Interlocked.Decrement(ref remaining);
             Interlocked.Increment(ref _dropped);
             return true;
@@ -399,7 +499,7 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
                         throw new InvalidDataException("Malformed packet in compatibility bearer.");
                     if (packet.Context == LinkContext.Resource &&
                         DropResourcePart(fromPython, Convert.ToHexStringLower(packet.CalculateHash()))) continue;
-                    await Task.Delay(20, stopped.Token);
+                    await Task.Delay(latencyMilliseconds, stopped.Token);
                     await destination.WriteAsync(frame, stopped.Token);
                 }
             }
@@ -420,6 +520,24 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
 [Trait("Category", "Integration")]
 public sealed class Parity8ResourceLossFixtureTests
 {
+    [Fact]
+    public async Task InitialWindowPassesWithoutConsumingTheDistinctPartLossBudget()
+    {
+        await using var bridge = new Parity8CompatibilityLiveTests.ResourceLossBridge(0);
+        bridge.LoseResourceParts(fromPython: true, 3, afterParts: 4);
+        for (var i = 0; i < 4; i++) Assert.False(bridge.DropResourcePart(true, "initial-" + i));
+        Assert.Equal(4, bridge.PassedBeforeLoss);
+        for (var i = 0; i < 3; i++)
+        {
+            Assert.True(bridge.DropResourcePart(true, "lost-" + i));
+            Assert.False(bridge.DropResourcePart(true, "lost-" + i));
+        }
+        Assert.Equal(3, bridge.Dropped);
+        Assert.Equal(3, bridge.Retried);
+        Assert.Equal(4, bridge.PassedBeforeLoss);
+        Assert.False(bridge.DropResourcePart(true, "after-loss"));
+    }
+
     [Fact]
     public async Task EarlyRetransmissionsDoNotConsumeTheRemainingDistinctPartLossBudget()
     {
