@@ -45,6 +45,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] Expand shared advertised-claim scenarios for heterogeneous routing, broader application request boundaries and Channel/Buffer
   - [x] Shared two-hop UDP/TCP routing in both directions with exact persisted bytes and observed hops (T055/T056; all four candidates passed in hosted run 40890841836)
   - [x] Shared ordered bidirectional Channel stream delivery through actual CLI consumers and pinned upstream message codecs (T057; all four candidates passed in hosted run 40915647175; broader Buffer APIs/loss/soak remain outstanding)
+  - [x] Shared small and resource-sized nested management responses (T053/T058; all four hosted candidates accepted)
   - [x] Expand identity/cryptographic failures, forged delivery proofs, authenticated management requests and fixed-upstream-peer file-transfer/IFAC acceptance (37 distinct cases, 17 quoted claims; 37/37 passed for all four candidates, all 12 CI jobs green in run 40634153580)
   - [ ] Verified primary-source citation browsing links (Git destination resolved; derived NomadNet page link failed; external URI scheme and line anchors unverified; no GitHub fallback)
   - [x] Approved Verb-Noun standalone PowerShell entry points, discoverable help for every declared parameter and updated workflow/documentation callers

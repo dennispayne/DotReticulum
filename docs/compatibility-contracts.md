@@ -101,10 +101,21 @@ response. Pinned `Link.py:845-854` carries such larger responses as resources;
 there is no response padding or replacement serialization. The observer
 delegates to the original status generator with its existing identity allowlist,
 and **T054** also requires that a denied identity never invokes that generator.
+All four hosted candidates passed these management cases in **40956389129**.
+These are bounded management request/response cases, not full Request/Response
+acceptance.
+
+**T059 / C008** additionally drives the actual candidate **rnx CLI** against an
+allowlisted upstream execution listener. The same fixed command persists and
+echoes **21,874 bytes** of ASCII-safe input. The test requires exact persisted
+bytes and returned output, authenticated identity, actual request-resource
+advertisement/ID, and both packed request and response above the observed MDU.
+The thin observer delegates to the original command generator and uses normal
+resource callbacks; it does not replace protocol methods, timers or responses.
 Windows published-native and upstream-to-upstream executions passed locally;
-fresh hosted cross-platform acceptance remains pending. These are bounded
-management request/response cases, not arbitrary application-value, large
-request, concurrency, timeout/cancellation or full Request/Response acceptance.
+fresh hosted acceptance remains pending. This does not establish arbitrary
+application values, multiline console-byte equivalence, concurrent requests,
+timeouts/cancellation or general remote-execution parity.
 
 Shared advertised-claim case **T057 / C009** additionally drives the actual
 candidate **rnsh CLI** against a pinned upstream Channel application using

@@ -4,6 +4,75 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Shared resource-sized application requests and responses
+
+Added **T059 / C008**, keeping the same scenario, fixed command, seeded
+ASCII-safe input and assertions for actual upstream and native candidates.
+The actual **rnx CLI** authenticates to an explicitly allowlisted pinned
+upstream execution listener. Its fixed PowerShell child persists and echoes
+**21,874 exact input bytes**. Acceptance requires the persisted bytes and
+returned output, authenticated identity, zero child exit/stderr, an observed
+request-resource advertisement with the actual matching request ID, and
+serialized request **and** response exceeding the actual **16,303-byte MDU**.
+Observed final packed request sizes were **22,852 / 22,840 bytes**
+(native/upstream); both response bodies were **21,923 bytes**. Command/path
+encoding accounts for the small invocation-size difference.
+
+The thin reference adapter invokes pinned `rnx.listen`, delegates to the
+original `execute_received_command`, and adds normal application resource
+callbacks. It neither replaces Link/Resource algorithms nor changes request
+values, authorization, timers, serialization or responses. Source contracts:
+`Link.py:473-510,804-854,885-897,1031-1040`, `Resource.py:168-230` and
+`Utilities/rnx.py:63-138,155-249,376-396`, unchanged pin
+**a29bfb51c468945c96a1ee22cae0114e993e2391** / RNS 1.5.7.
+The existing import/revision verifier runs for both CLI and observer.
+`reference_cli.py` now also exposes the unchanged rnx entry point.
+
+Initial experiments remained failing evidence until resolved: the CLI adapter
+had not yet exposed rnx; accepted incoming request Resources intentionally do
+not populate `resource.request_id`, so observation now uses the original
+advertisement's public `read_request_id`/`is_request` methods; and upstream
+Windows console `print` translates LF to CRLF. The final **identical**
+ASCII-safe input omits line breaks rather than normalizing mismatched bytes or
+weakening assertions. This is bounded large request/response evidence, not
+multiline console equivalence, arbitrary application values, concurrent
+requests, denial/timeout/cancellation or comprehensive remote-execution parity.
+Only the owned, explicitly authorized fixture command is executed.
+
+Validation:
+
+- `pwsh -NoProfile -File tests\Compatibility\Invoke-CompatibilityTests.ps1 -Application artifacts\native-receipt-write-boundary\DotReticulum.Applications.exe -Python TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5\reference\python\venv\Scripts\python.exe -Upstream TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5\reference\python\upstream -Implementation Both -OutputDirectory TestResults\large-request-shared-full`:
+  native **41 passed / one explicit skip**, actual upstream-to-upstream
+  **40 passed / two explicit skips**, zero failures. External reference retrieval
+  was deliberately not requested; upstream rnsh additionally requires POSIX.
+- Canonical Pester container for `Requests.Tests.ps1`, filtered to **T059**:
+  final seeded-input and typed socket-error handling recheck passed for both
+  candidates, **2 passed / zero skips**
+  (`TestResults\large-request-deterministic-final`).
+- `pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+  **61 passed / two explicit missing-reference/candidate skips**.
+- `pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
+  **66 tracked scripts / zero findings**.
+  Read-only compatibility discovery now reports **42 distinct tests / 17
+  unchanged quoted claims**, without starting nodes.
+
+The reused strict Windows native executable is the queue/write-clock
+milestone's actually exercised binary, SHA-256
+**93c9523d8aa45c2dba2d23810e5287a909247debaf9ab3d219cb14b2684dcc81**.
+No production code changed for this acceptance milestone. T059 hosted
+cross-platform execution remains pending.
+
+Separately, all four hosted candidates passed **T053/T054/T058** in
+**40956389129**, source **86a9b72**, establishing the earlier bounded small and
+nested resource-response boundary on Linux/macOS/Windows/upstream. The
+completed full-interop run **40953387442** at **b9777e1** passed all three
+Build, native Compatibility and Test jobs; only the upstream helper's external
+T001 hosted-link establishment failed, leaving its dependent baseline
+unexecuted. Its extended Test results were Linux **59 passed / six skips**,
+macOS **58 / seven**, Windows **57 / eight**, with no failures. Actual static
+artifacts at b9777e1 contained zero Actions/C#/PowerShell findings and the two
+existing Python fixture warnings, not zero findings overall.
+
 ### Start link receipt clocks at outbound send, not local enqueue
 
 Completed repeated-mesh run **40947802917** at **b5d01f2** retained all three

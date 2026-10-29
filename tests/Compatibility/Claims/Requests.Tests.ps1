@@ -3,7 +3,42 @@ param([hashtable] $Context)
 BeforeAll {
     . (Join-Path $PSScriptRoot '..\Support\Candidate.ps1')
     . (Join-Path $PSScriptRoot '..\Support\ManagementPeer.ps1')
+    . (Join-Path $PSScriptRoot '..\Support\TransferPeer.ps1')
+    . (Join-Path $PSScriptRoot '..\Support\RequestPeer.ps1')
     Initialize-CompatibilityCandidate $Context
+}
+
+Describe 'Application request and response resources through an authorized executable consumer' {
+    It 'persists large request input and returns exact command output beyond the negotiated packet payload' -Tag 'T059', 'C008' {
+        $directory = New-CompatibilityCaseDirectory $Context 'T059'
+        $random = [byte[]]::new(16384)
+        [Random]::new(59).NextBytes($random)
+        # Identical ASCII-safe input across candidates; above TCP MDU, below Windows' argv limit.
+        $inputText = 'request-start:' + [Convert]::ToBase64String($random) + ':request-end'
+        $query = Invoke-CompatibilityLargeRequest $Context $directory $inputText
+        $query.Candidate.Code | Should -Be 0 -Because $query.Candidate.Error
+        [Convert]::ToBase64String([IO.File]::ReadAllBytes($query.PersistedFile)) |
+            Should -BeExactly ([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($inputText)))
+        $query.Candidate.Output.EndsWith($inputText, [StringComparison]::Ordinal) | Should -BeTrue
+        [regex]::Matches($query.Candidate.Output, 'request-start:').Count | Should -Be 1
+        $execution = @($query.Observations | Where-Object event -EQ 'execution')
+        $execution.Count | Should -Be 1
+        $execution[0].identity | Should -BeExactly $query.Identity
+        $execution[0].executed | Should -BeTrue
+        $execution[0].exit_code | Should -Be 0
+        $execution[0].stdout_bytes | Should -Be ([Text.Encoding]::UTF8.GetByteCount($inputText))
+        $execution[0].stderr_bytes | Should -Be 0
+        $execution[0].request_bytes | Should -BeGreaterThan $execution[0].mdu
+        $execution[0].response_bytes | Should -BeGreaterThan $execution[0].mdu
+        $execution[0].mdu | Should -BeGreaterThan 0
+        $execution[0].packed_request_id | Should -BeExactly $execution[0].request_id
+        $resources = @($query.Observations | Where-Object event -EQ 'request_resource')
+        $resources.Count | Should -Be 1
+        $resources[0].is_request | Should -BeTrue
+        $resources[0].request_id | Should -BeExactly $execution[0].request_id
+        $resources[0].mdu | Should -Be $execution[0].mdu
+        $query.PeerError | Should -BeExactly ''
+    }
 }
 
 Describe 'Authenticated management requests to a fixed upstream transport' {
