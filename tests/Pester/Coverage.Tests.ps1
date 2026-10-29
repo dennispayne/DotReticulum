@@ -185,6 +185,42 @@ Describe 'PowerShell test runner' -Tag Tooling {
         $result.Error | Should -Match 'fresh coverage directory'
     }
 
+    It 'keeps repeated extended iterations separate without accepting duplicate rows within one iteration' {
+        $directory = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'repeated-platforms')
+        $linux = New-Item -ItemType Directory -Path (Join-Path $directory.FullName 'test-results-linux-x64-1')
+        $extended = New-Item -ItemType Directory -Path (Join-Path $linux.FullName 'extended')
+        foreach ($iteration in 1, 2) {
+            $group = New-Item -ItemType Directory -Path (Join-Path $extended.FullName "iteration-$iteration")
+            $cases = if ($iteration -eq 1) { '<test-case name="mesh" result="Success"/>' } else {
+                '<test-case name="mesh" result="Failure"><failure><message>actual resource failure</message></failure></test-case>' +
+                '<test-case name="device" result="Ignored"><reason><message>requires hardware</message></reason></test-case>'
+            }
+            "<test-results><test-suite><results>$cases</results></test-suite></test-results>" |
+                Set-Content -LiteralPath (Join-Path $group.FullName 'mesh.xml')
+        }
+        $json = Join-Path $linux.FullName 'summary-extended.json'
+        $export = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
+            (Join-Path $PSScriptRoot '..\Get-TestSummary.ps1'), '-Path', $extended.FullName,
+            '-IncludeParentDirectory', '-JsonPath', $json)
+        $export.Code | Should -Be 0 -Because $export.Error
+        $report = Get-Content -LiteralPath $json -Raw | ConvertFrom-Json
+        $report.Rows.Count | Should -Be 2
+        $report.Failures[0].Name | Should -BeExactly 'iteration-2 / mesh'
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
+            (Join-Path $PSScriptRoot '..\Get-TestPlatformSummary.ps1'), '-ReportsDirectory', $directory.FullName)
+        $result.Code | Should -Be 0 -Because $result.Error
+        $result.Output | Should -Match '\| iteration-1 / mesh \| 1 / 0 / 0 \| Unavailable \| Unavailable'
+        $result.Output | Should -Match '\| iteration-2 / mesh \| 0 / 1 / 1 \| Unavailable \| Unavailable'
+        $result.Output | Should -Match 'Linux.*iteration-2 / mesh.*actual resource failure'
+        $result.Output | Should -Match 'Linux.*requires hardware'
+        $report.Rows += $report.Rows[0]
+        $report | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $json
+        $duplicate = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
+            (Join-Path $PSScriptRoot '..\Get-TestPlatformSummary.ps1'), '-ReportsDirectory', $directory.FullName)
+        $duplicate.Code | Should -Not -Be 0
+        $duplicate.Error | Should -Match 'Duplicate extended row iteration-1 / mesh'
+    }
+
     It 'exports test counts and combines platform tables without losing failure or skip details' {
         $directory = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'test-platforms')
         $linux = New-Item -ItemType Directory -Path (Join-Path $directory.FullName 'test-results-linux-x64-1')

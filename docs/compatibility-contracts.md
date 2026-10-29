@@ -100,8 +100,9 @@ loss/reordering, sustained soak or arbitrary binary stdout. Both candidates use
 precreated owned shell-state directories; this avoids the upstream CLI's ordinary
 new-directory notice contaminating its stdout before logging initialization,
 without filtering output or patching upstream. Local Windows NativeAOT and actual
-Linux upstream-to-upstream executions passed; new cross-platform hosted results
-remain pending.
+Linux upstream-to-upstream executions passed, followed by all four hosted
+candidates in run **40915647175**, exact source **52dc6f0**. Separate impaired
+mesh failures in that run do not invalidate or expand this bounded Channel case.
 
 The linked [endpoints](endpoints.md), [transport controls](transport-controls.md),
 [runtime operations](runtime-operations.md), [runtime state](runtime-state.md),

@@ -315,7 +315,7 @@ jobs:
             $directory = "TestResults/extended/iteration-$iteration"
             dotnet test DotReticulum.slnx -c Release --no-build -m:1 --filter $filter --results-directory $directory --logger trx -- xUnit.MaxParallelThreads=1
             if ($LASTEXITCODE -ne 0) { $failed = $true }
-            ./tests/Get-TestSummary.ps1 -Path $directory -Title "Extended $env:EXTENDED_SUITE iteration $iteration" -JsonPath "$directory/summary.json"
+            ./tests/Get-TestSummary.ps1 -Path $directory -IncludeParentDirectory -Title "Extended $env:EXTENDED_SUITE iteration $iteration" -JsonPath "$directory/summary.json"
             $report = Get-Content -LiteralPath "$directory/summary.json" -Raw | ConvertFrom-Json
             if (($report.Rows | Measure-Object -Property Passed -Sum).Sum -lt 1) {
               Write-Error "Extended iteration $iteration has no passing executed tests." -ErrorAction Continue
@@ -327,7 +327,7 @@ jobs:
       - name: Summarize extended integration separately
         if: ${{ !cancelled() && (inputs.extended_suite == 'interop' || inputs.extended_suite == 'mesh') }}
         run: |
-          $summary = & ./tests/Get-TestSummary.ps1 -Path TestResults/extended -Title 'Extended integration (${{ matrix.rid }})' -JsonPath TestResults/summary-extended.json
+          $summary = & ./tests/Get-TestSummary.ps1 -Path TestResults/extended -IncludeParentDirectory -Title 'Extended integration (${{ matrix.rid }})' -JsonPath TestResults/summary-extended.json
           $summary
           $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 

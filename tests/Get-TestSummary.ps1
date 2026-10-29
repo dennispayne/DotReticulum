@@ -16,6 +16,9 @@ TRX and XML files; duplicate file paths are included only once.
 Markdown heading for the summary. Defaults to Test results.
 .PARAMETER JsonPath
 Optional output file for counts, failures and skip reasons consumed by platform summaries.
+.PARAMETER IncludeParentDirectory
+Prefixes result labels and test names with their containing directory, keeping
+repeated execution groups such as iteration-1 and iteration-2 distinct.
 .PARAMETER MaxFailures
 Maximum number of individual failures displayed in Markdown. Defaults to 50.
 .PARAMETER MaxMessageLength
@@ -29,7 +32,8 @@ param(
     [string] $Title = 'Test results',
     [string] $JsonPath,
     [int] $MaxFailures = 50,
-    [int] $MaxMessageLength = 600
+    [int] $MaxMessageLength = 600,
+    [switch] $IncludeParentDirectory
 )
 
 $ErrorActionPreference = 'Stop'
@@ -79,6 +83,10 @@ foreach ($file in $files) {
     if ($file.Extension -eq '.trx') {
         $code = ([xml](Get-Content -LiteralPath $file.FullName -Raw)).GetElementsByTagName('TestMethod') | Select-Object -First 1
         if ($code) { $label = [IO.Path]::GetFileNameWithoutExtension($code.GetAttribute('codeBase')) }
+    }
+    if ($IncludeParentDirectory) {
+        $label = "$($file.Directory.Name) / $label"
+        foreach ($result in $results) { $result.Name = "$($file.Directory.Name) / $($result.Name)" }
     }
     $passed = @($results | Where-Object Outcome -eq 'Passed').Count
     $failed = @($results | Where-Object Outcome -eq 'Failed')

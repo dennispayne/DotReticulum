@@ -4,6 +4,50 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Repeated-mesh reporting preserves iteration identity and actual failures
+
+Repeated mesh **40915647175**, exact source **52dc6f0**, completed **failed**.
+All Builds, all four Compatibility candidates, the Compatibility renderer and
+Windows / Linux Test passed. Actual uploaded extended TRX has **3/3 tests in
+each of three iterations** on Windows and Linux; macOS has **2 passed / 1 failed
+in every iteration**. The impaired resource failed before its first repair
+in iterations 1/3 and after Python-router restart in iteration 2
+(**12 dropped / 9 retried** at failure). No reference-side root cause or resource
+fix is claimed by this reporting change.
+
+The final Test renderer also rejected legitimate repeated execution as
+**Duplicate extended row DotReticulum.Applications.Tests for linux-x64**:
+the exporter labeled every TRX with only its assembly, discarding iteration
+identity. Added explicit **-IncludeParentDirectory** to `Get-TestSummary.ps1`
+and both extended workflow callers. Result labels and failed test names now
+include their containing **iteration-N** directory. Existing callers, positional
+parameters, suite counts and separate Unit/Integration coverage stay unchanged.
+The renderer's rejection of genuinely duplicate rows is preserved, not relaxed.
+
+`tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+**61 passed / 2 explicit optional-reference skips / zero failures**.
+The new real-process case covers separate iteration counts, a retained failed
+iteration, hardware skip details and rejection of a repeated row within one
+iteration. `tools\Invoke-PowerShellAnalysis.ps1`: **65 tracked files / zero
+findings**. No production build is needed for this tooling-only slice.
+
+Replayed **actual downloaded Linux/macOS/Windows** artifacts through
+`Get-TestSummary.ps1 -Path <downloaded-extended-directory> -IncludeParentDirectory`
+and the unchanged strict `Get-TestPlatformSummary.ps1`. The latter now succeeds
+and prints three independent rows, each retaining **3/0/0 Linux, 2/1/0 macOS,
+3/0/0 Windows**, plus all three macOS failures with their iteration names.
+Owned replay:
+`TestResults\mesh-summary-replay-52dc6f0\rendered-summary.txt`.
+This validates reporting, not a passing mesh: both workflow TODOs remain open.
+
+Inspected the actual four completed Compatibility job logs from that run:
+**T057 passed** on Linux (**703 ms**), macOS (**1.59 s**), Windows (**975 ms**)
+and the actual Linux upstream-to-upstream baseline (**925 ms**).
+Read-only discovery confirms **40 distinct tests / 17 distinct mapped claims**.
+README and the bounded Channel ledger now reflect that hosted evidence.
+Current full interop **40918584672** tests earlier **291bc7d**, not this later
+report grouping correction.
+
 ### macOS residuals: retained PTY output, deterministic Git deadlines and resource diagnostics
 
 Full interop **40911880526**, exact source **0598977**, completed **failed**.
@@ -174,8 +218,9 @@ Local acceptance with unchanged import-verified RNS
   optional-reference skips / zero failures**. Final focused Windows native
   execution with precreated state also passed **1/1**, no skips.
 
-New hosted Linux/macOS/Windows acceptance is pending. The separately running
-full interop **40911880526** tests earlier **0598977**, not this new case.
+Subsequent hosted run **40915647175**, exact source **52dc6f0**, verified this
+case on all four candidates. Its separate impaired-mesh/reporting failures
+remain recorded above; the aggregate workflow did not pass.
 
 ### Hosted residual failures: bounded impairment model and Darwin pipe status
 
