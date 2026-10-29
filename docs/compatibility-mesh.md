@@ -95,8 +95,8 @@ live recovery from simultaneous router overflow and bearer loss.
 ## Automatic endpoint timeout and fresh-session recovery
 
 `ManagedAndPinnedEndpointsAutomaticallyTimeOutAfterRouterCrashAndRecoverWithFreshLinks`
-adds a separate managed live case, accepted locally on Windows and in all
-three Linux/macOS repetitions of hosted run 40938753343:
+adds a separate managed live case, accepted in all three repetitions on
+Windows/Linux/macOS in hosted run 40956389129:
 
 ```text
 .NET endpoint -- .NET transport -- impaired TCP -- Python transport -- Python endpoint
@@ -151,7 +151,8 @@ not the remote watchdog policy or the impaired-network acceptance assertions.
 ## Fresh sessions through a surviving alternate route
 
 `SurvivingDotNetAlternateRouteCarriesFreshBidirectionalLinksAfterPinnedPrimaryRouterCrash`
-adds a bounded Windows managed case with two non-transport Python endpoints.
+adds a bounded Windows/Linux/macOS managed case with two non-transport Python
+endpoints, accepted in all three repetitions of hosted run 40956389129.
 Both connect to the actual pinned primary Python transport and, separately,
 to a surviving .NET backup transport.
 

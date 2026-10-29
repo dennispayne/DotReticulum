@@ -24,7 +24,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] Remaining physical rnodeconf device/platform and RF acceptance (one RAK4631 verified; one radio cannot establish RF interoperability)
 - [ ] Parity 8 - Compatibility and release acceptance
   - [ ] Broader mesh acceptance: broader alternate-route topologies, cold initial-window resource-loss recovery, sustained Channel/resource soak and impaired native-binary/per-bearer matrices (pinned upstream cold-window cancellation is independently reproduced, not passing recovery)
-  - [x] Windows managed surviving .NET alternate route after actual pinned-primary-router crash: observed next-hop replacement after fresh announcements, distinct links in both initiator roles and exact bidirectional DATA/proofs without restarting either leaf
+  - [x] Windows/Linux/macOS managed surviving .NET alternate route after actual pinned-primary-router crash: observed next-hop replacement after fresh announcements, distinct links in both initiator roles and exact bidirectional DATA/proofs without restarting either leaf
   - [x] Actual pinned Python-router forced crash/restart with persisted transport identity, surviving leaves, interrupted proved link/forwarding-state cleanup, explicit endpoint teardown, distinct recovered link and bidirectional measured-window impaired resources
   - [x] Windows/Linux/macOS managed .NET/Python endpoints automatically reach TIMEOUT after a remote router crash with surviving local routing, in both initiator roles, then prove a distinct fresh session; impaired native matrices remain outstanding
   - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
@@ -51,7 +51,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Approved Verb-Noun standalone PowerShell entry points, discoverable help for every declared parameter and updated workflow/documentation callers
   - [x] Zero-argument local Compatibility runner with automatic native/reference preparation and fresh results directories
   - [ ] `interop-test.yml`
-  - [ ] `e2e-mesh-test.yml`
+  - [x] `e2e-mesh-test.yml` (all 12 jobs passed in run 40956389129; three repetitions of seven extended cases per platform)
   - [x] Advanced Static analysis workflow: CodeQL (Actions, C#, Python), pinned PSScriptAnalyzer, SARIF and consolidated finding summary; replaces GitHub-managed default setup (all five jobs passed in run 40644131301; C# full-database selection avoids overlay fallback warnings)
   - [x] Separate Unit/Integration production coverage in consolidated Build and Test platform summaries (all 12 jobs passed in run 40644131484; six suite/platform coverage artifacts verified)
   - [x] Basic accessibility goals, limitations and reporting in `ACCESSIBILITY.md`

@@ -4,6 +4,41 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Accepted three-repeat mixed-mesh workflow on all desktop targets
+
+Exact-source **86a9b72**, **40956389129**, completed successfully with all
+**12 jobs passed**. Downloaded all three actual `test-results-*-1` artifacts;
+each `summary-extended.json` has precisely three iteration rows, each
+**seven passed / zero failed / zero skipped**: Linux **21/21**, macOS
+**21/21**, Windows **21/21**, **63 executed extended cases** overall.
+Actual TRX names, not only counts, confirm each iteration exercised:
+
+- Mixed unknown-path discovery, announcements, encrypted datagrams and links.
+- Published native daemon dormant-tunnel persistence and authenticated Python
+  transport-path restoration after restart.
+- Default endpoint watchdog TIMEOUT and fresh-session recovery in both roles.
+- Bidirectional measured-window resource-loss recovery and actual router restart.
+- Observation of an already authenticated Python delivery proof.
+- The independently reproduced upstream cold-window cancellation negative control.
+- Fresh-announcement route replacement through a surviving .NET backup, distinct
+  links and bidirectional DATA/proofs in both initiator roles.
+
+The actual Summarize Test job **123756558348** printed all three iteration
+rows as **7 / 0 / 0** for each platform. Actual Summarize Compatibility job
+**123742180383** printed T058 as **Passed** for all four candidates, with the
+test-source hyperlink pinned to the executing commit. All three Builds, all
+four Compatibility candidates, all three Tests and both summary jobs passed.
+This closes the earlier Windows healthy-proof failure's repeated acceptance
+gate after the queue/write-clock correction; failures in older runs remain
+recorded rather than being relabeled.
+
+`e2e-mesh-test.yml` is now checked off. Cross-platform alternate-route
+acceptance is no longer Windows-only. This bounded three-repeat workflow is not
+sustained soak, full native/impaired/per-bearer acceptance, automatic active-link
+migration or passing upstream cold-window recovery. Those broader checklist
+items remain open. No production changes or redundant build/coverage run were
+needed for this evidence-only update.
+
 ### Transport-only route restoration and native I2P reused-configuration startup
 
 Resolved the previously recorded Windows published-candidate startup failure
@@ -178,8 +213,9 @@ failed the initial managed DATA receipt at
 iterations two and three passed unchanged. The separate full interop run
 **40947799428** passed all three Test jobs, including their extended cases,
 but failed overall on the separately corrected native Windows T057 shutdown.
-Neither run is a complete green gate; both scheduled workflow checklist items
-remain unchecked.
+Neither run was a complete green gate; at that point both scheduled workflow
+checklist items remained unchecked. The later passing repeated-mesh gate is
+recorded above.
 
 Two deterministic regressions then failed in both endpoint roles: hold an
 earlier bearer write, enqueue DATA behind it, advance beyond the unchanged
@@ -238,8 +274,8 @@ Validation:
   and real peer shutdown (`TestResults\receipt-write-boundary-native-channel`).
 
 Coverage remains managed ordinary-suite evidence; the separate live/native
-flows are not included. Hosted repeated acceptance of this queue-clock
-correction remains pending.
+flows are not included. Subsequent exact-source run **40956389129** passed all
+three repetitions on all three platforms, as recorded above.
 
 ### Awaiting the actual link-close write before rnsh owner disposal
 
