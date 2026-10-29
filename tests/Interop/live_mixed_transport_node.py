@@ -93,7 +93,7 @@ def main():
 
     RNS.Transport.register_announce_handler(Handler())
     emit("ready", dest=destination.hash.hex(), transport=RNS.Reticulum.transport_enabled(),
-         rns_file=RNS.__file__, revision=PINNED_RNS_SHA)
+         transport_id=RNS.Transport.identity.hash.hex(), rns_file=RNS.__file__, revision=PINNED_RNS_SHA)
     for line in sys.stdin:
         parts = line.strip().split()
         if not parts:

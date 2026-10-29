@@ -243,7 +243,12 @@ def main():
         cmd = parts[0]
         link = STATE["link"]
         try:
-            if cmd == "announce":
+            if cmd == "interfaces":
+                emit({"event": "interfaces", "interfaces": [
+                    {"name": interface.name, "online": interface.online}
+                    for interface in RNS.Transport.interfaces
+                ]})
+            elif cmd == "announce":
                 dest.announce(app_data=bytes.fromhex(parts[1]) if len(parts) > 1 else b"dotreticulum-p06")
                 emit({"event": "announced", "dest": dest.hash.hex()})
             elif cmd in ("path", "request_path"):

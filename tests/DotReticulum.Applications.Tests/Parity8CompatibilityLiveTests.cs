@@ -105,6 +105,19 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             await responder.NextAsync("link_closed", before, Patience);
         }
 
+        async Task WaitForLeafConnection(bool online)
+        {
+            using var timeout = new CancellationTokenSource(Patience);
+            while (true)
+            {
+                var interfaces = await a!.Command("interfaces", "interfaces", Patience);
+                var bearer = Assert.Single(interfaces.GetProperty("interfaces").EnumerateArray(),
+                    item => item.GetProperty("name").GetString() == "ToDotNet");
+                if (bearer.GetProperty("online").GetBoolean() == online) return;
+                await Task.Delay(25, timeout.Token);
+            }
+        }
+
         async Task Send(PyLinkNode sender, PyLinkNode receiver, string payload)
         {
             var before = receiver.Count("data");
@@ -178,14 +191,40 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             await Send(b, a, "726573746172742d6261");
             await Resource(b, a, fromPython: false, 220_019, "parity8-restart");
             await Close(b, a);
+
+            var pythonIdentity = ready.GetProperty("transport_id").GetString();
+            Assert.False(string.IsNullOrEmpty(pythonIdentity));
+            await WaitForLeafConnection(online: true);
+            await router.CrashAsync();
+            await WaitForLeafConnection(online: false);
+            await Until(() => Assert.IsType<TcpServerPacketInterface>(host.Interfaces.Single().Interface).ClientCount == 1);
+            sessions = bridge.Sessions;
+            await router.RestartAsync();
+            Assert.Equal(pythonIdentity, router.Events("ready").Last().GetProperty("transport_id").GetString());
+            await WaitForLeafConnection(online: true);
+            await Until(() => bridge.Sessions > sessions);
+            await Until(() => Assert.IsType<TcpServerPacketInterface>(host.Interfaces.Single().Interface).ClientCount == 2);
+            await a.Command("announce", "announced", Patience);
+            await b.Command("announce", "announced", Patience);
+            var pythonPath = await router.Command($"request_path {b.HashHex} 60", "path", Patience);
+            Assert.True(pythonPath.GetProperty("has_path").GetBoolean());
+            Assert.Equal(2, pythonPath.GetProperty("hops").GetInt32());
+            await Discover();
+            await Connect(a, b);
+            await Send(a, b, "707974686f6e2d63726173682d6162");
+            await Send(b, a, "707974686f6e2d63726173682d6261");
+            await Resource(a, b, fromPython: true, 220_017, "parity8-python-crash-ab");
+            await Resource(b, a, fromPython: false, 220_019, "parity8-python-crash-ba");
+            await Close(a, b);
             Assert.True(bridge.BackpressureWaits > 0, "The capacity-one bearer queue must actually apply backpressure.");
-            Assert.Equal(9, bridge.Dropped);
-            Assert.Equal(9, bridge.Retried);
+            Assert.Equal(15, bridge.Dropped);
+            Assert.Equal(15, bridge.Retried);
             output.WriteLine($"A(Python leaf) -- Python transport -- impaired TCP -- .NET transport -- B(Python leaf); " +
                 $"2.2 MB incompressible resources both ways, 20 ms/frame latency, capacity-one bearer queues, " +
                 $"router inbound capacities=2; dropped/retransmitted parts={bridge.Dropped}/{bridge.Retried}, " +
                 $"backpressure waits={bridge.BackpressureWaits}, TCP sessions={bridge.Sessions}; " +
-                "proved packets both ways after TCP reconnect and persisted-identity .NET router restart, then another impaired resource.");
+                "proved packets after TCP reconnect, persisted-identity .NET restart and forced Python-router crash/restart; " +
+                "surviving leaves observed their bearer offline/online, then exchanged proved data and impaired resources both ways.");
         }
         finally
         {
@@ -204,12 +243,12 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
         }
     }
 
-    private sealed class ResourceLossBridge(int targetPort) : IAsyncDisposable
+    internal sealed class ResourceLossBridge(int targetPort) : IAsyncDisposable
     {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
         private readonly CancellationTokenSource _stop = new();
         private readonly object _gate = new();
-        private readonly ConcurrentDictionary<string, byte> _missing = new();
+        private readonly ConcurrentDictionary<string, byte> _lostParts = new();
         private TcpClient? _incoming, _outgoing;
         private Task _running = Task.CompletedTask;
         private int _sessions, _dropped, _retried, _backpressureWaits, _dropUp, _dropDown;
@@ -223,6 +262,22 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
         public void LoseResourceParts(bool fromPython, int count) =>
             Interlocked.Exchange(ref (fromPython ? ref _dropUp : ref _dropDown), count);
         public void Disconnect() { lock (_gate) { _incoming?.Dispose(); _outgoing?.Dispose(); } }
+
+        internal bool DropResourcePart(bool fromPython, string hash)
+        {
+            var key = (fromPython ? "up:" : "down:") + hash;
+            if (_lostParts.TryGetValue(key, out var retransmitted))
+            {
+                if (retransmitted == 0 && _lostParts.TryUpdate(key, 1, 0))
+                    Interlocked.Increment(ref _retried);
+                return false;
+            }
+            ref var remaining = ref (fromPython ? ref _dropUp : ref _dropDown);
+            if (Volatile.Read(ref remaining) <= 0 || !_lostParts.TryAdd(key, 0)) return false;
+            Interlocked.Decrement(ref remaining);
+            Interlocked.Increment(ref _dropped);
+            return true;
+        }
 
         private async Task Run()
         {
@@ -319,23 +374,13 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
                     }
                     if (!Packet.TryParse(decoded.ToArray(), out var packet, InterfaceAccessCode.MaximumPacketSize))
                         throw new InvalidDataException("Malformed packet in compatibility bearer.");
-                    if (packet.Context == LinkContext.Resource)
-                    {
-                        var key = (fromPython ? "up:" : "down:") + Convert.ToHexStringLower(packet.CalculateHash());
-                        ref var remaining = ref (fromPython ? ref _dropUp : ref _dropDown);
-                        if (Volatile.Read(ref remaining) > 0)
-                        {
-                            Interlocked.Decrement(ref remaining);
-                            if (!_missing.TryAdd(key, 0)) throw new InvalidDataException("Loss schedule selected a duplicate resource part.");
-                            Interlocked.Increment(ref _dropped);
-                            continue;
-                        }
-                        if (_missing.TryRemove(key, out _)) Interlocked.Increment(ref _retried);
-                    }
+                    if (packet.Context == LinkContext.Resource &&
+                        DropResourcePart(fromPython, Convert.ToHexStringLower(packet.CalculateHash()))) continue;
                     await Task.Delay(20, stopped.Token);
                     await destination.WriteAsync(frame, stopped.Token);
                 }
             }
+
         }
 
         public async ValueTask DisposeAsync()
@@ -346,5 +391,26 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             try { await _running.WaitAsync(TimeSpan.FromSeconds(10)); }
             finally { _stop.Dispose(); }
         }
+    }
+}
+
+[Trait("Category", "Integration")]
+public sealed class Parity8ResourceLossFixtureTests
+{
+    [Fact]
+    public async Task EarlyRetransmissionsDoNotConsumeTheRemainingDistinctPartLossBudget()
+    {
+        await using var bridge = new Parity8CompatibilityLiveTests.ResourceLossBridge(0);
+        bridge.LoseResourceParts(fromPython: true, 3);
+        Assert.True(bridge.DropResourcePart(true, "first"));
+        Assert.False(bridge.DropResourcePart(true, "first"));
+        Assert.False(bridge.DropResourcePart(true, "first"));
+        Assert.True(bridge.DropResourcePart(true, "second"));
+        Assert.False(bridge.DropResourcePart(true, "second"));
+        Assert.True(bridge.DropResourcePart(true, "third"));
+        Assert.False(bridge.DropResourcePart(true, "third"));
+        Assert.False(bridge.DropResourcePart(true, "fourth"));
+        Assert.Equal(3, bridge.Dropped);
+        Assert.Equal(3, bridge.Retried);
     }
 }

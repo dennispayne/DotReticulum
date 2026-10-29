@@ -4,6 +4,74 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Forced actual Python-router crash/restart with surviving leaves and distinct-part loss
+
+Extended the existing bounded mesh case rather than inflating shared claim/test
+counts: **A(Python leaf) -- Python transport -- impaired TCP -- managed .NET
+transport -- B(Python leaf)**. After the existing reconnect and persisted .NET
+restart phases, C# forcibly kills only the owned Python-router process, awaits
+its exit, observes A's real upstream interface go offline and the .NET server's
+peer count fall **2 -> 1**, then starts a new Python process with the same owned
+configuration/storage. Its actual persisted transport identity must match.
+Surviving A/B processes are not restarted. Online/peer-count **1 -> 2** recovery,
+fresh upstream-router path discovery and three-hop leaf paths precede a new
+link, proved DATA and impaired resources in both directions.
+
+Thin reference adapters only expose actual `interface.name/online` and
+`RNS.Transport.identity.hash`; C# owns crash/restart, waits and assertions.
+`PyLinkNode` retains its generated storage across the explicit crash/restart
+but still owns final cleanup, bounded process/pump joins and idempotent disposal.
+Its children no longer inherit Actions command/summary output paths.
+Pin remains **a29bfb51c468945c96a1ee22cae0114e993e2391**:
+`RNS/Transport.py:319-327`, `RNS/Interfaces/TCPInterface.py:271-300,410-435`.
+No new reference shim or timer change; the existing both-endpoint **PROVE_ALL**
+policy remains explicit. Links were closed before crashing: active-link
+failure/resumption and alternate routes are not established.
+
+An initial attempt reached real offline/online recovery but tried a link while
+the restarted Python router still lacked B's path: the surviving leaves' cached
+paths were not a readiness proxy. The case now explicitly requests and verifies
+the fresh router's actual **two-hop** path to B before establishing that link.
+No blind sleep or deadline increase was used.
+
+Hosted macOS run **40890841836** additionally exposed a loss-fixture bug:
+an early legitimate retransmission could arrive before three distinct parts
+had been dropped. The fixture incorrectly consumed another loss credit and
+threw `Loss schedule selected a duplicate resource part`. It now drops each
+selected hash once, forwards retransmissions even while unused loss credits
+remain, and counts the first retry per distinct lost part. Assertions are not
+relaxed: five exercised transfers must drop/retry exactly **15 distinct parts**,
+deliver matching sizes/SHA-256 once, and exercise capacity-one backpressure.
+A focused non-live fixture regression is outside the scheduled live-class
+selection and does not masquerade as Python or RF evidence.
+
+Final validation:
+`dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+**zero warnings/errors**.
+`dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --results-directory TestResults\mesh-loss-managed-final-20261029 --logger trx`:
+**1,849 passed, 83 explicit skips**, live modes disabled.
+With verified local Python/reference and `DOTRETICULUM_LIVE=1`:
+
+```powershell
+dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~Parity8CompatibilityLiveTests' --results-directory TestResults\mesh-loss-crash-final-20261029 --logger trx -- xUnit.MaxParallelThreads=1
+```
+
+**1 passed, zero failed/skipped**, **2m44s**. Payloads remain incompressible
+**2,200,017/2,200,019 bytes** initially, **220,019 bytes** after .NET restart,
+and **220,017/220,019 bytes** after Python crash, with exact size/hash/proof
+assertions and **20 ms/frame** latency. An earlier four-case regression selection
+(`Parity8CompatibilityLiveTests|LiveMixedTransportTests|Parity4NativeTransportTests|NativeResourceTests`)
+passed **4/4**, zero skips, **3m27s**, using
+`artifacts\native-rnode-radio\DotReticulum.Applications.exe`.
+That separately executes the freshly published native encrypted resource and
+tunnel/path feature flows; it does not turn the managed Python-crash phase into
+native bearer acceptance. No production code changed in this test milestone,
+so no redundant coverage collection/native publication was performed.
+
+An earlier full run had one unrelated `RngitRepositoryStoreTests.ActualUpstreamPrecedenceAndBlocklistDecisionsMatch`
+failure. Its focused rerun and two subsequent full runs passed without changing
+that test or implementation; the intermittent cause is not established.
+
 ### Actual receive-only RAK startup exposed and fixed an acknowledgement race
 
 The authorized Windows RAK4631/SX1262 (nRF52, firmware **1.86**) initially
@@ -79,7 +147,10 @@ explicitly; zero is retained for existing 1-10 validation, not silently replaced
 GitHub's dispatch API rejected a numeric JSON input directly (HTTP 422), and
 `gh workflow run --json` requires string-valued inputs, so coercion belongs
 at the caller boundary. Actionlint **1.7.12** accepts the corrected workflow;
-hosted corrective deployment remains pending a push and new dispatch.
+corrective dispatch **40894852888** at **99f4470** created and ran all reusable
+jobs, confirming the input-boundary fix. All three native Build jobs, all four
+candidate Compatibility jobs and both summary jobs passed; Test/Linux passed.
+Test/Windows and Test/macOS still failed, so workflow TODOs remain unchecked.
 
 The full local scheduled live selection with actual pinned Python and native
 Windows binary completed **55 passed, 6 explicit skips, 1 failed**:
@@ -108,8 +179,17 @@ at **9.1%**; dependent compatibility containers failed for unavailable reference
 This is retained as a failed external-network retrieval, not a macOS feature
 or compatibility pass. The independent interop run **40890841836** passed all
 three native Build and candidate Compatibility jobs at the same commit.
-Their Test/upstream/summary acceptance is still pending; no timeout increase,
-fake retrieval, fallback artifact or weakened assertion was introduced.
+The interop run finished with all four **39-case** Compatibility candidates and
+their renderer passing; actual rendered T055/T056 rows show **Passed** in all
+four columns with test links pinned to **3078e5d**. Test/Linux passed, but
+Test/Windows failed its POSIX-reference prerequisite and a media-test assumption
+(expected PNG despite an automatically discovered encoder returning WebP).
+Test/macOS exposed **13** terminal integration failures at `TIOCSWINSZ: ENOTTY`,
+plus live loss-fixture duplication (fixed above), an rnsh EOF-outcome assumption
+and a narrow-MTU transfer timeout. Those are retained failures, not hosted
+acceptance; the remaining root causes require investigation. Both summaries
+completed. No timeout increase, fake retrieval, fallback artifact or weakened
+assertion was introduced.
 
 ### Scheduled opt-in live integration and repeated mixed meshes
 

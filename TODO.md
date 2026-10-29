@@ -22,7 +22,8 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Authorized RAK4631 native rnodeconf USB-triggered DFU, same-version reflash, changed-port recovery and reversible EEPROM-setting persistence/restoration
   - [ ] Remaining physical rnodeconf device/platform and RF acceptance (one RAK4631 verified; one radio cannot establish RF interoperability)
 - [ ] Parity 8 - Compatibility and release acceptance
-  - [ ] Broader mesh acceptance: Python-router/crash restart, alternate routes, sustained Channel/resource soak and impaired native-binary/per-bearer matrices
+  - [ ] Broader mesh acceptance: alternate routes, active-link crash behavior, sustained Channel/resource soak and impaired native-binary/per-bearer matrices
+  - [x] Actual pinned Python-router forced crash/restart with persisted transport identity, surviving leaves, observed bearer outage/recovery and bidirectional impaired resources
   - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
   - [ ] Darwin rnsh terminal backend and actual macOS feature acceptance (backend implemented; actual macOS acceptance pending CI)
   - [ ] Android host/providers, desktop RNode BLE and other missing/partial applicable software identified in the compatibility ledger
@@ -39,7 +40,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Readable Pester compatibility claim tests, citation-only catalog, read-only discovery and individual Pester outcomes across four candidates (all four Compatibility jobs and renderer passed in runs 40626931637 and 40628676024; later discovery-only metadata cleanup locally verified)
   - [x] Table-only Compatibility summary with commit-pinned test-code hyperlinks, no Family column, and isolated child-process Actions output
   - [ ] Expand shared advertised-claim scenarios for heterogeneous routing, broader application request boundaries and Channel/Buffer
-  - [x] Shared two-hop UDP/TCP routing in both directions with exact persisted bytes and observed hops (T055/T056; local Windows native and independent upstream baseline)
+  - [x] Shared two-hop UDP/TCP routing in both directions with exact persisted bytes and observed hops (T055/T056; all four candidates passed in hosted run 40890841836)
   - [x] Expand identity/cryptographic failures, forged delivery proofs, authenticated management requests and fixed-upstream-peer file-transfer/IFAC acceptance (37 distinct cases, 17 quoted claims; 37/37 passed for all four candidates, all 12 CI jobs green in run 40634153580)
   - [ ] Verified primary-source citation browsing links (Git destination resolved; derived NomadNet page link failed; external URI scheme and line anchors unverified; no GitHub fallback)
   - [x] Approved Verb-Noun standalone PowerShell entry points, discoverable help for every declared parameter and updated workflow/documentation callers

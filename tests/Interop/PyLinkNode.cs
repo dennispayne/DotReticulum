@@ -10,9 +10,11 @@ public sealed class PyLinkNode : IAsyncDisposable
 {
     private readonly ConcurrentQueue<JsonElement> _events = new();
     private readonly StringBuilder _log = new();
-    private readonly TaskCompletionSource<JsonElement> _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private TaskCompletionSource<JsonElement> _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly string _configDir = Path.Combine(AppContext.BaseDirectory, "live-rns-" + Guid.NewGuid().ToString("N"));
     private readonly List<Task> _pumps = [];
+    private readonly object _disposeGate = new();
+    private Task? _dispose;
     private Process _process = null!;
 
     public string Name { get; }
@@ -44,19 +46,51 @@ public sealed class PyLinkNode : IAsyncDisposable
         psi.Environment["PYTHONPATH"] = Environment.GetEnvironmentVariable("DOTRETICULUM_UPSTREAM")
             ?? throw new InvalidOperationException("DOTRETICULUM_UPSTREAM must point at the pinned upstream checkout.");
         psi.Environment["PYTHONIOENCODING"] = "utf-8";
-        node._process = Process.Start(psi) ?? throw new InvalidOperationException("Could not start python.");
-        node._pumps.Add(Task.Run(node.PumpStdout));
-        node._pumps.Add(Task.Run(node.PumpStderr));
+        foreach (var key in new[] { "GITHUB_STEP_SUMMARY", "GITHUB_ENV", "GITHUB_OUTPUT", "GITHUB_PATH", "GITHUB_STATE" })
+            psi.Environment.Remove(key);
+        return await node.StartProcessAsync(psi);
+    }
+
+    private async Task<PyLinkNode> StartProcessAsync(ProcessStartInfo start)
+    {
+        _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        _process = Process.Start(start) ?? throw new InvalidOperationException("Could not start python.");
+        _pumps.Add(Task.Run(PumpStdout));
+        _pumps.Add(Task.Run(PumpStderr));
         try
         {
-            var ready = await node._ready.Task.WaitAsync(TimeSpan.FromSeconds(60));
-            node.Hash = Convert.FromHexString(ready.GetProperty("dest").GetString()!);
-            return node;
+            var ready = await _ready.Task.WaitAsync(TimeSpan.FromSeconds(60));
+            Hash = Convert.FromHexString(ready.GetProperty("dest").GetString()!);
+            return this;
         }
         catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or FormatException)
         {
-            await node.DisposeAsync();
-            throw new InvalidOperationException($"Python node {name} startup failed:\n{node.Log}", ex);
+            await DisposeAsync();
+            throw new InvalidOperationException($"Python node {Name} startup failed:\n{Log}", ex);
+        }
+    }
+
+    public async Task CrashAsync()
+    {
+        ObjectDisposedException.ThrowIf(_dispose is not null, this);
+        if (_process.HasExited) throw new InvalidOperationException($"Python node {Name} already exited.");
+        _process.Kill(entireProcessTree: true);
+        await _process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        await Task.WhenAll(_pumps).WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    public async Task RestartAsync()
+    {
+        ObjectDisposedException.ThrowIf(_dispose is not null, this);
+        if (!_process.HasExited) throw new InvalidOperationException($"Python node {Name} is still running.");
+        await Task.WhenAll(_pumps).WaitAsync(TimeSpan.FromSeconds(10));
+        var previous = _process;
+        var start = previous.StartInfo;
+        _pumps.Clear();
+        try { await StartProcessAsync(start); }
+        finally
+        {
+            if (!ReferenceEquals(previous, _process)) previous.Dispose();
         }
     }
 
@@ -95,7 +129,12 @@ public sealed class PyLinkNode : IAsyncDisposable
         return await NextAsync(expectedEvent, before, timeout);
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
+    {
+        lock (_disposeGate) return new(_dispose ??= DisposeCoreAsync());
+    }
+
+    private async Task DisposeCoreAsync()
     {
         try
         {
