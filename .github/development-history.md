@@ -69,6 +69,48 @@ This is native hardware-control execution, **not Python RF interoperability**.
 Other frequencies, power settings, DATA/over-air delivery, unplug/replug,
 Multi, BLE and other hardware/platforms remain unverified.
 
+### Correct dispatch input conversion and explicit Windows POSIX-reference prerequisite
+
+Initial mesh dispatch **40890846669** failed before creating jobs. Its caller
+passed the manually supplied iteration value directly into a reusable numeric
+input, unlike the working interop caller's literal number. The mesh caller
+now uses `fromJSON` to convert both scheduled/default and dispatch values
+explicitly; zero is retained for existing 1-10 validation, not silently replaced.
+GitHub's dispatch API rejected a numeric JSON input directly (HTTP 422), and
+`gh workflow run --json` requires string-valued inputs, so coercion belongs
+at the caller boundary. Actionlint **1.7.12** accepts the corrected workflow;
+hosted corrective deployment remains pending a push and new dispatch.
+
+The full local scheduled live selection with actual pinned Python and native
+Windows binary completed **55 passed, 6 explicit skips, 1 failed**:
+
+```powershell
+dotnet test DotReticulum.slnx -c Release --no-build -m:1 --nologo -v quiet --filter 'Category=Live' --results-directory TestResults\extended-local-interop-20261029 --logger trx -- xUnit.MaxParallelThreads=1
+```
+
+The failure was specifically upstream `rnsh/process.py:40` importing POSIX
+`fcntl` in Windows Python (`ModuleNotFoundError`), not a wire failure.
+`RnshLiveFact` now explicitly skips this one case on Windows when the required
+`DOTRETICULUM_RNSH_WSL_PYTHON` environment is absent. Configured peers still
+execute normally; invalid configured environments are not caught or defaulted.
+The focused `FullyQualifiedName~RnshLiveTests` run with live enabled and the
+verified Windows reference produced **one explicit POSIX-prerequisite skip**.
+The remaining live cases were not needlessly rerun; this is not a full-green
+Windows rnsh/Python-process claim. Linux/macOS still execute that reference case.
+Updated stale CLI terminal help to include the implemented Darwin backend and
+the actual Windows terminal-output merging boundary. Full Release/build/coverage
+and native publication in the preceding hardware gate also included these changes.
+
+Hosted **3078e5d** Static analysis **40890716711** passed. Normal Build and Test
+**40890716875** built all three native artifacts, but macOS candidate retrieval
+timed out after **900 seconds** with a discovered **11-hop** path and `/git/fetch`
+at **9.1%**; dependent compatibility containers failed for unavailable reference.
+This is retained as a failed external-network retrieval, not a macOS feature
+or compatibility pass. The independent interop run **40890841836** passed all
+three native Build and candidate Compatibility jobs at the same commit.
+Their Test/upstream/summary acceptance is still pending; no timeout increase,
+fake retrieval, fallback artifact or weakened assertion was introduced.
+
 ### Scheduled opt-in live integration and repeated mixed meshes
 
 Implemented `interop-test.yml` (Tuesday **06:00 UTC**, or manual) and

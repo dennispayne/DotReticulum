@@ -7,11 +7,21 @@ using Xunit.Abstractions;
 
 namespace DotReticulum.Applications.Tests;
 
+public sealed class RnshLiveFactAttribute : LiveFactAttribute
+{
+    public RnshLiveFactAttribute()
+    {
+        if (Skip is null && OperatingSystem.IsWindows() &&
+            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOTRETICULUM_RNSH_WSL_PYTHON")))
+            Skip = "Pinned rnsh requires a POSIX Python peer; on Windows supply a verified DOTRETICULUM_RNSH_WSL_PYTHON environment.";
+    }
+}
+
 [Trait("Category", "Integration")]
 public sealed class RnshLiveTests(ITestOutputHelper log)
 {
     [Trait("Category", "Live")]
-    [LiveFact]
+    [RnshLiveFact]
     public async Task ActualPinnedPythonListenerAndInitiatorExchangeBinaryStdinOutputAndRecoverNewSessions()
     {
         var (server, unused, dir) = ReticulumNodeTests.Pair(out var port);

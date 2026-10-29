@@ -20,7 +20,7 @@ public static class RnshApp
         -C/--no-remote-command rejects supplied remote commands.
         -N/--no-id suppresses identification; -m/--mirror mirrors the process exit.
         -p/--print-identity prints identity (and destination in listener mode).
-        Native terminal support uses Linux PTY or Windows ConPTY; mixed Windows pipe/PTY endpoints are unsupported.
+        Native terminal backends use Linux/macOS PTY or Windows ConPTY; Windows terminal-attached outputs merge.
         """;
 
     private sealed class Options

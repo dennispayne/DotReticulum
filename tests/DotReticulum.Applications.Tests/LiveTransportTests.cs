@@ -11,7 +11,7 @@ using Xunit.Abstractions;
 
 namespace DotReticulum.Applications.Tests;
 
-public sealed class LiveFactAttribute : FactAttribute
+public class LiveFactAttribute : FactAttribute
 {
     public LiveFactAttribute()
     {

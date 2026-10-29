@@ -23,4 +23,4 @@ jobs:
     uses: ./.github/workflows/ci-build-test.yml
     with:
       extended_suite: mesh
-      iterations: ${{ github.event_name == 'schedule' && 3 || inputs.iterations }}
+      iterations: ${{ fromJSON(github.event_name == 'schedule' && '3' || inputs.iterations) }}
