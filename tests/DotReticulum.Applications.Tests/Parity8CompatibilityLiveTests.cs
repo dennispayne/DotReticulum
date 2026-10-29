@@ -148,7 +148,7 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             var sent = await sender.Command($"resource {size} {seed} random", "resource_sent", TransferTimeout);
             var received = await receiver.NextAsync("resource_done", before, Patience);
             Assert.True(sent.GetProperty("status").GetInt32() == 6,
-                $"Sender resource failed: {sent}; receiver: {received}; dropped={bridge.Dropped}, retried={bridge.Retried}.");
+                $"Sender resource failed: {sent}; receiver: {received}; dropped={bridge.Dropped}, retried={bridge.Retried}, initial replays={bridge.InitialReplays}.");
             Assert.True(received.GetProperty("status").GetInt32() == 6, $"Receiver resource failed: {received}.");
             Assert.Equal(size, received.GetProperty("size").GetInt32());
             Assert.Equal(sent.GetProperty("sha256").GetString(), received.GetProperty("sha256").GetString());
@@ -248,6 +248,7 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
                 $"2.2 MB incompressible resources both ways, 20 ms/frame latency, capacity-one bearer queues, " +
                 $"router inbound capacities=2; dropped/retransmitted parts={bridge.Dropped}/{bridge.Retried}, " +
                 $"first complete resource windows passed before loss={bridge.PassedBeforeLoss} parts; " +
+                $"initial-window replay frames passed={bridge.InitialReplays}; " +
                 $"backpressure waits={bridge.BackpressureWaits}, TCP sessions={bridge.Sessions}; " +
                 "proved packets after TCP reconnect, persisted-identity .NET restart and forced Python-router crash/restart; " +
                 "crash interrupted an active proved link, detached its .NET forwarding state and prevented further delivery; " +
@@ -720,19 +721,22 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
         private readonly CancellationTokenSource _stop = new();
         private readonly object _gate = new();
         private readonly ConcurrentDictionary<string, byte> _lostParts = new();
+        private readonly ConcurrentDictionary<string, byte> _initialUp = new(), _initialDown = new();
         private TcpClient? _incoming, _outgoing;
         private Task _running = Task.CompletedTask;
-        private int _sessions, _dropped, _retried, _backpressureWaits, _dropUp, _dropDown, _passUp, _passDown, _passedBeforeLoss;
+        private int _sessions, _dropped, _retried, _backpressureWaits, _dropUp, _dropDown, _passUp, _passDown, _passedBeforeLoss, _initialReplays;
         public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
         public int Sessions => Volatile.Read(ref _sessions);
         public int Dropped => Volatile.Read(ref _dropped);
         public int Retried => Volatile.Read(ref _retried);
         public int BackpressureWaits => Volatile.Read(ref _backpressureWaits);
         public int PassedBeforeLoss => Volatile.Read(ref _passedBeforeLoss);
+        public int InitialReplays => Volatile.Read(ref _initialReplays);
 
         public void Start() { _listener.Start(1); _running = Run(); }
         public void LoseResourceParts(bool fromPython, int count, int afterParts = 0)
         {
+            (fromPython ? _initialUp : _initialDown).Clear();
             Interlocked.Exchange(ref (fromPython ? ref _passUp : ref _passDown), afterParts);
             Interlocked.Exchange(ref (fromPython ? ref _dropUp : ref _dropDown), count);
         }
@@ -747,11 +751,18 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
                     Interlocked.Increment(ref _retried);
                 return false;
             }
+            var initial = fromPython ? _initialUp : _initialDown;
+            if (initial.ContainsKey(hash))
+            {
+                Interlocked.Increment(ref _initialReplays);
+                return false;
+            }
             ref var remaining = ref (fromPython ? ref _dropUp : ref _dropDown);
             if (Volatile.Read(ref remaining) <= 0) return false;
             ref var passing = ref (fromPython ? ref _passUp : ref _passDown);
             if (Volatile.Read(ref passing) > 0)
             {
+                if (!initial.TryAdd(hash, 0)) return false;
                 Interlocked.Decrement(ref passing);
                 Interlocked.Increment(ref _passedBeforeLoss);
                 return false;
@@ -886,8 +897,14 @@ public sealed class Parity8ResourceLossFixtureTests
     {
         await using var bridge = new Parity8CompatibilityLiveTests.ResourceLossBridge(0);
         bridge.LoseResourceParts(fromPython: true, 3, afterParts: 4);
-        for (var i = 0; i < 4; i++) Assert.False(bridge.DropResourcePart(true, "initial-" + i));
+        for (var i = 0; i < 4; i++)
+        {
+            Assert.False(bridge.DropResourcePart(true, "initial-" + i));
+            Assert.False(bridge.DropResourcePart(true, "initial-" + i));
+            Assert.Equal(i + 1, bridge.PassedBeforeLoss);
+        }
         Assert.Equal(4, bridge.PassedBeforeLoss);
+        Assert.False(bridge.DropResourcePart(true, "initial-0"));
         for (var i = 0; i < 3; i++)
         {
             Assert.True(bridge.DropResourcePart(true, "lost-" + i));

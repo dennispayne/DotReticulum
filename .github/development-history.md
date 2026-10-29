@@ -4,6 +4,44 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Distinct initial-window parts, not replayed frames
+
+Investigating the completed macOS mesh failure revealed a real fixture defect:
+the pre-loss quota counted every forwarded RESOURCE frame, including a replay
+of an already forwarded packet. Four counted frames could therefore mean
+fewer than four distinct parts, and an initial part's later replay could
+incorrectly consume the subsequent distinct-loss budget. The original failed
+run did not retain the initial frame hashes, so this defect is **not proven
+to be the sole cause of that historical timeout**.
+
+The bridge now retains a bounded per-direction set of the initial packet
+hashes, cleared when that direction is rearmed. Replays neither advance the
+four-part quota nor consume any of the three distinct drops. Existing
+lost-part/retry accounting and the unchanged 20 ms delay, bounded queues,
+15 losses/repairs and upstream defaults remain intact. Failure and success
+diagnostics now include observed initial-window replay counts.
+
+The existing focused fixture case now repeats each initial frame and replays
+an initial part again after the window. It failed before the correction
+(`TestResults\mesh-initial-replay-regression`: **1 passed / 1 failed**), then
+passed with the same exact distinct quotas.
+
+Final validation:
+
+- `DOTRETICULUM_LIVE=1 dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --nologo -v quiet --filter 'FullyQualifiedName~Parity8CompatibilityLiveTests|FullyQualifiedName~Parity8ResourceLossFixtureTests|FullyQualifiedName~LiveMixedTransportTests' --logger trx --results-directory TestResults\mesh-distinct-initial-window-final -- xUnit.MaxParallelThreads=1`:
+  **7 passed / zero skips / 3m59s**, actual verified pinned Python peers.
+  The measured-window case retained **20 distinct initial parts / 15 dropped /
+  15 retried / 219 capacity-one waits / four TCP sessions**. Its live run
+  observed zero initial replays; replay handling is independently established
+  by the failing-then-passing focused fixture, not invented live evidence.
+- `DOTRETICULUM_LIVE=0 dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --logger trx --results-directory TestResults\mesh-distinct-initial-full-final -- xUnit.MaxParallelThreads=1`:
+  **1854 passed / 88 explicit skips / zero failures**.
+
+No production/reference timer, packet format or MTU changed. A distinct
+forwarded-part quota alone is not callback-level proof that an upstream
+throughput estimate completed; actual failure observations remain visible.
+New-source hosted repeat acceptance remains pending.
+
 ### Fresh links through a surviving alternate transport
 
 Added Windows managed live integration case
@@ -61,7 +99,8 @@ still ACTIVE, **13 dropped / 12 retried** at failure and an actual sender
 part-request timeout. Receiver observations included four received parts,
 `req_data_rtt_rate=0` and two outstanding parts. Four forwarded frames therefore
 did not establish a completed measured window in that execution. Initial-frame
-counting and replay handling require further investigation; this is not
+replay counting is corrected above, without proving the cause of this historical
+failure; this is not
 reclassified as a passing recovery or explained by the separate cold control.
 The subsequent three-repeat run **40938753343** remains a separate pending
 result, not a retroactive repair of this failure.

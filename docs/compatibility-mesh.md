@@ -68,11 +68,19 @@ The test requires:
   restart, a distinct recovered link, and proved DATA/resources in both directions.
 
 The bounded bearer rejects malformed/unbounded frames and retains hashes for
-only the deliberately lost parts (15 across the bounded recovery scenario). It applies
+the deliberately lost parts (15 across the bounded recovery scenario) plus
+at most four initial parts per direction. It applies
 application-frame loss above TCP, because ordinary TCP packet loss would merely
 exercise the operating system's reliable stream, not RNS resource recovery.
 This is a repeatable loopback impairment, not evidence from radio hardware or
 an uncontrolled wide-area network.
+
+The initial four-part quota counts distinct packet hashes, not replayed frames;
+replays of those initial parts must not consume the later loss budget either.
+Its small per-direction initial set is reset for each transfer. Replay handling
+has a focused failing-then-passing fixture regression. Forwarded-part counts
+alone are not callback-level proof of an upstream throughput estimate; actual
+receiver state and resource failure observations remain relevant diagnostics.
 
 ## Automatic endpoint timeout and fresh-session recovery
 
