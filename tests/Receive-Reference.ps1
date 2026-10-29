@@ -21,7 +21,7 @@ Python reference revision. Defaults to the canonical compatibility pin and must 
 Fresh destination for the fetched repository, bundle, configuration and provenance.
 .PARAMETER Gateway
 Reticulum TCP gateway hostname or IPv4 address.
-Defaults to reticulum.thecryptosquid.com.
+Defaults to rmap.world.
 .PARAMETER Port
 Gateway TCP port, from 1 through 65535. Defaults to 4242.
 .PARAMETER TimeoutSeconds
@@ -37,7 +37,7 @@ param(
     [Parameter(Mandatory, ParameterSetName = 'Python')] [string] $Upstream,
     [Parameter(ParameterSetName = 'Python')] [string] $Revision,
     [Parameter(Mandatory)] [string] $Directory,
-    [string] $Gateway = 'reticulum.thecryptosquid.com',
+    [string] $Gateway = 'rmap.world',
     [ValidateRange(1, 65535)] [int] $Port = 4242,
     [ValidateRange(1, 3600)] [int] $TimeoutSeconds = 900
 )

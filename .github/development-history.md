@@ -4,6 +4,82 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Verified alternate public gateway after hosted reference-link failures
+
+Exact-source **ef4f5ae** normal **40970422887** and repeated mesh
+**40970422515** built all three native platforms, but all native Compatibility
+candidates failed their actual hosted-reference link establishment through
+`reticulum.thecryptosquid.com:4242`. T001 failed; dependent reference tests did
+not acquire a canonical source bundle and are not acceptance evidence.
+Linux learned the repository destination at 11 hops but could not establish its
+link. No Channel traffic had begun at that boundary.
+
+Local controls independently failed through that same gateway with both the
+new native executable and the pre-Channel-change executable
+**f8816a7d417d08a9096732615f026d7a6f29dd0338a5c1a2f104eca7305f8907**.
+Rather than retrying blindly or substituting GitHub source, verified the
+operator-published `https://rmap.world/services.html` TCP entrypoint
+**rmap.world:4242** and successfully fetched through it with our native stack:
+
+`tests\Receive-Reference.ps1 -Application artifacts\native-channel-retention-final\DotReticulum.Applications.exe -Directory TestResults\reference-rmap-alternate-control -Gateway rmap.world -Port 4242 -TimeoutSeconds 180`
+
+The target pin was initially absent; **100,256 bundle bytes** arrived over
+Reticulum. Existing strict Git integrity/pin validation passed:
+**a29bfb51c468945c96a1ee22cae0114e993e2391**, tree
+**24d4c393de9fd57b933836cea68891fd953ab060**. Fetched development head was
+**a8cc6cb239a3e9c44183b28eb1eaa1f88601e00b**, tree
+**fbe3e36e3e2f2efa06abd4d2d67ff0f523edfebc**; it does not change the pin.
+Bundle SHA-256:
+**47ecb071e17fc29a3b3ea7eba686b198966bae4df7692ea7cfdcb487d8d4af1d**.
+The mirror-parent seed remains disclosed and publisher authentication remains
+false. CI now names this verified gateway explicitly; both manual entry points
+use it by default and retain `-Gateway` overrides and discoverable help. This
+changes the network entrypoint, not retrieval assertions, retry/deadline policy
+or source provenance requirements.
+
+Validation after the entrypoint change:
+`pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+**65 passed / two prerequisite skips**;
+`pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
+**66 tracked scripts / zero findings**; actionlint 1.7.12 passed all three
+affected/calling workflows. Actual `Get-Help -Full` on both entry points
+discovers the updated Gateway description/default.
+
+Exact-source Static **40970422860** passed all five jobs. Downloaded actual
+SARIF and rendered summary **123787356283** show zero Actions/C#/PowerShell
+findings and the same two Python warnings (test-only cleartext authentication
+fixture and intentionally weak upstream signing-vector key).
+
+### Actual-router transport-enabled native persisted-startup negative result
+
+Followed the existing Windows native leaf acceptance with a bounded experiment
+varying only candidate `enable_transport` (`no`/`yes`) in
+`I2pNativeTests.PublishedProbeExchangesEncryptedDataAndValidatedProofsAcrossFreshAndPersistedProcesses`.
+The original fresh/fresh/reused sequence, real Java I2P 2.14.0 local-destination
+router, encrypted 257-byte packets, signed proofs, connected-peer announces and
+deadlines were unchanged. The native executable was the already verified
+**c3d7eb967e6b5cbcb21a0dd52b4c11174a7c72b2df190d608dd8b6423c5e6438**
+artifact; no production change was made.
+
+The leaf control passed. With transport enabled both fresh processes passed,
+but process three reused its saved path and reported **sent 1 / received 0**,
+timing out before proof. The transport case failed in **154 seconds**; overall
+experimental execution was **one passed / one failed / zero skips**. This
+narrows the outstanding acceptance boundary; it is not passing transport
+recovery. The existing offline-send discard and transport-mode path restoration
+are source-grounded behavior, so neither was changed speculatively. An independent
+pinned-upstream transport-enabled control remains outstanding.
+
+Command:
+`tests\Interop\Invoke-I2pTopology.ps1 -JavaExecutable TestResults\i2p-tools-java-win\jdk-21.0.12.1+1-jre\bin\java.exe -JavaRouterDirectory TestResults\i2p-tools-java-win\router -AllowPublicNetwork -JavaLocalDestinationRouting -PublishedFeatureOnly -NoBuild -SamEndpoint 127.0.0.1:17657 -TestTimeoutSeconds 600 -KeepArtifacts`
+with `DOTRETICULUM_NATIVE_EXE` set to the verified published executable.
+Actual TRX:
+`TestResults\i2p-topology-6fd22a11f4194fb99c9982792b6b79bc\results\i2p-live.trx`.
+The temporary theory expansion was removed, not silently accepted as a passing
+test or committed as a known-red gate. The original positive leaf test remains
+unchanged. Owned router/test processes were stopped by the runner. Retained
+router state/logs are private local artifacts, never upload evidence.
+
 ### Native Channel gap recovery, constrained streaming and KISS disposal ownership
 
 The separately published public Buffer consumer's two healthy cases passed on

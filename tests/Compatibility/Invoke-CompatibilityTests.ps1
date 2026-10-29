@@ -45,7 +45,7 @@ the upstream Git baseline uses the existing reference-provenance.json in this di
 Preparation defaults to the reference subdirectory of OutputDirectory.
 .PARAMETER Gateway
 Reticulum TCP gateway hostname or IPv4 address for hosted reference retrieval.
-Defaults to reticulum.thecryptosquid.com.
+Defaults to rmap.world.
 .PARAMETER Prepare
 Publishes the native candidate when Application is omitted, enables FetchReference
 and chooses fresh results/reference directories when omitted. Runs automatically
@@ -69,7 +69,7 @@ param(
     [ValidateSet('Both', 'DotReticulum', 'Upstream')] [string] $Implementation = 'Both',
     [switch] $FetchReference,
     [string] $ReferenceDirectory,
-    [string] $Gateway = 'reticulum.thecryptosquid.com',
+    [string] $Gateway = 'rmap.world',
     [switch] $Prepare
 )
 $ErrorActionPreference = 'Stop'

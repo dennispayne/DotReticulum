@@ -412,7 +412,7 @@ jobs:
 
       - name: Run shared scenarios, retrieving the reference with this native candidate
         run: |
-          ./tests/Compatibility/Invoke-CompatibilityTests.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Implementation DotReticulum -FetchReference -ReferenceDirectory "$env:RUNNER_TEMP/candidate-reference" -Label '${{ matrix.rid }}' -NoJobSummary
+          ./tests/Compatibility/Invoke-CompatibilityTests.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Implementation DotReticulum -FetchReference -ReferenceDirectory "$env:RUNNER_TEMP/candidate-reference" -Gateway rmap.world -Label '${{ matrix.rid }}' -NoJobSummary
 
       - name: Retain one verified reference source bundle for this run
         if: ${{ !cancelled() && matrix.rid == 'linux-x64' }}

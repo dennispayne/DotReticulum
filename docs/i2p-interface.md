@@ -75,8 +75,10 @@ Use `-PublishedFeatureOnly` with `DOTRETICULUM_NATIVE_EXE` pointing to an existi
 published executable to run cold-start NativeAOT `rnprobe` acceptance. This
 selects the Applications test project and requires explicit
 `-AllowPublicNetwork`; it does not require Python. The receiver announces only
-after each actual I2P stream connects. Each candidate has isolated fresh state:
-this case does not establish persisted-candidate startup readiness.
+after each actual I2P stream connects. Two candidates have isolated fresh state;
+the third process reuses the first candidate's configuration/storage and must
+find the previous valid path in storage. This establishes bounded leaf
+persisted-candidate startup readiness, not transport-enabled recovery.
 
 For concurrent development, first copy the complete Release test-output directory
 into an owned directory under `TestResults`, then supply its
@@ -151,7 +153,15 @@ including the reused storage containing the prior valid route. Each process
 received a fresh announce after its distinct real I2P stream connected, sent one
 encrypted 257-byte packet and validated its signed delivery proof. No storage
 deletion, added retry, increased timer or changed offline-send behavior was used.
-Transport-enabled startup and broader restart modes remain unverified.
+An actual-router follow-up changed only the candidate's `enable_transport` to
+`yes`, retaining the fresh/fresh/reused process sequence and assertions.
+Both fresh processes passed, but the reused candidate sent its single probe
+using the saved I2P path and timed out: zero of one received.
+The otherwise identical leaf control passed. This is a measured
+transport-enabled native restart failure, not accepted recovery; an independent
+upstream transport-enabled control has not yet been run. No cached-path deletion,
+offline-send buffering, added retry or longer deadline was introduced to mask it.
+Broader restart modes remain unverified.
 
 An earlier unannounced receiver also timed out during discovery. Explicit
 connected-peer announcements are part of the accepted scenario, not a discovery
@@ -159,7 +169,7 @@ retry fix or a preseeded path/identity.
 
 Historical forced-public-tunnel restart attempts on i2pd and Java remain separate
 failed evidence; local-route success does not resolve them. Impaired-network,
-IFAC/routing, transport-enabled native startup, other native platforms,
+IFAC/routing, successful transport-enabled native persisted startup, other native platforms,
 remote-router and router-process restart acceptance remain unverified.
 Tests target RNS 1.5.7 at
 `a29bfb51c468945c96a1ee22cae0114e993e2391` and LXMF 1.2.1.
