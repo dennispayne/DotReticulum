@@ -200,7 +200,7 @@ public sealed class RngitTests
             Assert.Equal(1, await RngitApp.RunAsync(
                 ["clone", "rns://00000000000000000000000000000000/fixtures/sample.git", timedout, "--config", config, "--timeout", "0.5"],
                 output, error, CancellationToken.None));
-            Assert.Contains("timeout expired", error.ToString());
+            Assert.True(error.ToString().Contains("timeout expired", StringComparison.Ordinal), error.ToString());
             Assert.True(clock.Elapsed < TimeSpan.FromSeconds(15), clock.Elapsed.ToString());
             Assert.False(Directory.Exists(timedout));
         }

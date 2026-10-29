@@ -4,6 +4,102 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Hosted residual failures: bounded impairment model and Darwin pipe status
+
+Completed full interop **40902040408**, source **68c7b39**, had all three Builds,
+all four Compatibility candidates, both summary jobs and Linux Test pass.
+Downloaded and validated actual reports using
+`tests\Compatibility\New-CompatibilitySummary.ps1 -ReportsDirectory TestResults\hosted-interop-68c7b39-compatibility -Commit 68c7b39967c1ec9e6be31b1c2e9fce1f0eaa7bc1`:
+**39 distinct rows, all four candidates passed**, with exact tested-commit links.
+The aggregate workflow nevertheless **failed**, not full hosted acceptance.
+
+Actual macOS ARM64 TRX now proves the initial PTY correction: all **three**
+`RnshDarwinTests` passed (controlling TTY/resize/literal argv, foreground interrupt,
+owned process-group cancellation), along with seven mixed terminal/pipe
+combinations, the ordinary TTY resize case and the actual published
+`RnshNativeTests` initiator. The remaining managed failure was the terminal-mode
+probe aborting with code **6**; the old assertion discarded its captured
+diagnostic. Extended macOS failures were the crash-recovery resource returning
+**7** instead of **6**, narrow-MTU forward resource timing out at **29.35%**
+with its link still active, the all-pipe rnsh child returning **7** instead of
+reference **0**, and a Git timeout assertion without its full error detail.
+Windows failed one upgraded-MTU case before observing the initial announce.
+No deadline, loss count, payload-size or successful-resource assertion was relaxed.
+
+Corrections and bounded diagnostics:
+
+- The impairment bridge now pipelines fixed one-way latency through a
+  **64-frame bounded queue**, while separately serializing bytes at the
+  configured bitrate. It formerly charged the full latency serially for every
+  frame, unintentionally capping throughput irrespective of configured bitrate.
+  The new real-socket burst regression requires **64 exact ordered frames**
+  inside **3 seconds** at 100-ms one-way latency; the old model requires at least
+  **6.4 seconds**. Both impairment bridges now disable Nagle on their owned TCP
+  legs, as the real pinned TCP bearer does (`TCPInterface.py:149,242`), rather than
+  adding uncontrolled platform-specific buffering to their explicit impairment.
+  The crash bridge retains its **capacity-one** queue and **20-ms/frame** shaping,
+  exact **15 distinct drops / 15 first retries**, actual router crash and
+  unchanged resource/proof/identity assertions.
+- The live-link fixture waits for the actual pinned server's registered online
+  **Client on PyTCPServer** before issuing its first announce. It observes the
+  existing upstream interface API, not a sleep or substituted path. The original
+  **45-second** readiness budget remains bounded; failed setup disposes its peer.
+- Darwin all-pipe commands now use the same owned Unix spawn/wait backend as
+  Linux. Pinned `rnsh/process.py:639-645` masks raw `waitpid` status with **0xff**;
+  ordinary `exit 7` therefore returns **0**. The previous Darwin-only
+  `System.Diagnostics.Process` fallback returned normalized **7**.
+- The terminal probe reports full captured output on failure. Primary XNU
+  **f6217f891ac0bb64f3d375211650a4c1ff8ca1ea**,
+  `bsd/kern/tty.c:1358-1391`, adds **PENDIN** when restoring canonical input and
+  ORs that kernel state into restored flags; `bsd/sys/termios.h:259` defines it
+  as **0x20000000**. The probe allows only this documented added state bit and
+  prints actual values if encountered; every other mode byte remains exact.
+  Production restoration does not change or flush input. The prior abort's
+  actual byte difference remains unknown until this revised hosted probe runs.
+- Resource callback diagnostics retain the actual upstream failure status even
+  when a failed resource has no readable `data`; they expose actual link/resource
+  RTT and retry state, not synthetic success. The Git timeout test retains the
+  original strict condition but now prints the whole error if it fails.
+
+Local validation, same unchanged RNS **a29bfb51c468945c96a1ee22cae0114e993e2391**
+and verified Windows/WSL peers:
+`dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+**zero warnings/errors**.
+Applications selected `RnshTests|RnshLiveTests|Parity4TransportLiveTests|Parity5TransferLiveTests|Parity8CompatibilityLiveTests|RngitTests.LiveRngit_Clone`
+with `DOTRETICULUM_LIVE=1`, verified Python/WSL variables and
+`-- xUnit.MaxParallelThreads=1`: **28/28 passed, no skips, 4m06s**.
+Both narrow/upgraded-MTU impaired flows passed in **25s / 14s**; actual
+Python-router crash/restart passed in **2m42s**. Results:
+`TestResults\hosted-failure-corrections-20261029`.
+Transport selected `Parity5UpgradedMtu_DataResourceAndChannel`:
+**2/2 passed**, both initiator directions, **18s**; results:
+`TestResults\hosted-failure-corrections-transport-20261029`.
+
+Final full managed coverage command:
+`dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --settings tests\coverage.runsettings --collect:'XPlat Code Coverage' --results-directory TestResults\coverage-hosted-corrections-20261029 --logger trx`:
+**1,850 passed / 84 explicit skips**, live modes disabled.
+`tests\Get-CoverageSummary.ps1 TestResults\coverage-hosted-corrections-20261029`
+deduplicated collectors/TRX copies:
+
+| Project | Lines | Branches |
+|---|---:|---:|
+| Applications | 76.79% | 63.66% |
+| Core | 96.89% | 90.93% |
+| Crypto | 94.83% | 94.00% |
+| Interfaces | 82.18% | 73.02% |
+| Transport | 91.36% | 79.49% |
+| **Overall** | **82.39%** | **69.35%** |
+
+Fresh strict Windows NativeAOT:
+`dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 -o artifacts\native-hosted-corrections -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true --nologo -v quiet`
+with discoverable **vswhere** and **vcvars64.bat** in the same process:
+**passed**, followed by native help and actual native terminal /
+encrypted compressed multi-megabyte resource cases **2/2 passed**, no skips.
+Binary SHA-256:
+**f8816a7d417d08a9096732615f026d7a6f29dd0338a5c1a2f104eca7305f8907**.
+These Windows results do not establish the new Darwin paths or resolve the
+remaining hosted Git/resource failures. Those remain explicit pending rerun.
+
 ### Actual-router published-native I2P cold-start DATA and proofs
 
 Added opt-in Applications integration case

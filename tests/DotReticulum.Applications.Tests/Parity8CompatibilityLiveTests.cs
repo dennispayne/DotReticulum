@@ -135,8 +135,9 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             bridge.LoseResourceParts(fromPython, 3);
             var sent = await sender.Command($"resource {size} {seed} random", "resource_sent", TransferTimeout);
             var received = await receiver.NextAsync("resource_done", before, Patience);
-            Assert.Equal(6, sent.GetProperty("status").GetInt32());
-            Assert.Equal(6, received.GetProperty("status").GetInt32());
+            Assert.True(sent.GetProperty("status").GetInt32() == 6,
+                $"Sender resource failed: {sent}; receiver: {received}; dropped={bridge.Dropped}, retried={bridge.Retried}.");
+            Assert.True(received.GetProperty("status").GetInt32() == 6, $"Receiver resource failed: {received}.");
             Assert.Equal(size, received.GetProperty("size").GetInt32());
             Assert.Equal(sent.GetProperty("sha256").GetString(), received.GetProperty("sha256").GetString());
             Assert.False(sent.GetProperty("compressed").GetBoolean());
@@ -286,7 +287,8 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
                 while (!_stop.IsCancellationRequested)
                 {
                     using var incoming = await _listener.AcceptTcpClientAsync(_stop.Token);
-                    using var outgoing = new TcpClient();
+                    incoming.NoDelay = true;
+                    using var outgoing = new TcpClient { NoDelay = true };
                     using var session = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
                     lock (_gate) { _incoming = incoming; _outgoing = outgoing; }
                     try

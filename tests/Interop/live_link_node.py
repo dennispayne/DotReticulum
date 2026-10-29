@@ -185,8 +185,10 @@ def configure_link(link, role, identity_box):
                   "metadata": json.dumps(meta, default=lambda o: o.hex() if isinstance(o, bytes) else str(o)) if meta is not None else None,
                   "compressed": bool(resource.compressed), "segments": resource.total_segments})
         except Exception as e:
-            emit({"event": "resource_done", "status": -1, "size": 0, "sha256": "", "metadata": None, "compressed": False,
-                  "segments": 0, "error": str(e)})
+            emit({"event": "resource_done", "status": int(resource.status), "size": 0, "sha256": "", "metadata": None,
+                  "compressed": False, "segments": 0, "error": str(e), "link_status": int(link.status),
+                  "link_rtt": link.rtt, "resource_rtt": resource.rtt, "retries_left": resource.retries_left,
+                  "total_parts": getattr(resource, "total_parts", None)})
 
     link.set_packet_callback(on_packet)
     link.set_link_closed_callback(on_closed)

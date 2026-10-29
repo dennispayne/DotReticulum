@@ -26,7 +26,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] Broader mesh acceptance: alternate routes, active-link crash behavior, sustained Channel/resource soak and impaired native-binary/per-bearer matrices
   - [x] Actual pinned Python-router forced crash/restart with persisted transport identity, surviving leaves, observed bearer outage/recovery and bidirectional impaired resources
   - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
-  - [ ] Darwin rnsh terminal backend and actual macOS feature acceptance (initial hosted initialization failed; source-grounded fix pending hosted acceptance)
+  - [ ] Darwin rnsh terminal backend and actual macOS feature acceptance (controlling TTY/resize/literal argv/signals/group teardown and native terminal passed; pending mode-state and redirected-exit corrections)
   - [ ] Android host/providers, desktop RNode BLE and other missing/partial applicable software identified in the compatibility ledger
   - [ ] Per-interface interoperability and hardware evidence; untested platforms/devices remain unverified
 - [ ] CI/CD and automation

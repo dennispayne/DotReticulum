@@ -90,7 +90,7 @@ public sealed class RnshTests
         await child.Stdin.WriteAsync(data);
         child.CloseInput();
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        Assert.Equal(OperatingSystem.IsLinux() ? 0 : 7, await child.WaitAsync(deadline.Token));
+        Assert.Equal(OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() ? 0 : 7, await child.WaitAsync(deadline.Token));
         await Task.WhenAll(reading, errors).WaitAsync(deadline.Token);
         Assert.Equal(data, output.ToArray());
         Assert.Equal("err", Encoding.UTF8.GetString(error.ToArray()));
@@ -142,7 +142,7 @@ public sealed class RnshTests
     }
 
     [RnshTerminalFact]
-    public async Task ActualTerminalFlagsChangeAndRestoreExactly()
+    public async Task ActualTerminalModesRestoreWithOnlyDocumentedDarwinPendingInputState()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "DotReticulum.slnx"))) root = root.Parent;
@@ -156,9 +156,11 @@ public sealed class RnshTests
         using var output = new MemoryStream();
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         var pump = child.Stdout.CopyToAsync(output, deadline.Token);
-        Assert.Equal(0, await child.WaitAsync(deadline.Token));
+        var code = await child.WaitAsync(deadline.Token);
         await pump;
-        Assert.Contains("terminal-modes-restored", Encoding.UTF8.GetString(output.ToArray()));
+        var text = Encoding.UTF8.GetString(output.ToArray());
+        Assert.True(code == 0, $"Terminal probe exit {code}: {text}");
+        Assert.Contains("terminal-modes-restored", text);
     }
 
     [RnshTerminalTheory]

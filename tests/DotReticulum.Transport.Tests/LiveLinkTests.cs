@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -43,9 +44,27 @@ public sealed class LiveLinkTests(ITestOutputHelper output)
             {
                 Log = m => { lock (s.Log) s.Log.AppendLine(m); },
             };
-            await s.Manager.StartAsync();
-            s._run = Task.Run(() => s.Router.RunAsync(s._cts.Token));
-            return s;
+            try
+            {
+                await s.Manager.StartAsync();
+                s._run = Task.Run(() => s.Router.RunAsync(s._cts.Token));
+                var clock = Stopwatch.StartNew();
+                while (true)
+                {
+                    var remaining = Patience - clock.Elapsed;
+                    if (remaining <= TimeSpan.Zero) throw new TimeoutException("Pinned Python TCP server did not register the actual accepted peer.");
+                    var interfaces = await s.Py.Command("interfaces", "interfaces", remaining);
+                    if (interfaces.GetProperty("interfaces").EnumerateArray().Any(item =>
+                        item.GetProperty("name").GetString() == "Client on PyTCPServer" && item.GetProperty("online").GetBoolean()))
+                        return s;
+                    await Task.Delay(25);
+                }
+            }
+            catch
+            {
+                await s.DisposeAsync();
+                throw;
+            }
         }
 
         public async Task<(Link Link, TaskCompletionSource<Link> Closed)> ConnectToPythonAsync()

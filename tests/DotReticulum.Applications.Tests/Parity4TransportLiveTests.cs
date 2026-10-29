@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using DotReticulum.Applications.Rnsd;
@@ -20,7 +21,7 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
         return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
-    // One read/write at a time per direction; no unbounded task or byte queue.
+    // One reader/writer per direction with a bounded in-flight frame queue.
     internal sealed class ImpairedBridge(int targetPort, int bitrate = 64_000, int latencyMilliseconds = 20) : IAsyncDisposable
     {
         private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
@@ -60,7 +61,8 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
                 while (!_stop.IsCancellationRequested)
                 {
                     using var incoming = await _listener.AcceptTcpClientAsync(_stop.Token);
-                    using var outgoing = new TcpClient();
+                    incoming.NoDelay = true;
+                    using var outgoing = new TcpClient { NoDelay = true };
                     await outgoing.ConnectAsync(IPAddress.Loopback, targetPort, _stop.Token);
                     lock (_gate) { _incoming = incoming; _outgoing = outgoing; }
                     Interlocked.Increment(ref _sessions);
@@ -80,34 +82,61 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
 
         private async Task Pump(NetworkStream from, NetworkStream to, bool impair, CancellationToken token)
         {
-            var input = new byte[2048];
-            var frame = new List<byte>(2048);
-            while (true)
+            using var pipeline = CancellationTokenSource.CreateLinkedTokenSource(token);
+            var pending = System.Threading.Channels.Channel.CreateBounded<(byte[] Bytes, long Due)>(64);
+            async Task Receive()
             {
-                var count = await from.ReadAsync(input, token);
-                if (count == 0) return;
-                for (var index = 0; index < count; index++)
+                Exception? failure = null;
+                try
                 {
-                    var value = input[index];
-                    frame.Add(value);
-                    if (frame.Count > (InterfaceAccessCode.MaximumPacketSize + 64) * 2 + 2)
-                        throw new InvalidDataException("Test bridge received an unbounded HDLC frame.");
-                    if (value != 0x7e) continue;
-                    if (frame.Count > 2)
+                    var input = new byte[2048];
+                    var frame = new List<byte>(2048);
+                    var serialized = Stopwatch.GetTimestamp();
+                    while (true)
                     {
-                        if ((impair && Interlocked.Exchange(ref _dropFrames, 0) != 0) || DropChannel(frame, impair))
-                            Interlocked.Increment(ref _dropped);
-                        else
+                        var count = await from.ReadAsync(input, pipeline.Token);
+                        if (count == 0) return;
+                        for (var index = 0; index < count; index++)
                         {
-                            // 20 ms one-way latency plus a 64 kbit/s serialization delay.
-                            await Task.Delay(TimeSpan.FromMilliseconds(latencyMilliseconds + frame.Count * 8_000.0 / bitrate), token);
-                            await to.WriteAsync(frame.ToArray(), token);
+                            var value = input[index];
+                            frame.Add(value);
+                            if (frame.Count > (InterfaceAccessCode.MaximumPacketSize + 64) * 2 + 2)
+                                throw new InvalidDataException("Test bridge received an unbounded HDLC frame.");
+                            if (value != 0x7e) continue;
+                            if (frame.Count > 2)
+                            {
+                                if ((impair && Interlocked.Exchange(ref _dropFrames, 0) != 0) || DropChannel(frame, impair))
+                                    Interlocked.Increment(ref _dropped);
+                                else
+                                {
+                                    serialized = Math.Max(serialized, Stopwatch.GetTimestamp()) +
+                                        (long)Math.Ceiling(frame.Count * 8.0 * Stopwatch.Frequency / bitrate);
+                                    var due = serialized + (long)(latencyMilliseconds * Stopwatch.Frequency / 1000.0);
+                                    await pending.Writer.WriteAsync((frame.ToArray(), due), pipeline.Token);
+                                }
+                            }
+                            frame.Clear();
+                            frame.Add(0x7e);
                         }
                     }
-                    frame.Clear();
-                    frame.Add(0x7e);
+                }
+                catch (Exception error) { failure = error; throw; }
+                finally { pending.Writer.TryComplete(failure); }
+            }
+            async Task Forward()
+            {
+                await foreach (var frame in pending.Reader.ReadAllAsync(pipeline.Token))
+                {
+                    var remaining = (frame.Due - Stopwatch.GetTimestamp()) / (double)Stopwatch.Frequency;
+                    if (remaining > 0) await Task.Delay(TimeSpan.FromSeconds(remaining), pipeline.Token);
+                    await to.WriteAsync(frame.Bytes, pipeline.Token);
                 }
             }
+            var receive = Receive();
+            var forward = Forward();
+            var first = await Task.WhenAny(receive, forward);
+            if (first.IsFaulted || first.IsCanceled) await pipeline.CancelAsync();
+            await Task.WhenAll(receive, forward);
         }
 
         private bool DropChannel(List<byte> frame, bool fromPython)
@@ -141,6 +170,33 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
     {
         using var timeout = new CancellationTokenSource(Patience);
         while (!condition()) await Task.Delay(25, timeout.Token);
+    }
+
+    [Fact]
+    public async Task ImpairedBridgePipelinesOneWayLatencyInsteadOfChargingItPerFrame()
+    {
+        using var target = new TcpListener(IPAddress.Loopback, 0);
+        target.Start();
+        await using var bridge = new ImpairedBridge(((IPEndPoint)target.LocalEndpoint).Port,
+            bitrate: 1_000_000, latencyMilliseconds: 100);
+        bridge.Start();
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        using var sender = new TcpClient();
+        await sender.ConnectAsync(IPAddress.Loopback, bridge.Port, deadline.Token);
+        using var receiver = await target.AcceptTcpClientAsync(deadline.Token);
+        var frames = new List<byte>();
+        for (byte sequence = 1; sequence <= 64; sequence++)
+        {
+            frames.Add(0x7e);
+            frames.AddRange(Packet.Create(PacketType.Data, DestinationType.Plain, new byte[16], new byte[] { sequence }).ToArray());
+            frames.Add(0x7e);
+        }
+        var expected = frames.ToArray();
+        await sender.GetStream().WriteAsync(expected, deadline.Token);
+        var actual = new byte[expected.Length];
+        await receiver.GetStream().ReadExactlyAsync(actual, deadline.Token);
+        Assert.Equal(expected, actual);
+        Assert.Equal(0, bridge.Dropped);
     }
 
     [Trait("Category", "Live")]

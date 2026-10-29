@@ -16,6 +16,21 @@ var raw = terminal.SnapshotModes() ?? throw new IOException("Terminal disappeare
 if (before.AsSpan().SequenceEqual(raw)) throw new IOException("Raw mode did not change terminal flags.");
 terminal.Dispose();
 var restored = terminal.SnapshotModes() ?? throw new IOException("Terminal disappeared.");
-if (!before.AsSpan().SequenceEqual(restored))
+var comparison = restored;
+if (OperatingSystem.IsMacOS())
+{
+    const ulong pendingInput = 0x20000000;
+    var beforeFlags = BitConverter.ToUInt64(before, 24);
+    var restoredFlags = BitConverter.ToUInt64(restored, 24);
+    if (restoredFlags != beforeFlags && restoredFlags == (beforeFlags | pendingInput))
+    {
+        // XNU tty.c TIOCSETAW adds PENDIN when restoring canonical input.
+        // Compare every configured mode byte, excluding only that kernel state.
+        comparison = restored.ToArray();
+        before.AsSpan(24, 8).CopyTo(comparison.AsSpan(24, 8));
+        Console.WriteLine($"darwin-kernel-pendin: before={beforeFlags:x}, restored={restoredFlags:x}");
+    }
+}
+if (!before.AsSpan().SequenceEqual(comparison))
     throw new IOException($"Original terminal modes were not restored: before={Convert.ToHexString(before)}, restored={Convert.ToHexString(restored)}");
 Console.WriteLine("terminal-modes-restored");

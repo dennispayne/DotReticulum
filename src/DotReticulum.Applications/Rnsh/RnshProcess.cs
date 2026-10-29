@@ -39,7 +39,7 @@ public sealed class RnshProcess : IAsyncDisposable
         if (argv.Length == 0 || argv.Any(v => v.Contains('\0'))) throw new ArgumentException("Invalid command argv.");
         var identity = remote is null ? "" : "<" + remote.HexHash + ">";
         if (OperatingSystem.IsWindows()) return new RnshProcess(WindowsRnshTerminal.Start(argv, command, identity));
-        if (OperatingSystem.IsLinux() || !command.PipeStdin || !command.PipeStdout || !command.PipeStderr)
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || !command.PipeStdin || !command.PipeStdout || !command.PipeStderr)
             return new RnshProcess(UnixRnshTerminal.Start(argv, command, identity));
         var start = new ProcessStartInfo(argv[0])
         {
