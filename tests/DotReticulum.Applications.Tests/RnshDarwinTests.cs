@@ -15,6 +15,28 @@ public sealed class RnshDarwinFactAttribute : FactAttribute
 public sealed class RnshDarwinTests
 {
     [RnshDarwinFact]
+    public async Task ExitedChildTerminalOutputRemainsReadableBeforeTheFirstRead()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        foreach (var stdoutPipe in new[] { false, true })
+        {
+            await using var child = RnshProcess.Start(["/bin/sh", "-c",
+                "printf stdout-marker; printf stderr-marker >&2"], new RnshExecute
+                {
+                    PipeStdin = true, PipeStdout = stdoutPipe, PipeStderr = false,
+                }, null);
+            Assert.Equal(0, await child.WaitAsync(timeout.Token));
+            using var output = new StreamReader(child.Stdout, leaveOpen: true);
+            using var error = new StreamReader(child.Stderr, leaveOpen: true);
+            var stdout = await output.ReadToEndAsync(timeout.Token);
+            var stderr = await error.ReadToEndAsync(timeout.Token);
+            Assert.Contains("stdout-marker", stdout);
+            Assert.Contains("stderr-marker", stdoutPipe ? stderr : stdout);
+            if (stdoutPipe) Assert.DoesNotContain("stderr-marker", stdout);
+        }
+    }
+
+    [RnshDarwinFact]
     public async Task ControllingTerminalResizesAndExecKeepsArgumentsLiteral()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));

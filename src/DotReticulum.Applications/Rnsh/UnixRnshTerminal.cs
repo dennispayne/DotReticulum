@@ -10,14 +10,17 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
     private readonly int _pid;
     private readonly FileStream _master;
     private readonly bool _stdinPipe;
+    private readonly SafeFileHandle? _replica;
     private readonly Task<int> _exit;
     private readonly object _disposeGate = new();
     private Task? _dispose;
-    private UnixRnshTerminal(int pid, FileStream master, Stream input, Stream output, Stream error, bool stdinPipe)
+    private UnixRnshTerminal(int pid, FileStream master, Stream input, Stream output, Stream error, bool stdinPipe,
+        SafeFileHandle? replica)
     {
         _pid = pid;
         _master = master;
         Input = input; Output = output; Error = error; _stdinPipe = stdinPipe;
+        _replica = replica;
         _exit = Task.Run(() =>
         {
             int result, status;
@@ -46,6 +49,9 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
         var attr = Marshal.AllocHGlobal(darwin ? IntPtr.Size : 512);
         var actionsReady = false;
         var attrReady = false;
+        var initialSlave = -1;
+        SafeFileHandle? retainedReplica = null;
+        var replicaTransferred = false;
         try
         {
             if (grantpt(master) != 0 || unlockpt(master) != 0) throw ErrorFor("grantpt/unlockpt");
@@ -53,8 +59,9 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
             if (darwin && (!command.PipeStdin || !command.PipeStdout || !command.PipeStderr))
             {
                 // XNU rejects extended master ioctls until a replica has opened.
-                // Keep it open until spawn installs the child's terminal endpoints.
-                var initialSlave = open(slave, 2 | DarwinRnshNative.NoControllingTerminal);
+                // Retain it until exited-child output drains; XNU flushes the
+                // output queue when the final replica closes.
+                initialSlave = open(slave, 2 | DarwinRnshNative.NoControllingTerminal);
                 if (initialSlave < 0) throw ErrorFor("open PTY replica");
                 owned.Add(initialSlave);
             }
@@ -119,21 +126,34 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
                 if (SetWindow(master, size) != 0) throw ErrorFor("TIOCSWINSZ");
             }
             Check(posix_spawnp(out var pid, spawnArgv[0], actions, attr, av, ev));
+            if (initialSlave >= 0)
+            {
+                retainedReplica = new SafeFileHandle(initialSlave, true);
+                owned.Remove(initialSlave);
+            }
             foreach (var fd in sources.Where(fd => fd >= 0)) { close(fd); owned.Remove(fd); }
             var masterStream = StreamFor(master); owned.Remove(master);
+            Task<int>? exited = null;
+            void ReleaseDrainedReplica()
+            {
+                if (exited?.IsCompleted == true) retainedReplica?.Dispose();
+            }
             Stream Parent(int index)
             {
                 if (!pipes[index])
                 {
                     var duplicate = dup(master);
                     if (duplicate < 0) throw ErrorFor("dup");
-                    return index == 0 ? StreamFor(duplicate) : new RnshNativeReader(new SafeFileHandle(duplicate, true), true, true);
+                    return index == 0 ? StreamFor(duplicate) : new RnshNativeReader(new SafeFileHandle(duplicate, true),
+                        true, true, ReleaseDrainedReplica);
                 }
                 var fd = parents[index]; owned.Remove(fd);
                 return index == 0 ? StreamFor(fd) : new RnshNativeReader(new SafeFileHandle(fd, true), true);
             }
             var terminal = new UnixRnshTerminal(pid, masterStream, Parent(0), Parent(1),
-                pipes[2] ? Parent(2) : command.PipeStdout ? Parent(2) : Stream.Null, command.PipeStdin);
+                pipes[2] ? Parent(2) : command.PipeStdout ? Parent(2) : Stream.Null, command.PipeStdin, retainedReplica);
+            exited = terminal._exit;
+            replicaTransferred = true;
             return terminal;
         }
         finally
@@ -142,6 +162,7 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
             if (attrReady) posix_spawnattr_destroy(attr);
             Marshal.FreeHGlobal(actions); Marshal.FreeHGlobal(attr);
             foreach (var ptr in allocations) Marshal.FreeCoTaskMem(ptr);
+            if (!replicaTransferred) retainedReplica?.Dispose();
             foreach (var fd in owned) close(fd);
         }
     }
@@ -170,7 +191,7 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
         finally
         {
             kill(-_pid, 9);
-            Input.Dispose(); Output.Dispose(); Error.Dispose(); _master.Dispose();
+            Input.Dispose(); Output.Dispose(); Error.Dispose(); _replica?.Dispose(); _master.Dispose();
         }
     }
     private static IOException ErrorFor(string operation) => new($"{operation}: {new Win32Exception(Marshal.GetLastPInvokeError()).Message}");

@@ -5,7 +5,7 @@ namespace DotReticulum.Applications.Rnsh;
 
 // Polling readiness keeps cancellation independent of an uninterruptible native
 // console/PTY read. At most one reader owns each endpoint.
-internal sealed class RnshNativeReader(SafeFileHandle handle, bool ownsHandle, bool pty = false) : Stream
+internal sealed class RnshNativeReader(SafeFileHandle handle, bool ownsHandle, bool pty = false, Action? onIdle = null) : Stream
 {
     private bool _disposed;
     private long _lastRead = Environment.TickCount64;
@@ -65,6 +65,7 @@ internal sealed class RnshNativeReader(SafeFileHandle handle, bool ownsHandle, b
                     }
                     else { bytes.AsMemory(0, (int)count).CopyTo(buffer); return (int)count; }
                 }
+                else if (ready == 0) onIdle?.Invoke();
             }
             await Task.Delay(10, cancellationToken).ConfigureAwait(false);
         }

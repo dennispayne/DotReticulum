@@ -4,6 +4,80 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### macOS residuals: retained PTY output, deterministic Git deadlines and resource diagnostics
+
+Full interop **40911880526**, exact source **0598977**, completed **failed**.
+All Builds, all four Compatibility candidates, both summary jobs and Windows /
+Linux Test passed. Actual downloaded macOS TRX proves all three original
+Darwin-specific cases, terminal-mode restoration with the documented PENDIN
+allowance, all-pipe exit status, both actual Python process roles and the
+previously failing narrow-MTU impaired resource case passed.
+Remaining macOS failures were:
+
+- Mixed pipe stdin/stdout with terminal stderr returned empty stderr rather
+  than the actual child's marker.
+- The nonexistent Git destination correctly failed but reported **Path not
+  found** rather than the elapsed timeout; the full captured diagnostic now
+  exposes that race.
+- Initial impaired resource failed on both actual upstream endpoints with
+  **3 dropped / 0 retried** parts; the receiver remained on an active link,
+  RTT **0.2865941524505615**, **16 retries left**, **65 parts**. This failure's
+  root cause is **not established or claimed fixed**.
+
+Primary XNU **f6217f891ac0bb64f3d375211650a4c1ff8ca1ea**,
+`bsd/kern/tty_dev.c:325-361`, closes the line discipline/backing TTY and flushes
+on the final replica close. The parent previously released its initial replica
+at the end of spawn setup; a fast child could already have exited before the
+caller's first output read. The parent now retains that non-controlling replica.
+Only after the child exits and the terminal reader observes an empty queue is
+it released; disposal also releases it. Native poll/read still supplies EOF,
+so surviving descendants retain their normal output lifetime. A new actual
+Darwin regression deliberately waits for process exit **before its first read**,
+for merged and independently redirected stdout. It explicitly skips elsewhere;
+the corrected Darwin branch still needs actual macOS acceptance.
+
+Git path/link establishment now measures its consumed stage budget with a
+monotonic clock and reports an elapsed **timeout expired** explicitly when no
+link is obtained after that budget. This does not depend on which outer
+cancellation timer gets scheduled first. A deterministic no-interface reference-
+free case consumes a 20-ms path budget while its independent 5-second guard
+remains uncancelled; no file/clone success is fabricated.
+
+The thin actual-reference adapter now records resource counters/timers, window,
+request-response rate, EIFR, outstanding/received parts and watchdog state in
+failure observations and sender conclusions. The Parity 8 leaf selects ordinary
+upstream **DEBUG** logging to expose actual resource cancellation/retry reasons.
+No reference algorithm, timer, deadline, loss budget or success assertion changes.
+The source pin remains **a29bfb51c468945c96a1ee22cae0114e993e2391**.
+
+Local focused Applications
+`RnshTests|RnshDarwinTests|RngitTests|Parity8CompatibilityLiveTests`, verified
+Windows Python and `DOTRETICULUM_LIVE=1`, serial execution:
+**36 passed / 4 explicit Darwin skips / zero failures**, **3m25s**, including
+the actual active-link router crash and unchanged **15 drops / 15 retries**.
+Full warning-free Release build and fresh full managed coverage:
+`dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --settings tests\coverage.runsettings --collect:'XPlat Code Coverage' --results-directory TestResults\coverage-darwin-drain-timeout-20261029 --logger trx`:
+**1,851 passed / 85 explicit skips**, live modes disabled.
+`tests\Get-CoverageSummary.ps1 TestResults\coverage-darwin-drain-timeout-20261029`:
+
+| Project | Lines | Branches |
+|---|---:|---:|
+| Applications | 76.71% | 63.59% |
+| Core | 96.89% | 90.93% |
+| Crypto | 94.83% | 94.00% |
+| Interfaces | 82.14% | 73.08% |
+| Transport | 91.38% | 79.69% |
+| **Overall** | **82.34%** | **69.35%** |
+
+Fresh strict Windows NativeAOT publish with both ILLink/ILC warnings as errors,
+native help, actual native terminal and encrypted compressed multi-megabyte
+resource execution: **2/2 passed**, no skips.
+`artifacts\native-darwin-drain-timeout\DotReticulum.Applications.exe` SHA-256:
+**fb302ef4179142d0511d604ddf36dc7e1bde93c49b2c401962994199acf53663**.
+These results do not prove the pending Darwin drain branch or resolve the
+macOS impaired-resource failure. Repeated mesh **40915647175** tests earlier
+**52dc6f0**, not these later production corrections/diagnostics.
+
 ### Interrupted active-link crash and explicit session recovery
 
 Extended the existing mixed three-hop actual-upstream transport case to kill

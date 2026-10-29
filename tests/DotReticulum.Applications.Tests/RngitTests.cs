@@ -8,6 +8,29 @@ namespace DotReticulum.Applications.Tests;
 [Trait("Category", "Integration")]
 public sealed class RngitTests
 {
+    [Fact]
+    public async Task ExpiredPathBudgetReportsTimeoutWithoutDependingOnCancellationTimerDispatch()
+    {
+        var root = Directory.CreateTempSubdirectory("rngit path deadline ").FullName;
+        try
+        {
+            await using var node = ReticulumNode.Create(Rnsd.RnsdConfigParser.Parse("""
+                [reticulum]
+                share_instance = no
+                [interfaces]
+                """), root);
+            using var identity = node.LoadOrCreateIdentity("rngit");
+            using var guard = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await node.StartAsync(guard.Token);
+            var error = await Assert.ThrowsAsync<TimeoutException>(() =>
+                RngitSession.OpenAsync(node, identity, "rns://00000000000000000000000000000000/fixtures/sample.git",
+                    TimeSpan.FromMilliseconds(20), 1024, null, guard.Token));
+            Assert.Contains("timeout expired", error.Message);
+            Assert.False(guard.IsCancellationRequested);
+        }
+        finally { TestDirectory.DeleteWithRetry(root); }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

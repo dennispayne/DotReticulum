@@ -18,4 +18,4 @@ def configure_proved_link(link, role, identity_box):
 
 if __name__ == "__main__":
     live_link_node.configure_link = configure_proved_link
-    live_link_node.main()
+    live_link_node.main(loglevel=RNS.LOG_DEBUG)

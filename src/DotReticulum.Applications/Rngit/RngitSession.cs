@@ -33,7 +33,10 @@ internal sealed partial class RngitSession : IDisposable
         if (refBatchSize is < 1 or > 1024) throw new ArgumentOutOfRangeException(nameof(refBatchSize));
         var address = RngitAddress.Parse(url);
         progress?.Invoke("Resolving path and establishing link...");
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
         var connection = await ClientLinks.ConnectAsync(node, address.DestinationHash, timeout, stop).ConfigureAwait(false);
+        if (connection.Link is null && System.Diagnostics.Stopwatch.GetElapsedTime(started) >= timeout)
+            throw new TimeoutException("Path discovery/link establishment timeout expired.");
         var link = connection.Link ?? throw new IOException(connection.Error);
         var session = new RngitSession(link, address, timeout, limit, progress, refBatchSize);
         try

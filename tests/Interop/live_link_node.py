@@ -160,6 +160,14 @@ def configure_channel(link):
     raw_reader.add_ready_callback(on_ready)
 
 
+def resource_observation(resource):
+    return {name: getattr(resource, name, None) for name in (
+        "rtt", "max_retries", "retries_left", "outstanding_parts", "received_count",
+        "receiving_part", "watchdog_lock", "waiting_for_hmu", "consecutive_completed_height",
+        "req_resp_rtt_rate", "req_data_rtt_rate", "eifr", "sdu", "window", "window_min",
+        "window_max", "req_sent", "req_resp", "last_activity", "sent_parts", "total_parts")}
+
+
 def configure_link(link, role, identity_box):
     STATE["link"] = link
     STATE["role"] = role
@@ -188,7 +196,7 @@ def configure_link(link, role, identity_box):
             emit({"event": "resource_done", "status": int(resource.status), "size": 0, "sha256": "", "metadata": None,
                   "compressed": False, "segments": 0, "error": str(e), "link_status": int(link.status),
                   "link_rtt": link.rtt, "resource_rtt": resource.rtt, "retries_left": resource.retries_left,
-                  "total_parts": getattr(resource, "total_parts", None)})
+                  "total_parts": getattr(resource, "total_parts", None), "state": resource_observation(resource)})
 
     link.set_packet_callback(on_packet)
     link.set_link_closed_callback(on_closed)
@@ -198,7 +206,7 @@ def configure_link(link, role, identity_box):
     link.set_resource_concluded_callback(on_resource_concluded)
 
 
-def main():
+def main(loglevel=RNS.LOG_WARNING):
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     parser.add_argument("--tcp-server-port", type=int, default=0)
@@ -208,7 +216,7 @@ def main():
 
     verify_reference()
     write_config(args.config, args.tcp_server_port, args.rnsd_port)
-    RNS.Reticulum(configdir=args.config, loglevel=RNS.LOG_WARNING)
+    RNS.Reticulum(configdir=args.config, loglevel=loglevel)
     RNS.Transport.register_announce_handler(Handler())
 
     identity = RNS.Identity()
@@ -305,12 +313,13 @@ def main():
                 def concluded(resource):
                     box["status"] = int(resource.status)
                     box["compressed"] = bool(resource.compressed)
+                    box["state"] = resource_observation(resource)
                     done.set()
 
                 RNS.Resource(payload, link, metadata=metadata, callback=concluded, auto_compress=True)
                 done.wait(300.0)
                 emit({"event": "resource_sent", "status": box.get("status", -1), "size": size, "sha256": sha256(payload),
-                      "compressed": box.get("compressed", False)})
+                      "compressed": box.get("compressed", False), "state": box.get("state")})
             elif cmd == "request":
                 path = parts[1]
                 text = " ".join(parts[2:])
