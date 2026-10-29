@@ -49,7 +49,8 @@ public sealed class Parity4DiscoveryControlsTests
             var run = Task.WhenAll(peer.RunAsync(stop.Token), host.RunAsync(stop.Token));
             try
             {
-                var port = Assert.IsType<TcpServerPacketInterface>(Assert.Single(peer.Interfaces).Interface).LocalEndpoint!.Port;
+                var server = Assert.IsType<TcpServerPacketInterface>(Assert.Single(peer.Interfaces).Interface);
+                var port = server.LocalEndpoint!.Port;
                 // This controlled advertisement exercises the compatible HDLC adapter, not a real Python Backbone.
                 var payload = DiscoveryCodec.Create(new DiscoveryAdvertisement
                 {
@@ -68,6 +69,7 @@ public sealed class Parity4DiscoveryControlsTests
                 Assert.Equal(17, options.HeldAnnounceCapacity);
                 Assert.NotNull(options.RateLimit);
 
+                while (server.ClientCount == 0) await Task.Delay(20, stop.Token);
                 using var identity = Identity.Generate();
                 var destination = Destination.Create(DestinationType.Single, "parity4", ["discovery"], identity);
                 await peer.Router.AnnounceAsync(new LocalDestination(identity, destination), cancellationToken: stop.Token);

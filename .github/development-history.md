@@ -4,6 +4,73 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Hosted Darwin acceptance and scheduling-independent fixture assertions
+
+Inspected the actual uploaded macOS and Windows TRX from full interop
+**40926579478**, exact source **f5688026ed42457af486114f41c328f35dc61746**.
+All **29 rnsh cases passed on macOS ARM64**, including all pipe/terminal
+combinations, the delayed-first-read regression, controlling TTY/resize/literal
+argv, interrupt delivery and subsequent session, process-group teardown, mode
+restoration, first-window change during handshake, the published-native terminal
+initiator and both actual pinned Python roles. This accepts the bounded Darwin
+milestone, not upstream interactive-UI or installation parity. The observed
+upstream EOF race remains explicitly negative.
+
+The overall run **failed**, not just a renderer: macOS had the old cold-window
+resource failure and two unit fixture failures; Windows failed the native Git
+host's blocked-peer assertion. All three Builds, all four Compatibility
+candidates, Linux Test and both renderers passed. The resource diagnostics
+reported an active receiver, one received / three outstanding parts, no measured
+data rate and zero repaired drops; this run predates the explicit measured-window
+scenario and independent negative reference control in **df2b80b**.
+
+Corrected the three scheduling assumptions without changing production code:
+
+- The controlled discovery fixture now waits for the server to accept its child
+  before sending its one-shot announcement. A completed client connect does not
+  imply server acceptance; the failed run counted the attempted announcement but
+  sent zero bearer bytes to the eventual child.
+- The busy-observer initialization test uses the existing fixed protocol clock,
+  retaining real bounded waits and the delivered-proof/identity/payload/error
+  assertions. It exercises initialization independent of saturated observers,
+  not whether a sub-millisecond loopback RTT's receipt deadline survives runner
+  scheduling. Production RTT-derived deadlines are unchanged.
+- The native Git negative case still requires the actual blocked-peer diagnostic
+  and continued service for another peer. It now also accepts the exact
+  **status 3 / `Not found` / no metadata** denial when that response wins the race
+  with the asynchronous disconnect observer. It does not accept a successful
+  listing, arbitrary error status or unexplained timeout. Both
+  `RngitRepositoryStore.Permissions.cs:144-151` and pinned
+  `RNS/Utilities/rngit/server.py:2310-2312,2870-2888` enforce this repository
+  denial independently of the notification. The failed historical assertion did
+  not retain its response bytes, so their exact value is not retroactively
+  claimed.
+
+Validation:
+
+- Clean resume baseline:
+  `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+  **zero warnings/errors**; ordinary serialized suite **1854 passed / 86 skips**,
+  `TestResults\resume-f568-hosted-baseline`.
+- Verified reference and unchanged strict native binary from the f568802
+  milestone, `DOTRETICULUM_LIVE=1`,
+  `dotnet test DotReticulum.slnx -c Release --nologo -v quiet --filter 'FullyQualifiedName~Link_ResponderInitializesBeforeFirstDataEvenWhenObserversAreBusy|FullyQualifiedName~ControlledHdlcAutoconnectAppliesIfacAndDiscoveredRoutingOverrides|FullyQualifiedName~PublishedHostServesRepositoryCollaborationTemplatesMediaAndDownloadsAcrossNativeLinks' --logger trx --results-directory TestResults\hosted-ordering-fixtures-focused -- xUnit.MaxParallelThreads=1`:
+  **4 passed / zero skips**, including actual native hosting with the pinned
+  Python client. Production source is unchanged; no redundant publish/coverage
+  collection is claimed.
+- `DOTRETICULUM_LIVE=0 dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --logger trx --results-directory TestResults\hosted-ordering-fixtures-full -- xUnit.MaxParallelThreads=1`:
+  **1854 passed / 86 explicit skips / zero failures**.
+- Inspected actual rendered Static analysis summaries from **40926400969**
+  (f568802) and **40929610785** (df2b80b): all five jobs passed, zero
+  Actions/C#/PowerShell findings, and the same **two Python warnings**:
+  `py/clear-text-storage-sensitive-data` at `tests/Interop/live_auto_node.py:100`
+  and `py/weak-crypto-key` at
+  `tests/DotReticulum.Applications.Tests/GenerateRnodeconfSigningVectors.py:21`.
+  Neither warning was suppressed; scan success does not mean zero findings.
+
+The exact three-iteration mesh run **40929696634**, source **df2b80b**, remains
+in progress at this milestone. It is not evidence for the later fixture fixes.
+
 ### Independent cold-window reference failure and explicit measured-window recovery
 
 Executed a real **all-upstream** control: two pinned Python transports, two
@@ -71,9 +138,10 @@ Final validation:
 This slice changes tests/adapters and truthful acceptance boundaries, not
 production code. The preceding strict native/coverage gates remain the evidence
 for unchanged production source; no redundant native publication is claimed.
-Full interop **40926579478** still tests earlier **f568802**, without this later
-measured-window/negative-control separation. Cross-platform acceptance of this
-slice and repeated mesh reporting remain pending actual hosted execution.
+Full interop **40926579478** tested earlier **f568802**, without this later
+measured-window/negative-control separation, and subsequently failed as detailed
+above. Cross-platform acceptance of this slice and repeated mesh reporting remain
+pending actual hosted execution.
 
 ### Darwin exit draining and the first rnsh window change
 
@@ -95,8 +163,9 @@ with a bounded **16 x 4096-byte** queue; full queues apply backpressure. When on
 stdin uses the terminal, unused primary output is drained without misreporting
 it as either redirected output stream. Cancellation joins the pump, and read
 failures propagate through the output or owned-drain disposal. Linux and Windows
-terminal backends are unchanged. The actual Darwin correction remains pending
-hosted execution, not accepted from Windows evidence.
+terminal backends are unchanged. The actual Darwin correction was pending at
+this milestone and was subsequently verified by all 29 rnsh cases in macOS run
+40926579478, as detailed above; it was not accepted from Windows evidence.
 
 The lost resize has a separate source-grounded cause: after the handshake,
 `PumpWindowAsync` sampled the *current* size as its baseline rather than the

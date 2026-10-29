@@ -119,7 +119,7 @@ Windows rncp peer cases disclose a file-retention workaround in
 | --- | --- |
 | Windows x64 | Built, tested, NativeAOT-published; primary development platform |
 | Linux x64 | Built, tested, NativeAOT-published; Auto and Backbone live-tested |
-| macOS ARM64 | CI builds, runs the managed suite and an encrypted multi-megabyte native resource transfer; rnsh terminal backend implemented with macOS acceptance pending; packaging not accepted |
+| macOS ARM64 | CI builds, runs the managed suite and an encrypted multi-megabyte native resource transfer; bounded rnsh terminal/native flows and actual Python roles verified; packaging not accepted |
 | Linux ARM/RISC-V, FreeBSD, Android, iOS | Not verified; a managed build is not platform support |
 
 ## Build and test

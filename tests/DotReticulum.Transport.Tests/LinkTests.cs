@@ -227,7 +227,8 @@ public class LinkTests
     public async Task Link_ResponderInitializesBeforeFirstDataEvenWhenObserversAreBusy(bool initializerThrows)
     {
         // RNS a29bfb5 Link.rtt_packet invokes the owner's setup callback before receiving more data.
-        await using var topo = await BuildAsync(false);
+        // Freeze protocol time: this tests observer ordering, not the RTT-derived receipt deadline.
+        await using var topo = await BuildAsync(false, new Parity4LinkMtuTests.Clock());
         using var releaseObservers = new ManualResetEventSlim();
         var observersStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var started = 0;

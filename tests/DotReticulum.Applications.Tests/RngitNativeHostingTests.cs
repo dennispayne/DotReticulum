@@ -199,13 +199,24 @@ public sealed class RngitNativeHostingTests
         }));
         Assert.Equal(4, concurrent.Distinct().Count());
         using var blockedDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        (byte[] Data, object? Metadata)? blockedResponse = null;
         var rejected = await Record.ExceptionAsync(async () =>
         {
             using var connection = await RngitManagementClient.ConnectAsync(node, blocked, Destination("Repositories Destination"),
                 TimeSpan.FromSeconds(3), blockedDeadline.Token);
-            await connection.RequestAsync("/git/list", new Dictionary<object, object?> { [0] = "fixtures/sample.git" }, blockedDeadline.Token);
+            blockedResponse = await connection.RequestAsync("/git/list", new Dictionary<object, object?> { [0] = "fixtures/sample.git" }, blockedDeadline.Token);
         });
-        Assert.True(rejected is IOException or InvalidOperationException, $"Unexpected blocked-peer outcome: {rejected}\n{host.Output}");
+        if (rejected is null)
+        {
+            // The request can be denied before the asynchronous disconnect observer runs.
+            Assert.NotNull(blockedResponse);
+            Assert.Equal(RngitWire.Status(3, "Not found"), blockedResponse.Value.Data);
+            Assert.Null(blockedResponse.Value.Metadata);
+        }
+        else
+            Assert.True(rejected is IOException or InvalidOperationException, $"Unexpected blocked-peer outcome: {rejected}\n{host.Output}");
+        while (!host.Output.Contains("Blocked Git peer " + blocked.HexHash, StringComparison.Ordinal))
+            await Task.Delay(20, deadline.Token);
         Assert.Contains("Blocked Git peer " + blocked.HexHash, host.Output);
         Assert.Contains("Native wrapper", Encoding.UTF8.GetString((await pages.RequestAsync("/page/index.mu", data, deadline.Token)).Data));
         Assert.DoesNotContain("Git peer request", host.Output);
