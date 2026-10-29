@@ -22,6 +22,7 @@ stdout protocol: lines starting with "@@" followed by JSON (other lines are RNS 
   {"event":"link_closed", "role", "link_id", "reason"}       teardown reason: 1 timeout, 2 initiator closed, 3 destination closed
   {"event":"data", "payload", "link_id"}                     packet received over the link
   {"event":"sent", "ok", "delivered"}                        reply to "send <hex>" (delivered = receipt proof validated, waited 15 s)
+  send_after_proof <hex> registers its observer only after the actual receipt concludes, exposing before-observer status.
   {"event":"stat", "status", "rtt", "keepalive", "stale_time", "last_inbound_age", "mtu", "mdu", "remote_identity"}   reply to "stat"
   {"event":"identified", "identity_hash"}                    the peer identified itself on the link
   {"event":"resource_started", "size"}                       incoming resource accepted
@@ -291,14 +292,26 @@ def main(loglevel=RNS.LOG_WARNING):
                 new_link = RNS.Link(out, established_callback=established)
                 if not up.wait(30.0):
                     emit({"event": "link_failed", "reason": "timeout"})
-            elif cmd == "send":
+            elif cmd in ("send", "send_after_proof"):
                 packet = RNS.Packet(link, bytes.fromhex(parts[1]))
                 receipt = packet.send()
+                ok = receipt is not False and receipt is not None
+                if ok and cmd == "send_after_proof":
+                    deadline = time.monotonic() + 15.0
+                    while receipt.get_status() == RNS.PacketReceipt.SENT and time.monotonic() < deadline:
+                        time.sleep(0.005)
+                before_observer = receipt.get_status() if ok else None
                 delivered = threading.Event()
                 if receipt:
                     receipt.set_delivery_callback(lambda r: delivered.set())
-                ok = receipt is not False and receipt is not None
-                emit({"event": "sent", "ok": ok, "delivered": delivered.wait(15.0) if ok else False})
+                    if receipt.get_status() == RNS.PacketReceipt.DELIVERED and receipt.proved:
+                        delivered.set()
+                observed = delivered.wait(15.0) if ok else False
+                emit({"event": "sent", "ok": ok, "delivered": observed,
+                      "receipt_status_before_observer": before_observer,
+                      "receipt_status": receipt.get_status() if ok else None,
+                      "receipt_proved": receipt.proved if ok else None,
+                      "receipt_timeout": receipt.timeout if ok else None})
             elif cmd == "close":
                 link.teardown()
             elif cmd == "stat":

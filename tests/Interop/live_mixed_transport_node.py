@@ -106,6 +106,12 @@ def main():
         command = parts[0]
         if command == "quit":
             break
+        if command == "interfaces":
+            emit("interfaces", interfaces=[
+                {"name": interface.name, "online": interface.online}
+                for interface in RNS.Transport.interfaces
+            ])
+            continue
         if command == "tunnels":
             with RNS.Transport.tunnels_lock:
                 emit("tunnels", entries=[

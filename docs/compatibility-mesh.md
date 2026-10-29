@@ -85,7 +85,8 @@ receiver state and resource failure observations remain relevant diagnostics.
 ## Automatic endpoint timeout and fresh-session recovery
 
 `ManagedAndPinnedEndpointsAutomaticallyTimeOutAfterRouterCrashAndRecoverWithFreshLinks`
-adds a separate Windows managed live case:
+adds a separate managed live case, accepted locally on Windows and in all
+three Linux/macOS repetitions of hosted run 40938753343:
 
 ```text
 .NET endpoint -- .NET transport -- impaired TCP -- Python transport -- Python endpoint
@@ -103,16 +104,27 @@ surviving router must remain running.
 The deadline derives from the actual endpoints' RTT/stale intervals,
 `KEEPALIVE_TIMEOUT_FACTOR`, `STALE_GRACE` and two default five-second upstream
 watchdog polling intervals. Excessive observed budgets fail the bounded case;
-neither reference timers nor production policies are changed. Before fresh
+the maximum guard derives from the unchanged default maximum stale interval
+plus this case's 90-second handshake bound, timeout factor and grace
+(1,095 seconds), rather than assuming every loaded-runner RTT fits a four-minute
+ceiling. The actual wait still uses each observed session's derived deadline,
+not that maximum or a fixed sleep. Neither reference timers nor production
+policies are changed. Before fresh
 links, the case observes actual leaf TCP reconnection, new route availability
 and a newly received announce rather than trusting an old cached path.
 Restarted Python transport, both endpoint processes and the .NET router retain
 their identities; distinct new links must then prove exact DATA both ways.
 
 The thin upstream callback adapter only adds its actual link ID to closure
-observations. Local acceptance covers both .NET roles and default watchdog
-expiry, not active-link resumption, impaired published-native execution or
-cross-platform acceptance of this new case.
+observations. Acceptance covers both .NET roles and default watchdog expiry,
+not active-link resumption or impaired published-native execution.
+
+The reference DATA adapter also observes the actual receipt status after
+registering its delivery callback: a proof can validate before that registration.
+`PinnedReceiptObserverRecognizesAnAlreadyValidatedDeliveryProof` deliberately
+registers late, then requires actual DELIVERED/proved receipts and exact peer
+bytes in both directions. This is a thin observation-race regression, not a
+reference-side timer change or a new compatibility capability.
 
 ## Fresh sessions through a surviving alternate route
 

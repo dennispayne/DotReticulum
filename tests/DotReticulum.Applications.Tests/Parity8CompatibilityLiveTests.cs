@@ -30,6 +30,19 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
         while (!predicate()) await Task.Delay(25, timeout.Token);
     }
 
+    private static async Task WaitForPythonServerPeers(PyLinkNode node, int count, string serverName = "ToLeaf")
+    {
+        using var timeout = new CancellationTokenSource(Patience);
+        while (true)
+        {
+            var observed = await node.Command("interfaces", "interfaces", Patience);
+            if (observed.GetProperty("interfaces").EnumerateArray().Count(item =>
+                item.GetProperty("name").GetString() == $"Client on {serverName}" && item.GetProperty("online").GetBoolean()) == count)
+                return;
+            await Task.Delay(25, timeout.Token);
+        }
+    }
+
     [Trait("Category", "Live")]
     [LiveFact]
     public async Task MixedTransports_RetryLostResourcePartsBothWays_ThenReconnectAndRestartWithSurvivingLeaves()
@@ -83,6 +96,7 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
 
         async Task Discover()
         {
+            await WaitForPythonServerPeers(router!, 1);
             Assert.True((await a!.Command($"request_path {b!.HashHex} 60", "path", Patience)).GetProperty("has_path").GetBoolean());
             Assert.Equal(3, (await a.Command($"path {b.HashHex}", "path", Patience)).GetProperty("hops").GetInt32());
             Assert.True((await b.Command($"request_path {a.HashHex} 60", "path", Patience)).GetProperty("has_path").GetBoolean());
@@ -321,6 +335,7 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
 
             async Task<(Link Link, Task<byte[]> Received, Task<LinkTeardownReason> Closed)> Connect()
             {
+                await WaitForPythonServerPeers(router!, 1);
                 using var ready = new CancellationTokenSource(Patience);
                 while (true)
                 {
@@ -403,7 +418,10 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
                     connection.Link.StaleTime + connection.Link.Rtt!.Value * Link.KeepaliveTimeoutFactor,
                     state.GetProperty("stale_time").GetDouble() + state.GetProperty("rtt").GetDouble() * Link.KeepaliveTimeoutFactor)
                     + Link.StaleGrace + 10); // Two default five-second upstream watchdog polling intervals.
-                Assert.True(seconds is > 0 and <= 240, $"Observed watchdog budget exceeds this bounded case: {seconds}s; peer={state}.");
+                var maximum = Link.KeepaliveMax * Link.StaleFactor + Patience.TotalSeconds * Link.KeepaliveTimeoutFactor
+                    + Link.StaleGrace + 10;
+                Assert.True(seconds > 0 && seconds <= maximum,
+                    $"Observed watchdog budget exceeds default stale policy plus this case's handshake bound: {seconds}s > {maximum}s; peer={state}.");
                 var timeout = TimeSpan.FromSeconds(seconds);
                 output.WriteLine($"Managed initiator={dotNetInitiates}, link={connection.Link.LinkIdHex}, " +
                     $"RTT={connection.Link.Rtt}, keepalive={connection.Link.KeepaliveInterval}, stale={connection.Link.StaleTime}; " +
@@ -560,6 +578,7 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             var b = await PyLinkNode.StartAsync("b", tcpServerPort: bPort, rnsdPort: primaryPort,
                 harness: "parity8_transport_node.py");
             peers.Add(b);
+            await WaitForPythonServerPeers(primary, 2);
             foreach (var (source, destination) in new[] { (a, b), (b, a) })
             {
                 Assert.True((await source.Command($"request_path {destination.HashHex} 60", "path", Patience))
@@ -635,6 +654,47 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
 
     [Trait("Category", "Live")]
     [LiveFact]
+    public async Task PinnedReceiptObserverRecognizesAnAlreadyValidatedDeliveryProof()
+    {
+        var peers = new List<PyLinkNode>();
+        try
+        {
+            var port = Port();
+            var b = await PyLinkNode.StartAsync("receipt-responder", tcpServerPort: port, harness: "parity8_transport_node.py");
+            peers.Add(b);
+            var a = await PyLinkNode.StartAsync("receipt-initiator", rnsdPort: port, harness: "parity8_transport_node.py");
+            peers.Add(a);
+            await WaitForPythonServerPeers(b, 1, "PyTCPServer");
+            Assert.True((await a.Command($"request_path {b.HashHex} 60", "path", Patience)).GetProperty("has_path").GetBoolean());
+            var before = b.Count("link_up");
+            var connected = await a.Command($"connect {b.HashHex}", "link_up", Patience);
+            var accepted = await b.NextAsync("link_up", before, Patience);
+            var id = connected.GetProperty("link_id").GetString();
+            Assert.Equal(id, accepted.GetProperty("link_id").GetString());
+            foreach (var (sender, receiver) in new[] { (a, b), (b, a) })
+            {
+                var payload = Convert.ToHexStringLower(System.Text.Encoding.UTF8.GetBytes("late-observer:" + sender.Name));
+                var receivedBefore = receiver.Count("data");
+                var sent = await sender.Command($"send_after_proof {payload}", "sent", Patience);
+                var received = await receiver.NextAsync("data", receivedBefore, Patience);
+                Assert.Equal(payload, received.GetProperty("payload").GetString());
+                Assert.Equal(id, received.GetProperty("link_id").GetString());
+                Assert.True(sent.GetProperty("ok").GetBoolean());
+                Assert.Equal(2, sent.GetProperty("receipt_status_before_observer").GetInt32());
+                Assert.Equal(2, sent.GetProperty("receipt_status").GetInt32());
+                Assert.True(sent.GetProperty("receipt_proved").GetBoolean());
+                Assert.True(sent.GetProperty("delivered").GetBoolean(), $"Already validated upstream receipt was missed: {sent}.");
+            }
+        }
+        finally
+        {
+            foreach (var peer in peers) output.WriteLine(peer.Name + ":\n" + peer.Log);
+            await Task.WhenAll(peers.Select(peer => peer.DisposeAsync().AsTask()));
+        }
+    }
+
+    [Trait("Category", "Live")]
+    [LiveFact]
     public async Task PinnedUpstreamOnlyColdWindowLossNegativeControlCancelsBeforeItsFirstRepair()
     {
         foreach (var latency in new[] { 0, 120 })
@@ -658,6 +718,8 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
                 peers.Add(b);
                 foreach (var router in new[] { root, left })
                     Assert.True(Assert.Single(router.Events("ready")).GetProperty("transport").GetBoolean());
+                await WaitForPythonServerPeers(root, 2);
+                await WaitForPythonServerPeers(left, 1);
                 Assert.True((await a.Command($"request_path {b.HashHex} 60", "path", Patience)).GetProperty("has_path").GetBoolean());
                 Assert.True((await b.Command($"request_path {a.HashHex} 60", "path", Patience)).GetProperty("has_path").GetBoolean());
                 Assert.Equal(3, (await a.Command($"path {b.HashHex}", "path", Patience)).GetProperty("hops").GetInt32());
@@ -666,12 +728,13 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
                 var accepted = await b.NextAsync("link_up", acceptedBefore, Patience);
                 Assert.Equal(connected.GetProperty("link_id").GetString(), accepted.GetProperty("link_id").GetString());
                 Assert.Equal(16384, connected.GetProperty("mtu").GetInt32());
-                Assert.True((await a.Command("send 7265666572656e63652d636f6e74726f6c", "sent", Patience))
-                    .GetProperty("delivered").GetBoolean());
-                Assert.Equal("7265666572656e63652d636f6e74726f6c",
-                    Assert.Single(b.Events("data")).GetProperty("payload").GetString());
                 output.WriteLine($"Actual upstream-only routers, {latency} ms/frame, sender {await a.Command("stat", "stat", Patience)}, " +
                     $"receiver {await b.Command("stat", "stat", Patience)}.");
+                var delivered = await a.Command("send 7265666572656e63652d636f6e74726f6c", "sent", Patience);
+                await b.NextAsync("data", 0, Patience);
+                Assert.Equal("7265666572656e63652d636f6e74726f6c",
+                    Assert.Single(b.Events("data")).GetProperty("payload").GetString());
+                Assert.True(delivered.GetProperty("delivered").GetBoolean(), $"Actual upstream healthy DATA/proof control failed: {delivered}.");
                 var before = b.Count("resource_done");
                 bridge.LoseResourceParts(fromPython: true, 3);
                 var sent = await a.Command("resource 220019 reference-cold-window random", "resource_sent", TransferTimeout);

@@ -4,6 +4,103 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Default watchdog bounds and already-validated receipt observation
+
+Inspected the actual Linux and Windows artifacts from repeated mesh
+**40938753343**, source
+**3aacad63d2ed7c4d502ee37860c6b50c49790db8**. Linux passed all five selected
+cases in all three iterations (**15 passed / zero failures/skips**).
+The automatic outage case exercised both initiator roles in each repetition,
+with actual source-derived deadlines **38/35, 37/34 and 37/34 seconds**,
+matched TIMEOUT closures and distinct proved recovered links.
+
+Windows iterations were **5/0/0, 3/2/0, 5/0/0**. Its second automatic-outage
+case rejected a legitimate **423-second** budget before crashing the router:
+the actual RTT was **0.981228099999953 seconds**, adaptive keepalive
+**201.85263771427606 seconds**, and stale interval
+**403.7052754285521 seconds**. The four-minute fixture ceiling was not an
+upstream policy. Its replacement maximum derives from default maximum stale
+time plus this case's 90-second handshake bound, timeout factor, grace and two
+watchdog polling intervals: **1,095 seconds**. Actual waits still use each
+session's observed budget; there is no fixed sleep or reference timer change.
+
+The other Windows failure was the all-upstream cold control's initial DATA
+proof assertion, **not path discovery**. Actual peer logs prove that exact
+DATA arrived, while the adapter reported `delivered=false`. Source review
+found that a valid proof can conclude before `set_delivery_callback`; that
+setter does not replay a past delivery. The adapter now registers its callback
+and also checks the actual public receipt status. No unproved delivery is
+accepted. New metadata retains before-observer/final status, actual proof flag
+and unchanged receipt timeout.
+
+The deterministic live regression
+`PinnedReceiptObserverRecognizesAnAlreadyValidatedDeliveryProof` deliberately
+registers after the real upstream receipt concludes. Before the fix it failed
+with **DELIVERED before and after registration, proved=true, delivered=false**
+and actual timeout **0.010577201843261719 seconds**
+(`TestResults\reference-late-proof-observer-regression`). After the fix,
+both directions require actual DELIVERED/proved receipts and exact peer bytes.
+This proves the observation race, not the unrecorded exact receipt state in
+the earlier hosted failure. The zero-delay healthy control and all proof,
+MTU, loss, repair and negative-cancellation assertions remain intact.
+
+One-shot setup also now observes actual registered Python server children,
+using a thin interface-name/online observation in the existing adapter.
+Initial connection success alone is not server admission. This is additional
+setup hardening, not a claimed explanation of the hosted DATA/proof failure.
+
+Validation:
+
+- `DOTRETICULUM_LIVE=1 dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --nologo -v quiet --filter 'FullyQualifiedName~Parity8CompatibilityLiveTests|FullyQualifiedName~Parity8ResourceLossFixtureTests|FullyQualifiedName~LiveMixedTransportTests' --logger trx --results-directory TestResults\mesh-proof-observer-and-budget-final -- xUnit.MaxParallelThreads=1`:
+  **8 passed / zero skips / 4m05s**, verified actual pinned Python peers.
+- `DOTRETICULUM_LIVE=0 dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --logger trx --results-directory TestResults\mesh-proof-observer-full-final -- xUnit.MaxParallelThreads=1`:
+  **1854 passed / 89 explicit skips / zero failures**.
+- `DOTRETICULUM_LIVE=1 dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~PinnedReceiptObserverRecognizesAnAlreadyValidatedDeliveryProof' --logger trx --results-directory TestResults\reference-late-proof-observer-final -- xUnit.MaxParallelThreads=1`:
+  **1 passed / zero skips / 1 second**, final observer guard requires actual
+  DELIVERED and proved state and verifies exact bytes in both directions.
+
+These are test/observation changes, not production changes or additional shared
+Compatibility capabilities. No redundant native publish or production coverage
+is claimed. Fresh-source hosted acceptance remains outstanding; the workflows
+stay unchecked.
+
+The completed macOS artifact and actual rendered summary subsequently showed
+iterations **5/0/0, 4/1/0, 5/0/0**. Its automatic watchdog case passed both
+roles in every repetition, with derived deadlines **77/92, 170/107 and
+112/126 seconds**, matched TIMEOUT closures and distinct proved recovered
+links. This extends bounded managed watchdog acceptance to macOS, not native
+impaired endpoints.
+
+The macOS failure was a different measured-window resource: its second
+2,200,019-byte transfer, with four parts reported sent but only two received,
+no completed throughput estimate, ACTIVE receiver link and sender cancellation.
+Bridge totals were still **3 dropped / 3 retried**, belonging to the preceding
+successful transfer. This does not establish that the current resource's
+missing initial parts were deliberately dropped by the bridge. The configured
+two-slot router ingress queues can independently drop burst traffic; those
+counters were not retained, so that remains a hypothesis requiring separate
+fault isolation, not a proven historical cause.
+
+All three Builds, all four Compatibility candidates and both actual renderers
+passed, but the workflow **failed overall** on these Windows/macOS extended
+cases. Its rendered iteration rows preserve every failure. The macOS job
+finished in about 42 minutes, not by exhausting its 45-minute budget; no blind
+workflow-timeout increase was made.
+
+### Hosted artifact transport failure, not a protocol result
+
+Full interop **40943225354**, exact source
+**1e56396b4d1af352d3d7a79357f6062030ded2f9**, failed because macOS's native
+artifact finalization returned **ECONNRESET**. Its actual Publish NativeAOT
+step passed, and Windows/Linux Build jobs passed; the macOS Build job still
+failed. The missing canonical reference then correctly failed Upstream reuse
+instead of substituting an old bundle. This is not passing hosted acceptance
+or an observed protocol failure. A fresh exact-source run is still required.
+
+Static **40943226294**, same exact source, completed all five jobs; its actual
+rendered report retains zero Actions/C#/PowerShell findings and the same two
+Python warnings recorded below.
+
 ### Distinct initial-window parts, not replayed frames
 
 Investigating the completed macOS mesh failure revealed a real fixture defect:
@@ -163,8 +260,9 @@ and its closure callback must occur once. The surviving router remains running.
 The deadline derives from the actual endpoints' RTT/stale intervals plus the
 unchanged timeout factor/grace and two default five-second upstream polling
 intervals (`RNS/Link.py:745-777,795-797`, pin
-**a29bfb51c468945c96a1ee22cae0114e993e2391**). Budgets above the case's explicit
-four-minute bound fail, rather than silently increasing a wait. No reference
+**a29bfb51c468945c96a1ee22cae0114e993e2391**). The initial four-minute ceiling
+was later shown to reject a valid loaded-runner adaptive keepalive; the
+source-derived maximum correction is recorded separately. No reference
 timer, production policy, MTU or protocol is modified. The thin Python callback
 adapter adds only the actual `link_id` to its closure observation.
 
