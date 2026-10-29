@@ -270,7 +270,10 @@ def main(loglevel=RNS.LOG_WARNING):
                     deadline = time.time() + (float(parts[2]) if len(parts) > 2 else 10.0)
                     while time.time() < deadline and not RNS.Transport.has_path(h):
                         time.sleep(0.1)
-                emit({"event": "path", "dest": parts[1], "has_path": RNS.Transport.has_path(h), "hops": RNS.Transport.hops_to(h)})
+                next_hop = RNS.Transport.next_hop(h)
+                emit({"event": "path", "dest": parts[1], "has_path": RNS.Transport.has_path(h),
+                      "hops": RNS.Transport.hops_to(h),
+                      "next_hop": next_hop.hex() if next_hop is not None else None})
             elif cmd == "connect":
                 h = bytes.fromhex(parts[1])
                 remote = RNS.Identity.recall(h)

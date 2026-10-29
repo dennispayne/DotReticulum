@@ -468,6 +468,172 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
 
     [Trait("Category", "Live")]
     [LiveFact]
+    public async Task SurvivingDotNetAlternateRouteCarriesFreshBidirectionalLinksAfterPinnedPrimaryRouterCrash()
+    {
+        var directory = Path.Combine(AppContext.BaseDirectory, "parity8-alternate-" + Guid.NewGuid().ToString("N"));
+        var primaryPort = Port();
+        var aPort = Port();
+        var bPort = Port();
+        var logs = new ConcurrentQueue<string>();
+        using var stop = new CancellationTokenSource();
+        await using var backup = RnsdHost.Create(RnsdConfigParser.Parse($"""
+            [reticulum]
+              share_instance = no
+              enable_transport = yes
+            [interfaces]
+              [[A]]
+                type = TCPClientInterface
+                enabled = yes
+                mode = gateway
+                target_host = 127.0.0.1
+                target_port = {aPort}
+              [[B]]
+                type = TCPClientInterface
+                enabled = yes
+                mode = gateway
+                target_host = 127.0.0.1
+                target_port = {bPort}
+            """), Path.Combine(directory, "transport_identity"), (level, message) => logs.Enqueue($"[{level}] {message}"));
+        var peers = new List<PyLinkNode>();
+        Task running = Task.CompletedTask;
+
+        async Task<string> ConnectAndProve(PyLinkNode initiator, PyLinkNode responder, string phase)
+        {
+            var before = responder.Count("link_up");
+            var connected = await initiator.Command($"connect {responder.HashHex}", "link_up", Patience);
+            var accepted = await responder.NextAsync("link_up", before, Patience);
+            var id = Assert.IsType<string>(connected.GetProperty("link_id").GetString());
+            Assert.Equal(id, accepted.GetProperty("link_id").GetString());
+            foreach (var (sender, receiver) in new[] { (initiator, responder), (responder, initiator) })
+            {
+                var payload = Convert.ToHexStringLower(System.Text.Encoding.UTF8.GetBytes($"{phase}:{sender.Name}->{receiver.Name}"));
+                var receivedBefore = receiver.Count("data");
+                Assert.True((await sender.Command($"send {payload}", "sent", Patience)).GetProperty("delivered").GetBoolean());
+                var received = await receiver.NextAsync("data", receivedBefore, Patience);
+                Assert.Equal(payload, received.GetProperty("payload").GetString());
+                Assert.Equal(id, received.GetProperty("link_id").GetString());
+            }
+            return id;
+        }
+
+        async Task Close(PyLinkNode initiator, PyLinkNode responder, string linkId)
+        {
+            var initiatorBefore = initiator.Count("link_closed");
+            var before = responder.Count("link_closed");
+            await initiator.SendLineAsync("close");
+            Assert.Equal(linkId, (await initiator.NextAsync("link_closed", initiatorBefore, Patience))
+                .GetProperty("link_id").GetString());
+            Assert.Equal(linkId, (await responder.NextAsync("link_closed", before, Patience))
+                .GetProperty("link_id").GetString());
+        }
+
+        async Task AssertRoute(PyLinkNode source, PyLinkNode destination, string transportId)
+        {
+            var path = await source.Command($"path {destination.HashHex}", "path", Patience);
+            Assert.True(path.GetProperty("has_path").GetBoolean());
+            Assert.Equal(2, path.GetProperty("hops").GetInt32());
+            Assert.Equal(transportId, path.GetProperty("next_hop").GetString());
+        }
+
+        async Task WaitForInterface(PyLinkNode node, string name, bool online)
+        {
+            using var timeout = new CancellationTokenSource(Patience);
+            while (true)
+            {
+                var interfaces = await node.Command("interfaces", "interfaces", Patience);
+                if (interfaces.GetProperty("interfaces").EnumerateArray().Any(item =>
+                    item.GetProperty("name").GetString() == name && item.GetProperty("online").GetBoolean() == online)) return;
+                await Task.Delay(25, timeout.Token);
+            }
+        }
+
+        try
+        {
+            var primary = await PyLinkNode.StartAsync("primary", tcpServerPort: primaryPort,
+                harness: "live_mixed_transport_node.py");
+            peers.Add(primary);
+            var primaryId = Assert.IsType<string>(Assert.Single(primary.Events("ready")).GetProperty("transport_id").GetString());
+            var a = await PyLinkNode.StartAsync("a", tcpServerPort: aPort, rnsdPort: primaryPort,
+                harness: "parity8_transport_node.py");
+            peers.Add(a);
+            var b = await PyLinkNode.StartAsync("b", tcpServerPort: bPort, rnsdPort: primaryPort,
+                harness: "parity8_transport_node.py");
+            peers.Add(b);
+            foreach (var (source, destination) in new[] { (a, b), (b, a) })
+            {
+                Assert.True((await source.Command($"request_path {destination.HashHex} 60", "path", Patience))
+                    .GetProperty("has_path").GetBoolean());
+                await AssertRoute(source, destination, primaryId);
+            }
+            var oldId = await ConnectAndProve(a, b, "primary");
+            await Close(a, b, oldId);
+            var oldTimebase = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+            await backup.StartAsync(stop.Token);
+            running = backup.RunAsync(stop.Token);
+            foreach (var peer in new[] { a, b }) await WaitForInterface(peer, "Client on PyTCPServer", true);
+            await AssertRoute(a, b, primaryId);
+            await AssertRoute(b, a, primaryId);
+            Assert.Equal(0, backup.Router.LinkTableCount);
+
+            await primary.CrashAsync();
+            foreach (var peer in new[] { a, b }) await WaitForInterface(peer, "ToDotNet", false);
+            Assert.False(running.IsCompleted, string.Join('\n', logs));
+            // RNS/Transport.py:2232-2240 requires a strictly newer whole-second announce timebase.
+            using var announceTimeout = new CancellationTokenSource(Patience);
+            while (DateTimeOffset.UtcNow.ToUnixTimeSeconds() <= oldTimebase)
+                await Task.Delay(25, announceTimeout.Token);
+            var beforeA = a.Events("announce").Count(item => item.GetProperty("dest").GetString() == b.HashHex);
+            var beforeB = b.Events("announce").Count(item => item.GetProperty("dest").GetString() == a.HashHex);
+            await a.Command("announce", "announced", Patience);
+            await b.Command("announce", "announced", Patience);
+            await a.NextAsync("announce", beforeA, Patience, item => item.GetProperty("dest").GetString() == b.HashHex);
+            await b.NextAsync("announce", beforeB, Patience, item => item.GetProperty("dest").GetString() == a.HashHex);
+            Assert.Equal(1, backup.Router.HopsTo(a.Hash));
+            Assert.Equal(1, backup.Router.HopsTo(b.Hash));
+            var backupId = Convert.ToHexStringLower(backup.Router.TransportId);
+            await AssertRoute(a, b, backupId);
+            await AssertRoute(b, a, backupId);
+            var linkIds = new HashSet<string> { oldId };
+            foreach (var (initiator, responder) in new[] { (a, b), (b, a) })
+            {
+                var forwardingBefore = backup.Router.LinkTableCount;
+                var id = await ConnectAndProve(initiator, responder, "alternate");
+                Assert.True(linkIds.Add(id), "Recovery must establish a distinct fresh link.");
+                Assert.Equal(forwardingBefore + 1, backup.Router.LinkTableCount);
+                await Close(initiator, responder, id);
+                output.WriteLine($"Fresh {id}: {initiator.Name} initiated; exact DATA and proofs both ways through {backupId}.");
+            }
+            Assert.False(running.IsCompleted, string.Join('\n', logs));
+            output.WriteLine($"Both endpoints changed their observed two-hop next hop from crashed {primaryId} to surviving {backupId}.");
+        }
+        finally
+        {
+            try
+            {
+                foreach (var peer in peers) output.WriteLine(peer.Name + ":\n" + peer.Log);
+                await Task.WhenAll(peers.Select(peer => peer.DisposeAsync().AsTask()));
+            }
+            finally
+            {
+                await stop.CancelAsync();
+                try
+                {
+                    try { await running.WaitAsync(TimeSpan.FromSeconds(15)); }
+                    catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
+                }
+                finally
+                {
+                    await backup.DisposeAsync();
+                    output.WriteLine(string.Join('\n', logs));
+                    if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+                }
+            }
+        }
+    }
+
+    [Trait("Category", "Live")]
+    [LiveFact]
     public async Task PinnedUpstreamOnlyColdWindowLossNegativeControlCancelsBeforeItsFirstRepair()
     {
         foreach (var latency in new[] { 0, 120 })

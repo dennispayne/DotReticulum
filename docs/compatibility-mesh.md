@@ -106,6 +106,39 @@ observations. Local acceptance covers both .NET roles and default watchdog
 expiry, not active-link resumption, impaired published-native execution or
 cross-platform acceptance of this new case.
 
+## Fresh sessions through a surviving alternate route
+
+`SurvivingDotNetAlternateRouteCarriesFreshBidirectionalLinksAfterPinnedPrimaryRouterCrash`
+adds a bounded Windows managed case with two non-transport Python endpoints.
+Both connect to the actual pinned primary Python transport and, separately,
+to a surviving .NET backup transport.
+
+The initial two-hop paths must name the actual primary transport's next-hop
+identity, and a link must prove exact DATA both ways. Starting the backup and
+observing its actual accepted connections must not change those selected paths.
+After force-killing the primary, both leaves must observe its TCP interface
+offline while the .NET backup stays running.
+
+Fresh announcements, with a strictly newer whole-second emission timebase,
+must propagate through the backup. This follows the pinned
+`Transport.py:2232-2240` replacement rule, without clearing either endpoint's
+path cache or changing upstream policy. The Python adapter now reports the
+actual public `Transport.next_hop()` value alongside its existing path
+observations. Both endpoints must select the .NET backup identity, still at
+two hops; the backup must have direct one-hop paths to both leaves.
+
+Each initiator role then establishes a distinct fresh link, proves exact DATA
+both ways and correlates both endpoint closure callbacks to that link.
+Forwarding entries must increase for those actual routed links. They do not
+vanish immediately on encrypted endpoint teardown: the pinned transport
+retains validated entries until its traffic timeout or interface removal
+(`Transport.py:152,873-881`). Neither leaf nor the surviving router restarts.
+
+This is managed integration evidence for fresh-announcement route replacement,
+not shared Compatibility, a cached-alternate guarantee, automatic route
+replacement without announcements, active-session migration, a native-binary
+matrix or physical-bearer acceptance.
+
 ## Cold initial-window reference limitation
 
 The recovery scenario now injects loss **after** the initial window establishes
@@ -161,8 +194,9 @@ The recovery case restarts the managed .NET router and force-kills/restarts the
 Python router, without promising preservation of live links across either
 restart. That resource case explicitly closes old endpoints; the separate
 automatic-timeout case requires watchdog expiry and distinct recovered links.
-Active-link session resumption, alternate routing paths,
-mass-client overload, prolonged
+The separate alternate-route case covers fresh sessions after new announcements,
+not active-link session resumption or every alternate-route topology.
+Mass-client overload, prolonged
 soak, physical bearers, other platforms, and impaired published-native execution
 are not covered. The capacity-two .NET queue setting does not prove router
 queue exhaustion; the pressure assertion applies only to the capacity-one

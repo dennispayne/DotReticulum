@@ -4,6 +4,68 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Fresh links through a surviving alternate transport
+
+Added Windows managed live integration case
+`SurvivingDotNetAlternateRouteCarriesFreshBidirectionalLinksAfterPinnedPrimaryRouterCrash`.
+Two actual pinned Python leaves initially discover two-hop paths through an
+actual Python transport and prove exact DATA both ways. A separately connected
+.NET backup starts without replacing those selected paths. The actual primary
+process is then force-killed; both leaves observe its TCP interface offline.
+
+Fresh announcements follow the pinned `RNS/Transport.py:2232-2240` rule:
+strictly newer whole-second emission timestamps permit same-hop replacement.
+Neither path cache is cleared and neither leaf restarts. The thin Python
+adapter adds only the actual public `Transport.next_hop()` value to existing
+path observations. Both leaves must select the surviving .NET transport's
+identity, its own paths to them must be direct, and each initiator role then
+opens a distinct link and proves exact DATA both ways. Endpoint teardown
+callbacks must correlate with each fresh link.
+
+An exploratory assertion incorrectly expected immediate transit-table removal
+on encrypted endpoint teardown. The pinned transport instead retains validated
+entries until its traffic timeout or interface removal
+(`Transport.py:152,873-881`), matching our existing implementation. The final
+case correlates actual endpoint closure and requires each routed new link to
+add a forwarding entry; it does not invent an immediate transit cleanup policy.
+
+Validation with the unchanged import-verified pin:
+
+- `DOTRETICULUM_LIVE=1 dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --nologo -v quiet --filter 'FullyQualifiedName~SurvivingDotNetAlternateRouteCarriesFreshBidirectionalLinksAfterPinnedPrimaryRouterCrash' --logger trx --results-directory TestResults\mesh-alternate-route-final -- xUnit.MaxParallelThreads=1`:
+  **1 passed / zero skips / 3 seconds**, both recovered initiator roles.
+- `DOTRETICULUM_LIVE=1 dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~Parity8CompatibilityLiveTests|FullyQualifiedName~Parity8ResourceLossFixtureTests|FullyQualifiedName~LiveMixedTransportTests' --logger trx --results-directory TestResults\mesh-alternate-and-recovery-final -- xUnit.MaxParallelThreads=1`:
+  **7 passed / zero skips / 4m04s**.
+- `DOTRETICULUM_LIVE=0 dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --logger trx --results-directory TestResults\mesh-alternate-full-final -- xUnit.MaxParallelThreads=1`:
+  **1854 passed / 88 explicit skips / zero failures**.
+
+No production behavior changed; no redundant production coverage or native
+publish is claimed. This is bounded integration acceptance after fresh
+announcements, not shared Compatibility, automatic switching without
+announcements, cached-alternate guarantees, active-session migration or
+native/cross-platform acceptance. Broader matrices remain unchecked.
+
+### Completed full interop after the scheduling corrections
+
+Run **40934315953**, source
+**9de09d31bf51698be40e96afe667753a7846a411**, completed with all three Builds,
+all four Compatibility candidates, Linux Test and both renderers passing.
+The actual macOS TRX confirms controlled autoconnect discovery, both
+busy-observer theory cases, native Git hosting and all **29 rnsh cases**
+passed. The corresponding corrected Windows cases also passed.
+
+The overall run **failed**: Windows exposed the owned PID-file publication
+race fixed below. macOS extended integration had **30 passed / 1 failed**:
+the measured-window mesh case failed on its final 220,019-byte resource after
+the Python-router restart, with sender/receiver FAILED, the receiver link
+still ACTIVE, **13 dropped / 12 retried** at failure and an actual sender
+part-request timeout. Receiver observations included four received parts,
+`req_data_rtt_rate=0` and two outstanding parts. Four forwarded frames therefore
+did not establish a completed measured window in that execution. Initial-frame
+counting and replay handling require further investigation; this is not
+reclassified as a passing recovery or explained by the separate cold control.
+The subsequent three-repeat run **40938753343** remains a separate pending
+result, not a retroactive repair of this failure.
+
 ### Atomic owned-descendant PID readiness
 
 The actual Windows Integration TRX from full interop **40934315953**,
@@ -16,8 +78,9 @@ modes retain the same bounded timeout and actual descendant-termination
 assertions; no read retries, extra sleeps or production changes were added.
 
 The earlier discovery, busy-observer and native blocked-peer corrections
-passed in that actual Windows run. Linux Test passed; macOS and the overall
-run were still incomplete when this correction was recorded.
+passed in that actual Windows run. Linux Test passed. macOS and the overall
+run were incomplete when this correction was first recorded; the completed
+outcome and the separate macOS mesh failure are recorded above.
 
 Local validation:
 

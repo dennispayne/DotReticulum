@@ -113,7 +113,7 @@ Windows rncp peer cases disclose a file-retention workaround in
 | `rncp`, `rnx` | Live both ways |
 | `rngit`, `git-remote-rns`, `rngcs` | Clone, fetch and push against the pinned Python server; hosting, releases, work documents, signing; verified fetch of the hosted upstream |
 | `rnid`, `rnstatus`, `rnpath`, `rnprobe`, `rnsh`, `rnodeconf` | Windows and Linux native-process tests against Python; one Windows RAK4631 passed native USB DFU/reflash and reversible EEPROM persistence/restoration; no RF acceptance |
-| Mixed mesh | Measured-window resource loss/retry and .NET/Python-router recovery; bounded Windows managed endpoint timeout/fresh-session recovery in both initiator roles. Separate all-upstream cold-window cancellation is negative evidence, not passing recovery; see [the mesh reference](docs/compatibility-mesh.md) |
+| Mixed mesh | Measured-window resource loss/retry and .NET/Python-router recovery; bounded Windows managed endpoint timeout/fresh-session recovery and fresh links through a surviving alternate .NET router after new announcements, both initiator roles. Separate all-upstream cold-window cancellation is negative evidence, not passing recovery; see [the mesh reference](docs/compatibility-mesh.md) |
 
 | Platform | Status |
 | --- | --- |

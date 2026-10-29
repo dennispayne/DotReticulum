@@ -23,7 +23,8 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Authorized RAK4631 native rnodeconf USB-triggered DFU, same-version reflash, changed-port recovery and reversible EEPROM-setting persistence/restoration
   - [ ] Remaining physical rnodeconf device/platform and RF acceptance (one RAK4631 verified; one radio cannot establish RF interoperability)
 - [ ] Parity 8 - Compatibility and release acceptance
-  - [ ] Broader mesh acceptance: alternate routes, cold initial-window resource-loss recovery, sustained Channel/resource soak and impaired native-binary/per-bearer matrices (pinned upstream cold-window cancellation is independently reproduced, not passing recovery)
+  - [ ] Broader mesh acceptance: broader alternate-route topologies, cold initial-window resource-loss recovery, sustained Channel/resource soak and impaired native-binary/per-bearer matrices (pinned upstream cold-window cancellation is independently reproduced, not passing recovery)
+  - [x] Windows managed surviving .NET alternate route after actual pinned-primary-router crash: observed next-hop replacement after fresh announcements, distinct links in both initiator roles and exact bidirectional DATA/proofs without restarting either leaf
   - [x] Actual pinned Python-router forced crash/restart with persisted transport identity, surviving leaves, interrupted proved link/forwarding-state cleanup, explicit endpoint teardown, distinct recovered link and bidirectional measured-window impaired resources
   - [x] Windows managed .NET/Python endpoints automatically reach TIMEOUT after a remote router crash with surviving local routing, in both initiator roles, then prove a distinct fresh session; cross-platform/native matrices remain outstanding
   - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
