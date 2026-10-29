@@ -88,12 +88,15 @@ Pester test with its own outcome, not a calculated claim verdict, and its Test I
 links to the shared test source. Readable cases live under
 `tests\Compatibility\Claims`; `tests\Compatibility\Get-CompatibilityTests.ps1`
 discovers tests and joins their upstream citations without executing them.
-The shared inventory now has **40 distinct tests and 17 catalogued claims**,
+The shared inventory now has **41 distinct tests and 17 catalogued claims**,
 including malformed cryptography/proofs, authenticated requests, TCP IFAC
 isolation and bidirectional multi-megabyte transfers with compression and
 authorization/recovery checks, plus exact bidirectional file delivery across
 a two-hop UDP/TCP path through a fixed upstream router and exact ordered
-bidirectional Channel stream delivery through actual CLI consumers. This is
+bidirectional Channel stream delivery through actual CLI consumers. Management
+requests additionally check intact nested responses on both sides of the
+negotiated packet-size boundary; this new boundary case currently has local
+Windows native/reference evidence, with hosted cross-platform execution pending. This is
 bounded evidence, not comprehensive parity: the Channel case covers Buffer
 message encoding, not general reader/writer APIs, loss or soak; routing cases
 do not establish alternate routes, RF or impaired meshes.

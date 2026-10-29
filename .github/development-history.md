@@ -4,6 +4,60 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Shared small-packet and resource-sized management responses
+
+Added **T058 / C008**, using the same actual `rnstatus` invocation, inputs and
+assertions for the upstream and .NET candidates against a fixed pinned upstream
+transport. It keeps **24 owned loopback TCP connections** open, observes their
+actual registered upstream child names before querying, and requires exact
+agreement between every returned nested interface name and the original status
+generator's response. Its packed response must exceed the **observed** negotiated
+MDU; the unchanged pinned `Link.py:845-854` consequently uses the resource
+response branch. Existing **T053** now explicitly requires a small response
+fitting that MDU, and **T054** proves that the identified unauthorized peer
+never invokes the protected response generator.
+
+The thin observer registers through the normal application API, delegates to
+`Transport.remote_status_handler` and preserves its existing identity allowlist.
+It records actual packed length, link MDU, request/link IDs and interface names;
+no protocol algorithm, timer, response value, serialization or resource policy
+is replaced. Actual admission snapshots are atomically published after close;
+the Windows reader permits replacement while reading. Owned children and
+processes are bounded and closed. This is management request/response evidence,
+not arbitrary application values, large requests, concurrency or complete
+request failure/cancellation acceptance.
+
+The initial 12-connection experiment correctly failed the intended boundary
+assertion: actual responses were **12,640 / 12,793 bytes**, still below the
+**16,303-byte MDU**. The final topology uses 24 real children rather than
+shrinking the MDU, injecting padding or weakening the assertion. Final actual
+responses were **23,274 bytes (.NET candidate) / 23,571 bytes (upstream
+candidate)**, each with **26 interfaces** and the same **16,303-byte MDU**.
+Both small responses were **2,008 bytes / two interfaces**.
+
+Validation:
+
+- `pwsh -NoProfile -File tests\Compatibility\Invoke-CompatibilityTests.ps1 -Application TestResults\requests-b5d01f2-native\DotReticulum.Applications.exe -Python TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5\reference\python\venv\Scripts\python.exe -Upstream TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5\reference\python\upstream -OutputDirectory TestResults\requests-boundary-shared-final -Implementation Both`:
+  Windows published-native **40 passed / one explicit skip**; actual
+  upstream-to-upstream **39 passed / two explicit skips**; zero failures.
+  Hosted retrieval was deliberately not requested in either execution;
+  upstream rnsh additionally requires POSIX. All three management cases
+  passed for both candidates. Discovery now has **41 distinct tests /
+  17 unchanged quoted claims**.
+- The native executable is the exact **win-x64** Build artifact downloaded from
+  repeated mesh **40947802917**, with manifest verified at source
+  **b5d01f2bb2a458bdd0d087e9401749ecad100b2d**. No duplicate local publication
+  or production coverage is claimed. Imported upstream remains verified at
+  **a29bfb51c468945c96a1ee22cae0114e993e2391**, RNS 1.5.7 / LXMF 1.2.1.
+- `pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+  **61 passed / two explicit missing-reference/candidate skips**, zero failures.
+- `pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
+  **65 tracked PowerShell files / zero findings**.
+
+Fresh-source hosted request-boundary acceptance remains pending. Earlier-source
+full interop **40947799428** and three-repeat mesh **40947802917** were dispatched
+at **b5d01f2**; their outcomes are not inferred from local results.
+
 ### Isolating controlled bearer loss from router ingress saturation
 
 The completed macOS repeat failure had no new deliberate bridge drops on its

@@ -20,6 +20,7 @@ def main():
     parser.add_argument("--proof-mode", choices=("missing", "invalid-signature", "wrong-hash", "truncated"),
                         default="missing")
     parser.add_argument("--observe-management", action="store_true")
+    parser.add_argument("--interface-observation", type=Path)
     args = parser.parse_args()
 
     if args.revision:
@@ -33,9 +34,31 @@ def main():
     no_proof_identity = RNS.Identity.from_file(args.no_proof_identity)
     node = RNS.Reticulum(configdir=str(config), loglevel=0, require_shared_instance=False)
     if args.observe_management:
+        management_links = {}
+
+        def established(link):
+            management_links[link.link_id] = link
+            link.set_remote_identified_callback(
+                lambda established_link, identity: emit(
+                    event="management_identified", identity=identity.hash.hex()))
+
+        def status_response(path, data, request_id, link_id, remote_identity, requested_at):
+            response = RNS.Transport.remote_status_handler(
+                path, data, request_id, link_id, remote_identity, requested_at)
+            if response is not None:
+                from RNS.vendor import umsgpack
+                emit(event="management_response", request_id=request_id.hex(), link_id=link_id.hex(),
+                     identity=remote_identity.hash.hex(),
+                     packed_bytes=len(umsgpack.packb([request_id, response])),
+                     mdu=management_links[link_id].mdu,
+                     interface_names=[interface["name"] for interface in response[0]["interfaces"]])
+            return response
+
         RNS.Transport.remote_management_destination.set_link_established_callback(
-            lambda link: link.set_remote_identified_callback(
-                lambda established_link, identity: emit(event="management_identified", identity=identity.hash.hex())))
+            established)
+        RNS.Transport.remote_management_destination.register_request_handler(
+            "/status", response_generator=status_response, allow=RNS.Destination.ALLOW_LIST,
+            allowed_list=RNS.Transport.remote_management_allowed)
 
     def received(destination, data, _packet):
         emit(event="probe_received", destination=destination.hex(), payload_bytes=len(data))
@@ -81,6 +104,15 @@ def main():
                 if RNS.Transport.remote_management_destination is not None:
                     RNS.Transport.remote_management_destination.announce()
                 emit(event="announced")
+            elif command == "interfaces":
+                names = [
+                    str(interface) for interface in RNS.Transport.interfaces
+                    if str(interface).startswith("TCPInterface[Client on Candidate/")]
+                if args.interface_observation is not None:
+                    pending = args.interface_observation.with_suffix(".pending")
+                    pending.write_text(json.dumps(names), encoding="utf-8")
+                    pending.replace(args.interface_observation)
+                emit(event="interfaces", names=names)
     finally:
         RNS.Reticulum.exit_handler()
 

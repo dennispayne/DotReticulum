@@ -91,6 +91,21 @@ runtime effect is implemented.
 | Channel envelope/order/window/retry/receipts/exhaustion; `Channel.py:113–148,175–245,303–608` | **Implemented** bounded V/U/L coverage and rnsh N: `ChannelResilienceTests`, `Parity5ChannelTests`, `Parity5ChannelRetryCryptoTests`, mixed transfers/rnsh. Wrap/reorder/RTT boundaries have independent reference evidence, not live 65536-message wrap-under-loss evidence. Retries preserve envelope/sequence but use fresh encryption/hash/receipt. Prolonged impaired soak is **unverified**. |
 | Buffer stream IDs/compression/EOF/flow/closure/callbacks; `Buffer.py:44–379` | **Implemented native equivalent** V/U/L coverage and rnsh N: `Parity5ChannelBufferTests`, mixed transfer/rnsh. Bounded slow-reader failure, outstanding-read settlement and concurrent close/write covered. Native blocking async reads, internal-handler precedence, bounded callbacks and 15-second close deadline intentionally differ from Python's nonblocking stream API and RTT-based close. |
 
+Shared advertised-claim cases **T053/T058 / C008** drive the actual candidate
+**rnstatus CLI** against the same pinned upstream management endpoint.
+The existing small response must fit the observed link MDU. The larger case
+keeps 24 owned TCP connections open, waits for their actual upstream child
+registration, then requires a packed response larger than that MDU and exact
+agreement between all returned interface names and the peer's generated
+response. Pinned `Link.py:845-854` carries such larger responses as resources;
+there is no response padding or replacement serialization. The observer
+delegates to the original status generator with its existing identity allowlist,
+and **T054** also requires that a denied identity never invokes that generator.
+Windows published-native and upstream-to-upstream executions passed locally;
+fresh hosted cross-platform acceptance remains pending. These are bounded
+management request/response cases, not arbitrary application-value, large
+request, concurrency, timeout/cancellation or full Request/Response acceptance.
+
 Shared advertised-claim case **T057 / C009** additionally drives the actual
 candidate **rnsh CLI** against a pinned upstream Channel application using
 `rnsh/protocol.py:100-107`'s `Buffer.StreamDataMessage` subclass. Both directions
