@@ -1,0 +1,21 @@
+name: Extended live interoperability
+
+on:
+  schedule:
+    - cron: '0 6 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: extended-interop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci-build-test.yml
+    with:
+      extended_suite: interop
+      iterations: 1

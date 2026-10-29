@@ -4,6 +4,57 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Scheduled opt-in live integration and repeated mixed meshes
+
+Implemented `interop-test.yml` (Tuesday **06:00 UTC**, or manual) and
+`e2e-mesh-test.yml` (Saturday **06:00 UTC**, or manual). Both call the same
+Build and Test workflow through `workflow_call`; they do not duplicate native
+publish/retrieval code, substitute a historical artifact or use Python to fetch
+on the candidate's behalf. Each invocation builds its own three native artifacts,
+validates their manifests and provisions the canonical same-run Linux
+candidate-fetched reference bundle exactly as normal CI does.
+
+Optional inputs leave normal pushes/PRs unchanged. Extended `interop` enables
+the actual xUnit `Category=Live` selection. Extended `mesh` selects the existing
+`Parity8CompatibilityLiveTests`, `LiveMixedTransportTests` and
+`Parity4NativeTransportTests`: mixed real Python transports, bidirectional
+multi-megabyte resource-part loss/retry, surviving-leaf reconnect/.NET restart,
+and published-native tunnel/path restoration. These cases are **integration**,
+not shared advertised-claim Compatibility. They do not establish Python-router
+crash recovery, alternate routes, physical bearers or sustained Channel soak.
+
+Mesh defaults to three repetitions, with integer **1-10** validation; interop
+runs once. Each repetition must execute passing tests, and an earlier failure
+stays failed even if a later iteration passes. Inputs enter PowerShell via
+environment variables, not interpolated code. Extended jobs have a 60-minute
+timeout versus normal Test's unchanged 30 minutes. Test children do not inherit
+Actions command/summary output paths.
+
+Extended raw results and their own `summary-extended.json` are retained in the
+existing platform artifacts. The consolidated renderer adds an **Extended**
+table only when those reports exist; Unit/Integration/Native counts and their
+independent production coverage stay separate. Missing platforms remain
+unavailable, not zero or passed. A focused reporting regression exercises
+extended pass/skip counts alongside an unchanged failing Native report.
+
+Local validation:
+`TestResults\workflow-tools\actionlint-1.7.12\actionlint.exe -color .github\workflows\ci-build-test.yml .github\workflows\interop-test.yml .github\workflows\e2e-mesh-test.yml .github\workflows\stale.yml`
+passed; `pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+**60 passed, 2 explicit missing-reference skips**;
+`pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
+**63 tracked files, zero findings**.
+With `DOTRETICULUM_LIVE=1`, the verified local Python/reference paths and
+`DOTRETICULUM_NATIVE_EXE=artifacts\native-device-ble-darwin\DotReticulum.Applications.exe`:
+
+```powershell
+dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v normal --filter 'FullyQualifiedName~Parity8CompatibilityLiveTests|FullyQualifiedName~LiveMixedTransportTests|FullyQualifiedName~Parity4NativeTransportTests' --results-directory TestResults\extended-local-mesh-20261029 --logger trx -- xUnit.MaxParallelThreads=1
+```
+
+**3 passed, zero failed/skipped**, **2.24 minutes**, with actual pinned Python
+transport processes and the native Windows daemon for the tunnel case.
+This is one local iteration, not the scheduled three-iteration soak.
+Hosted workflow acceptance remains pending; workflow TODOs remain unchecked.
+
 ### Shared heterogeneous UDP/TCP routing acceptance (T055/T056)
 
 Added two genuine shared advertised-claim cases for existing quoted **C007**:

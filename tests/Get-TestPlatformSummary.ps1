@@ -42,7 +42,11 @@ function Format-CoverageCell($Row) {
 '### Test results - all platforms'
 ''
 'Cells show **passed / failed / skipped**. Unavailable means no result was received.'
-foreach ($suite in 'unit', 'integration', 'native') {
+$suites = @('unit', 'integration', 'native')
+if (Get-ChildItem -LiteralPath $ReportsDirectory -Recurse -File -Filter 'summary-extended.json') {
+    $suites += 'extended'
+}
+foreach ($suite in $suites) {
     $reports = @{}
     $names = [Collections.Generic.HashSet[string]]::new()
     $details = [Collections.Generic.List[string]]::new()
@@ -89,7 +93,7 @@ foreach ($suite in 'unit', 'integration', 'native') {
         ''
         '</details>'
     }
-    if ($suite -eq 'native') { continue }
+    if ($suite -in 'native', 'extended') { continue }
     $coverage = @{}
     $projects = [Collections.Generic.HashSet[string]]::new()
     foreach ($rid in $platforms.Keys) {

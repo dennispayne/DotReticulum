@@ -36,6 +36,26 @@ on:
       - '!**/*.md'
       - '!docs/**'
   workflow_dispatch:
+    inputs:
+      extended_suite:
+        description: Optional live integration suite, separate from shared Compatibility
+        type: choice
+        options: [none, interop, mesh]
+        default: none
+      iterations:
+        description: Extended suite repetitions (1-10, failures remain failures)
+        type: number
+        default: 1
+  workflow_call:
+    inputs:
+      extended_suite:
+        description: Optional live integration suite (none, interop or mesh)
+        type: string
+        default: none
+      iterations:
+        description: Extended suite repetitions (1-10, failures remain failures)
+        type: number
+        default: 1
 
 permissions:
   contents: read
@@ -52,7 +72,7 @@ jobs:
   build:
     name: Build
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: ${{ (inputs.extended_suite == 'interop' || inputs.extended_suite == 'mesh') && 60 || 30 }}
     strategy:
       fail-fast: false
       matrix:
@@ -77,6 +97,18 @@ jobs:
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
+
+      - name: Validate optional extended test selection
+        if: inputs.extended_suite != '' && inputs.extended_suite != 'none'
+        env:
+          EXTENDED_SUITE: ${{ inputs.extended_suite }}
+          EXTENDED_ITERATIONS: ${{ inputs.iterations }}
+        run: |
+          if ($env:EXTENDED_SUITE -notin @('interop', 'mesh')) { throw 'Unknown extended test suite.' }
+          $iterations = 0
+          if (![int]::TryParse($env:EXTENDED_ITERATIONS, [ref]$iterations) -or $iterations -lt 1 -or $iterations -gt 10) {
+            throw 'Extended test iterations must be an integer from 1 through 10.'
+          }
 
       - name: Install Linux NativeAOT prerequisites
         if: runner.os == 'Linux'
@@ -261,6 +293,43 @@ jobs:
       - name: Run native contract integration and mixed-peer checks
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: ./tests/Invoke-ContractIntegration.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary
+
+      - name: Run optional live integration or repeated mixed-mesh acceptance
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && (inputs.extended_suite == 'interop' || inputs.extended_suite == 'mesh') }}
+        env:
+          EXTENDED_SUITE: ${{ inputs.extended_suite }}
+          EXTENDED_ITERATIONS: ${{ inputs.iterations }}
+          DOTRETICULUM_LIVE: '1'
+        run: |
+          if (!$env:DOTRETICULUM_PYTHON -or !$env:DOTRETICULUM_UPSTREAM) {
+            throw 'Extended acceptance requires the same-run candidate-fetched, verified reference.'
+          }
+          foreach ($name in 'GITHUB_STEP_SUMMARY', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STATE') {
+            Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
+          }
+          $filter = if ($env:EXTENDED_SUITE -eq 'interop') { 'Category=Live' } else {
+            'FullyQualifiedName~Parity8CompatibilityLiveTests|FullyQualifiedName~LiveMixedTransportTests|FullyQualifiedName~Parity4NativeTransportTests'
+          }
+          $failed = $false
+          for ($iteration = 1; $iteration -le [int]$env:EXTENDED_ITERATIONS; $iteration++) {
+            $directory = "TestResults/extended/iteration-$iteration"
+            dotnet test DotReticulum.slnx -c Release --no-build -m:1 --filter $filter --results-directory $directory --logger trx -- xUnit.MaxParallelThreads=1
+            if ($LASTEXITCODE -ne 0) { $failed = $true }
+            ./tests/Get-TestSummary.ps1 -Path $directory -Title "Extended $env:EXTENDED_SUITE iteration $iteration" -JsonPath "$directory/summary.json"
+            $report = Get-Content -LiteralPath "$directory/summary.json" -Raw | ConvertFrom-Json
+            if (($report.Rows | Measure-Object -Property Passed -Sum).Sum -lt 1) {
+              Write-Error "Extended iteration $iteration has no passing executed tests." -ErrorAction Continue
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+
+      - name: Summarize extended integration separately
+        if: ${{ !cancelled() && (inputs.extended_suite == 'interop' || inputs.extended_suite == 'mesh') }}
+        run: |
+          $summary = & ./tests/Get-TestSummary.ps1 -Path TestResults/extended -Title 'Extended integration (${{ matrix.rid }})' -JsonPath TestResults/summary-extended.json
+          $summary
+          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
 
       - name: Summarize native test results
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}

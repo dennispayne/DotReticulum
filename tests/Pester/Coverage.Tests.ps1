@@ -210,5 +210,24 @@ Describe 'PowerShell test runner' -Tag Tooling {
         $result.Output | Should -Match '#### Unit tests'
         $result.Output | Should -Match '#### Integration tests'
         $result.Output | Should -Match '#### Native tests'
+        $extendedInput = Join-Path $linux.FullName 'extended.xml'
+        @'
+<test-results><test-suite><results>
+<test-case name="live" result="Success"/>
+<test-case name="hardware" result="Ignored"><reason><message>requires physical adapter</message></reason></test-case>
+</results></test-suite></test-results>
+'@ | Set-Content -LiteralPath $extendedInput
+        $export = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
+            (Join-Path $PSScriptRoot '..\Get-TestSummary.ps1'), '-Path', $extendedInput,
+            '-JsonPath', (Join-Path $linux.FullName 'summary-extended.json'))
+        $export.Code | Should -Be 0 -Because $export.Error
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
+            (Join-Path $PSScriptRoot '..\Get-TestPlatformSummary.ps1'),
+            '-ReportsDirectory', $directory.FullName)
+        $result.Code | Should -Be 0 -Because $result.Error
+        $result.Output | Should -Match '#### Extended tests'
+        $result.Output | Should -Match '\| extended \| 1 / 0 / 1 \| Unavailable \| Unavailable'
+        $result.Output | Should -Match '\| cli \| 1 / 1 / 1 \| Unavailable \| Unavailable'
+        $result.Output | Should -Match 'Linux.*requires physical adapter'
     }
 }

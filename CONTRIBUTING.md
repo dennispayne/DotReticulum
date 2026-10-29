@@ -55,6 +55,26 @@ help: `Get-Help .\tests\Invoke-Tests.ps1 -Full` shows usage without running test
 Renamed entry points replace the previous lowercase/underscore names; update
 local commands accordingly. Tooling tests guard entry-point naming and help discovery.
 
+### Scheduled live integration and mixed meshes
+
+The weekly `interop-test.yml` and `e2e-mesh-test.yml` workflows reuse Build and
+Test, including fresh three-platform native artifacts and candidate-owned
+reference retrieval. They do not download an old successful build/reference.
+Normal pushes keep the bounded default suite; extended runs explicitly enable
+the live xUnit integration cases or repeat the mixed-router/resource-loss,
+reconnect and published-daemon tunnel-restoration cases.
+
+```powershell
+gh workflow run interop-test.yml
+gh workflow run e2e-mesh-test.yml -f iterations=3
+```
+
+Iterations are bounded to 1-10 and every failure remains a failure, even if a
+later round passes. Extended results have their own cross-platform Test table,
+not Compatibility rows or instrumented coverage. Hardware/I2P prerequisites
+still skip explicitly. Existing mixed-mesh cases do not establish Python-router
+crash recovery, alternate routes, sustained Channel soak or every native bearer.
+
 ### Static analysis
 
 The [Static analysis workflow](.github/workflows/codeql.yml) uses CodeQL advanced
