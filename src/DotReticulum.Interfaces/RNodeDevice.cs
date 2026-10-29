@@ -6,7 +6,7 @@ namespace DotReticulum.Interfaces;
 
 internal sealed class RNodeDevice
 {
-    internal sealed record Connection(Stream Stream, IDisposable? Owner = null, bool Tcp = false);
+    internal sealed record Connection(Stream Stream, IDisposable? Owner = null, bool Tcp = false, bool Ble = false);
     private sealed class Echo
     {
         public long? Frequency;
@@ -122,7 +122,11 @@ internal sealed class RNodeDevice
     internal static Func<CancellationToken, ValueTask<Connection>> StreamFactory(Func<CancellationToken, ValueTask<Stream>> open)
     {
         ArgumentNullException.ThrowIfNull(open);
-        return async token => new(await open(token).ConfigureAwait(false));
+        return async token =>
+        {
+            var stream = await open(token).ConfigureAwait(false);
+            return new(stream, Ble: stream is RNodeBleStream);
+        };
     }
 
     internal static Func<CancellationToken, ValueTask<Connection>> SerialFactory(string portName)
@@ -338,8 +342,9 @@ internal sealed class RNodeDevice
                 if (decoder.HasPartialFrame)
                 {
                     using var idleStop = CancellationTokenSource.CreateLinkedTokenSource(token);
-                    var idle = Task.Delay(session.Connection.Tcp ? ((RNodeOptions)_options).Tcp.PartialFrameTimeout
-                        : _options.PartialFrameTimeout, _options.TimeProvider, idleStop.Token);
+                    var partialTimeout = session.Connection.Tcp ? ((RNodeOptions)_options).Tcp.PartialFrameTimeout
+                        : session.Connection.Ble ? ((RNodeOptions)_options).Ble.PartialFrameTimeout : _options.PartialFrameTimeout;
+                    var idle = Task.Delay(partialTimeout, _options.TimeProvider, idleStop.Token);
                     if (await Task.WhenAny(pending, idle).ConfigureAwait(false) != pending)
                     {
                         token.ThrowIfCancellationRequested();

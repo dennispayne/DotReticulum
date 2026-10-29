@@ -127,7 +127,14 @@ public sealed class Parity6RNodeTests
             Assert.Throws<ArgumentOutOfRangeException>(() => new RNodePacketInterface(Stream.Null, Options() with { Radio = radio }));
         Assert.Throws<ArgumentOutOfRangeException>(() => new RNodePacketInterface(Stream.Null,
             Options() with { IdCallsign = new string('é', 17) }));
-        Assert.Throws<NotSupportedException>(() => new RNodePacketInterface("ble://unowned", Options()));
+        foreach (var ble in new[]
+        {
+            new RNodeOptions.RNodeBleOptions { ConnectTimeout = TimeSpan.Zero },
+            new RNodeOptions.RNodeBleOptions { PartialFrameTimeout = TimeSpan.Zero },
+            new RNodeOptions.RNodeBleOptions { ReceiveBufferBytes = 511 },
+            new RNodeOptions.RNodeBleOptions { ReceiveBufferBytes = 1048577 },
+        })
+            Assert.Throws<ArgumentOutOfRangeException>(() => new RNodePacketInterface(Stream.Null, Options() with { Ble = ble }));
         Assert.Throws<ArgumentException>(() => new RNodeMultiPacketInterface(Stream.Null, MultiOptions() with { Subinterfaces = [] }));
     }
 

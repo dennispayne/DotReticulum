@@ -4,6 +4,56 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Windows RNode BLE software slice (not full desktop BLE acceptance)
+
+Added static-native Windows SetupAPI/Bluetooth GATT discovery of paired devices,
+Nordic UART service/characteristic selection, notification subscription and
+write-without-response operations. `ble://`, name and address selectors dispatch
+from the real single-radio constructor, not a Python process or a caller-owned
+stream substitution. The bounded byte stream serializes/chunks writes, rejects
+notification overflow, cancels pending operations, joins ownership on disposal,
+and faults ambiguous partial writes rather than replaying bytes. Existing radio
+ownership reopens/redetects/reconfigures after simulated GATT disconnect.
+BLE partial-frame expiry is **1250 ms**, distinct from serial/TCP.
+
+Pinned source: `RNS/Interfaces/RNodeInterface.py:174-186,385-400,1257-1450`.
+`GenerateRNodeBleVectors.py` executes original selector code and
+`BLEConnection.find_target_device`/`device_bonded`, with a recording scanner and
+paired-address query, at **a29bfb51c468945c96a1ee22cae0114e993e2391**.
+`Fixtures/rnode-ble.json` records that revision and actual source SHA-256.
+No actual Bluetooth is involved in vector generation. Microsoft documents
+`GUID_BLUETOOTHLE_DEVICE_INTERFACE` as paired-device enumeration at
+https://learn.microsoft.com/windows/win32/api/_bltooth/#guids ; optional device
+flags further reject known unpaired entries, rather than establish bonding
+from an absent property.
+
+Intentional/remaining boundaries:
+- Windows uses **cached paired PnP/GATT inventory, not live advertisement
+  scanning**. An offline first match may fail rather than select another
+  advertising device. This is a partial discovery contract.
+- Windows desktop GATT exposes no negotiated-MTU getter here: writes use
+  conservative **20-byte** ATT payloads, not upstream's maximum-chunk optimization.
+- In-progress synchronous Windows GATT transactions cannot be cancelled by this
+  API. Cancellation is checked before/after; owned operations are joined and may
+  last until the OS ATT timeout. The five-second option is not a hard in-flight
+  native deadline. Missing driver connection flags leave idle disappearance
+  detection dependent on a later failed operation.
+- Linux/macOS BLE providers remain **not implemented**. Android is deferred.
+  The local Windows machine reports **no present Bluetooth adapter**, so actual
+  discovery, physical notifications/writes, pairing and device reconnect remain
+  **unverified**. No RF evidence follows from stream tests.
+
+The **11** software/lifecycle cases passed in the full integrated Release suite:
+selector/bond oracles, bounded ring wrap/overflow, chunk serialization,
+disconnect wakeup, cancellation/read recovery, notification-start cleanup,
+ambiguous-write failure, platform rejection, and owner redetection including
+fragments separated beyond serial's timeout. The integrated gate recorded in the
+RAK section passed **1,847 tests, 82 explicit skips**, zero warnings/errors;
+Interfaces contributed **325 passed, 23 skipped**. NativeAOT publication remained
+warning-free; real native resource/crypto/file flows against pinned Python passed
+**36 cases, 1 explicit hosted-retrieval skip**. Those resource flows do not exercise
+physical BLE. TODO retains full RNode/desktop BLE acceptance as unchecked.
+
 ### Darwin rnsh terminal backend implementation
 
 Implemented macOS PTY creation with Darwin-specific `O_NOCTTY`,

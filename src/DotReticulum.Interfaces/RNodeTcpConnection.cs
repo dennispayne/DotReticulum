@@ -8,6 +8,8 @@ internal static class RNodeTcpConnection
     internal static Func<CancellationToken, ValueTask<RNodeDevice.Connection>> Factory(string port, RNodeOptions options)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(port);
+        if (port.StartsWith("ble://", StringComparison.OrdinalIgnoreCase))
+            return RNodeBleConnection.Factory(port, options);
         if (!port.StartsWith("tcp://", StringComparison.OrdinalIgnoreCase))
             return RNodeDevice.SerialFactory(port);
         var host = port[6..];

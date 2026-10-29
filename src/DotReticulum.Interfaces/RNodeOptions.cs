@@ -69,6 +69,7 @@ public sealed record RNodeOptions : RNodeDeviceOptions
 {
     public RNodeRadioOptions Radio { get; init; } = new();
     public RNodeTcpOptions Tcp { get; init; } = new();
+    public RNodeBleOptions Ble { get; init; } = new();
 
     internal void ValidateSingle()
     {
@@ -77,6 +78,8 @@ public sealed record RNodeOptions : RNodeDeviceOptions
         Radio.Validate(multi: false);
         ArgumentNullException.ThrowIfNull(Tcp);
         Tcp.Validate();
+        ArgumentNullException.ThrowIfNull(Ble);
+        Ble.Validate();
     }
 
     public sealed record RNodeTcpOptions
@@ -93,6 +96,20 @@ public sealed record RNodeOptions : RNodeDeviceOptions
             if (ConnectTimeout <= TimeSpan.Zero || DetectionTimeout <= TimeSpan.Zero ||
                 PartialFrameTimeout <= TimeSpan.Zero || ActivityKeepalive <= TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException(nameof(ConnectTimeout));
+        }
+    }
+
+    public sealed record RNodeBleOptions
+    {
+        public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(5);
+        public TimeSpan PartialFrameTimeout { get; init; } = TimeSpan.FromMilliseconds(1250);
+        public int ReceiveBufferBytes { get; init; } = 65536;
+
+        internal void Validate()
+        {
+            if (ConnectTimeout <= TimeSpan.Zero || PartialFrameTimeout <= TimeSpan.Zero)
+                throw new ArgumentOutOfRangeException(nameof(ConnectTimeout));
+            if (ReceiveBufferBytes is < 512 or > 1048576) throw new ArgumentOutOfRangeException(nameof(ReceiveBufferBytes));
         }
     }
 }

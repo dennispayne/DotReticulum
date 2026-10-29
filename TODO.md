@@ -7,8 +7,9 @@ the [compatibility ledger](docs/compatibility-contracts.md) defines residual
 contracts and acceptance boundaries. Completed historical phases are not repeated.
 
 - [ ] Parity 6 - Upstream interface coverage
-  - [ ] RNodeInterface and RNodeMultiInterface full software contracts (serial/TCP accepted; desktop BLE selector/provider still missing)
-  - [ ] Desktop RNode `ble://` Nordic UART selection, bonding, GATT notification/write/reconnect provider and platform/device acceptance
+  - [ ] RNodeInterface and RNodeMultiInterface full software contracts (serial/TCP accepted; Windows BLE software slice implemented, remaining BLE discovery/platform/device acceptance outstanding)
+  - [x] Windows RNode BLE selector, native paired-device GATT provider, bounded notification/write stream and simulated reconnect contracts
+  - [ ] Desktop RNode BLE live-advertisement selection, Linux/macOS providers and physical platform/device acceptance (Windows cached paired-device provider is partial; local host has no Bluetooth adapter)
   - [ ] I2PInterface
   - [ ] Android-specific adapters or documented native platform equivalents (deferred by user)
   - [ ] Complete UDP/TCP/serial configuration and validate real serial/radio hardware

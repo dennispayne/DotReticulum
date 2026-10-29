@@ -1,0 +1,351 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "source": "RNS/Interfaces/RNodeInterface.py",
+  "sha256": "ae3ec2e539ca9a888dcd9dad3bdd52f1914c24e33b3dcf63cc066ba0883ab369",
+  "rns_import": "RNS/Interfaces/RNodeInterface.py",
+  "method": "Execute original constructor selector AST and BLEConnection.find_target_device/device_bonded; recording scanner and paired-address query only.",
+  "selectors": [
+    {
+      "port": "ble://",
+      "name": null,
+      "address": null
+    },
+    {
+      "port": "BLE://RNode Example",
+      "name": "RNode Example",
+      "address": null
+    },
+    {
+      "port": "ble://AA:BB:CC:DD:EE:FF",
+      "name": null,
+      "address": "AA:BB:CC:DD:EE:FF"
+    },
+    {
+      "port": "ble://aa:bb:cc:dd:ee:ff",
+      "name": null,
+      "address": "aa:bb:cc:dd:ee:ff"
+    },
+    {
+      "port": "ble://not:an:addr",
+      "name": "not:an:addr",
+      "address": null
+    },
+    {
+      "port": "ble://zz:zz:zz:zz:zz:zz",
+      "name": null,
+      "address": "zz:zz:zz:zz:zz:zz"
+    }
+  ],
+  "selections": [
+    {
+      "port": "ble://",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": true
+    },
+    {
+      "port": "ble://",
+      "name": "Other UART",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": true
+    },
+    {
+      "port": "ble://",
+      "name": "rnode example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": true
+    },
+    {
+      "port": "ble://",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": false,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": false,
+      "matches": false
+    },
+    {
+      "port": "ble://",
+      "name": "RNode Example",
+      "address": "11:22:33:44:55:66",
+      "bonded": true,
+      "uart": true,
+      "matches": true
+    },
+    {
+      "port": "BLE://RNode Example",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": true
+    },
+    {
+      "port": "BLE://RNode Example",
+      "name": "Other UART",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "BLE://RNode Example",
+      "name": "rnode example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "BLE://RNode Example",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": false,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "BLE://RNode Example",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": false,
+      "matches": false
+    },
+    {
+      "port": "BLE://RNode Example",
+      "name": "RNode Example",
+      "address": "11:22:33:44:55:66",
+      "bonded": true,
+      "uart": true,
+      "matches": true
+    },
+    {
+      "port": "ble://AA:BB:CC:DD:EE:FF",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": true
+    },
+    {
+      "port": "ble://AA:BB:CC:DD:EE:FF",
+      "name": "Other UART",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": true
+    },
+    {
+      "port": "ble://AA:BB:CC:DD:EE:FF",
+      "name": "rnode example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": true
+    },
+    {
+      "port": "ble://AA:BB:CC:DD:EE:FF",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": false,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://AA:BB:CC:DD:EE:FF",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": false,
+      "matches": false
+    },
+    {
+      "port": "ble://AA:BB:CC:DD:EE:FF",
+      "name": "RNode Example",
+      "address": "11:22:33:44:55:66",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://aa:bb:cc:dd:ee:ff",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://aa:bb:cc:dd:ee:ff",
+      "name": "Other UART",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://aa:bb:cc:dd:ee:ff",
+      "name": "rnode example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://aa:bb:cc:dd:ee:ff",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": false,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://aa:bb:cc:dd:ee:ff",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": false,
+      "matches": false
+    },
+    {
+      "port": "ble://aa:bb:cc:dd:ee:ff",
+      "name": "RNode Example",
+      "address": "11:22:33:44:55:66",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://not:an:addr",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://not:an:addr",
+      "name": "Other UART",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://not:an:addr",
+      "name": "rnode example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://not:an:addr",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": false,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://not:an:addr",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": false,
+      "matches": false
+    },
+    {
+      "port": "ble://not:an:addr",
+      "name": "RNode Example",
+      "address": "11:22:33:44:55:66",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://zz:zz:zz:zz:zz:zz",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://zz:zz:zz:zz:zz:zz",
+      "name": "Other UART",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://zz:zz:zz:zz:zz:zz",
+      "name": "rnode example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://zz:zz:zz:zz:zz:zz",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": false,
+      "uart": true,
+      "matches": false
+    },
+    {
+      "port": "ble://zz:zz:zz:zz:zz:zz",
+      "name": "RNode Example",
+      "address": "AA:BB:CC:DD:EE:FF",
+      "bonded": true,
+      "uart": false,
+      "matches": false
+    },
+    {
+      "port": "ble://zz:zz:zz:zz:zz:zz",
+      "name": "RNode Example",
+      "address": "11:22:33:44:55:66",
+      "bonded": true,
+      "uart": true,
+      "matches": false
+    }
+  ],
+  "windows_bonds": [
+    {
+      "paired": false,
+      "linux_bonded_property": false,
+      "matches": false
+    },
+    {
+      "paired": false,
+      "linux_bonded_property": true,
+      "matches": false
+    },
+    {
+      "paired": true,
+      "linux_bonded_property": false,
+      "matches": true
+    },
+    {
+      "paired": true,
+      "linux_bonded_property": true,
+      "matches": true
+    }
+  ]
+}

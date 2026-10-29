@@ -13,7 +13,8 @@ public sealed class RNodePacketInterface : IReconnectingPacketInterface, IPacket
     {
         ArgumentNullException.ThrowIfNull(duplexStream);
         ArgumentNullException.ThrowIfNull(options);
-        _device = new(_ => ValueTask.FromResult(new RNodeDevice.Connection(duplexStream)), options, false, false, duplexStream);
+        _device = new(_ => ValueTask.FromResult(new RNodeDevice.Connection(duplexStream, Ble: duplexStream is RNodeBleStream)),
+            options, false, false, duplexStream);
     }
 
     /// <summary>Every returned stream transfers ownership. Reconnection uses a fresh stream from the factory.</summary>
