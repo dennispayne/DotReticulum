@@ -54,10 +54,6 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             [reticulum]
               share_instance = no
               enable_transport = yes
-              qlen_in_data = 2
-              qlen_in_announce = 2
-              qlen_in_pr = 2
-              qlen_in_il = 2
             [interfaces]
               [[Server]]
                 type = TCPServerInterface
@@ -85,6 +81,8 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
         async Task StopHost()
         {
             if (host is null) return;
+            output.WriteLine($"Router ingress capacities=[{string.Join(',', host.Router.InboundQueueCapacities)}], " +
+                $"cumulative dropped=[{string.Join(',', host.Router.InboundQueues.Dropped)}].");
             await stop!.CancelAsync();
             try { await running.WaitAsync(TimeSpan.FromSeconds(15)); }
             catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
@@ -156,14 +154,19 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             var lostBefore = bridge.Dropped;
             var retryBefore = bridge.Retried;
             var primedBefore = bridge.PassedBeforeLoss;
+            var ingressBefore = host!.Router.InboundQueues.Dropped;
             // Pinned Resource.py:842-940 only measures throughput after its first
             // complete four-part window. Cold-window failure is a separate negative control.
             bridge.LoseResourceParts(fromPython, 3, afterParts: 4);
             var sent = await sender.Command($"resource {size} {seed} random", "resource_sent", TransferTimeout);
             var received = await receiver.NextAsync("resource_done", before, Patience);
+            var ingressAfter = host.Router.InboundQueues.Dropped;
             Assert.True(sent.GetProperty("status").GetInt32() == 6,
-                $"Sender resource failed: {sent}; receiver: {received}; dropped={bridge.Dropped}, retried={bridge.Retried}, initial replays={bridge.InitialReplays}.");
+                $"Sender resource failed: {sent}; receiver: {received}; dropped={bridge.Dropped}, retried={bridge.Retried}, " +
+                $"initial replays={bridge.InitialReplays}; router ingress dropped=[{string.Join(',', ingressBefore)}]->[{string.Join(',', ingressAfter)}].");
             Assert.True(received.GetProperty("status").GetInt32() == 6, $"Receiver resource failed: {received}.");
+            Assert.True(ingressBefore.SequenceEqual(ingressAfter),
+                $"Unexpected router ingress loss outside the controlled bearer: [{string.Join(',', ingressBefore)}]->[{string.Join(',', ingressAfter)}].");
             Assert.Equal(size, received.GetProperty("size").GetInt32());
             Assert.Equal(sent.GetProperty("sha256").GetString(), received.GetProperty("sha256").GetString());
             Assert.False(sent.GetProperty("compressed").GetBoolean());
@@ -260,7 +263,8 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             Assert.Equal(20, bridge.PassedBeforeLoss);
             output.WriteLine($"A(Python leaf) -- Python transport -- impaired TCP -- .NET transport -- B(Python leaf); " +
                 $"2.2 MB incompressible resources both ways, 20 ms/frame latency, capacity-one bearer queues, " +
-                $"router inbound capacities=2; dropped/retransmitted parts={bridge.Dropped}/{bridge.Retried}, " +
+                $"default router inbound capacities=[{string.Join(',', host.Router.InboundQueueCapacities)}]; " +
+                $"dropped/retransmitted parts={bridge.Dropped}/{bridge.Retried}, " +
                 $"first complete resource windows passed before loss={bridge.PassedBeforeLoss} parts; " +
                 $"initial-window replay frames passed={bridge.InitialReplays}; " +
                 $"backpressure waits={bridge.BackpressureWaits}, TCP sessions={bridge.Sessions}; " +

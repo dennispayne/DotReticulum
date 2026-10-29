@@ -55,8 +55,9 @@ The test requires:
   status and exactly one resource conclusion are required. Five transfers must
   observe exactly **20 initial parts passed, 15 dropped and 15 retried**.
 - Twenty milliseconds of delay per forwarded frame in both directions,
-  capacity-one wait-on-full bearer queues, and managed .NET inbound routing queue
-  capacities of two. Actual bearer backpressure must be observed.
+  capacity-one wait-on-full bearer queues, and reference-default bounded .NET
+  router ingress queues. Actual bearer backpressure must be observed, and no
+  router ingress-drop counter may increase during any resource transfer.
 - Explicit link teardown, transport TCP disconnect/reconnect, a reverse-initiated
   new link, and proved encrypted packet delivery in both directions.
 - Complete disposal/recreation of the .NET router using its persisted identity,
@@ -81,6 +82,15 @@ Its small per-direction initial set is reset for each transfer. Replay handling
 has a focused failing-then-passing fixture regression. Forwarded-part counts
 alone are not callback-level proof of an upstream throughput estimate; actual
 receiver state and resource failure observations remain relevant diagnostics.
+
+The controlled-loss scenario uses the pinned default ingress capacities
+**1,024/128/128/8**, not its earlier two-slot override
+(`Transport.py:143-146`). A two-slot queue can drop part of an initial resource
+burst independently of the bearer, confounding this isolated loss scenario.
+Before/after drop counters and shutdown snapshots now expose that distinction.
+Independent saturation/priority assertions retain their deliberately tiny
+queues and reference vectors in `Parity4RoutingTests`; this does not establish
+live recovery from simultaneous router overflow and bearer loss.
 
 ## Automatic endpoint timeout and fresh-session recovery
 
@@ -218,6 +228,6 @@ The separate alternate-route case covers fresh sessions after new announcements,
 not active-link session resumption or every alternate-route topology.
 Mass-client overload, prolonged
 soak, physical bearers, other platforms, and impaired published-native execution
-are not covered. The capacity-two .NET queue setting does not prove router
-queue exhaustion; the pressure assertion applies only to the capacity-one
+are not covered. Router queue exhaustion remains separate from this
+controlled-loss case; its pressure assertion applies only to the capacity-one
 impairment bearer.

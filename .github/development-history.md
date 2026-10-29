@@ -4,6 +4,51 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Isolating controlled bearer loss from router ingress saturation
+
+The completed macOS repeat failure had no new deliberate bridge drops on its
+failing resource, yet the receiver lacked initial parts. Source review confirms
+the fixture's non-default two-slot ingress queues can independently discard a
+resource burst: `TransportRouter.InboundScheduling.cs:77-80` increments the
+traffic-class drop counter on overflow, matching pinned
+`RNS/Transport.py:1894-1895`. That is a different impairment from the three
+explicit bearer drops and can reintroduce the separately demonstrated upstream
+cold-window limitation before a measured window completes. Historical ingress
+counters were not retained, so this remains fault isolation rather than a claim
+to have proven every earlier failure's cause.
+
+The controlled-loss scenario now uses the **actual pinned bounded defaults**
+**1,024/128/128/8** (`Transport.py:143-146`), rather than searching for an
+arbitrary larger queue. It snapshots all four ingress-drop counters before and
+after each resource and requires no increase outside the controlled bearer.
+Failure diagnostics and both router shutdowns retain capacities and actual
+drop counters. Intentional saturation is still independently checked by
+`InboundSaturationHasIndependentBoundsAndReferencePriorityOrder`, with its
+two-slot DATA queue and existing independent reference vectors unchanged.
+
+This intentionally removes the old two-slot mesh setting, not boundedness or
+the capacity-one bearer pressure test. The 20 ms/frame latency, three deliberate
+distinct drops per resource, all 15 observed repairs, two router restarts,
+actual pinned peers and exact resource hashes are unchanged. Simultaneous
+live router-overflow/bearer-loss recovery remains unverified, not silently
+claimed from the now-isolated scenario.
+
+Validation:
+
+- `DOTRETICULUM_LIVE=1 dotnet test DotReticulum.slnx -c Release --nologo -v quiet --filter 'FullyQualifiedName~Parity8CompatibilityLiveTests|FullyQualifiedName~Parity8ResourceLossFixtureTests|FullyQualifiedName~LiveMixedTransportTests|FullyQualifiedName~InboundSaturationHasIndependentBoundsAndReferencePriorityOrder' --logger trx --results-directory TestResults\mesh-controlled-loss-isolation-final -- xUnit.MaxParallelThreads=1`:
+  **9 passed / zero skips**: eight Applications cases and the independent
+  Transport saturation case. Actual mesh output retained **20 distinct initial
+  parts / 15 dropped / 15 retried / 224 capacity-one waits / four TCP sessions**.
+  Both router lifetimes reported **[0,0,0,0] ingress drops** at the pinned
+  default capacities.
+- `DOTRETICULUM_LIVE=0 dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --logger trx --results-directory TestResults\mesh-controlled-loss-full-final -- xUnit.MaxParallelThreads=1`:
+  **1854 passed / 89 explicit skips / zero failures**.
+
+No production behavior changed; fresh-source hosted acceptance remains pending.
+Static **40946356295**, exact source
+**cb9aef1**, completed all five jobs. Its inspected rendered report has zero
+Actions/C#/PowerShell findings and the same two Python warnings recorded below.
+
 ### Default watchdog bounds and already-validated receipt observation
 
 Inspected the actual Linux and Windows artifacts from repeated mesh
