@@ -395,7 +395,11 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
                 var before = leaf!.Count("data");
                 var receipt = link.Send("managed-before-outage"u8);
                 Assert.NotNull(receipt);
-                Assert.True(await receipt.Completion.WaitAsync(Patience));
+                Assert.True(await receipt.Completion.WaitAsync(Patience),
+                    $"Managed DATA proof failed before router crash: initiator={dotNetInitiates}, link={link.LinkIdHex}, " +
+                    $"status={receipt.Status}, timeout={receipt.Timeout}, RTT={link.Rtt}, sent={receipt.SentAt}, " +
+                    $"concluded={receipt.ConcludedAt}, queued={endpoint.Router.Links.QueuedOutboundPackets}, " +
+                    $"peer DATA events={leaf.Count("data") - before}.");
                 Assert.Equal(Convert.ToHexStringLower("managed-before-outage"u8),
                     (await leaf.NextAsync("data", before, Patience)).GetProperty("payload").GetString());
                 Assert.True((await leaf.Command("send 70696e6e65642d6265666f72652d6f7574616765", "sent", Patience))

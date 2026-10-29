@@ -203,6 +203,62 @@ public class LinkTests
     }
 
     [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    public async Task DataReceiptExcludesLocalQueueAndBearerWriteFromItsProofDeadline(bool initiatorSends, bool queued)
+    {
+        var clock = new Parity4LinkMtuTests.Clock();
+        await using var topo = await BuildAsync(false, clock);
+        var accepted = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+        topo.Destination.LinkEstablished = link => accepted.TrySetResult(link);
+        var established = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var initiator = topo.Initiator.Router.Links.Connect(topo.Destination.Identity,
+            topo.Destination.Destination.Hash, link => established.TrySetResult(link));
+        await Within(established.Task);
+        var responder = await Within(accepted.Task);
+        var sender = initiatorSends ? initiator : responder;
+        (initiatorSends ? responder : initiator).ProofStrategy = queued ? ProofStrategy.All : ProofStrategy.None;
+        var bearer = Assert.IsType<Loopback>(sender.AttachedInterface);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        bearer.SendBlock = release.Task;
+        bearer.SendStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            if (queued)
+            {
+                Assert.True(sender.TrySend("hold-pump"u8));
+                await bearer.SendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            var receipt = sender.Send("still-queued"u8);
+            Assert.NotNull(receipt);
+            if (!queued) await bearer.SendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            clock.Advance(1);
+            sender.Tick((initiatorSends ? topo.Initiator : topo.Responder).Router.Links.Now);
+            Assert.Equal(PacketReceiptStatus.Sent, receipt.Status);
+            Assert.False(receipt.Completion.IsCompleted);
+            var sentAt = clock.GetUtcNow().ToUnixTimeMilliseconds() / 1000.0;
+            release.TrySetResult();
+            if (queued)
+            {
+                Assert.True(await receipt.Completion.WaitAsync(TimeSpan.FromSeconds(5)));
+                Assert.True(receipt.Proved);
+                Assert.Equal(0, receipt.Rtt!.Value);
+            }
+            else
+            {
+                await Until(() => receipt.SentAt == sentAt);
+                clock.Advance(receipt.Timeout + 0.001);
+                sender.Tick((initiatorSends ? topo.Initiator : topo.Responder).Router.Links.Now);
+                Assert.False(await receipt.Completion.WaitAsync(TimeSpan.FromSeconds(5)));
+            }
+            Assert.Equal(sentAt, receipt.SentAt);
+        }
+        finally { release.TrySetResult(); }
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public async Task AsyncTeardownWaitsForBearerWriteBeforeOwnerCanDispose(bool initiatorCloses)

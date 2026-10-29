@@ -495,7 +495,7 @@ public sealed partial class Link
             if (createReceipt && PacketReceipt.IsEligible(packet))
             {
                 var timeout = Math.Max((Rtt ?? 0) * TrafficTimeoutFactor, 0.005);
-                receipt = new PacketReceipt(packet.CalculateHash(), _mgr.UnixNow, timeout)
+                receipt = new PacketReceipt(packet.CalculateHash(), _mgr.UnixNow, timeout, awaitingSend: true)
                 { TimeoutOrigin = Now, SentPacket = packet, CoreCallbacks = context == LinkContext.Channel,
                     ChannelOwner = context == LinkContext.Channel ? this : null };
                 _receipts.Add(receipt);
@@ -504,7 +504,7 @@ public sealed partial class Link
             }
 
             beforeSend?.Invoke(receipt);
-            if (!_mgr.Enqueue(packet, AttachedInterface))
+            if (!_mgr.Enqueue(packet, AttachedInterface, receipt: receipt))
             {
                 if (receipt is not null)
                 {
@@ -1123,7 +1123,7 @@ public sealed partial class Link
                     {
                         _receipts.RemoveAt(i);
                     }
-                    else if (now > receipt.TimeoutOrigin + receipt.Timeout)
+                    else if (receipt.IsTimedOut(now))
                     {
                         _receipts.RemoveAt(i);
                         receipt.Conclude(PacketReceiptStatus.Failed, _mgr.UnixNow + Math.Max(0, now - Now));

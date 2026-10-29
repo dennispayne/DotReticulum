@@ -14,20 +14,23 @@ public enum PacketReceiptStatus : byte
 public sealed class PacketReceipt
 {
     private readonly TaskCompletionSource<bool> _done = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private bool _awaitingSend;
 
-    internal PacketReceipt(byte[] hash, double sentAt, double timeout)
+    internal PacketReceipt(byte[] hash, double sentAt, double timeout, bool awaitingSend = false)
     {
         Hash = hash;
         SentAt = sentAt;
         Timeout = timeout;
         TimeoutOrigin = sentAt;
+        _awaitingSend = awaitingSend;
     }
 
     public byte[] Hash { get; }
 
     public PacketReceiptStatus Status { get; internal set; } = PacketReceiptStatus.Sent;
 
-    public double SentAt { get; }
+    /// <summary>Unix send timestamp; queued link receipts are updated by the outbound write.</summary>
+    public double SentAt { get; private set; }
 
     public double Timeout { get; internal set; }
     internal double TimeoutOrigin { get; set; }
@@ -54,6 +57,30 @@ public sealed class PacketReceipt
     public Task<bool> Completion => _done.Task;
 
     internal void Complete(bool delivered) => _done.TrySetResult(delivered);
+
+    internal void MarkTransmitting(double unixNow)
+    {
+        lock (_done)
+        {
+            if (_awaitingSend && Status == PacketReceiptStatus.Sent) SentAt = unixNow;
+        }
+    }
+
+    internal void StartProofDeadline(double unixNow, double now)
+    {
+        lock (_done)
+        {
+            if (!_awaitingSend || Status != PacketReceiptStatus.Sent) return;
+            SentAt = unixNow;
+            TimeoutOrigin = now;
+            _awaitingSend = false;
+        }
+    }
+
+    internal bool IsTimedOut(double now)
+    {
+        lock (_done) return !_awaitingSend && now > TimeoutOrigin + Timeout;
+    }
 
     internal bool Conclude(PacketReceiptStatus status, double now, Packet? proof = null)
     {

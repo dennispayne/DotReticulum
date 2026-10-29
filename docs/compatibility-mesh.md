@@ -136,6 +136,18 @@ registers late, then requires actual DELIVERED/proved receipts and exact peer
 bytes in both directions. This is a thin observation-race regression, not a
 reference-side timer change or a new compatibility capability.
 
+Link DATA receipt deadlines start after the bounded outbound pump's bearer
+write attempt returns, not while the packet waits behind earlier writes or
+inside the write. This follows the pinned Link branch's receipt creation after
+transmission (`Transport.py:1456-1458,1599-1602`). The native receipt is already
+registered to authenticate a proof arriving during asynchronous I/O; its
+provisional send-start timestamp excludes queue wait too. This preserves the
+reference RTT factor, five-millisecond minimum
+and strict expiry boundary. Deterministic queued-write cases exercise both
+roles, actual send timestamps and subsequent validated proofs; ordinary
+post-send expiry remains separately tested. This corrects local scheduling,
+not the remote watchdog policy or the impaired-network acceptance assertions.
+
 ## Fresh sessions through a surviving alternate route
 
 `SurvivingDotNetAlternateRouteCarriesFreshBidirectionalLinksAfterPinnedPrimaryRouterCrash`

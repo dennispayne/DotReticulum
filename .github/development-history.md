@@ -4,6 +4,79 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Start link receipt clocks at outbound send, not local enqueue
+
+Completed repeated-mesh run **40947802917** at **b5d01f2** retained all three
+iterations rather than hiding a first failure: Linux and macOS each passed
+**21/21** extended cases; Windows passed **20/21**. Its first watchdog case
+failed the initial managed DATA receipt at
+`Parity8CompatibilityLiveTests.cs:398`, before any router crash. Windows
+iterations two and three passed unchanged. The separate full interop run
+**40947799428** passed all three Test jobs, including their extended cases,
+but failed overall on the separately corrected native Windows T057 shutdown.
+Neither run is a complete green gate; both scheduled workflow checklist items
+remain unchecked.
+
+Two deterministic regressions then failed in both endpoint roles: hold an
+earlier bearer write, enqueue DATA behind it, advance beyond the unchanged
+proof deadline, and tick the link. The unsent packet was marked FAILED. Pinned
+`Transport.py:1456-1458,1599-1602` creates its Link receipt after the synchronous
+interface transmission, not in an additional local work queue.
+The native bounded pump records send-start and arms the proof deadline when
+its write attempt returns. Receipts stay registered during I/O so an actual
+early proof can still authenticate; they do not expire behind prior writes or
+inside their own write. Actual send
+timestamp/RTT metadata exclude the queue wait. The original RTT multiplier,
+five-millisecond minimum, strict expiry boundary, global receipt limit,
+Channel timeout overrides and failure/cancellation settlement remain.
+No sleeps, timer increases, reference patches or synthetic proofs were added.
+The existing virtual-clock expiry test now observes the actual outbound
+packet before advancing its post-send clock.
+
+The four final regressions use an explicit clock in both endpoint roles.
+Queued packets stay pending through a one-second queue delay, then require a
+genuine validated proof and exact send timestamp/zero virtual elapsed RTT.
+Packets inside their own blocked write cannot expire either; after release,
+unproved packets must fail at the unchanged strict deadline. These establish the
+queue-clock bug independently; missing historical send timestamps prevent
+claiming that it explains every earlier loaded-runner receipt failure.
+The live watchdog case now reports receipt timing/status, queue depth and
+actual peer DATA event count if its healthy precondition fails again.
+
+Validation:
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: zero warnings/errors.
+- `DOTRETICULUM_LIVE=0 dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --settings tests\coverage.runsettings --collect:"XPlat Code Coverage" --logger trx --results-directory TestResults\receipt-write-boundary-coverage-final -- xUnit.MaxParallelThreads=1`:
+  **1863 passed / 89 explicit skips / zero failures**.
+  `pwsh -NoProfile -File tests\Get-CoverageSummary.ps1 TestResults\receipt-write-boundary-coverage-final`
+  merged eight reports, counting production points once:
+
+| Project | Lines | Branches |
+|---|---:|---:|
+| Applications | 10653/13888 (76.71%) | 9190/14466 (63.53%) |
+| Core | 1840/1899 (96.89%) | 1153/1268 (90.93%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 4675/5689 (82.18%) | 2541/3477 (73.08%) |
+| Transport | 5056/5546 (91.16%) | 3209/4052 (79.20%) |
+| **Overall** | **22334/27138 (82.30%)** | **16140/23313 (69.23%)** |
+
+- `. tests\Compatibility\Support\Preparation.ps1; Publish-CompatibilityApplication -Directory (Join-Path $PWD 'artifacts\native-receipt-write-boundary')`:
+  strict Windows x64 NativeAOT/help passed; SHA-256
+  **93c9523d8aa45c2dba2d23810e5287a909247debaf9ab3d219cb14b2684dcc81**.
+- With that actual native executable and verified live reference,
+  `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~DataReceiptExcludesLocalQueueAndBearerWriteFromItsProofDeadline|FullyQualifiedName~LiveLinkTests|FullyQualifiedName~ManagedAndPinnedEndpointsAutomaticallyTimeOutAfterRouterCrashAndRecoverWithFreshLinks|FullyQualifiedName~NativeResourceTests|FullyQualifiedName~RnshNativeTests' --logger trx --results-directory TestResults\receipt-write-boundary-live-native-final -- xUnit.MaxParallelThreads=1`:
+  **18 passed / zero skips**. All four final clock cases and verified pinned
+  Python link roles ran. The unchanged default-watchdog case ran both
+  initiator roles, actual router crashes/TIMEOUT and fresh proved sessions.
+  Native terminal initiation and exact encrypted/compressed **2,200,017-byte**
+  resource receive/return also ran. Canonical shared **T057** separately passed
+  with this native binary and actual Python peer, including exact bytes/EOF
+  and real peer shutdown (`TestResults\receipt-write-boundary-native-channel`).
+
+Coverage remains managed ordinary-suite evidence; the separate live/native
+flows are not included. Hosted repeated acceptance of this queue-clock
+correction remains pending.
+
 ### Awaiting the actual link-close write before rnsh owner disposal
 
 Exact-source full interop **40947799428**, source **b5d01f2**, failed Windows
@@ -71,7 +144,12 @@ violation at its exclusive-write assertion. Its isolated instrumented test
 passed, then the fresh complete instrumented gate above passed unchanged.
 No speculative resolver change, retry loop or weakened assertion was added.
 `pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`: **65 files /
-zero findings**. Fresh-source hosted close-write acceptance remains pending.
+zero findings**. Fresh-source **T057** passed on all three native platforms in
+**40953387442** at **b9777e1**. Its upstream baseline failed the external
+**T001** prerequisite: the actual upstream Git helper
+resolved a path but could not establish its hosted retrieval link. Dependent
+upstream cases were not promoted to passing; this is not evidence of a native
+Channel or management-response failure.
 
 ### Shared small-packet and resource-sized management responses
 

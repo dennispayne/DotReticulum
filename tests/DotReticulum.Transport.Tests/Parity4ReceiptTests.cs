@@ -203,6 +203,7 @@ public class Parity4ReceiptTests
         node.Router.Log = _ => throw new InvalidOperationException("diagnostic observer");
         var receipt = link.Send(new byte[] { 1 });
         Assert.NotNull(receipt);
+        await LinkTests.Until(() => node.Interface.Sent.Any(packet => packet.CalculateHash().SequenceEqual(receipt.Hash)));
         receipt.Timeout = 3;
         receipt.TimedOut = _ => throw new InvalidOperationException("timeout observer");
         clock.Advance(2);
