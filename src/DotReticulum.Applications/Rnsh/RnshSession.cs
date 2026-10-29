@@ -251,12 +251,12 @@ public sealed class RnshSession : IAsyncDisposable
         catch (System.Threading.Channels.ChannelClosedException) { }
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _channel.RemoveMessageHandler(_handler);
         _closed.Cancel();
-        _link.Teardown();
-        return ValueTask.CompletedTask;
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await _link.TeardownAsync(deadline.Token).ConfigureAwait(false);
     }
 }
 

@@ -43,11 +43,11 @@ function Invoke-CompatibilityChannelStreams {
         $running = $candidate
         $candidate = $null
         $result = Complete-TestProcess $running 100
+        [IO.File]::WriteAllText((Join-Path $Directory 'candidate-received.txt'), $result.Output, [Text.UTF8Encoding]::new($false))
+        $result.Error | Set-Content -LiteralPath (Join-Path $Directory 'candidate-stderr.txt') -Encoding utf8
         if (!$peer.WaitForExit(15000)) { throw "Channel peer did not shut down: $($result.Error)" }
         $events = @($outputTask.GetAwaiter().GetResult() -split '\r?\n' |
             Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json })
-        [IO.File]::WriteAllText((Join-Path $Directory 'candidate-received.txt'), $result.Output, [Text.UTF8Encoding]::new($false))
-        $result.Error | Set-Content -LiteralPath (Join-Path $Directory 'candidate-stderr.txt') -Encoding utf8
         [pscustomobject]@{
             Candidate = $result
             ReceivedFile = $received

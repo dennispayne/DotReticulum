@@ -4,6 +4,75 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Awaiting the actual link-close write before rnsh owner disposal
+
+Exact-source full interop **40947799428**, source **b5d01f2**, failed Windows
+shared **T057** because its upstream Channel application did not shut down after
+the native candidate exited. Actual retained peer observations show **87,415
+input bytes / 23 messages / EOF**, and **207 output messages / EOF**. The helper
+previously threw before retaining candidate stdout/stderr; those streams are
+now saved before checking peer shutdown. No stream, EOF or peer-close assertion
+was removed or relaxed, and the existing deadlines are unchanged.
+
+Source tracing found a real ownership race: synchronous `Link.Teardown`
+enqueues its close packet, while immediate `ReticulumNode` disposal cancels
+the outbound pump and discards queued packets. Pinned upstream
+`Link.teardown`/`Packet.send` performs the outbound send synchronously.
+The new cancellation-aware **Link.TeardownAsync** closes an open link and
+settles only after its selected bearer write finishes. Concurrent asynchronous
+callers share completion. The existing void API is retained. The bounded
+256-entry queue now carries optional local-write completion, explicitly
+settled on write error, manager shutdown or rejection; this is not a protocol
+receipt, a peer acknowledgement, new retry policy or wire-format change.
+`RnshSession.DisposeAsync` awaits it within five seconds before its caller
+disposes the node. It does not delay arbitrarily or globally drain/rewrite
+manager shutdown. Historical missing candidate diagnostics prevent proving
+that every earlier peer-close failure had this exact timing.
+
+Five focused cases gate the actual bearer write, require both asynchronous
+callers to remain pending, release it and immediately dispose the owner before
+requiring the remote closure, in both endpoint roles. They also cover caller
+cancellation, manager shutdown and actual write failure without success-shaped
+completion.
+
+Validation:
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: zero warnings/errors.
+- `DOTRETICULUM_LIVE=1 DOTRETICULUM_NATIVE_EXE=artifacts\native-link-close-write-atomic\DotReticulum.Applications.exe dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~RnshTests|FullyQualifiedName~RnshLiveTests|FullyQualifiedName~LinkTests|FullyQualifiedName~LinkVectorTests|FullyQualifiedName~NativeResourceTests|FullyQualifiedName~RnshNativeTests' --logger trx --results-directory TestResults\rnsh-close-write-atomic-live-native-final -- xUnit.MaxParallelThreads=1`:
+  **65 passed / one explicit POSIX-reference skip**; actual verified pinned Python
+  link/rnsh peers, five strengthened close-ownership cases, native terminal
+  initiation and native encrypted/compressed **2,200,017-byte** resource
+  receive/return with exact persisted bytes.
+- `. tests\Compatibility\Support\Preparation.ps1; Publish-CompatibilityApplication -Directory (Join-Path $PWD 'artifacts\native-link-close-write-atomic')`:
+  strict Windows x64 NativeAOT publication and help passed; SHA-256
+  **5dc035e2a3d148903429a748d899b79df8969f6e398657632389005caf34d34d**.
+  **T057** then passed **ten separate native/Python executions / zero skips**
+  through the canonical Pester discovery/configuration, each preserving exact
+  stream bytes, EOF and actual peer shutdown
+  (`TestResults\channel-close-write-atomic-native-repeat\iteration-1` through `iteration-10`).
+- `DOTRETICULUM_LIVE=0 dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --settings tests\coverage.runsettings --collect:"XPlat Code Coverage" --logger trx --results-directory TestResults\rnsh-close-write-atomic-coverage-final -- xUnit.MaxParallelThreads=1`:
+  **1859 passed / 89 explicit skips / zero failures**.
+  `pwsh -NoProfile -File tests\Get-CoverageSummary.ps1 TestResults\rnsh-close-write-atomic-coverage-final`
+  merged nine reports by production source point, not average percentages:
+
+| Project | Lines | Branches |
+|---|---:|---:|
+| Applications | 10651/13888 (76.69%) | 9188/14466 (63.51%) |
+| Core | 1840/1899 (96.89%) | 1153/1268 (90.93%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 4673/5689 (82.14%) | 2538/3477 (72.99%) |
+| Transport | 5045/5530 (91.23%) | 3195/4038 (79.12%) |
+| **Overall** | **22319/27122 (82.29%)** | **16121/23299 (69.19%)** |
+
+Coverage is managed ordinary-suite evidence with live opt-ins disabled; it does
+not instrument the separately exercised native executable. The first coverage
+attempt retained one unrelated Windows resolver-test executable-image sharing
+violation at its exclusive-write assertion. Its isolated instrumented test
+passed, then the fresh complete instrumented gate above passed unchanged.
+No speculative resolver change, retry loop or weakened assertion was added.
+`pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`: **65 files /
+zero findings**. Fresh-source hosted close-write acceptance remains pending.
+
 ### Shared small-packet and resource-sized management responses
 
 Added **T058 / C008**, using the same actual `rnstatus` invocation, inputs and

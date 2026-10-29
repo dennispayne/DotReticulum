@@ -31,6 +31,7 @@ public sealed partial class Link
     private readonly LinkManager _mgr;
     private readonly object _gate = new();
     private readonly CancellationTokenSource _closedCancellation = new();
+    private Task? _teardownWrite;
     private readonly List<PacketReceipt> _receipts = [];
     private readonly List<RequestReceipt> _pendingRequests = [];
     private Action<byte[], Packet>? _packetReceiver;
@@ -939,40 +940,56 @@ public sealed partial class Link
     }
 
     /// <summary>Upstream <c>Link.teardown</c>: notifies the peer and closes the link.</summary>
-    public void Teardown()
+    public void Teardown() => TeardownCore(null);
+
+    /// <summary>Closes an open link and waits for its close packet's bearer write, not a remote acknowledgement.</summary>
+    public Task TeardownAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        return (TeardownCore(sent) ?? Task.CompletedTask).WaitAsync(cancellationToken);
+    }
+
+    private Task? TeardownCore(TaskCompletionSource? sent)
     {
         List<Action> after = [];
+        var queued = false;
         lock (_gate)
         {
+            if (sent is not null && _teardownWrite is not null) return _teardownWrite;
             if (Status is LinkStatus.Closed)
             {
-                return;
+                return null;
             }
+            if (sent is not null) _teardownWrite = sent.Task;
 
             if (Status != LinkStatus.Pending)
             {
-                SendTeardownPacket();
+                queued = SendTeardownPacket(sent);
             }
 
             CloseLocked(IsInitiator ? LinkTeardownReason.InitiatorClosed : LinkTeardownReason.DestinationClosed, after);
         }
+        if (!queued) sent?.TrySetResult();
 
         foreach (var a in after)
         {
             _mgr.Dispatch(a);
         }
+        return sent?.Task;
     }
 
-    private void SendTeardownPacket()
+    private bool SendTeardownPacket(TaskCompletionSource? sent = null)
     {
         if (_token is null)
         {
-            return;
+            return false;
         }
 
         var packet = Packet.Create(PacketType.Data, DestinationType.Link, LinkId, Encrypt(LinkId), LinkContext.LinkClose);
-        _mgr.Enqueue(packet, AttachedInterface);
+        var queued = _mgr.Enqueue(packet, AttachedInterface, sent);
         HadOutbound();
+        return queued;
     }
 
     internal void FailEstablishment()

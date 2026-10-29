@@ -21,7 +21,8 @@ public sealed class LinkManager : IAsyncDisposable
     private readonly object _gate = new();
     private readonly Dictionary<string, Link> _pending = [];
     private readonly Dictionary<string, Link> _active = [];
-    private readonly Channel<(Packet Packet, IPacketInterface? Interface)> _outbound = System.Threading.Channels.Channel.CreateBounded<(Packet, IPacketInterface?)>(WorkQueueCapacity);
+    private readonly Channel<(Packet Packet, IPacketInterface? Interface, TaskCompletionSource? Sent)> _outbound =
+        System.Threading.Channels.Channel.CreateBounded<(Packet, IPacketInterface?, TaskCompletionSource?)>(WorkQueueCapacity);
     private readonly Channel<Func<ValueTask>> _callbacks = System.Threading.Channels.Channel.CreateBounded<Func<ValueTask>>(WorkQueueCapacity);
     private readonly Channel<Func<ValueTask>> _requests = System.Threading.Channels.Channel.CreateBounded<Func<ValueTask>>(WorkQueueCapacity);
     private readonly SemaphoreSlim _observerSlots = new(ObserverConcurrency, ObserverConcurrency);
@@ -97,7 +98,7 @@ public sealed class LinkManager : IAsyncDisposable
             link.Closed = closed;
             link.RequestTime = Now;
             _pending[link.LinkIdHex] = link;
-            if (!_outbound.Writer.TryWrite((link.RequestPacket!, null)))
+            if (!_outbound.Writer.TryWrite((link.RequestPacket!, null, null)))
             {
                 Report("Link outbound queue is full; link establishment rejected.");
                 link.FailEstablishment();
@@ -113,18 +114,20 @@ public sealed class LinkManager : IAsyncDisposable
         lock (_gate) return _active.GetValueOrDefault(key) ?? _pending.GetValueOrDefault(key);
     }
 
-    internal bool Enqueue(Packet packet, IPacketInterface? iface)
+    internal bool Enqueue(Packet packet, IPacketInterface? iface, TaskCompletionSource? sent = null)
     {
         lock (_gate)
         {
             if (_stopping || _disposed || _suspended)
             {
                 Report("Link packet rejected because the link manager is stopped.");
+                sent?.TrySetException(new IOException("The link manager is stopped."));
                 return false;
             }
             EnsureStarted();
-            if (_outbound.Writer.TryWrite((packet, iface))) return true;
+            if (_outbound.Writer.TryWrite((packet, iface, sent))) return true;
             Report("Link outbound queue is full; packet rejected.");
+            sent?.TrySetException(new IOException("The link outbound queue is full."));
             return false;
         }
     }
@@ -328,7 +331,7 @@ public sealed class LinkManager : IAsyncDisposable
         finally
         {
             foreach (var link in Links) link.Teardown();
-            while (_outbound.Reader.TryRead(out _)) { }
+            while (_outbound.Reader.TryRead(out var pending)) pending.Sent?.TrySetCanceled();
             while (_requests.Reader.TryRead(out _)) { }
             Task[] cleanup;
             lock (_gate) cleanup = [.. _requiredCleanup];
@@ -434,7 +437,7 @@ public sealed class LinkManager : IAsyncDisposable
     {
         try
         {
-            await foreach (var (packet, iface) in _outbound.Reader.ReadAllAsync(ct).ConfigureAwait(false))
+            await foreach (var (packet, iface, sent) in _outbound.Reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
                 try
                 {
@@ -447,9 +450,20 @@ public sealed class LinkManager : IAsyncDisposable
                     {
                         await _manager.SendToAsync(packet, iface, ct).ConfigureAwait(false);
                     }
+                    else if (sent is not null)
+                    {
+                        throw new IOException("The link packet's interface is not outgoing.");
+                    }
+                    sent?.TrySetResult();
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
+                    sent?.TrySetCanceled(ct);
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    sent?.TrySetException(ex);
                     if (packet.PacketType == PacketType.LinkRequest)
                     {
                         var link = Find(Link.LinkIdFromRequest(packet));
@@ -458,8 +472,7 @@ public sealed class LinkManager : IAsyncDisposable
                             link.FailEstablishment();
                         }
                     }
-                    try { Log?.Invoke($"Could not send link packet: {ex.Message}"); }
-                    catch { }
+                    Report($"Could not send link packet: {ex.Message}");
                 }
             }
         }

@@ -15,6 +15,13 @@ Starting a listener explicitly authorizes child process execution. Access is den
 
 Protocol stream IDs 0, 1, and 2 carry stdin, stdout, and stderr. EOF flags delimit input; window messages carry rows, columns, and pixel dimensions. Output is read incrementally, channel queues are bounded, and the listener accepts at most 16 concurrent sessions. Child ownership and cancellation are explicit. Windows children use a kill-on-close Job; Linux and macOS PTY children use a new session/process group. Platform process-tree termination remains best effort for descendants that detach or escape OS ownership.
 
+On normal initiator completion, session disposal awaits the open link's close
+packet write before disposing its owning node. `Link.TeardownAsync` provides
+this local bearer-write completion; it is not a remote acknowledgement.
+Cancellation, manager shutdown and write failures settle the wait explicitly.
+The session bounds it to five seconds rather than sleeping or assuming that
+enqueueing a packet has sent it.
+
 The native Windows terminal backend uses ConPTY; the native Linux and macOS terminal backends use `posix_spawn`, a PTY, process groups, and window ioctls. The initiator saves and restores terminal state, enters raw mode, polls window dimensions and rate-limits subsequent updates using the reference's `RTT * 25` interval, and supports `~~`, `~.`, `~L`, and `~?` escapes. The first changed size is compared against the command's actual initial dimensions, including changes during the handshake. Redirected pipe input bypasses escape processing to preserve arbitrary bytes. Windows ConPTY merges endpoints attached to its terminal surface; independently redirected endpoints remain lossless, and explicit inherited handles support mixed modes. POSIX termios behavior is not reproduced by ConPTY. All eight stdin/stdout/stderr pipe-versus-terminal combinations are exercised on Windows and Linux, including stream separation or terminal merging.
 
 ## Platform notes and differences from upstream

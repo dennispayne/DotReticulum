@@ -13,6 +13,8 @@ public class LinkTests
         private readonly Channel<byte[]> _inbox = System.Threading.Channels.Channel.CreateUnbounded<byte[]>();
         public Loopback? Peer { get; set; }
         public Task? SendBlock { get; set; }
+        public TaskCompletionSource? SendStarted { get; set; }
+        public Exception? SendFailure { get; set; }
         public ValueTask StartAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
         public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReceiveAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
@@ -22,7 +24,9 @@ public class LinkTests
 
         public async ValueTask SendAsync(ReadOnlyMemory<byte> packet, CancellationToken cancellationToken)
         {
+            SendStarted?.TrySetResult();
             if (SendBlock is { } blocked) await blocked.WaitAsync(cancellationToken);
+            if (SendFailure is { } failure) throw failure;
             Peer?._inbox.Writer.TryWrite(packet.ToArray());
         }
 
@@ -196,6 +200,84 @@ public class LinkTests
         await Until(() => link.Status == LinkStatus.Closed && remote.Status == LinkStatus.Closed);
         Assert.Equal(initiatorCloses ? LinkTeardownReason.InitiatorClosed : LinkTeardownReason.DestinationClosed,
             initiatorCloses ? remote.TeardownReason : link.TeardownReason);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AsyncTeardownWaitsForBearerWriteBeforeOwnerCanDispose(bool initiatorCloses)
+    {
+        await using var topo = await BuildAsync(false);
+        var accepted = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+        topo.Destination.LinkEstablished = link => accepted.TrySetResult(link);
+        var established = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var initiator = topo.Initiator.Router.Links.Connect(topo.Destination.Identity,
+            topo.Destination.Destination.Hash, link => established.TrySetResult(link));
+        await Within(established.Task);
+        var responder = await Within(accepted.Task);
+        var closing = initiatorCloses ? initiator : responder;
+        var remote = initiatorCloses ? responder : initiator;
+        var bearer = Assert.IsType<Loopback>(closing.AttachedInterface);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        bearer.SendBlock = release.Task;
+        bearer.SendStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            var stopped = closing.TeardownAsync();
+            var repeated = closing.TeardownAsync();
+            await bearer.SendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(stopped.IsCompleted);
+            Assert.False(repeated.IsCompleted);
+            Assert.Equal(LinkStatus.Active, remote.Status);
+            release.TrySetResult();
+            await Task.WhenAll(stopped, repeated).WaitAsync(TimeSpan.FromSeconds(5));
+            await (initiatorCloses ? topo.Initiator : topo.Responder).DisposeAsync();
+            await Until(() => remote.Status == LinkStatus.Closed);
+        }
+        finally { release.TrySetResult(); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AsyncTeardownSettlesOnCancellationOrManagerShutdown(bool stopManager)
+    {
+        await using var topo = await BuildAsync(false);
+        var established = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var link = topo.Initiator.Router.Links.Connect(topo.Destination.Identity,
+            topo.Destination.Destination.Hash, accepted => established.TrySetResult(accepted));
+        await Within(established.Task);
+        var bearer = Assert.IsType<Loopback>(link.AttachedInterface);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        bearer.SendBlock = release.Task;
+        bearer.SendStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancellation = new CancellationTokenSource();
+        try
+        {
+            var stopped = link.TeardownAsync(cancellation.Token);
+            await bearer.SendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            if (stopManager) await topo.Initiator.Router.Links.StopAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            else await cancellation.CancelAsync();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => stopped.WaitAsync(TimeSpan.FromSeconds(5)));
+        }
+        finally { release.TrySetResult(); }
+    }
+
+    [Fact]
+    public async Task AsyncTeardownSurfacesBearerWriteFailure()
+    {
+        await using var topo = await BuildAsync(false);
+        var established = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var link = topo.Initiator.Router.Links.Connect(topo.Destination.Identity,
+            topo.Destination.Destination.Hash, accepted => established.TrySetResult(accepted));
+        await Within(established.Task);
+        var bearer = Assert.IsType<Loopback>(link.AttachedInterface);
+        bearer.SendFailure = new IOException("Owned close write failed.");
+        var failure = await Assert.ThrowsAsync<IOException>(
+            () => link.TeardownAsync().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal("Owned close write failed.", failure.Message);
+        Assert.Equal(LinkStatus.Closed, link.Status);
     }
 
     [Fact]
