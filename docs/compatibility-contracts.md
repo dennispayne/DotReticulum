@@ -89,6 +89,20 @@ runtime effect is implemented.
 | Channel envelope/order/window/retry/receipts/exhaustion; `Channel.py:113–148,175–245,303–608` | **Implemented** bounded V/U/L coverage and rnsh N: `ChannelResilienceTests`, `Parity5ChannelTests`, `Parity5ChannelRetryCryptoTests`, mixed transfers/rnsh. Wrap/reorder/RTT boundaries have independent reference evidence, not live 65536-message wrap-under-loss evidence. Retries preserve envelope/sequence but use fresh encryption/hash/receipt. Prolonged impaired soak is **unverified**. |
 | Buffer stream IDs/compression/EOF/flow/closure/callbacks; `Buffer.py:44–379` | **Implemented native equivalent** V/U/L coverage and rnsh N: `Parity5ChannelBufferTests`, mixed transfer/rnsh. Bounded slow-reader failure, outstanding-read settlement and concurrent close/write covered. Native blocking async reads, internal-handler precedence, bounded callbacks and 15-second close deadline intentionally differ from Python's nonblocking stream API and RTT-based close. |
 
+Shared advertised-claim case **T057 / C009** additionally drives the actual
+candidate **rnsh CLI** against a pinned upstream Channel application using
+`rnsh/protocol.py:100-107`'s `Buffer.StreamDataMessage` subclass. Both directions
+persist and compare distinct exact ordered stream bytes and observe EOF across
+multiple messages. The application does **not** execute a subprocess: this is
+Channel/stream-message acceptance, not remote-execution acceptance or a replacement
+upstream listener. It does not cover the public RawChannelReader/Writer APIs,
+loss/reordering, sustained soak or arbitrary binary stdout. Both candidates use
+precreated owned shell-state directories; this avoids the upstream CLI's ordinary
+new-directory notice contaminating its stdout before logging initialization,
+without filtering output or patching upstream. Local Windows NativeAOT and actual
+Linux upstream-to-upstream executions passed; new cross-platform hosted results
+remain pending.
+
 The linked [endpoints](endpoints.md), [transport controls](transport-controls.md),
 [runtime operations](runtime-operations.md), [runtime state](runtime-state.md),
 [resources](resources.md) and [Channel/Buffer](channel-buffer.md) specify local

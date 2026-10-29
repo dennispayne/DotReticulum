@@ -4,6 +4,65 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Shared executable Channel stream acceptance
+
+Added **T057 / C009** without changing its verbatim upstream claim or reference
+pin. The exact same Pester scenario drives actual candidate **rnsh** and an
+actual pinned upstream **Channel** peer, using the existing upstream
+`rnsh/protocol.py:100-107` subclass of `Buffer.StreamDataMessage`
+(`Buffer.py:44-110`). The peer uses reference message registration, Channel
+readiness/sending, unpacking and stream EOF; it does not reimplement envelopes,
+compression, retries or encryption. It records received bytes and callback
+observations; PowerShell owns setup, bounded processes and assertions.
+The peer executes **no commands** and does not substitute a subprocess backend
+or claim actual rnsh listener/process acceptance.
+
+Each direction sends a distinct **87,415-byte ASCII transcript**, including
+fresh random base64 content and ordered endpoint markers. Acceptance compares
+both persisted transcripts exactly, requires multiple actual Channel messages,
+observes stdin EOF and actual command-message receipt, requires both processes
+to exit successfully and waits for actual link closure. This is bounded
+Channel/Buffer message-codec acceptance, **not** general Buffer reader/writer,
+arbitrary binary stdout, impairment/recovery or sustained-soak acceptance.
+The actual CLI wrapper lazily imports the upstream rnsh entry point only when
+selected, preserving Windows support for the other reference utilities.
+Windows Upstream mode explicitly skips this POSIX-only CLI; hosted Upstream
+continues to execute on Linux. Native Windows does not require WSL or POSIX.
+
+Local acceptance with unchanged import-verified RNS
+**a29bfb51c468945c96a1ee22cae0114e993e2391**:
+
+- Actual published Windows candidate
+  `artifacts\native-hosted-corrections\DotReticulum.Applications.exe`
+  (**f8816a7d417d08a9096732615f026d7a6f29dd0338a5c1a2f104eca7305f8907**):
+  focused Pester **1/1 passed**, then the complete
+  `tests\Compatibility\Invoke-CompatibilityTests.ps1 -Application artifacts\native-hosted-corrections\DotReticulum.Applications.exe -Python <verified-Windows-python> -Upstream <verified-Windows-checkout> -Implementation DotReticulum -OutputDirectory <fresh-owned-directory>`:
+  **39 passed / 1 explicit hosted-retrieval skip / zero failed**, **86 seconds**.
+  Discovery now contains **40 distinct cases**; no added scenario switch or
+  duplicate catalog of test definitions.
+- Actual Linux upstream CLI and actual Linux upstream peer under WSL, with the
+  existing verified LF checkout/venv, the same test file/inputs/assertions:
+  **1/1 passed, zero skips**, **5 seconds**. PowerShell was absent in WSL,
+  so provisioned an owned portable official **7.6.9** archive after the explicit
+  missing-tool failure; SHA-256 verified against the publisher's downloaded
+  `hashes.sha256` (**1da6d6d6035d651f20e70ddee7c4c15ac6ab8b9fb40ee92240d91263f28a884b**).
+  Existing portable Pester **6.2.0** was reused; no global installation.
+  The first upstream execution exposed an asynchronous ordinary configuration
+  creation notice inside otherwise correct stdout. Both candidates now receive
+  precreated owned shell state, matching normal configured use. No filtering,
+  weakened byte comparison or upstream shim.
+- Resume baseline `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`
+  and `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet`:
+  **zero warnings/errors; 1,850 passed / 84 explicit skips**.
+  Production code is unchanged; the existing exercised native artifact is reused.
+- Final `tools\Invoke-PowerShellAnalysis.ps1`: **65 tracked files / zero findings**.
+  `tests\Invoke-PesterTests.ps1 -ToolingOnly`: **60 passed / 2 explicit
+  optional-reference skips / zero failures**. Final focused Windows native
+  execution with precreated state also passed **1/1**, no skips.
+
+New hosted Linux/macOS/Windows acceptance is pending. The separately running
+full interop **40911880526** tests earlier **0598977**, not this new case.
+
 ### Hosted residual failures: bounded impairment model and Darwin pipe status
 
 Completed full interop **40902040408**, source **68c7b39**, had all three Builds,

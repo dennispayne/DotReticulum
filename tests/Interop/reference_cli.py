@@ -6,7 +6,7 @@ from reference_environment import verify_reference
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--revision", required=True)
-parser.add_argument("--tool", choices=["rnid", "rnprobe", "rnstatus", "rnsd"], required=True)
+parser.add_argument("--tool", choices=["rnid", "rnprobe", "rnstatus", "rnsd", "rnsh"], required=True)
 parser.add_argument("arguments", nargs=argparse.REMAINDER)
 args = parser.parse_args()
 verify_reference(expected_revision=args.revision)
@@ -17,4 +17,7 @@ if arguments[:1] == ["--"]:
     arguments = arguments[1:]
 sys.argv = [args.tool, *arguments]
 tools = {"rnid": rnid.main, "rnprobe": rnprobe.main, "rnstatus": rnstatus.main, "rnsd": rnsd.main}
+if args.tool == "rnsh":
+    from RNS.Utilities.rnsh.rnsh import main
+    tools["rnsh"] = main
 tools[args.tool]()
