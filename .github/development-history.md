@@ -4,6 +4,32 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Conservative inactivity-reminder automation
+
+Added the roadmap's `stale.yml` as weekly Monday **05:30 UTC** reminders plus
+manual dispatch. It marks inactive unassigned issues/non-draft PRs after
+**90 days**, removes the label after activity and exempts assignments,
+milestones, `pinned`, `security` and `never-stale`. It **never auto-closes work
+or deletes branches**; manual runs default to preview-only. This avoids
+discarding unresolved parity reports merely because hardware/platform access
+has delayed them. CONTRIBUTING documents the policy.
+
+The job has no checkout or untrusted code execution, ten-minute timeout,
+30-operation budget, non-cancelling concurrency and only job-local
+issues/pull-requests write permission. `actions/stale` **v11.0.0** is pinned to
+verified release commit **4391f3da665fdf50b6810c1a66712fb9ba21aa93**.
+Its published input definitions were checked, including the `-1` no-close and
+debug-only behavior.
+
+Validation:
+`TestResults\workflow-tools\actionlint-1.7.12\actionlint.exe -color .github\workflows\stale.yml`
+passed with no findings. The missing local linter was provisioned from the
+Windows **actionlint v1.7.12** release; downloaded zip SHA-256
+**6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9**
+matched GitHub's release-asset digest. Tool/artifacts remain ignored.
+Hosted manual dry-run acceptance is pending; TODO remains unchecked until that
+execution succeeds.
+
 ### Actual Java I2P local-destination persisted-restart acceptance
 
 The actual Java **I2P 2.14.0** router, not a SAM simulator, now demonstrates

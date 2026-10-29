@@ -2,6 +2,14 @@
 
 DotReticulum is an experimental project written predominantly by LLM coding agents under human direction. Discuss substantial protocol or architecture changes in an issue first. Keep pull requests focused and follow the PR checklist and Code of Conduct.
 
+## Inactivity reminders
+
+The weekly inactivity workflow labels unassigned issues and non-draft pull
+requests after 90 days without activity. It never closes work or deletes
+branches. Assignments, milestones and the `pinned`, `security` or `never-stale`
+labels exempt work; a new comment removes `stale`. Manual dispatch defaults to
+a dry run so maintainers can preview reminders without modifying discussions.
+
 ## Development
 
 Install the .NET 10 SDK and use C# 13, nullable reference types, file-scoped namespaces, and the repository `.editorconfig`. Nullable diagnostics are errors. The solution file is `DotReticulum.slnx`.
