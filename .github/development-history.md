@@ -4,6 +4,71 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Actual receive-only RAK startup exposed and fixed an acknowledgement race
+
+The authorized Windows RAK4631/SX1262 (nRF52, firmware **1.86**) initially
+passed startup/live SF/CR changes/radio-off but failed its second serial open:
+the reported parameters were correct and **state=0** was observed before the
+final radio-on acknowledgement. `RNodeDevice` incorrectly completed configuration
+on the first snapshot containing every field, including an intermediate off
+state. Startup now clears detection-time echoes; both startup and live
+configuration wait for **state=1** within the existing response deadline.
+Missing acknowledgement still fails, and mismatched parameters are not accepted.
+Failure diagnostics now include reported radio settings (no secrets).
+
+Source contract: unchanged pin **a29bfb51c468945c96a1ee22cae0114e993e2391**,
+`RNS/Interfaces/RNodeInterface.py:418-487,643-647,667-695,1190-1208`.
+The reference validates the requested state after its serial settling interval;
+.NET instead observes its asynchronous acknowledgement with a bounded wait.
+No wire format changed and existing independently generated vectors still pass.
+A focused simulator regression emits intermediate off followed by delayed on
+for both startup and live reconfiguration; it does not simulate RF acceptance.
+
+`Parity6RNodeHardwareTests` is now Integration rather than Unit. Port-only opt-in
+still performs only identification; configuration needs the additional
+`DOTRETICULUM_RNODE_RECEIVE_ONLY=1` and explicit
+`DOTRETICULUM_RNODE_FREQUENCY=868100000`. With authorized port `COM8`:
+
+```powershell
+dotnet test tests\DotReticulum.Interfaces.Tests\DotReticulum.Interfaces.Tests.csproj -c Release --no-build --nologo -v normal --filter 'FullyQualifiedName~Parity6RNodeHardwareTests' --results-directory TestResults\rnode-radio-d10253636fa24ab396fae76fd4660277 --logger trx -- xUnit.MaxParallelThreads=1
+```
+
+**2 passed, zero failed/skipped**. Two serial sessions each verified device
+frequency/BW/power/SF/CR/on echoes, changed SF **8 -> 9** and CR **6 -> 7**,
+and awaited off acknowledgement before disposal/reopen. No packet send was
+requested; 0 dBm is not zero RF power. Native `rnodeconf --eeprom-backup`
+before/after confirmed all **200 bytes unchanged**; backups stay local.
+
+Full `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+**zero warnings/errors**.
+`dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --settings tests\coverage.runsettings --collect:'XPlat Code Coverage' --results-directory TestResults\coverage-rnode-radio-20261029`:
+**1,848 passed, 83 explicit skips**, live modes disabled.
+`pwsh -NoProfile -File tests\Get-CoverageSummary.ps1 TestResults\coverage-rnode-radio-20261029`
+merged five reports by production source point, without double counting:
+
+| Project | Lines | Branches |
+|---|---:|---:|
+| Applications | 76.78% | 63.69% |
+| Core | 96.89% | 90.93% |
+| Crypto | 94.83% | 94.00% |
+| Interfaces | 82.21% | 73.05% |
+| Transport | 91.36% | 79.49% |
+| **Overall** | **82.39%** | **69.38%** |
+
+`dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 -o artifacts\native-rnode-radio -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true --nologo -v quiet`
+passed under MSVC with `vswhere` on PATH, then native `--help` passed.
+An initial publish without discoverable `vswhere` failed explicitly; fixing
+the toolchain PATH resolved it, without source changes or warning suppression.
+The exact new binary ran two separate `rnsd --config <owned-dir> --interactive`
+processes against the real radio, with **share_instance=no, enable_transport=no,
+outgoing=no** and the same radio settings. Both reached interface/status commands,
+persisted actual runtime state and exited gracefully; post-native EEPROM
+also remained byte-identical. Owned logs/configuration/results are under
+`TestResults\rnode-radio-d10253636fa24ab396fae76fd4660277`.
+This is native hardware-control execution, **not Python RF interoperability**.
+Other frequencies, power settings, DATA/over-air delivery, unplug/replug,
+Multi, BLE and other hardware/platforms remain unverified.
+
 ### Scheduled opt-in live integration and repeated mixed meshes
 
 Implemented `interop-test.yml` (Tuesday **06:00 UTC**, or manual) and

@@ -139,6 +139,21 @@ public sealed class Parity6RNodeTests
     }
 
     [Fact]
+    public async Task StartupAndLiveReconfigurationWaitForRadioOnAfterIntermediateOffReport()
+    {
+        await using var simulator = new Parity6RNodeSimulator { ReportIntermediateRadioOff = true };
+        await using var node = new RNodePacketInterface(simulator.Host, Options());
+        await node.StartAsync(CancellationToken.None);
+        Assert.True(node.IsConnected);
+        var changed = Radio() with { SpreadingFactor = 8, CodingRate = 6 };
+        await node.ConfigureRadioAsync(changed);
+        var diagnostics = node.GetDiagnostics();
+        Assert.Equal(1, diagnostics["radio_state"]);
+        Assert.Equal(8, diagnostics["spreadingfactor"]);
+        Assert.Equal(6, diagnostics["codingrate"]);
+    }
+
+    [Fact]
     public async Task StartupUsesOracleConfigurationAndWorksWithoutObservers()
     {
         await using var simulator = new Parity6RNodeSimulator();

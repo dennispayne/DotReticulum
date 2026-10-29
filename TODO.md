@@ -13,10 +13,11 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] I2PInterface
   - [ ] Android-specific adapters or documented native platform equivalents (deferred by user)
   - [ ] Complete UDP/TCP/serial configuration and validate real serial/radio hardware
+  - [x] Authorized RAK4631 receive-only managed/native startup, live configuration echoes, radio-off control, serial reopen and unchanged EEPROM
   - [ ] Android USB/Bluetooth permission/adaptor contracts and on-device execution (deferred by user)
   - [x] Actual Java I2P local-destination bidirectional DATA before/after persisted bearer restart, independently for .NET and pinned upstream
   - [ ] I2P public-tunnel delivery after persisted bearer restart (still fails for both .NET and pinned upstream); separate-router overlay and published-native acceptance remain outstanding
-  - [ ] Authorized physical serial/TNC/RNode/Multi/Weave and Android USB/Bluetooth/RF acceptance (COM8 RNode USB/firmware identification verified; one radio only, RF acceptance explicitly retained as unverified; remaining devices/platform access/settings unavailable; see development history)
+  - [ ] Authorized physical serial/TNC/RNode/Multi/Weave and Android USB/Bluetooth/RF acceptance (one Windows RAK receive-only startup/reconfiguration/off/reopen verified; one radio only, RF acceptance explicitly retained as unverified; remaining devices/platform access/settings unavailable; see development history)
 - [ ] Parity 7 - Upstream utility coverage (software accepted; physical device acceptance outstanding)
   - [x] Authorized RAK4631 native rnodeconf USB-triggered DFU, same-version reflash, changed-port recovery and reversible EEPROM-setting persistence/restoration
   - [ ] Remaining physical rnodeconf device/platform and RF acceptance (one RAK4631 verified; one radio cannot establish RF interoperability)

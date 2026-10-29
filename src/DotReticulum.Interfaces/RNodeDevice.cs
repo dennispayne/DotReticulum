@@ -212,14 +212,16 @@ internal sealed class RNodeDevice
                         throw new ArgumentOutOfRangeException(nameof(radio.Options.Frequency), "Frequency is outside the detected radio family's range.");
                     radio.Statistic("radio_type", high ? "SX128X" : type is 0x10 or 0x11 ? "SX126X" : "SX127X");
                 }
+                var echo = session.Echoes[radio.VirtualPort];
+                lock (session.Gate) echo.Reset();
                 foreach (var frame in RNodeProtocol.Configuration(radio.Options, _multi ? radio.VirtualPort : null))
                     await WriteAsync(session, frame, cancellationToken).ConfigureAwait(false);
-                var echo = session.Echoes[radio.VirtualPort];
                 await ResponseAsync(session, echo.Received.Task, cancellationToken).ConfigureAwait(false);
                 if (Math.Abs(radio.Options.Frequency - echo.Frequency!.Value) > 100 ||
                     radio.Options.Bandwidth != echo.Bandwidth || radio.Options.TxPower != echo.Power ||
                     radio.Options.SpreadingFactor != echo.Sf || echo.State != 1)
-                    throw new IOException($"Radio {radio.VirtualPort} configuration echo does not match the requested parameters.");
+                    throw new IOException($"Radio {radio.VirtualPort} configuration echo does not match the requested parameters. " +
+                        $"Reported frequency={echo.Frequency}, bandwidth={echo.Bandwidth}, power={echo.Power}, SF={echo.Sf}, CR={echo.Cr}, state={echo.State}.");
             }
             return session;
         }
@@ -456,8 +458,9 @@ internal sealed class RNodeDevice
                 }
                 if ((command is 1 or 2 && p.Length == 4) || (command is 4 or 5 && p.Length == 1))
                     radio.UpdateBitrate(echo.Sf ?? 0, echo.Cr ?? 0, echo.Bandwidth ?? 0);
+                // Firmware can report the previous/off state before acknowledging radio startup.
                 if (echo.Frequency.HasValue && echo.Bandwidth.HasValue && echo.Power.HasValue &&
-                    echo.Sf.HasValue && echo.Cr.HasValue && echo.State.HasValue) echo.Received.TrySetResult();
+                    echo.Sf.HasValue && echo.Cr.HasValue && echo.State == 1) echo.Received.TrySetResult();
             }
         }
         if (session.DetectResponse && session.Major.HasValue && session.Platform.HasValue && session.Mcu.HasValue &&

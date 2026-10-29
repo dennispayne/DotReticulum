@@ -25,6 +25,7 @@ internal sealed class Parity6RNodeSimulator : IAsyncDisposable
     public bool DetectResponse { get; set; } = true;
     public bool WrongBandwidth { get; set; }
     public bool OmitCodingRate { get; set; }
+    public bool ReportIntermediateRadioOff { get; set; }
     public bool ReplyDisplays { get; set; } = true;
     public bool HostDisposed { get; private set; }
     public Exception? PumpFailure { get; private set; }
@@ -92,6 +93,12 @@ internal sealed class Parity6RNodeSimulator : IAsyncDisposable
                         case 0: await _transmissions.Writer.WriteAsync((_selected, frame.Payload), _stop.Token); break;
                         case >= 1 and <= 6:
                             if (frame.Command == 5 && OmitCodingRate) break;
+                            if (ReportIntermediateRadioOff)
+                            {
+                                if (frame.Command == 1) await ControlAsync(6, [0], _selected);
+                                if (frame.Command == 6 && frame.Payload[0] == 1)
+                                    await Task.Delay(100, _stop.Token);
+                            }
                             await ControlAsync(frame.Command, WrongBandwidth && frame.Command == 2
                                 ? [0, 0, 0, 1] : frame.Payload, _selected);
                             break;

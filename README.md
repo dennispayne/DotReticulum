@@ -107,7 +107,7 @@ Windows rncp peer cases disclose a file-retention workaround in
 | Announces, ratchets, paths, routing, `rnsd` | Live Python and .NET transports both ways, including IFAC, a rate-limited latent link and reconnects |
 | Runtime configuration, shared instances, management, discovery | Both roles tested against Python; persistence and restart covered |
 | Links, requests, resources, Channel, Buffer | Live both ways with multi-megabyte payloads, loss, retries and teardown recovery |
-| Auto, Backbone, Pipe, KISS, RNode, Weave, I2P | Software/process tests and live Python Auto/Backbone; Java I2P local-destination persisted restart exchanges DATA for .NET and upstream. Public-tunnel I2P restart still fails; no over-the-air radio acceptance |
+| Auto, Backbone, Pipe, KISS, RNode, Weave, I2P | Software/process tests and live Python Auto/Backbone; one Windows RAK4631 passed managed/native receive-only startup and reopen, live configuration and radio-off control. Java I2P local-destination persisted restart exchanges DATA for .NET and upstream; public-tunnel restart still fails. No over-the-air radio acceptance |
 | `rncp`, `rnx` | Live both ways |
 | `rngit`, `git-remote-rns`, `rngcs` | Clone, fetch and push against the pinned Python server; hosting, releases, work documents, signing; verified fetch of the hosted upstream |
 | `rnid`, `rnstatus`, `rnpath`, `rnprobe`, `rnsh`, `rnodeconf` | Windows and Linux native-process tests against Python; one Windows RAK4631 passed native USB DFU/reflash and reversible EEPROM persistence/restoration; no RF acceptance |

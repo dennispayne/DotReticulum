@@ -11,9 +11,67 @@ public sealed class RNodeHardwareFactAttribute : FactAttribute
     }
 }
 
-[Trait("Category", "Unit")]
+public sealed class RNodeReceiveHardwareFactAttribute : FactAttribute
+{
+    public RNodeReceiveHardwareFactAttribute()
+    {
+        if (Environment.GetEnvironmentVariable("DOTRETICULUM_RNODE_RECEIVE_ONLY") != "1" ||
+            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOTRETICULUM_RNODE_PORT")) ||
+            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOTRETICULUM_RNODE_FREQUENCY")))
+            Skip = "Receive-only radio startup requires explicit DOTRETICULUM_RNODE_RECEIVE_ONLY=1, authorized PORT and FREQUENCY.";
+    }
+}
+
+[Trait("Category", "Integration")]
 public sealed class Parity6RNodeHardwareTests(ITestOutputHelper output)
 {
+    [RNodeReceiveHardwareFact]
+    public async Task AuthorizedReceiveOnlyRadioStartsReconfiguresDisablesAndReopensWithoutSendingPackets()
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var frequency = long.Parse(Environment.GetEnvironmentVariable("DOTRETICULUM_RNODE_FREQUENCY")!,
+            System.Globalization.CultureInfo.InvariantCulture);
+        var options = new RNodeOptions
+        {
+            Reconnect = false,
+            Radio = new RNodeRadioOptions
+            {
+                Frequency = frequency, Bandwidth = 125000, TxPower = 0, SpreadingFactor = 8, CodingRate = 6,
+            },
+        };
+        var faults = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            await using var radio = new RNodePacketInterface(Environment.GetEnvironmentVariable("DOTRETICULUM_RNODE_PORT")!, options);
+            radio.Faulted += faults.Enqueue;
+            await radio.StartAsync(deadline.Token);
+            Assert.True(radio.IsConnected);
+            AssertEcho(radio, options.Radio);
+            var changed = options.Radio with { SpreadingFactor = 9, CodingRate = 7 };
+            await radio.ConfigureRadioAsync(changed, deadline.Token);
+            AssertEcho(radio, changed);
+            await radio.SetRadioStateAsync(false, deadline.Token);
+            while (Convert.ToInt32(radio.GetDiagnostics()["radio_state"], System.Globalization.CultureInfo.InvariantCulture) != 0)
+                await Task.Delay(20, deadline.Token);
+            output.WriteLine($"Receive-only serial pass {attempt + 1}: startup/live echoes match, radio-off acknowledged, no SendAsync call.");
+        }
+        Assert.Empty(faults);
+        output.WriteLine("Only volatile radio configuration/control was requested; this is not RF transmission or peer-receipt acceptance.");
+    }
+
+    private static void AssertEcho(RNodePacketInterface radio, RNodeRadioOptions expected)
+    {
+        var diagnostics = radio.GetDiagnostics();
+        long Value(string name) => Convert.ToInt64(diagnostics[name], System.Globalization.CultureInfo.InvariantCulture);
+        Assert.InRange(Value("frequency"), expected.Frequency - 100, expected.Frequency + 100);
+        Assert.Equal(expected.Bandwidth, Value("bandwidth"));
+        Assert.Equal(expected.TxPower, Value("txpower"));
+        Assert.Equal(expected.SpreadingFactor, Value("spreadingfactor"));
+        Assert.Equal(expected.CodingRate, Value("codingrate"));
+        Assert.Equal(1, Value("radio_state"));
+        Assert.True(radio.Bitrate > 0);
+    }
+
     [RNodeHardwareFact]
     public async Task AuthorizedSerialDeviceAnswersNativeDetectionWithoutRadioConfiguration()
     {
