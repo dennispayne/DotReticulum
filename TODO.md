@@ -28,7 +28,9 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Actual pinned Python-router forced crash/restart with persisted transport identity, surviving leaves, interrupted proved link/forwarding-state cleanup, explicit endpoint teardown, distinct recovered link and bidirectional measured-window impaired resources
   - [x] Windows/Linux/macOS managed .NET/Python endpoints automatically reach TIMEOUT after a remote router crash with surviving local routing, in both initiator roles, then prove a distinct fresh session; impaired native matrices remain outstanding
   - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
-  - [x] Windows separately published public Buffer reader/writer consumer: exact bidirectional compressed/binary streams and EOF on an active link
+  - [x] Windows/Linux/macOS separately published public Buffer reader/writer consumer: exact bidirectional compressed/binary streams and EOF on an active link
+  - [x] Windows native constrained Buffer streaming: exact 16 MB outbound/8 MB return, actual Channel loss in both directions, one surviving TCP session and active-link EOF
+  - [ ] Cross-platform repeated native constrained Buffer streaming acceptance; longer Channel/resource soak and broader impaired bearer matrices remain outstanding
   - [x] Darwin rnsh terminal backend and actual macOS feature acceptance (controlling TTY/resize/literal argv/signals/group teardown, all endpoint combinations, delayed first read, mode restoration, native terminal and actual Python roles passed in run 40926579478; upstream EOF race remains an explicit negative result)
   - [ ] Android host/providers, desktop RNode BLE and other missing/partial applicable software identified in the compatibility ledger
   - [ ] Per-interface interoperability and hardware evidence; untested platforms/devices remain unverified

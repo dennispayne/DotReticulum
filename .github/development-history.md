@@ -4,6 +4,100 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Native Channel gap recovery, constrained streaming and KISS disposal ownership
+
+The separately published public Buffer consumer's two healthy cases passed on
+**Windows/Linux/macOS** in exact-source **575d0f1**, run **40965064140**.
+Downloaded actual TRX and summaries confirm **2/0/0** on each platform;
+Summarize Test job **123776403796** rendered the separate Buffer row. All four
+Compatibility candidates passed **42/42**. The workflow was **not wholly
+green**: 11 of 12 jobs passed; Linux Test exposed the existing
+`Parity6KissTests.DisposeDuringAsynchronousOpenAwaitsAndClosesTheLateTransferredStream`
+race. Static run **40965064130** passed all five jobs; downloaded actual SARIF
+contained zero Actions/C#/PowerShell findings and two existing Python warnings.
+
+KISS disposal marks `_disposed` before `CancelAsync` necessarily propagates to
+the linked startup token. A late open could therefore publish a successful
+connection after disposal began. Startup now checks `_disposed` under the
+publication lock and throws cancellation before transferring ownership.
+The existing regression and all **31** focused KISS cases passed.
+
+Actual constrained native Buffer streaming exposed acknowledged Channel data
+loss, not merely a deadline issue. The original published consumer, sending to
+the unmodified pinned Python receiver, stalled at **802,816 bytes**, receiver
+next sequence **49**, with no queued frames or EOF. Pinned
+`RNS/Channel.py:353-395,398-440` limits receive lookahead but admits sends by
+outstanding proof count; `RNS/Link.py:1147-1155` proves before receive-window
+validation. Later proofs let a sender advance beyond an earlier missing
+sequence, acknowledging frames the receiver cannot retain.
+
+The native sender now also caps forward sequence distance from its oldest
+unproved envelope at `WindowMax`. Sender-only correction delivered all 16 MB
+outbound but the 8 MB reverse direction still failed with the unchanged
+upstream sender. The native receiver now proves retained/delivered frames and
+old/queued duplicates, but not rejected future or malformed frames. Link proof
+creation remains under live-link ownership. Four focused cases cover both
+boundaries at sequence zero and across wrap; the new sender cases failed
+before the correction. No wire format, receive capacity, retry timer, reference
+source or reference pin changed. This is intentional native reliability
+hardening, not a claim that pinned upstream has the same policy.
+
+The separately published public SDK consumer now passes **four** short cases
+(compressible/random return, healthy/lossy) and an explicitly opted-in
+**16,000,000-byte outbound / 8,000,000-byte return** case over **2 Mbit/s,
+40-ms bridge RTT**. Each lossy case discards an actual Channel frame in each
+direction and requires one surviving TCP session, exact lengths/SHA-256 and
+normal EOF. The final consumer rejects closure-shaped EOF by additionally
+requiring `Channel.Completion` incomplete and the link Active. The final long
+flow took **83.39 seconds**, observing **489 compressed / 549 plain** nonempty
+outbound chunks. Thin Python changes expose real progress/Channel state only;
+there is no reference-side protocol shim. Reference remains import-verified
+**a29bfb51c468945c96a1ee22cae0114e993e2391**, RNS 1.5.7/LXMF 1.2.1.
+
+Validation:
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+  zero warnings/errors, including the final consumer guard.
+- Focused Transport Channel selection: **53 passed / two opt-in skips**.
+  Full production coverage execution, live disabled: **1,868 passed /
+  91 explicit skips / zero failures**.
+- In the same MSVC-configured process,
+  `dotnet publish tests\Fixtures\ChannelBufferConsumer\ChannelBufferConsumer.csproj -c Release -r win-x64 -o artifacts\native-buffer-retention-verified-eof -p:PublishAot=true -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true --nologo -v quiet`:
+  passed strict publication and native `--help`. Final consumer SHA-256:
+  **afd8962bc1c4c4edb6cb41cf55ecacfb95f1c1c2b951e64d5f874f0944c36251**.
+  Companion Applications SHA-256:
+  **c3d7eb967e6b5cbcb21a0dd52b4c11174a7c72b2df190d608dd8b6423c5e6438**.
+- With live/reference/native variables and `DOTRETICULUM_BUFFER_SOAK=1`,
+  `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~NativeBufferTests|FullyQualifiedName~NativeResourceTests|FullyQualifiedName~RnshNativeTests' --logger trx --results-directory TestResults\native-channel-retention-verified-eof -- xUnit.MaxParallelThreads=1`:
+  **seven passed / zero skips**, including the encrypted/compressed native
+  resource and actual terminal regression flows.
+- Complete local shared suite after the production Channel corrections:
+  Native **41 passed / one skip**, Upstream **40 passed / two skips**.
+  No retrieval requested, so T001 explicitly skipped, not passed.
+- `pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+  **65 passed / two prerequisite skips**.
+  `pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
+  **66 tracked scripts / zero findings**. actionlint 1.7.12 passed the
+  Build/Test, interop and repeated-mesh workflows.
+- `pwsh -NoProfile -File tests\Get-CoverageSummary.ps1 TestResults\channel-retention-coverage -JsonPath TestResults\channel-retention-coverage\summary.json`:
+  production union across nine reports, without averaging/double counting:
+
+| Project | Lines | Branches |
+|---|---:|---:|
+| Applications | 10655/13890 (76.71%) | 9193/14468 (63.54%) |
+| Core | 1840/1899 (96.89%) | 1153/1268 (90.93%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 4676/5690 (82.18%) | 2540/3479 (73.01%) |
+| Transport | 5087/5557 (91.54%) | 3231/4060 (79.58%) |
+| Overall | 22368/27152 (82.38%) | 16164/23325 (69.30%) |
+
+Managed coverage does not measure separately launched native executables.
+Normal CI selects the four short native Buffer cases; scheduled/manual mesh
+explicitly enables and repeats the bounded native endurance case. Exact-source
+hosted correction/repeated cross-platform acceptance is pending. This does not
+close prolonged soak, impaired native/per-bearer, physical radio or Android
+requirements; Android remains deferred.
+
 ### Accepted complete extended live interoperability workflow
 
 Exact-source **67eaa41**, **40961479281**, completed with **all 12 jobs
@@ -57,7 +151,8 @@ Native resource and Buffer results use separate directories and parent-qualified
 labels; summarizing actual TRX files verified two distinct assembly rows.
 Normal CI requires the same-run verified reference for this new native flow.
 This is bounded **Integration**, not shared Compatibility or loss/soak evidence.
-Cross-platform hosted consumer acceptance remains pending.
+Cross-platform healthy hosted consumer acceptance subsequently passed in
+run 40965064140; its separate Linux KISS race and correction are recorded above.
 
 Validation:
 

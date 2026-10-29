@@ -57,19 +57,52 @@ exchanges exactly 340,000 outbound bytes and 200,000 returned bytes with the
 import-verified pinned Python peer in each of two cases. The peer observes both
 compressed and plain nonempty outbound chunks; separate compressible and random
 return streams exercise native reader decoding. Both peers must observe stream
-EOF, and the consumer requires its link still be active before teardown, so
-disconnect cannot masquerade as EOF. This is Integration, not a new shared
-Compatibility claim or passing loss/soak acceptance. CI publishes the consumer
+EOF, and the consumer requires its Channel still be incomplete and its link
+still be active before teardown, so disconnect cannot masquerade as EOF.
+Both healthy cases subsequently passed on
+Windows, Linux and macOS in run **40965064140**, source **575d0f1**; its separate
+Linux KISS lifecycle unit failure is recorded in development history.
+This is Integration, not a new shared Compatibility claim. CI publishes the consumer
 in Build, records its commit/RID/executable manifest and reuses that same-run
-artifact in Test; Linux/macOS execution is pending.
+artifact in Test.
+
+Separate Windows native cases now require an actual lost Channel frame in each
+direction, both compressible and random return streams, and exactly one TCP
+session. Opt-in `DOTRETICULUM_BUFFER_SOAK=1` additionally exercises **16 MB out /
+8 MB back** through a **2 Mbit/s / 40-ms bridge RTT** path, still with both
+losses, exact hashes and active-link EOF. This bounded streaming-endurance case
+passed locally in 83.39 seconds with the final EOF safeguard; scheduled mesh iterations select it explicitly.
+Cross-platform repeated execution, longer soak and broader bearers remain unverified.
+
+### Proofs and the bounded reorder window
+
+Pinned `Channel.py:353-395,398-440` checks a 48-message receive lookahead but
+admits sends based on outstanding proof count. `Link.py:1147-1155` proves Channel
+packets before receive-window validation. Later packet proofs can therefore let
+a sender pass an earlier lost sequence far enough to have data discarded yet
+acknowledged. The original native implementation reproduced this with the real
+Python receiver: exactly 802,816 bytes received, next sequence 49 and no EOF.
+Restricting only our sender fixed outbound delivery but left the reverse
+large-stream failure with the unchanged upstream sender.
+
+The native sender now also caps sequence distance from the oldest unproved
+envelope at `WindowMax`. The native receiver proves retained/delivered frames and
+duplicates, but not rejected ahead-of-window or malformed frames; those can be
+retried after the gap closes. Proof creation remains protected by the live
+link's ownership lock. Wire formats, receive capacity and retry timers are
+unchanged. This is an intentional native reliability hardening, not a claim that
+the pinned implementation has the same behavior; no reference-side shim is used.
+Focused tests cover both boundaries across sequence wrap and duplicate reproving;
+the actual native/Python constrained flow proves complete delivery in both directions.
 
 `RawChannelReader` uses one lazily allocated circular byte buffer. Its default
 unread-byte capacity is 1 MiB; callers may select `maxBufferedBytes` on the
 constructor or factory. Reads do not copy/reallocate the remaining buffer.
 Capacity exhaustion raises `IOException`, releases storage and closes the whole
-link. The protocol has no application-consumption credit message and the Link
-proves incoming channel packets before delivery, so blocking an ingress thread
-or dropping an already proven chunk cannot provide honest reader backpressure.
+link. The protocol has no application-consumption credit message; Channel
+proofs acknowledge retained/delivered data, not application consumption.
+Blocking an ingress thread or dropping an already proven chunk cannot provide
+honest reader backpressure.
 Write backpressure instead awaits the channel's real receipt/window signal,
 with cancellation, rather than polling.
 

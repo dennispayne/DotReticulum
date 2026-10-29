@@ -86,6 +86,53 @@ public sealed class Parity5ChannelTests
 
     private static int[] Window(Channel channel) => [channel.WindowSize, channel.WindowMinSize, channel.WindowMaxSize];
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(Channel.SeqModulus - 16)]
+    public async Task SenderDoesNotOutrunReceiverSequenceWindowWhileAnOldDeliveryProofIsMissing(int firstSequence)
+    {
+        var outlet = new Outlet { AutoDeliver = true };
+        var channel = new Channel(outlet);
+        for (var index = 0; index < firstSequence; index++) channel.Send(new BytesMessage());
+        outlet.AutoDeliver = false;
+        var first = channel.Send(new BytesMessage());
+        for (var index = 1; index <= Channel.WindowMax; index++)
+        {
+            Assert.True(channel.IsReadyToSend);
+            var later = channel.Send(new BytesMessage());
+            Outlet.Deliver(later.Receipt!);
+        }
+
+        Assert.False(channel.IsReadyToSend);
+        var error = Assert.Throws<ChannelException>(() => channel.Send(new BytesMessage()));
+        Assert.Equal(ChannelExceptionType.LinkNotReady, error.Type);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var waiting = channel.WaitForSendAsync(deadline.Token);
+        Assert.False(waiting.IsCompleted);
+        Outlet.Deliver(first.Receipt!);
+        await waiting;
+        var resumed = channel.Send(new BytesMessage());
+        Assert.Equal((firstSequence + Channel.WindowMax + 1) % Channel.SeqModulus, resumed.Sequence);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(Channel.SeqModulus - 16)]
+    public void ReceiverDoesNotAcknowledgeFramesItCannotRetainButReprovesDuplicates(int firstSequence)
+    {
+        var channel = new Channel(new Outlet());
+        channel.RegisterMessageType<BytesMessage>();
+        for (var index = 0; index < firstSequence; index++) Assert.True(channel.Receive(Raw(index)));
+        var next = (firstSequence + 1) % Channel.SeqModulus;
+        var ahead = (firstSequence + Channel.WindowMax + 1) % Channel.SeqModulus;
+        Assert.True(channel.Receive(Raw(next)));
+        Assert.True(channel.Receive(Raw(next)));
+        Assert.False(channel.Receive(Raw(ahead)));
+        Assert.True(channel.Receive(Raw(firstSequence)));
+        Assert.True(channel.Receive(Raw(firstSequence)));
+        Assert.True(channel.Receive(Raw(ahead)));
+    }
+
     [Fact]
     public void EnvelopeLayoutAndSendWrapMatchPinnedReference()
     {

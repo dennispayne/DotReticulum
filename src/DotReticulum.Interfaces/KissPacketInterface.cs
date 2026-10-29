@@ -114,6 +114,7 @@ public class KissPacketInterface : IReconnectingPacketInterface, IPacketInterfac
             connection = await OpenConfiguredAsync(linked.Token).ConfigureAwait(false);
             lock (_gate)
             {
+                if (_disposed) throw new OperationCanceledException(_stop.Token);
                 linked.Token.ThrowIfCancellationRequested();
                 _connection = connection;
                 _connected = true;

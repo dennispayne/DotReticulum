@@ -110,8 +110,8 @@ public sealed class RnshLiveTests(ITestOutputHelper log)
                 connected.Link!.Identify(identity);
                 if (attempt == 0)
                 {
-                    bridge.DropNextChannel(fromPython: false);
-                    bridge.DropNextChannel(fromPython: true);
+                    bridge.DropNextChannel(fromClient: false);
+                    bridge.DropNextChannel(fromClient: true);
                 }
                 using var output = new MemoryStream();
                 using var error = new MemoryStream();

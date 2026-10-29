@@ -31,7 +31,9 @@ stdout protocol: lines starting with "@@" followed by JSON (other lines are RNS 
   {"event":"response", "ok", "size", "sha256", "text", "metadata"}      reply to "request ..."
   {"event":"channel_msg", "text"}                            a TextMessage (MSGTYPE 0x0101, utf-8 text) arrived on the channel
   {"event":"channel_sent", "text"} / {"event":"channel_burst_done", "count", "window"}   replies to chsend / chburst
-  {"event":"buffer_done", "size", "sha256"}                  stream 1 of the channel reached EOF
+  {"event":"buffer_progress", "size", "observed_at"}         stream 1 crossed another megabyte
+  {"event":"buffer_status", "received", "eof", ...}          reply to bufferstatus; real Channel/reader observations
+  {"event":"buffer_done", "size", "sha256", ...}             stream 1 of the channel reached EOF
   {"event":"buffer_sent", "size", "sha256"}                  reply to bufsend (stream 2 written and closed)
 stdin commands: announce [hex] | path <hex> | request_path <hex> <s> | connect <desthash hex> |
   send <hex> | close | stat | identify | resource <size> <seed> <random|text> [metadata-text] |
@@ -137,7 +139,7 @@ class TextMessage(CHANNEL.MessageBase):
 def configure_channel(link):
     channel = link.get_channel()
     channel.register_message_type(TextMessage)
-    acc = {"data": bytearray(), "done": False, "compressed_chunks": 0, "plain_chunks": 0}
+    acc = {"data": bytearray(), "done": False, "compressed_chunks": 0, "plain_chunks": 0, "next_progress": 1_000_000}
 
     def on_message(message):
         if isinstance(message, BUFFER.StreamDataMessage) and message.stream_id == 1 and message.data:
@@ -149,6 +151,8 @@ def configure_channel(link):
     channel.add_message_handler(on_message)
 
     raw_reader = BUFFER.RawChannelReader(1, channel)
+    STATE["buffer_state"] = acc
+    STATE["buffer_reader"] = raw_reader
 
     lock = threading.Lock()
 
@@ -157,6 +161,9 @@ def configure_channel(link):
             chunk = raw_reader.read(max(n, 1))
             if chunk:
                 acc["data"].extend(chunk)
+            if len(acc["data"]) >= acc["next_progress"]:
+                emit({"event": "buffer_progress", "size": len(acc["data"]), "observed_at": time.time()})
+                acc["next_progress"] = (len(acc["data"]) // 1_000_000 + 1) * 1_000_000
             if raw_reader._eof and not raw_reader._buffer and not acc["done"]:
                 acc["done"] = True
                 emit({"event": "buffer_done", "size": len(acc["data"]), "sha256": sha256(bytes(acc["data"])),
@@ -390,6 +397,13 @@ def main(loglevel=RNS.LOG_WARNING):
                         time.sleep(0.005)
                     channel.send(TextMessage(f"{prefix}{i}"))
                 emit({"event": "channel_burst_done", "count": count, "window": channel.window})
+            elif cmd == "bufferstatus":
+                channel = link.get_channel()
+                emit({"event": "buffer_status", "received": len(STATE["buffer_state"]["data"]),
+                      "eof": STATE["buffer_reader"]._eof, "next_rx_sequence": channel._next_rx_sequence,
+                      "queued_sequences": [envelope.sequence for envelope in channel._rx_ring],
+                      "next_tx_sequence": channel._next_sequence,
+                      "pending_tx_sequences": [envelope.sequence for envelope in channel._tx_ring]})
             elif cmd == "bufsend":
                 size, seed, mode = int(parts[1]), parts[2], parts[3]
                 payload = make_payload(seed, size, mode)

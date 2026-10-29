@@ -93,11 +93,11 @@ public sealed class Parity5TransferLiveTests(ITestOutputHelper output)
             Assert.True(text.Length > Packet.Mtu);
             var before = leaf.Count("channel_msg");
             var dropped = bridge.Dropped;
-            bridge.DropNextChannel(fromPython: false);
+            bridge.DropNextChannel(fromClient: false);
             channel.Send(new TransferText { Text = text });
             Assert.Equal(text, (await leaf.NextAsync("channel_msg", before, Patience)).GetProperty("text").GetString());
             Assert.Equal(dropped + 1, bridge.Dropped);
-            bridge.DropNextChannel(fromPython: true);
+            bridge.DropNextChannel(fromClient: true);
             await leaf.SendLineAsync("chsend " + text);
             Assert.Equal(text, await received.Task.WaitAsync(Patience));
             Assert.Equal(dropped + 2, bridge.Dropped);

@@ -713,8 +713,14 @@ public sealed partial class Link
                         if (plaintext is not null)
                         {
                             UpdatePhysicalLayer(packet);
-                            ProvePacket(packet);
-                            coreAfter.Add(() => channel.Receive(plaintext));
+                            coreAfter.Add(() =>
+                            {
+                                if (!channel.Receive(plaintext)) return;
+                                lock (_gate)
+                                {
+                                    if (Status == LinkStatus.Active) ProvePacket(packet);
+                                }
+                            });
                         }
                     }
 

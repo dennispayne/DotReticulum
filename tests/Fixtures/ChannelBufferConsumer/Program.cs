@@ -29,7 +29,7 @@ try
     await input.CopyToAsync(writer, deadline.Token);
     await writer.CloseAsync(deadline.Token);
     await reader.CopyToAsync(output, deadline.Token);
-    if (!reader.EndOfStream || link.Status != LinkStatus.Active)
+    if (!reader.EndOfStream || channel.Completion.IsCompleted || link.Status != LinkStatus.Active)
         throw new IOException("Buffer EOF was not received on an active link.");
     Console.WriteLine("Both public Buffer streams completed with EOF on an active link.");
 }

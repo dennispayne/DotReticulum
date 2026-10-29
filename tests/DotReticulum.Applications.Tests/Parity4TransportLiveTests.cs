@@ -46,7 +46,7 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
         }
 
         public void DropNextFrame() => Interlocked.Exchange(ref _dropFrames, 1);
-        public void DropNextChannel(bool fromPython) => Interlocked.Exchange(ref (fromPython ? ref _dropChannelUp : ref _dropChannelDown), 1);
+        public void DropNextChannel(bool fromClient) => Interlocked.Exchange(ref (fromClient ? ref _dropChannelUp : ref _dropChannelDown), 1);
         public void DropAllChannels(bool enabled) => Volatile.Write(ref _dropAllChannels, enabled ? 1 : 0);
 
         public void Disconnect()
@@ -80,7 +80,7 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
             catch (SocketException) when (_stop.IsCancellationRequested) { }
         }
 
-        private async Task Pump(NetworkStream from, NetworkStream to, bool impair, CancellationToken token)
+        private async Task Pump(NetworkStream from, NetworkStream to, bool fromClient, CancellationToken token)
         {
             using var pipeline = CancellationTokenSource.CreateLinkedTokenSource(token);
             var pending = System.Threading.Channels.Channel.CreateBounded<(byte[] Bytes, long Due)>(64);
@@ -105,7 +105,7 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
                             if (value != 0x7e) continue;
                             if (frame.Count > 2)
                             {
-                                if ((impair && Interlocked.Exchange(ref _dropFrames, 0) != 0) || DropChannel(frame, impair))
+                                if ((fromClient && Interlocked.Exchange(ref _dropFrames, 0) != 0) || DropChannel(frame, fromClient))
                                     Interlocked.Increment(ref _dropped);
                                 else
                                 {
@@ -139,7 +139,7 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
             await Task.WhenAll(receive, forward);
         }
 
-        private bool DropChannel(List<byte> frame, bool fromPython)
+        private bool DropChannel(List<byte> frame, bool fromClient)
         {
             var decoded = new List<byte>(frame.Count);
             var escape = false;
@@ -153,7 +153,7 @@ public sealed class Parity4TransportLiveTests(ITestOutputHelper output)
             if (!Packet.TryParse(decoded.ToArray(), out var packet, InterfaceAccessCode.MaximumPacketSize)
                 || packet.Context != DotReticulum.Transport.LinkContext.Channel) return false;
             return Volatile.Read(ref _dropAllChannels) != 0
-                || Interlocked.Exchange(ref (fromPython ? ref _dropChannelUp : ref _dropChannelDown), 0) != 0;
+                || Interlocked.Exchange(ref (fromClient ? ref _dropChannelUp : ref _dropChannelDown), 0) != 0;
         }
 
         public async ValueTask DisposeAsync()

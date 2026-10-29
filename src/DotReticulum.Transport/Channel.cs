@@ -260,7 +260,10 @@ public sealed class Channel
             }
         }
 
-        return outstanding < WindowSize;
+        // Packet proofs acknowledge out-of-order frames, not their delivery through the receiver's bounded reorder window.
+        var sequenceFits = _txRing.Count == 0
+            || (_nextSequence - _txRing[0].Sequence + SeqModulus) % SeqModulus <= WindowMax;
+        return outstanding < WindowSize && sequenceFits;
     }
 
     internal async Task WaitForSendAsync(CancellationToken cancellationToken)
@@ -579,12 +582,13 @@ public sealed class Channel
     }
 
     /// <summary>Handles a decrypted channel packet payload (called by the link).</summary>
-    internal void Receive(byte[] raw)
+    /// <returns>Whether the frame can be proved: retained/delivered data or an already received duplicate.</returns>
+    internal bool Receive(byte[] raw)
     {
-        lock (_receiveLock) ReceiveSerialized(raw);
+        lock (_receiveLock) return ReceiveSerialized(raw);
     }
 
-    private void ReceiveSerialized(byte[] raw)
+    private bool ReceiveSerialized(byte[] raw)
     {
         try
         {
@@ -592,14 +596,17 @@ public sealed class Channel
             List<MessageBase> ready = [];
             lock (_lock)
             {
-                if (_shutdown) return;
+                if (_shutdown) return false;
                 if (raw.Length > _outlet.Mdu) throw new IOException("Channel envelope exceeds the negotiated MDU.");
                 UnpackEnvelope(envelope);
                 var distance = (envelope.Sequence - _nextRxSequence + SeqModulus) % SeqModulus;
-                if (distance > WindowMax || !_rxRing.TryAdd(envelope.Sequence, envelope))
+                if (distance > SeqModulus / 2) return true;
+                if (distance > WindowMax)
                 {
-                    return;
+                    Log($"Channel sequence {envelope.Sequence} exceeds the receive window at {_nextRxSequence}.");
+                    return false;
                 }
+                if (!_rxRing.TryAdd(envelope.Sequence, envelope)) return true;
 
                 while (_rxRing.Remove(_nextRxSequence, out var e))
                 {
@@ -616,7 +623,7 @@ public sealed class Channel
                 var overflow = false;
                 lock (_lock)
                 {
-                    if (_shutdown) return;
+                    if (_shutdown) return false;
                     if (_handlers.Count == 0) continue;
                     if (_pendingMessages.Count == MaximumPendingMessages)
                     {
@@ -636,13 +643,15 @@ public sealed class Channel
                 if (overflow)
                 {
                     Abort("Channel pending-message limit exceeded by a stalled consumer.");
-                    return;
+                    return false;
                 }
             }
+            lock (_lock) return !_shutdown;
         }
         catch (Exception ex)
         {
             Log("Error while receiving channel data: " + ex);
+            return false;
         }
     }
 
