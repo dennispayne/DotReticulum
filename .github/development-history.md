@@ -4,6 +4,42 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Atomic owned-descendant PID readiness
+
+The actual Windows Integration TRX from full interop **40934315953**,
+source **9de09d31bf51698be40e96afe667753a7846a411**, showed
+`RngitProcessTests.TimeoutKillsAnOwnedDescendantTree` failing with a sharing
+violation while reading the fixture's PID file. File existence could precede
+the writer closing its handle. The owned backend now writes a sibling
+`.pending` file, closes it, then renames it to publish readiness. Both child
+modes retain the same bounded timeout and actual descendant-termination
+assertions; no read retries, extra sleeps or production changes were added.
+
+The earlier discovery, busy-observer and native blocked-peer corrections
+passed in that actual Windows run. Linux Test passed; macOS and the overall
+run were still incomplete when this correction was recorded.
+
+Local validation:
+
+- `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --nologo -v quiet --filter 'FullyQualifiedName~RngitProcessTests' --logger trx --results-directory TestResults\atomic-pid-fixture-process -- xUnit.MaxParallelThreads=1`:
+  **12 passed / zero skips**.
+- `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~RngitMediaTests|FullyQualifiedName~RngitReleaseTests|FullyQualifiedName~RngitTemplatesTests|FullyQualifiedName~RngitRepositoryStoreTests' --logger trx --results-directory TestResults\atomic-pid-fixture-consumers`:
+  **66 passed / 3 explicit skips**.
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+  **zero warnings/errors**.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --logger trx --results-directory TestResults\atomic-pid-fixture-full -- xUnit.MaxParallelThreads=1`:
+  **1854 passed / 87 explicit skips / zero failures**; opt-in live cases
+  were not enabled.
+
+Static analysis **40938754611**, exact source
+**3aacad63d2ed7c4d502ee37860c6b50c49790db8**, completed all five jobs.
+Its actual rendered report has zero Actions/C#/PowerShell findings and the
+same two Python warnings: `py/clear-text-storage-sensitive-data` in
+`tests/Interop/live_auto_node.py:100` and `py/weak-crypto-key` in the
+upstream-compatible 1024-bit vector generator at
+`tests/DotReticulum.Applications.Tests/GenerateRnodeconfSigningVectors.py:21`.
+Successful scan execution is not a zero-finding claim.
+
 ### Automatic endpoint watchdog expiry and fresh-session recovery
 
 Added a bounded Windows managed integration case,

@@ -96,7 +96,10 @@ switch (backendMode)
             WorkingDirectory = root,
             ArgumentList = { "--child" }
         })!;
-        File.WriteAllText(Path.Combine(root, "rngit-child-pid"), process.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var pidPath = Path.Combine(root, "rngit-child-pid");
+        var pendingPidPath = pidPath + ".pending";
+        File.WriteAllText(pendingPidPath, process.Id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        File.Move(pendingPidPath, pidPath);
         if (backendMode == "orphan-pipes") return 0;
         await Task.Delay(TimeSpan.FromSeconds(60));
         return 0;
