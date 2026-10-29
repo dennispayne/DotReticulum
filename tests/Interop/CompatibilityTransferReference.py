@@ -31,6 +31,7 @@ def main():
             "status": resource.status,
             "segment": resource.segment_index,
             "segments": resource.total_segments,
+            "hops": resource.link.expected_hops,
         }), file=sys.stderr, flush=True)
 
     original_started = rncp.receive_resource_started

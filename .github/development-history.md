@@ -4,6 +4,53 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Shared heterogeneous UDP/TCP routing acceptance (T055/T056)
+
+Added two genuine shared advertised-claim cases for existing quoted **C007**:
+candidate **UDP** leaf, fixed pinned-upstream transport with UDP/TCP interfaces,
+fixed pinned-upstream **TCP** rncp peer. The exact same scenarios, random
+**3,211,282-byte** payload size, authorization and assertions run independently
+with upstream and the published Windows native candidate. Configurations disable
+shared instances and contain no static routes or direct candidate/reference
+bearer. They assert exact persisted bytes, surviving peers/router and the
+upstream link's observed **two-hop** distance for every resource.
+
+`RoutingPeer.ps1` owns bounded local processes/configuration and reuses the
+existing rncp helpers. The thin import-verified `reference_cli.py` now invokes
+the actual upstream `rnsd.main`; the existing transfer observer additionally
+exports `resource.link.expected_hops`. It does not implement routing or assert
+the scenario in Python. Source: unchanged reference pin
+**a29bfb51c468945c96a1ee22cae0114e993e2391**, `README.md:40`,
+`RNS/Interfaces/UDPInterface.py:59-110`, and `RNS/Link.py:267-281,515-525`.
+The existing disclosed Windows rncp copy-instead-of-move retention shim remains;
+these cases do **not** establish unmodified Windows retention behavior.
+
+A first **32,771-byte** upstream send exposed its existing Windows fast-transfer
+metrics failure: `rncp.py:773-775` can observe zero elapsed time and divide by zero
+after a completed transfer. The native sender did not show that failure.
+The final bounded multi-megabyte cases retain strict exit, byte and hop
+assertions and use no timing shim or added sleeps. They do **not** establish
+small-file metric correctness, arbitrary carriers, alternate routes, loss,
+radio interoperability or sustained mesh soak.
+
+Direct Pester **5.7.1** execution of both cases for both candidates:
+**4 passed, zero failed/skipped**; evidence
+`TestResults\compatibility-routing-6f1bcf8a3e074c668262cee27ac9ea48\routing.xml`.
+The normal complete runner then passed independently for each candidate:
+**38 passed, 1 explicit hosted-retrieval skip, zero failures** apiece.
+The inventory is now **39 distinct It cases**, with **17 quoted claims**
+catalogued; not every catalogued claim has shared acceptance.
+
+```powershell
+pwsh -NoProfile -File tests\Compatibility\Invoke-CompatibilityTests.ps1 -Application artifacts\native-device-ble-darwin\DotReticulum.Applications.exe -Python TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5\reference\python\venv\Scripts\python.exe -Upstream TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5\reference\python\upstream -Implementation Both -OutputDirectory TestResults\compatibility-routing-full-20261029 -NoJobSummary
+```
+
+No new reference retrieval or Git baseline is claimed by this local reuse.
+`pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1` analyzed
+**63 tracked files, zero findings**; tooling discovery/reporting gates passed
+**60 tests with 2 explicit missing-reference skips** in the adjacent build-fix
+gate. Hosted Linux/macOS/native acceptance remains pending.
+
 ### Fix concurrent GitHub Actions version-variable exports
 
 Hosted build **40887675136**, macOS job **123495856574**, compiled successfully

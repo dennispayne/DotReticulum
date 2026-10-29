@@ -206,16 +206,19 @@ pwsh -NoProfile -File tests\Compatibility\Get-CompatibilityTests.ps1
 pwsh -NoProfile -File tests\Compatibility\Get-CompatibilityTests.ps1 -IncludeUncoveredClaims
 ```
 
-The shared inventory contains 37 distinct tests and 17 quoted claims. Cases
+The shared inventory contains 39 distinct tests and 17 catalogued quoted claims. Cases
 cover identity generation/persistence/import/export, valid and corrupted
 signatures, authenticated decryption failures, public-only restrictions,
 proof/no-proof/forged-proof delivery, authenticated management requests,
 bidirectional multi-megabyte rncp transfers, automatic compression, authorized
 fetches, authorization failure/recovery and TCP IFAC mismatches. Assertions
 check persisted bytes and actual peer observations, not only exit success.
-Heterogeneous multi-hop routing and Channel/Buffer remain uncovered claims in
-this shared inventory, not fabricated results; historical integration results
-do not silently pass them. TCP IFAC does not establish authentication on every
+Two routing cases add bidirectional exact file delivery across a two-hop
+UDP/TCP path through a fixed pinned upstream router, with no static routes and
+the upstream link's observed hop count. This is not alternate-route, RF or
+impaired-mesh acceptance. Channel/Buffer remains uncovered in this shared
+inventory; historical integration results do not silently pass it.
+TCP IFAC does not establish authentication on every
 bearer; direct transfers do not establish impaired-link or sustained-soak
 acceptance. On Windows the rncp reference adapter uses the existing disclosed
 `shutil.move` to `copyfile` retention workaround; those cases are not evidence
