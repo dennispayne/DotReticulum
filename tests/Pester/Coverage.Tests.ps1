@@ -133,6 +133,18 @@ Describe 'PowerShell test runner' -Tag Tooling {
         finally { $env:GITHUB_STEP_SUMMARY = $saved }
     }
 
+    It 'preserves cmd environment setup and quoted paths in the bounded native publisher' -Skip:(!$IsWindows) {
+        $directory = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'native tools')
+        $setup = Join-Path $directory.FullName 'setup.cmd'
+        @('@echo off', 'set DOTRETICULUM_PREPARATION_TEST=owned') | Set-Content -LiteralPath $setup
+        $result = Invoke-TestProcess $env:ComSpec -RawArguments "/d /s /c `"call `"$setup`" && set DOTRETICULUM_PREPARATION_TEST`""
+        $result.Code | Should -Be 0 -Because $result.Error
+        $result.Output.Trim() | Should -Be 'DOTRETICULUM_PREPARATION_TEST=owned'
+        $env:DOTRETICULUM_PREPARATION_TEST | Should -BeNullOrEmpty
+        { Invoke-TestProcess $env:ComSpec @('/c', 'echo ignored') -RawArguments '/c echo invalid' } |
+            Should -Throw '*not both*'
+    }
+
     It 'rejects filtered coverage before starting a partial suite' {
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner, '-Coverage', '-Filter', 'Example')
         $result.Code | Should -Be 1

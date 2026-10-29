@@ -1,5 +1,6 @@
 function Start-TestProcess {
-    param([string] $Executable, [string[]] $Arguments, [string] $WorkingDirectory, [hashtable] $Environment = @{})
+    param([string] $Executable, [string[]] $Arguments, [string] $WorkingDirectory, [hashtable] $Environment = @{},
+        [string] $RawArguments)
     $info = [System.Diagnostics.ProcessStartInfo]::new($Executable)
     $info.UseShellExecute = $false
     $info.RedirectStandardOutput = $true
@@ -9,7 +10,12 @@ function Start-TestProcess {
         $null = $info.Environment.Remove($key)
     }
     if ($WorkingDirectory) { $info.WorkingDirectory = $WorkingDirectory }
-    foreach ($argument in $Arguments) { $info.ArgumentList.Add($argument) }
+    if ($RawArguments) {
+        if ($Arguments) { throw 'Specify Arguments or RawArguments, not both.' }
+        # cmd.exe /s /c requires a raw command line, not C runtime argv quote escaping.
+        $info.Arguments = $RawArguments
+    }
+    else { foreach ($argument in $Arguments) { $info.ArgumentList.Add($argument) } }
     foreach ($key in $Environment.Keys) {
         if ($null -eq $Environment[$key]) { $null = $info.Environment.Remove($key) }
         else { $info.Environment[$key] = $Environment[$key] }
@@ -50,8 +56,9 @@ function Complete-TestProcess {
 
 function Invoke-TestProcess {
     param([string] $Executable, [string[]] $Arguments, [int] $TimeoutSeconds = 60,
-        [string] $WorkingDirectory, [hashtable] $Environment = @{}, [string] $InputText = '')
-    $peer = Start-TestProcess $Executable $Arguments $WorkingDirectory $Environment
+        [string] $WorkingDirectory, [hashtable] $Environment = @{}, [string] $InputText = '',
+        [string] $RawArguments)
+    $peer = Start-TestProcess $Executable $Arguments $WorkingDirectory $Environment -RawArguments $RawArguments
     if ($InputText) { $peer.Process.StandardInput.Write($InputText) }
     $peer.Process.StandardInput.Close()
     Complete-TestProcess $peer $TimeoutSeconds

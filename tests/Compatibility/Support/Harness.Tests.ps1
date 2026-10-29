@@ -8,6 +8,7 @@ Describe 'Compatibility harness' {
     BeforeAll {
         . (Join-Path $PSScriptRoot 'Discovery.ps1')
         . (Join-Path $PSScriptRoot 'Export.ps1')
+        . (Join-Path $PSScriptRoot 'Preparation.ps1')
         . (Join-Path $PSScriptRoot '..\..\Pester\TestProcess.ps1')
         $harnessRunner = Join-Path $PSScriptRoot '..\Invoke-CompatibilityTests.ps1'
         $harnessWork = Join-Path $PSScriptRoot "..\..\..\TestResults\compatibility-harness-$([guid]::NewGuid().ToString('N'))"
@@ -20,6 +21,81 @@ Describe 'Compatibility harness' {
     AfterAll {
         if ($harnessWork -and (Test-Path -LiteralPath $harnessWork)) {
             Remove-Item -LiteralPath $harnessWork -Recurse -Force
+        }
+    }
+
+    Context 'Local compatibility preparation' {
+        BeforeEach {
+            Mock Get-Command {
+                param($Name)
+                $command = @($Name)[0]
+                [pscustomobject]@{ Source = (Join-Path $TestDrive "$command-first") }
+                [pscustomobject]@{ Source = (Join-Path $TestDrive "$command-second") }
+            } -ParameterFilter { @($Name)[0] -in @('python', 'python3', 'git') }
+        }
+
+        It 'creates separate owned run directories and defaults the reference beneath each run' {
+            Mock Publish-CompatibilityApplication { param($Directory) Join-Path $Directory 'candidate' }
+            $first = Initialize-CompatibilityLocalRun -Implementation Both
+            $second = Initialize-CompatibilityLocalRun -Implementation Both
+            try {
+                $first.OutputDirectory | Should -Not -Be $second.OutputDirectory
+                foreach ($run in $first, $second) {
+                    $run.OutputDirectory | Should -Exist
+                    $run.ReferenceDirectory | Should -Be (Join-Path $run.OutputDirectory 'reference')
+                    $run.ReferenceDirectory | Should -Not -Exist
+                    $run.Application | Should -Be (Join-Path $run.OutputDirectory 'native\candidate')
+                    $pythonCommand = if ($IsWindows) { 'python' } else { 'python3' }
+                    $run.Python | Should -Be (Get-Command $pythonCommand -CommandType Application | Select-Object -First 1).Source
+                }
+                Should -Invoke Publish-CompatibilityApplication -Times 2 -Exactly
+            }
+            finally {
+                Remove-Item -LiteralPath $first.OutputDirectory -Recurse -Force
+                Remove-Item -LiteralPath $second.OutputDirectory -Recurse -Force
+            }
+        }
+
+        It 'honors explicit native and directory overrides without publishing or overwriting artifacts' {
+            Mock Publish-CompatibilityApplication { throw 'An explicit candidate must not be rebuilt.' }
+            $application = Join-Path $TestDrive 'candidate'
+            'owned fixture' | Set-Content -LiteralPath $application
+            $output = Join-Path $TestDrive 'prepared'
+            $reference = Join-Path $TestDrive 'reference'
+            $run = Initialize-CompatibilityLocalRun -Application $application -OutputDirectory $output `
+                -ReferenceDirectory $reference -Implementation DotReticulum
+            $run.Application | Should -Be $application
+            $run.OutputDirectory | Should -Be $output
+            $run.ReferenceDirectory | Should -Be $reference
+            { Initialize-CompatibilityLocalRun -OutputDirectory $output -Implementation Both } |
+                Should -Throw '*Comparison directory must be fresh*'
+            $null = New-Item -ItemType Directory -Path $reference
+            { Initialize-CompatibilityLocalRun -OutputDirectory (Join-Path $TestDrive 'other') `
+                -ReferenceDirectory $reference -Implementation Both } | Should -Throw '*Reference directory must be fresh*'
+            Should -Invoke Publish-CompatibilityApplication -Times 0 -Exactly
+        }
+
+        It 'rejects invalid preparation modes before publishing and preserves native build failures' {
+            Mock Publish-CompatibilityApplication { throw 'Native candidate publication failed (exit 7).' }
+            { Initialize-CompatibilityLocalRun -Implementation Upstream } | Should -Throw '*requires a DotReticulum candidate*'
+            $dll = Join-Path $TestDrive 'candidate.dll'
+            'owned fixture' | Set-Content -LiteralPath $dll
+            { Initialize-CompatibilityLocalRun -Application $dll -Implementation Both } | Should -Throw '*not a managed DLL*'
+            Should -Invoke Publish-CompatibilityApplication -Times 0 -Exactly
+            $output = Join-Path $TestDrive 'failed-publish'
+            { Initialize-CompatibilityLocalRun -OutputDirectory $output -Implementation Both } |
+                Should -Throw '*publication failed*'
+            Should -Invoke Publish-CompatibilityApplication -Times 1 -Exactly
+            (Join-Path $output 'reference\reference-provenance.json') | Should -Not -Exist
+        }
+
+        It 'rejects disabling retrieval during automatic preparation without creating reports' {
+            $output = Join-Path $harnessWork 'contradictory-preparation'
+            $result = Invoke-TestProcess pwsh @('-NoProfile', '-File', $harnessRunner,
+                '-Prepare', '-FetchReference:$false', '-OutputDirectory', $output)
+            $result.Code | Should -Be 1
+            $result.Error | Should -Match 'requires hosted reference retrieval'
+            $output | Should -Not -Exist
         }
     }
 

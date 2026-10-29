@@ -116,6 +116,44 @@ measurements, not coverage of separately launched native executables.
 
 Live Python harnesses require `DOTRETICULUM_UPSTREAM` to point at an unmodified working checkout of the Reticulum-hosted upstream, currently `a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7), and `DOTRETICULUM_PYTHON` to select the reference venv. They verify the imported source and Git revision; LXMF harnesses also verify the pinned package version (1.2.1). Obtain updates with our .NET `rngit fetch`, verify the resulting objects and materialize a working checkout locally; the GitHub repository is only a secondary comparison mirror. See [rngit.md](docs/rngit.md). Existing vectors and their reproduction generators still identify the older revision that actually generated them; reproducing those requires that historical checkout rather than the current live pin. Disclose reference-side shims and non-default peer limits. Unsupported test modes must explicitly skip rather than return a false pass.
 
+### Run shared compatibility locally
+
+From the repository root, no parameters or preconfigured reference paths are needed:
+
+```powershell
+.\tests\Compatibility\Invoke-CompatibilityTests.ps1
+```
+
+Install the prerequisites first: PowerShell 7, Pester 5.7.1+, Git, Python with
+venv/pip support, the pinned .NET SDK and the platform's NativeAOT build tools
+(MSVC C++ tools on Windows, clang/zlib development files on Linux, Xcode tools
+on macOS). The automatic path supports Windows x64, Linux x64 and macOS ARM64.
+It publishes a fresh native candidate, uses that candidate to retrieve the
+pinned reference over Reticulum, provisions an isolated Python environment,
+and runs both .NET and upstream candidates. The existing disclosed mirror-parent
+seed is used for retrieval; this is not publisher authentication or a full
+network clone. Internet access and a reachable Reticulum gateway are required.
+
+Each invocation prints and retains a unique `TestResults\compatibility-local-*`
+directory containing the native executable, reference artifacts, NUnit XML and
+per-test JSON reports. Existing results are never overwritten, and failed setup
+or retrieval is not treated as passing compatibility. Dependencies for the
+Python reference are installed only inside that run's virtual environment;
+the script does not install global tools.
+
+On Windows, the upstream candidate's hosted Git helper has a recorded bundle
+verification failure. The runner reports this as a failed case and exits nonzero,
+even when the .NET candidate passes; it does not hide the failure or apply a
+reference-side workaround. `-Prepare -Implementation DotReticulum` runs just
+the .NET candidate when that is the intended scope.
+
+Use `-Prepare` to keep automatic setup while overriding selected values, for
+example `-Prepare -Gateway my.gateway.example`, or `-Prepare -Application <native-executable>`
+to avoid republishing. Explicit invocations without `-Prepare` retain the existing
+manual/CI behavior, including environment-sourced reference paths and the fixed
+default output directory. `Get-Help .\tests\Compatibility\Invoke-CompatibilityTests.ps1 -Full`
+documents all overrides.
+
 ## Moving to a new upstream release
 
 The consolidated compatibility table has one row per Pester `It` case and

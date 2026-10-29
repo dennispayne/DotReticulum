@@ -4,6 +4,77 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Zero-argument local compatibility execution
+
+`tests\Compatibility\Invoke-CompatibilityTests.ps1` now runs without parameters.
+It chooses an owned unique `TestResults\compatibility-local-*` directory,
+publishes a fresh native application for the host, enables the existing
+candidate-owned hosted reference retrieval, provisions the verified pinned
+checkout/venv, and executes both candidates. `-Prepare` enables the same setup
+with explicit overrides (gateway, native candidate, output/reference paths or
+candidate selection). An explicitly supplied native application is not rebuilt.
+Existing explicit manual/CI invocations without `-Prepare` are unchanged;
+read-only discovery still does not prepare, download or start nodes.
+
+Automatic publishing supports the existing Windows x64, Linux x64 and macOS
+ARM64 RIDs; only Windows was executed locally in this pass. It requires installed
+Git, Python, the pinned SDK/native toolchain and Pester, and does not install
+global tools. Reference packages are installed into the fresh run-owned venv.
+Publication and smoke-test processes use the existing bounded process helper,
+with MSVC setup isolated to the same child as publication. Added a narrow raw
+command-line option for `cmd.exe /s /c`: .NET's argv escaping otherwise breaks
+quoted batch-file paths. Ordinary subprocess calls still use ArgumentList.
+Executable lookup selects the first PATH match, not a joined list of all
+installed Python interpreters. Both failures were encountered and corrected
+while exercising real no-argument invocations, not bypassed with caller flags.
+
+Validation:
+- Baseline `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+  zero warnings/errors; `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet`:
+  **1,831 passed, 79 skipped**, zero failed; opt-in live xUnit tests disabled.
+- `pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+  **59 passed, 2 explicit reference-dependent skips**, zero failed with local
+  Pester **6.2.0**. New tooling cases cover unique output/reference locations,
+  explicit overrides/no overwrite/no republish, multiple PATH matches, invalid
+  preparation combinations, publication failure propagation and actual bounded
+  Windows batch setup with quoted paths. Tooling preparation tests mock external
+  tool discovery/publication and do not require Python or native build tools.
+- Focused `Invoke-Pester` with **5.7.1**, `Run.Path` set to
+  `tests\Pester\Coverage.Tests.ps1` and `Filter.FullName` set to
+  `*Local compatibility preparation*`, `*preserves cmd environment*`,
+  `*help discoverable for every declared parameter`: **6 passed**, zero failed.
+- `pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
+  **61 tracked PowerShell files, zero findings** with **1.24.0**.
+- Actual `pwsh -NoProfile -File tests\Compatibility\Invoke-CompatibilityTests.ps1`
+  with **no parameters or DOTRETICULUM reference environment variables** retained
+  artifacts in `TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5`.
+  The new Windows NativeAOT binary ran help and all **37/37 .NET cases passed**,
+  including both-direction multi-megabyte rncp transfers and failure/recovery
+  cases against the fixed Python peer. The .NET client retrieved **87,057**
+  network bundle bytes via `reticulum.thecryptosquid.com` (11-hop route observed).
+  Strict object checks and actual imports verified pin
+  `a29bfb51c468945c96a1ee22cae0114e993e2391`, tree
+  `24d4c393de9fd57b933836cea68891fd953ab060`, RNS **1.5.7** and the isolated
+  pinned dependency installation. The existing disclosed mirror-parent seed was
+  used; this is not a full network clone or publisher authentication.
+  Fetched development HEAD was separately
+  `c0fe08c08d75ffbcc8ef34bd7ad90636954b4738` (tree
+  `14ba7e4b639f2d8892f556d01ffd112e741fbdaf`), not a new reference pin.
+- The same command's independent **Upstream candidate passed 36/37 cases**.
+  `T001` failed with `Bundle verification failed for batch` after observing
+  **79,718,410 bytes** in the actual Python Git helper. This matches the already
+  recorded local Windows upstream-only limitation below; it is not an automatic
+  setup failure or a .NET retrieval failure. Both per-test JSON and NUnit reports
+  were retained and the command correctly exited **1**. No assertion was weakened,
+  no case skipped to obtain success, no reference shim added, and no upstream
+  source or pin changed. Hosted Linux upstream acceptance is separate evidence.
+
+Updated discoverable parameter help and CONTRIBUTING with the one-command path,
+prerequisites, overrides, artifact ownership and this Windows baseline limitation.
+No production behavior or CI workflow changed; no new compatibility claim or
+cross-platform/hardware support is inferred. Coverage collection was unnecessary
+for this tooling change. Hosted CI was not run or pushed in this pass.
+
 ### Standalone PowerShell parameter help
 
 Added `.PARAMETER` descriptions for all **100 declared parameters** across the
