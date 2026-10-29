@@ -4,6 +4,33 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Accepted complete extended live interoperability workflow
+
+Exact-source **67eaa41**, **40961479281**, completed with **all 12 jobs
+passed**: three Builds, four Compatibility candidates, three Tests and both
+summaries. Downloaded all three actual `test-results-*-1` artifacts, separately
+from the four already inspected Compatibility reports. Actual reports contain
+the following **passed / failed / skipped** counts:
+
+| Suite | Linux | macOS | Windows |
+|---|---:|---:|---:|
+| Unit | 1441 / 0 / 5 | 1441 / 0 / 5 | 1440 / 0 / 6 |
+| Integration | 434 / 0 / 11 | 430 / 0 / 15 | 426 / 0 / 19 |
+| Native executable/CLI/contract integration | 199 / 0 / 4 | 192 / 0 / 11 | 198 / 0 / 5 |
+| Extended live integration | 59 / 0 / 6 | 58 / 0 / 7 | 57 / 0 / 8 |
+
+These are separate suite executions, not a sum of distinct capability claims.
+The extended reports preserve actual Applications/Interfaces/Transport assembly
+rows and explicit hardware/platform/prerequisite skips. The actual Summarize
+Test job **123767521328** rendered the extended rows, including
+Applications **35/0/1**, **34/0/2**, **33/0/3** and Transport **17/0/0** on
+each platform. All four Compatibility candidates independently passed
+**42/42**, including the actual large **T059** request/response, as recorded
+below. This checks off `interop-test.yml`; the separate three-repeat mesh
+workflow was already accepted. Neither workflow is sustained soak or complete
+impaired native/per-bearer/platform/hardware acceptance. The separately added
+public Buffer SDK consumer is not present in this older source revision.
+
 ### Native public Buffer SDK consumer and four-candidate large-request acceptance
 
 Added `tests/Fixtures/ChannelBufferConsumer`, a minimal separately published
@@ -65,8 +92,8 @@ Windows**, including **T059**. The actual Summarize Compatibility job
 **123759309158** renders T057/T058/T059 Passed for all four candidates with
 commit-pinned test-code links. This resolves the earlier T059 hosted-pending
 statement; the older b716cc6 external-reference failure remains recorded.
-The full extended interop/Test workflow is still running, so its checklist
-item is not yet checked off.
+The full extended interop/Test workflow subsequently passed all 12 jobs; its
+actual platform counts and checked workflow gate are recorded above.
 
 ### Accepted three-repeat mixed-mesh workflow on all desktop targets
 
@@ -253,8 +280,8 @@ Validation:
 The reused strict Windows native executable is the queue/write-clock
 milestone's actually exercised binary, SHA-256
 **93c9523d8aa45c2dba2d23810e5287a909247debaf9ab3d219cb14b2684dcc81**.
-No production code changed for this acceptance milestone. T059 hosted
-cross-platform execution remains pending.
+No production code changed for this acceptance milestone. T059 subsequently
+passed for all four hosted candidates in **40961479281**, source **67eaa41**.
 
 Separately, all four hosted candidates passed **T053/T054/T058** in
 **40956389129**, source **86a9b72**, establishing the earlier bounded small and
@@ -465,7 +492,8 @@ Validation:
 - `pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
   **65 tracked PowerShell files / zero findings**.
 
-Fresh-source hosted request-boundary acceptance remains pending. Earlier-source
+Fresh-source hosted request-boundary acceptance subsequently passed in
+**40956389129** and **40961479281**, as recorded above. Earlier-source
 full interop **40947799428** and three-repeat mesh **40947802917** were dispatched
 at **b5d01f2**; their outcomes are not inferred from local results.
 
@@ -509,7 +537,8 @@ Validation:
 - `DOTRETICULUM_LIVE=0 dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --logger trx --results-directory TestResults\mesh-controlled-loss-full-final -- xUnit.MaxParallelThreads=1`:
   **1854 passed / 89 explicit skips / zero failures**.
 
-No production behavior changed; fresh-source hosted acceptance remains pending.
+No production behavior changed; subsequent hosted controlled-loss acceptance
+passed in all three repetitions/platforms in **40956389129**.
 Static **40946356295**, exact source
 **cb9aef1**, completed all five jobs. Its inspected rendered report has zero
 Actions/C#/PowerShell findings and the same two Python warnings recorded below.
@@ -647,7 +676,7 @@ Final validation:
 No production/reference timer, packet format or MTU changed. A distinct
 forwarded-part quota alone is not callback-level proof that an upstream
 throughput estimate completed; actual failure observations remain visible.
-New-source hosted repeat acceptance remains pending.
+Subsequent corrected-source repeat acceptance passed in **40956389129**.
 
 ### Fresh links through a surviving alternate transport
 
@@ -1752,7 +1781,9 @@ dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Test
 **3 passed, zero failed/skipped**, **2.24 minutes**, with actual pinned Python
 transport processes and the native Windows daemon for the tunnel case.
 This is one local iteration, not the scheduled three-iteration soak.
-Hosted workflow acceptance remains pending; workflow TODOs remain unchecked.
+Subsequent corrected-source workflow acceptance passed: full interop
+**40961479281** and three-repeat mesh **40956389129**. Their workflow TODOs
+are now checked, without relabeling these earlier local-only results.
 
 ### Shared heterogeneous UDP/TCP routing acceptance (T055/T056)
 

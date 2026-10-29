@@ -51,7 +51,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] Verified primary-source citation browsing links (Git destination resolved; derived NomadNet page link failed; external URI scheme and line anchors unverified; no GitHub fallback)
   - [x] Approved Verb-Noun standalone PowerShell entry points, discoverable help for every declared parameter and updated workflow/documentation callers
   - [x] Zero-argument local Compatibility runner with automatic native/reference preparation and fresh results directories
-  - [ ] `interop-test.yml`
+  - [x] `interop-test.yml` (all 12 jobs passed in run 40961479281)
   - [x] `e2e-mesh-test.yml` (all 12 jobs passed in run 40956389129; three repetitions of seven extended cases per platform)
   - [x] Advanced Static analysis workflow: CodeQL (Actions, C#, Python), pinned PSScriptAnalyzer, SARIF and consolidated finding summary; replaces GitHub-managed default setup (all five jobs passed in run 40644131301; C# full-database selection avoids overlay fallback warnings)
   - [x] Separate Unit/Integration production coverage in consolidated Build and Test platform summaries (all 12 jobs passed in run 40644131484; six suite/platform coverage artifacts verified)
