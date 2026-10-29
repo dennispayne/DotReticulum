@@ -4,6 +4,88 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Automatic endpoint watchdog expiry and fresh-session recovery
+
+Added a bounded Windows managed integration case,
+`ManagedAndPinnedEndpointsAutomaticallyTimeOutAfterRouterCrashAndRecoverWithFreshLinks`,
+using a .NET endpoint, surviving .NET transport, the existing **20 ms/frame**
+capacity-one bridge, an actual pinned Python transport and a Python endpoint.
+Both initiator roles establish three-hop links and prove exact DATA receipt in
+both directions before the actual Python router is force-killed.
+
+The .NET endpoint's local router connection stays present. A first exploratory
+topology placed the endpoint directly on the removed interface and correctly
+triggered immediate local link teardown (`TransportRouter.cs:234-252`), not
+watchdog expiry. The final routed topology tests the intended remote outage.
+The failed post-crash send must obtain no proof or peer receipt. Without
+issuing `close` at either endpoint, both must report **TIMEOUT**, the upstream
+callback must identify that exact old link, the .NET link must leave its manager,
+and its closure callback must occur once. The surviving router remains running.
+
+The deadline derives from the actual endpoints' RTT/stale intervals plus the
+unchanged timeout factor/grace and two default five-second upstream polling
+intervals (`RNS/Link.py:745-777,795-797`, pin
+**a29bfb51c468945c96a1ee22cae0114e993e2391**). Budgets above the case's explicit
+four-minute bound fail, rather than silently increasing a wait. No reference
+timer, production policy, MTU or protocol is modified. The thin Python callback
+adapter adds only the actual `link_id` to its closure observation.
+
+Recovery initially exposed fixture ordering: router-side readiness did not mean
+the surviving leaf had reconnected, and cached paths did not establish new
+route propagation. The final case observes leaf TCP online, new intermediate
+route availability and a newly received announce before either initiator role
+opens its distinct new link. It then proves exact DATA both ways. An exploratory
+cleanup also deleted state before the separately owned endpoint had persisted;
+the endpoint now explicitly disposes before its owned directory is removed.
+These failures were not accepted as passing recovery.
+
+Final local validation, verified actual upstream imports:
+
+- `DOTRETICULUM_LIVE=1 dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --nologo -v quiet --filter 'FullyQualifiedName~ManagedAndPinnedEndpointsAutomaticallyTimeOutAfterRouterCrashAndRecoverWithFreshLinks' --logger trx --results-directory TestResults\mesh-automatic-timeout-discovered -- xUnit.MaxParallelThreads=1`:
+  **1 passed / zero skips / 1m28s**, exercising both initiator roles.
+- `DOTRETICULUM_LIVE=1 dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~Parity8CompatibilityLiveTests|FullyQualifiedName~Parity8ResourceLossFixtureTests|FullyQualifiedName~LiveMixedTransportTests' --logger trx --results-directory TestResults\mesh-automatic-timeout-and-reference-final -- xUnit.MaxParallelThreads=1`:
+  **6 passed / zero skips / 3m57s**, including measured-window recovery and the
+  separately negative all-upstream cold-window control. The final automatic
+  case observed RTT **0.06476690014824271 / 0.06319093704223633** for the two
+  .NET roles, source-derived close budgets **42 / 42 seconds**, matched TIMEOUT
+  callbacks at both endpoints and distinct proved recovered links.
+- `DOTRETICULUM_LIVE=0 dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --logger trx --results-directory TestResults\mesh-automatic-timeout-full-final -- xUnit.MaxParallelThreads=1`:
+  **1854 passed / 87 explicit skips / zero failures**.
+
+This adds acceptance tests and observation metadata, not production behavior.
+No redundant production coverage or native publish is claimed. Cross-platform
+execution of the new automatic case and impaired published-native endpoints
+remain unverified. It is integration evidence, not a shared Compatibility claim
+or active-link resumption.
+
+### Completed three-iteration mesh evidence before the fixture fixes
+
+Run **40929696634**, exact source **df2b80b444543d7e563b0c3a01081f9001a64e29**,
+completed with **all four selected cases passing in all three iterations on
+Linux, Windows and macOS**: twelve case executions per platform, no extended
+failures/skips. Actual uploaded TRX and the rendered summary were inspected;
+the renderer preserved each `iteration-1/2/3` row with **4 / 0 / 0** in all
+three platform columns. These are four distinct integration cases, not 36
+different capabilities or shared Compatibility cases.
+
+All nine measured-window recovery executions retained **20 initial parts
+passed / 15 dropped / 15 retried**, four TCP sessions, both router restarts and
+the interrupted old/fresh-link assertions. Actual capacity-one pressure counts
+were Linux **193/216/194**, Windows **213/202/215** and macOS **199/201/203**.
+The all-upstream cold-window case independently retained its healthy zero-delay
+control and its explicit negative 120 ms result in each iteration; it is not
+passing cold-window recovery. Native persisted-tunnel recovery and the original
+mixed-router path/datagram/link case also passed in every iteration.
+
+The workflow **still failed overall** because its earlier-source macOS Unit
+suite hit the controlled discovery announcement-before-acceptance race. Both
+renderers passed while preserving that real Unit failure. The later
+**9de09d3** fixture correction is under full interop **40934315953**; no passing
+overall result is inferred from the green extended rows.
+Static analysis **40934316808**, exact source 9de09d3, completed all five jobs;
+its actual rendered report still has zero Actions/C#/PowerShell findings and
+the same two Python warnings recorded below.
+
 ### Hosted Darwin acceptance and scheduling-independent fixture assertions
 
 Inspected the actual uploaded macOS and Windows TRX from full interop
@@ -68,8 +150,9 @@ Validation:
   `tests/DotReticulum.Applications.Tests/GenerateRnodeconfSigningVectors.py:21`.
   Neither warning was suppressed; scan success does not mean zero findings.
 
-The exact three-iteration mesh run **40929696634**, source **df2b80b**, remains
-in progress at this milestone. It is not evidence for the later fixture fixes.
+The exact three-iteration mesh run **40929696634**, source **df2b80b**, was
+in progress at this milestone and subsequently completed as detailed above.
+It is not evidence for the later fixture fixes.
 
 ### Independent cold-window reference failure and explicit measured-window recovery
 
@@ -140,8 +223,9 @@ production code. The preceding strict native/coverage gates remain the evidence
 for unchanged production source; no redundant native publication is claimed.
 Full interop **40926579478** tested earlier **f568802**, without this later
 measured-window/negative-control separation, and subsequently failed as detailed
-above. Cross-platform acceptance of this slice and repeated mesh reporting remain
-pending actual hosted execution.
+above. Cross-platform acceptance of the measured-window cases, negative control
+and repeated mesh reporting was subsequently verified in 40929696634, as detailed
+above; its unrelated Unit failure prevents an overall passing-workflow claim.
 
 ### Darwin exit draining and the first rnsh window change
 

@@ -19,7 +19,7 @@ stdout protocol: lines starting with "@@" followed by JSON (other lines are RNS 
   {"event":"path", "dest", "has_path", "hops"}               reply to "path <hex>" / "request_path <hex> <timeout s>"
   {"event":"link_up", "role", "link_id", "mtu", "mdu"}       link established (initiator: proof validated; responder: request accepted)
   {"event":"link_failed", "reason"}                          initiator link did not come up within 30 s
-  {"event":"link_closed", "role", "reason"}                  teardown reason: 1 timeout, 2 initiator closed, 3 destination closed
+  {"event":"link_closed", "role", "link_id", "reason"}       teardown reason: 1 timeout, 2 initiator closed, 3 destination closed
   {"event":"data", "payload", "link_id"}                     packet received over the link
   {"event":"sent", "ok", "delivered"}                        reply to "send <hex>" (delivered = receipt proof validated, waited 15 s)
   {"event":"stat", "status", "rtt", "keepalive", "stale_time", "last_inbound_age", "mtu", "mdu", "remote_identity"}   reply to "stat"
@@ -178,7 +178,8 @@ def configure_link(link, role, identity_box):
         emit({"event": "data", "payload": message.hex(), "link_id": link.link_id.hex()})
 
     def on_closed(l):
-        emit({"event": "link_closed", "role": role, "reason": int(l.teardown_reason) if l.teardown_reason else 0})
+        emit({"event": "link_closed", "role": role, "link_id": l.link_id.hex(),
+              "reason": int(l.teardown_reason) if l.teardown_reason else 0})
 
     def on_identified(l, identity):
         emit({"event": "identified", "identity_hash": identity.hash.hex()})

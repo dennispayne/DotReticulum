@@ -273,6 +273,201 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
 
     [Trait("Category", "Live")]
     [LiveFact]
+    public async Task ManagedAndPinnedEndpointsAutomaticallyTimeOutAfterRouterCrashAndRecoverWithFreshLinks()
+    {
+        // Pinned Link.py:745-777,795-797: default RTT-derived stale time and watchdog grace.
+        foreach (var dotNetInitiates in new[] { true, false })
+        {
+            var directory = Path.Combine(AppContext.BaseDirectory, "parity8-timeout-" + Guid.NewGuid().ToString("N"));
+            var port = Port();
+            var pythonPort = Port();
+            var logs = new ConcurrentQueue<string>();
+            var closedLinks = new ConcurrentQueue<string>();
+            using var stop = new CancellationTokenSource();
+            using var identity = Identity.Generate();
+            await using var host = RnsdHost.Create(RnsdConfigParser.Parse($"""
+                [reticulum]
+                  share_instance = no
+                  enable_transport = yes
+                [interfaces]
+                  [[Server]]
+                    type = TCPServerInterface
+                    enabled = yes
+                    listen_ip = 127.0.0.1
+                    listen_port = {port}
+                """), Path.Combine(directory, "transport_identity"), (level, message) => logs.Enqueue($"[{level}] {message}"));
+            await using var endpoint = ReticulumNode.Create(RnsdConfigParser.Parse($"""
+                [reticulum]
+                  share_instance = no
+                  enable_transport = no
+                [interfaces]
+                  [[Surviving router]]
+                    type = TCPClientInterface
+                    enabled = yes
+                    target_host = 127.0.0.1
+                    target_port = {port}
+                """), Path.Combine(directory, "endpoint"), (level, message) => logs.Enqueue($"[endpoint/{level}] {message}"));
+            var destination = new LocalDestination(identity,
+                Destination.Create(DestinationType.Single, "dotreticulum", ["interop", "link"], identity))
+            {
+                AcceptLinks = true,
+                ProofStrategy = ProofStrategy.All,
+            };
+            endpoint.Router.RegisterLocalDestination(destination);
+            await using var bridge = new ResourceLossBridge(port);
+            PyLinkNode? router = null, leaf = null;
+            Task running = Task.CompletedTask;
+
+            async Task<(Link Link, Task<byte[]> Received, Task<LinkTeardownReason> Closed)> Connect()
+            {
+                using var ready = new CancellationTokenSource(Patience);
+                while (true)
+                {
+                    var interfaces = await leaf!.Command("interfaces", "interfaces", Patience);
+                    var bearer = Assert.Single(interfaces.GetProperty("interfaces").EnumerateArray(),
+                        item => item.GetProperty("name").GetString() == "ToDotNet");
+                    if (bearer.GetProperty("online").GetBoolean()) break;
+                    await Task.Delay(25, ready.Token);
+                }
+                var established = new TaskCompletionSource<Link>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var received = new TaskCompletionSource<byte[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var closed = new TaskCompletionSource<LinkTeardownReason>(TaskCreationOptions.RunContinuationsAsynchronously);
+                void Configure(Link link)
+                {
+                    link.ProofStrategy = ProofStrategy.All;
+                    link.PacketReceived = (data, _) => received.TrySetResult(data);
+                    link.Closed = value =>
+                    {
+                        closedLinks.Enqueue(value.LinkIdHex);
+                        closed.TrySetResult(value.TeardownReason);
+                    };
+                    established.TrySetResult(link);
+                }
+                var before = leaf!.Count("link_up");
+                await leaf.Command("announce", "announced", Patience);
+                await Until(() => host.Router.HasPath(leaf.Hash) && endpoint.Router.HasPath(leaf.Hash));
+                Assert.Equal(3, endpoint.Router.HopsTo(leaf.Hash));
+                var destinationHash = Convert.ToHexStringLower(destination.Destination.Hash);
+                var announcedBefore = leaf.Events("announce").Count(item => item.GetProperty("dest").GetString() == destinationHash);
+                await endpoint.Router.AnnounceAsync(destination);
+                await leaf.NextAsync("announce", announcedBefore, Patience,
+                    item => item.GetProperty("dest").GetString() == destinationHash);
+                var path = await leaf.Command($"request_path {destinationHash} 60", "path", Patience);
+                Assert.True(path.GetProperty("has_path").GetBoolean());
+                Assert.Equal(3, path.GetProperty("hops").GetInt32());
+                if (dotNetInitiates)
+                {
+                    endpoint.Router.Links.Connect(endpoint.Router.Engine.Known.Recall(leaf.Hash)!, leaf.Hash, Configure);
+                }
+                else
+                {
+                    destination.LinkEstablished = Configure;
+                    await leaf.SendLineAsync($"connect {destinationHash}");
+                }
+                var link = await established.Task.WaitAsync(Patience);
+                var peer = await leaf.NextAsync("link_up", before, Patience);
+                Assert.Equal(link.LinkIdHex, peer.GetProperty("link_id").GetString());
+                return (link, received.Task, closed.Task);
+            }
+
+            async Task ProveBothWays(Link link, Task<byte[]> received)
+            {
+                var before = leaf!.Count("data");
+                var receipt = link.Send("managed-before-outage"u8);
+                Assert.NotNull(receipt);
+                Assert.True(await receipt.Completion.WaitAsync(Patience));
+                Assert.Equal(Convert.ToHexStringLower("managed-before-outage"u8),
+                    (await leaf.NextAsync("data", before, Patience)).GetProperty("payload").GetString());
+                Assert.True((await leaf.Command("send 70696e6e65642d6265666f72652d6f7574616765", "sent", Patience))
+                    .GetProperty("delivered").GetBoolean());
+                Assert.Equal("pinned-before-outage"u8.ToArray(), await received.WaitAsync(Patience));
+            }
+
+            try
+            {
+                await host.StartAsync(stop.Token);
+                running = host.RunAsync(stop.Token);
+                await endpoint.StartAsync(stop.Token);
+                bridge.Start();
+                router = await PyLinkNode.StartAsync("timeout-router", tcpServerPort: pythonPort, rnsdPort: bridge.Port,
+                    harness: "live_mixed_transport_node.py");
+                leaf = await PyLinkNode.StartAsync("timeout-leaf", rnsdPort: pythonPort, harness: "parity8_transport_node.py");
+                await Until(() => Assert.IsType<TcpServerPacketInterface>(host.Interfaces.Single().Interface).ClientCount == 2);
+                var connection = await Connect();
+                await ProveBothWays(connection.Link, connection.Received);
+                var state = await leaf.Command("stat", "stat", Patience);
+                Assert.Equal(2, state.GetProperty("status").GetInt32());
+                Assert.Equal(LinkStatus.Active, connection.Link.Status);
+                var seconds = Math.Ceiling(Math.Max(
+                    connection.Link.StaleTime + connection.Link.Rtt!.Value * Link.KeepaliveTimeoutFactor,
+                    state.GetProperty("stale_time").GetDouble() + state.GetProperty("rtt").GetDouble() * Link.KeepaliveTimeoutFactor)
+                    + Link.StaleGrace + 10); // Two default five-second upstream watchdog polling intervals.
+                Assert.True(seconds is > 0 and <= 240, $"Observed watchdog budget exceeds this bounded case: {seconds}s; peer={state}.");
+                var timeout = TimeSpan.FromSeconds(seconds);
+                output.WriteLine($"Managed initiator={dotNetInitiates}, link={connection.Link.LinkIdHex}, " +
+                    $"RTT={connection.Link.Rtt}, keepalive={connection.Link.KeepaliveInterval}, stale={connection.Link.StaleTime}; " +
+                    $"peer={state}; source-derived close budget={timeout}.");
+                var beforeClosed = leaf.Count("link_closed");
+                var beforeData = leaf.Count("data");
+                var sessions = bridge.Sessions;
+                await router.CrashAsync();
+                await Until(() => Assert.IsType<TcpServerPacketInterface>(host.Interfaces.Single().Interface).ClientCount == 1);
+                var undelivered = connection.Link.Send("must-not-cross-crashed-router"u8);
+                Assert.NotNull(undelivered);
+                Assert.False(await undelivered.Completion.WaitAsync(Patience));
+                var managedClosed = connection.Closed.WaitAsync(timeout);
+                var referenceClosed = leaf.NextAsync("link_closed", beforeClosed, timeout);
+                await Task.WhenAll(managedClosed, referenceClosed);
+                Assert.Equal(LinkTeardownReason.Timeout, await managedClosed);
+                Assert.Equal(1, (await referenceClosed).GetProperty("reason").GetInt32());
+                Assert.Equal(LinkStatus.Closed, connection.Link.Status);
+                Assert.Null(endpoint.Router.Links.Find(connection.Link.LinkId));
+                Assert.Single(closedLinks, id => id == connection.Link.LinkIdHex);
+                var peerClosed = Assert.Single(leaf.Events("link_closed").Skip(beforeClosed));
+                Assert.Equal(connection.Link.LinkIdHex, peerClosed.GetProperty("link_id").GetString());
+                Assert.Equal(4, (await leaf.Command("stat", "stat", Patience)).GetProperty("status").GetInt32());
+                Assert.Equal(beforeData, leaf.Count("data"));
+                Assert.False(running.IsCompleted, string.Join('\n', logs));
+                output.WriteLine($"Both endpoints closed {connection.Link.LinkIdHex} with TIMEOUT, without a close command.");
+
+                await router.RestartAsync();
+                await Until(() => bridge.Sessions > sessions);
+                await Until(() => Assert.IsType<TcpServerPacketInterface>(host.Interfaces.Single().Interface).ClientCount == 2);
+                var recovered = await Connect();
+                Assert.NotEqual(connection.Link.LinkIdHex, recovered.Link.LinkIdHex);
+                await ProveBothWays(recovered.Link, recovered.Received);
+                output.WriteLine($"Fresh {recovered.Link.LinkIdHex} proved DATA both ways after persisted Python-router restart.");
+            }
+            finally
+            {
+                try
+                {
+                    var peers = new[] { leaf, router }.OfType<PyLinkNode>().ToArray();
+                    foreach (var peer in peers) output.WriteLine(peer.Name + ":\n" + peer.Log);
+                    await Task.WhenAll(peers.Select(peer => peer.DisposeAsync().AsTask()));
+                }
+                finally
+                {
+                    await stop.CancelAsync();
+                    try
+                    {
+                        try { await running.WaitAsync(TimeSpan.FromSeconds(15)); }
+                        catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
+                    }
+                    finally
+                    {
+                        await endpoint.DisposeAsync();
+                        await host.DisposeAsync();
+                        output.WriteLine(string.Join('\n', logs));
+                        if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+                    }
+                }
+            }
+        }
+    }
+
+    [Trait("Category", "Live")]
+    [LiveFact]
     public async Task PinnedUpstreamOnlyColdWindowLossNegativeControlCancelsBeforeItsFirstRepair()
     {
         foreach (var latency in new[] { 0, 120 })

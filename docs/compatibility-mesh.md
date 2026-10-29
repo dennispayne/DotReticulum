@@ -16,7 +16,8 @@ configuration, not a change to upstream code or proof behavior.
 Source contracts reviewed at that pin: `RNS/Resource.py` `__watchdog_job`
 (receiver timeout and missing-part re-request), `receive_part`, `request_next`
 and `request` (map-hash-based part selection and retransmission);
-`RNS/Link.py` `teardown`; and `RNS/Interfaces/TCPInterface.py` `reconnect`
+`RNS/Link.py` `teardown`, `__watchdog_job` and `__update_keepalive`; and
+`RNS/Interfaces/TCPInterface.py` `reconnect`
 (the upstream five-second reconnect interval). The bearer observes the existing
 packet codec's resource context and packet hash; it creates no protocol bytes.
 
@@ -73,6 +74,38 @@ exercise the operating system's reliable stream, not RNS resource recovery.
 This is a repeatable loopback impairment, not evidence from radio hardware or
 an uncontrolled wide-area network.
 
+## Automatic endpoint timeout and fresh-session recovery
+
+`ManagedAndPinnedEndpointsAutomaticallyTimeOutAfterRouterCrashAndRecoverWithFreshLinks`
+adds a separate Windows managed live case:
+
+```text
+.NET endpoint -- .NET transport -- impaired TCP -- Python transport -- Python endpoint
+```
+
+It runs both initiator roles, proves exact DATA receipt in both directions,
+then force-kills the actual Python transport. The .NET endpoint's connection
+to its surviving router stays up; otherwise local interface removal would
+close the link immediately instead of exercising its watchdog. A post-crash
+send must obtain no proof or peer receipt. Both endpoints must automatically
+report **TIMEOUT**, correlated to the old link ID, with no `close` command.
+The old .NET link must leave its manager, the peer must report CLOSED, and the
+surviving router must remain running.
+
+The deadline derives from the actual endpoints' RTT/stale intervals,
+`KEEPALIVE_TIMEOUT_FACTOR`, `STALE_GRACE` and two default five-second upstream
+watchdog polling intervals. Excessive observed budgets fail the bounded case;
+neither reference timers nor production policies are changed. Before fresh
+links, the case observes actual leaf TCP reconnection, new route availability
+and a newly received announce rather than trusting an old cached path.
+Restarted Python transport, both endpoint processes and the .NET router retain
+their identities; distinct new links must then prove exact DATA both ways.
+
+The thin upstream callback adapter only adds its actual link ID to closure
+observations. Local acceptance covers both .NET roles and default watchdog
+expiry, not active-link resumption, impaired published-native execution or
+cross-platform acceptance of this new case.
+
 ## Cold initial-window reference limitation
 
 The recovery scenario now injects loss **after** the initial window establishes
@@ -126,8 +159,9 @@ published-native router.
 
 The recovery case restarts the managed .NET router and force-kills/restarts the
 Python router, without promising preservation of live links across either
-restart. Old endpoints explicitly close; a distinct recovered link is required.
-Automatic endpoint outage timeout/session resumption, alternate routing paths,
+restart. That resource case explicitly closes old endpoints; the separate
+automatic-timeout case requires watchdog expiry and distinct recovered links.
+Active-link session resumption, alternate routing paths,
 mass-client overload, prolonged
 soak, physical bearers, other platforms, and impaired published-native execution
 are not covered. The capacity-two .NET queue setting does not prove router
