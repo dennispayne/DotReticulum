@@ -7,6 +7,8 @@
     <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors>
     <AnalysisLevel>latest</AnalysisLevel>
     <Deterministic>true</Deterministic>
+    <!-- Parallel projects must not append version variables to shared CI command files. -->
+    <NBGV_SetCloudBuildVersionVars>false</NBGV_SetCloudBuildVersionVars>
     <IsAotCompatible Condition="!$(MSBuildProjectName.EndsWith('.Tests'))">true</IsAotCompatible>
     <IsTrimmable Condition="!$(MSBuildProjectName.EndsWith('.Tests'))">true</IsTrimmable>
   </PropertyGroup>

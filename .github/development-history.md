@@ -4,6 +4,36 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Fix concurrent GitHub Actions version-variable exports
+
+Hosted build **40887675136**, macOS job **123495856574**, compiled successfully
+with **zero warnings/errors** but Actions then rejected its command file:
+`Unable to process file command 'env' successfully`, `Invalid format '.7'`.
+This was **not a Darwin C# compilation failure**. Parallel solution projects
+each invoke Nerdbank.GitVersioning's default cloud-variable exporter against
+the same Actions environment file; those values are unused by our workflows.
+
+Disabled only `NBGV_SetCloudBuildVersionVars` in `Directory.Build.props`.
+The pinned **3.10.94** package's `SetCloudBuildVersionVars` target explicitly
+supports this switch. Assembly/package/version-height calculation remains
+enabled, as do the existing artifact manifests. No version base, pin, tag
+policy or `version.json` content changed.
+
+An owned `GITHUB_ACTIONS=true`/`GITHUB_ENV`/`GITHUB_OUTPUT` reproduction previously
+exported `GitAssemblyInformationalVersion`, `GitBuildVersion` and
+`GitBuildVersionSimple`. After the fix, calculated assembly/file/informational
+versions matched the pre-change values **byte-for-byte**, and the complete
+parallel Release build left both sentinel command files untouched:
+**zero warnings/errors**. This verifies the actual shared-output boundary
+without writing any real runner command files.
+
+Added a focused Pester regression using real `dotnet msbuild -t:GetBuildVersion`
+with owned sentinel files, requiring valid matching assembly versions and no
+Actions-file mutation. `pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+**60 passed, 2 explicit missing-reference skips**.
+`pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
+**61 tracked files, zero findings**. Hosted rerun acceptance remains pending.
+
 ### Conservative inactivity-reminder automation
 
 Added the roadmap's `stale.yml` as weekly Monday **05:30 UTC** reminders plus
@@ -27,8 +57,10 @@ passed with no findings. The missing local linter was provisioned from the
 Windows **actionlint v1.7.12** release; downloaded zip SHA-256
 **6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9**
 matched GitHub's release-asset digest. Tool/artifacts remain ignored.
-Hosted manual dry-run acceptance is pending; TODO remains unchecked until that
-execution succeeds.
+Hosted manual preview **40887769855** on **8bbffcc** succeeded, with the log
+confirming debug mode, no issue/PR mutation and no persisted debug state.
+There were **no eligible issues**; this validates deployment/permissions and
+non-mutating preview, not actual stale-label removal or reminder delivery.
 
 ### Actual Java I2P local-destination persisted-restart acceptance
 

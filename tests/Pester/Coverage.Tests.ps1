@@ -133,6 +133,30 @@ Describe 'PowerShell test runner' -Tag Tooling {
         finally { $env:GITHUB_STEP_SUMMARY = $saved }
     }
 
+    It 'calculates assembly versions without writing shared Actions command files' {
+        $environmentFile = Join-Path $TestDrive 'version-env.txt'
+        $outputFile = Join-Path $TestDrive 'version-output.txt'
+        foreach ($file in $environmentFile, $outputFile) {
+            [IO.File]::WriteAllText($file, "OWNED_SENTINEL=unchanged`n")
+        }
+        $project = Join-Path $PSScriptRoot '..\..\src\DotReticulum.Applications\DotReticulum.Applications.csproj'
+        $result = Invoke-TestProcess 'dotnet' @('msbuild', $project, '-nologo',
+            '-t:GetBuildVersion', '-p:Configuration=Release',
+            '-getProperty:BuildVersion,AssemblyVersion,AssemblyInformationalVersion') -Environment @{
+                GITHUB_ACTIONS = 'true'
+                GITHUB_ENV = $environmentFile
+                GITHUB_OUTPUT = $outputFile
+            }
+        $result.Code | Should -Be 0 -Because $result.Error
+        $versions = ($result.Output | ConvertFrom-Json).Properties
+        $versions.BuildVersion | Should -Match '^\d+\.\d+\.\d+\.\d+$'
+        $versions.AssemblyVersion | Should -BeExactly $versions.BuildVersion
+        $versions.AssemblyInformationalVersion | Should -BeLike "$($versions.BuildVersion)*"
+        foreach ($file in $environmentFile, $outputFile) {
+            [IO.File]::ReadAllText($file) | Should -BeExactly "OWNED_SENTINEL=unchanged`n"
+        }
+    }
+
     It 'preserves cmd environment setup and quoted paths in the bounded native publisher' -Skip:(!$IsWindows) {
         $directory = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'native tools')
         $setup = Join-Path $directory.FullName 'setup.cmd'

@@ -47,4 +47,4 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Advanced Static analysis workflow: CodeQL (Actions, C#, Python), pinned PSScriptAnalyzer, SARIF and consolidated finding summary; replaces GitHub-managed default setup (all five jobs passed in run 40644131301; C# full-database selection avoids overlay fallback warnings)
   - [x] Separate Unit/Integration production coverage in consolidated Build and Test platform summaries (all 12 jobs passed in run 40644131484; six suite/platform coverage artifacts verified)
   - [x] Basic accessibility goals, limitations and reporting in `ACCESSIBILITY.md`
-  - [ ] `stale.yml`
+  - [x] `stale.yml` inactivity reminders without auto-close (hosted dry run 40887769855; no eligible issues to exercise mutation)
