@@ -21,7 +21,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
 - [ ] Parity 8 - Compatibility and release acceptance
   - [ ] Broader mesh acceptance: Python-router/crash restart, alternate routes, sustained Channel/resource soak and impaired native-binary/per-bearer matrices
   - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
-  - [ ] Darwin rnsh terminal backend and actual macOS feature acceptance (CI provides macOS execution; backend remains missing)
+  - [ ] Darwin rnsh terminal backend and actual macOS feature acceptance (backend implemented; actual macOS acceptance pending CI)
   - [ ] Android host/providers, desktop RNode BLE and other missing/partial applicable software identified in the compatibility ledger
   - [ ] Per-interface interoperability and hardware evidence; untested platforms/devices remain unverified
 - [ ] CI/CD and automation

@@ -27,12 +27,17 @@ public sealed class RnshTerminal : IDisposable
             if (GetConsoleMode(_input, out var inputMode)) _inputMode = inputMode;
             if (GetConsoleMode(_output, out var outputMode)) _outputMode = outputMode;
         }
-        else if (OperatingSystem.IsLinux() && Interactive)
+        else if ((OperatingSystem.IsLinux() || OperatingSystem.IsMacOS()) && Interactive)
         {
-            var state = new byte[60];
+            var state = new byte[OperatingSystem.IsMacOS() ? DarwinRnshNative.TermiosSize : 60];
             if (tcgetattr(0, state) == 0)
             {
                 _original = state;
+                if (OperatingSystem.IsMacOS())
+                {
+                    Flags = DarwinRnshNative.Flags(state);
+                    return;
+                }
                 // Python termios shape: four flags, input/output speed, control bytes.
                 var cc = state.AsSpan(17, 32).ToArray().Select(v => (object?)new[] { v }).ToArray();
                 Flags = new object?[] { (long)BitConverter.ToUInt32(state, 0), (long)BitConverter.ToUInt32(state, 4),
@@ -66,20 +71,21 @@ public sealed class RnshTerminal : IDisposable
             if (!GetConsoleMode(_input, out var input) || !GetConsoleMode(_output, out var output)) return null;
             return [.. BitConverter.GetBytes(input), .. BitConverter.GetBytes(output)];
         }
-        if (OperatingSystem.IsLinux())
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
         {
-            var modes = new byte[60];
+            var modes = new byte[OperatingSystem.IsMacOS() ? DarwinRnshNative.TermiosSize : 60];
             if (tcgetattr(0, modes) == 0) return modes;
         }
         return null;
     }
     public RnshWindow Window()
     {
-        if (OperatingSystem.IsLinux())
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
         {
             var size = new ushort[4];
             for (var fd = 0; fd < 3; fd++)
-                if (ioctl(fd, 0x5413, size) == 0) return new RnshWindow { Rows = size[0], Columns = size[1], HorizontalPixels = size[2], VerticalPixels = size[3] };
+                if ((OperatingSystem.IsMacOS() ? DarwinRnshNative.Window(fd, DarwinRnshNative.GetWindow, size) : ioctl(fd, 0x5413, size)) == 0)
+                    return new RnshWindow { Rows = size[0], Columns = size[1], HorizontalPixels = size[2], VerticalPixels = size[3] };
         }
         else if (OperatingSystem.IsWindows() && GetConsoleScreenBufferInfo(_output, out var info))
             return new RnshWindow { Rows = info.Window.Bottom - info.Window.Top + 1, Columns = info.Window.Right - info.Window.Left + 1, HorizontalPixels = 0, VerticalPixels = 0 };

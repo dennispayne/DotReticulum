@@ -4,13 +4,15 @@ using Microsoft.Win32.SafeHandles;
 
 namespace DotReticulum.Applications.Rnsh;
 
-// Linux libc ABI. Other platforms are deliberately rejected rather than silently using pipes as a PTY.
+// Linux and Darwin libc ABIs. Unsupported platforms are rejected rather than using pipes as a PTY.
 internal sealed class UnixRnshTerminal : IAsyncDisposable
 {
     private readonly int _pid;
     private readonly FileStream _master;
     private readonly bool _stdinPipe;
     private readonly Task<int> _exit;
+    private readonly object _disposeGate = new();
+    private Task? _dispose;
     private UnixRnshTerminal(int pid, FileStream master, Stream input, Stream output, Stream error, bool stdinPipe)
     {
         _pid = pid;
@@ -32,13 +34,16 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
 
     public static UnixRnshTerminal Start(string[] argv, RnshExecute command, string identity)
     {
-        if (!OperatingSystem.IsLinux()) throw new IOException("Native rnsh PTY sessions currently require Linux; use redirected streams on this platform.");
-        var master = posix_openpt(2 | 0x100);
+        if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+            throw new IOException("Native Unix rnsh PTY sessions require Linux or macOS; use redirected streams on this platform.");
+        var darwin = OperatingSystem.IsMacOS();
+        var master = posix_openpt(2 | (darwin ? DarwinRnshNative.NoControllingTerminal : 0x100));
         if (master < 0) throw ErrorFor("posix_openpt");
         var owned = new HashSet<int> { master };
         var allocations = new List<IntPtr>();
-        var actions = Marshal.AllocHGlobal(512);
-        var attr = Marshal.AllocHGlobal(512);
+        // Darwin's opaque spawn types are pointers; Linux uses inline structs.
+        var actions = Marshal.AllocHGlobal(darwin ? IntPtr.Size : 512);
+        var attr = Marshal.AllocHGlobal(darwin ? IntPtr.Size : 512);
         var actionsReady = false;
         var attrReady = false;
         try
@@ -47,7 +52,8 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
             var slave = Marshal.PtrToStringUTF8(ptsname(master)) ?? throw ErrorFor("ptsname");
             Check(posix_spawn_file_actions_init(actions)); actionsReady = true;
             Check(posix_spawnattr_init(attr)); attrReady = true;
-            Check(posix_spawnattr_setflags(attr, 0x80)); // POSIX_SPAWN_SETSID
+            Check(posix_spawnattr_setflags(attr, darwin
+                ? (short)(DarwinRnshNative.SpawnNewSession | DarwinRnshNative.SpawnCloseOnExecDefault) : (short)0x80));
             var sources = new int[3];
             var parents = new int[3];
             var pipes = new[] { command.PipeStdin, command.PipeStdout, command.PipeStderr };
@@ -64,7 +70,7 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
                 }
                 else
                 {
-                    // Open after setsid so this becomes the child's controlling terminal.
+                    // Linux opens after setsid. Darwin needs a second open in the bootstrap below.
                     Check(posix_spawn_file_actions_addopen(actions, i, slave, 2, 0));
                     sources[i] = -1; parents[i] = master;
                 }
@@ -86,15 +92,25 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
                 Marshal.WriteIntPtr(array, strings.Length * IntPtr.Size, IntPtr.Zero);
                 return array;
             }
-            var av = Strings(argv);
+            var spawnArgv = argv;
+            if (darwin && pipes.Any(value => !value))
+            {
+                var terminalFd = Array.FindIndex(pipes, value => !value);
+                // XNU kern_exec.c applies file actions before POSIX_SPAWN_SETSID.
+                // Reopen one terminal fd after the new session exists: open1() in
+                // vfs_syscalls.c then assigns its controlling tty and foreground pgrp.
+                // The script is fixed; user command arguments never become shell code.
+                spawnArgv = ["/bin/sh", "-c", $"exec {terminalFd}<> \"$1\"; shift; exec -- \"$@\"", "rnsh-pty", slave, .. argv];
+            }
+            var av = Strings(spawnArgv);
             var ev = Strings(environment.Select(e => e.Key + "=" + e.Value));
             if (!command.PipeStdin || !command.PipeStdout || !command.PipeStderr)
             {
                 var size = new ushort[] { checked((ushort)(command.Window.Rows ?? 0)), checked((ushort)(command.Window.Columns ?? 0)),
                     checked((ushort)(command.Window.HorizontalPixels ?? 0)), checked((ushort)(command.Window.VerticalPixels ?? 0)) };
-                if (ioctl(master, 0x5414, size) != 0) throw ErrorFor("TIOCSWINSZ");
+                if (SetWindow(master, size) != 0) throw ErrorFor("TIOCSWINSZ");
             }
-            Check(posix_spawnp(out var pid, argv[0], actions, attr, av, ev));
+            Check(posix_spawnp(out var pid, spawnArgv[0], actions, attr, av, ev));
             foreach (var fd in sources.Where(fd => fd >= 0)) { close(fd); owned.Remove(fd); }
             var masterStream = StreamFor(master); owned.Remove(master);
             Stream Parent(int index)
@@ -125,7 +141,7 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
     {
         var window = new ushort[] { checked((ushort)(size.Rows ?? 0)), checked((ushort)(size.Columns ?? 0)),
             checked((ushort)(size.HorizontalPixels ?? 0)), checked((ushort)(size.VerticalPixels ?? 0)) };
-        if (ioctl(_master.SafeFileHandle.DangerousGetHandle().ToInt32(), 0x5414, window) != 0) throw ErrorFor("TIOCSWINSZ");
+        if (SetWindow(_master.SafeFileHandle.DangerousGetHandle().ToInt32(), window) != 0) throw ErrorFor("TIOCSWINSZ");
     }
     public void CloseInput()
     {
@@ -133,16 +149,25 @@ internal sealed class UnixRnshTerminal : IAsyncDisposable
         else { Input.WriteByte(4); Input.Flush(); }
     }
     public Task<int> WaitAsync(CancellationToken token) => _exit.WaitAsync(token);
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
+    {
+        lock (_disposeGate) return new ValueTask(_dispose ??= DisposeCoreAsync());
+    }
+    private async Task DisposeCoreAsync()
     {
         // The leader may have exited while descendants still own output pipes.
         kill(-_pid, 15);
         try { await _exit.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false); }
         catch (TimeoutException) { kill(-_pid, 9); await _exit.WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false); }
-        kill(-_pid, 9);
-        Input.Dispose(); Output.Dispose(); Error.Dispose(); _master.Dispose();
+        finally
+        {
+            kill(-_pid, 9);
+            Input.Dispose(); Output.Dispose(); Error.Dispose(); _master.Dispose();
+        }
     }
     private static IOException ErrorFor(string operation) => new($"{operation}: {new Win32Exception(Marshal.GetLastPInvokeError()).Message}");
+    private static int SetWindow(int fd, ushort[] size) => OperatingSystem.IsMacOS()
+        ? DarwinRnshNative.Window(fd, DarwinRnshNative.SetWindow, size) : ioctl(fd, 0x5414, size);
     private static void Check(int code) { if (code != 0) throw new IOException(new Win32Exception(code).Message); }
     [DllImport("libc", SetLastError = true)] private static extern int posix_openpt(int flags);
     [DllImport("libc", SetLastError = true)] private static extern int grantpt(int fd);

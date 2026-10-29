@@ -108,14 +108,14 @@ Windows rncp peer cases disclose a file-retention workaround in
 | Auto, Backbone, Pipe, KISS, RNode, Weave, I2P | Software, process and simulator tests; live Python on Linux for Auto and Backbone. No over-the-air radio interoperability; I2P restart recovery not verified |
 | `rncp`, `rnx` | Live both ways |
 | `rngit`, `git-remote-rns`, `rngcs` | Clone, fetch and push against the pinned Python server; hosting, releases, work documents, signing; verified fetch of the hosted upstream |
-| `rnid`, `rnstatus`, `rnpath`, `rnprobe`, `rnsh`, `rnodeconf` | Windows and Linux native-process tests against Python; `rnodeconf` identified a real RNode over USB, flashing/recovery not hardware-accepted |
+| `rnid`, `rnstatus`, `rnpath`, `rnprobe`, `rnsh`, `rnodeconf` | Windows and Linux native-process tests against Python; one Windows RAK4631 passed native USB DFU/reflash and reversible EEPROM persistence/restoration; no RF acceptance |
 | Mixed mesh | Impaired transports, lost resource parts and a restarted .NET router; see [the mesh reference](docs/compatibility-mesh.md) |
 
 | Platform | Status |
 | --- | --- |
 | Windows x64 | Built, tested, NativeAOT-published; primary development platform |
 | Linux x64 | Built, tested, NativeAOT-published; Auto and Backbone live-tested |
-| macOS ARM64 | CI builds, runs the managed suite and an encrypted multi-megabyte native resource transfer; rnsh terminal backend missing, packaging not accepted |
+| macOS ARM64 | CI builds, runs the managed suite and an encrypted multi-megabyte native resource transfer; rnsh terminal backend implemented with macOS acceptance pending; packaging not accepted |
 | Linux ARM/RISC-V, FreeBSD, Android, iOS | Not verified; a managed build is not platform support |
 
 ## Build and test

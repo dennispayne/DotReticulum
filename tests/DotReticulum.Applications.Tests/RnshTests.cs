@@ -10,8 +10,8 @@ public sealed class RnshTerminalFactAttribute : FactAttribute
 {
     public RnshTerminalFactAttribute()
     {
-        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux())
-            Skip = "The rnsh PTY backend supports Windows/Linux only; Darwin terminal support remains unimplemented in TODO.md.";
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+            Skip = "The rnsh PTY backend supports Windows, Linux and macOS.";
     }
 }
 
@@ -19,8 +19,8 @@ public sealed class RnshTerminalTheoryAttribute : TheoryAttribute
 {
     public RnshTerminalTheoryAttribute()
     {
-        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux())
-            Skip = "The rnsh PTY backend supports Windows/Linux only; Darwin terminal support remains unimplemented in TODO.md.";
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+            Skip = "The rnsh PTY backend supports Windows, Linux and macOS.";
     }
 }
 

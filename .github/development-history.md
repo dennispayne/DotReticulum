@@ -4,6 +4,39 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Darwin rnsh terminal backend implementation
+
+Implemented macOS PTY creation with Darwin-specific `O_NOCTTY`,
+`POSIX_SPAWN_SETSID`/close-on-exec flags, pointer-sized opaque spawn objects,
+72-byte LP64 termios observations/restoration, and window ioctls. The arm64
+variadic ioctl binding places its pointer argument on the stack, as Apple's ABI
+requires. XNU applies spawn file actions before creating the session; a fixed
+shell bootstrap reopens one terminal descriptor after `setsid` and `exec`s the
+literal argv to acquire a controlling tty and foreground process group.
+It does not interpolate remote command text. Linux's existing spawn path and
+Windows ConPTY remain separate. Unix disposal now joins the same teardown task
+on repeat calls and releases streams even if bounded child termination fails.
+
+Sources: pinned `RNS/Utilities/rnsh/process.py` plus Apple XNU revision
+`f6217f891ac0bb64f3d375211650a4c1ff8ca1ea`
+`bsd/sys/{termios,ttycom,ioccom,fcntl,spawn}.h`,
+`bsd/kern/kern_exec.c`, `bsd/vfs/vfs_syscalls.c`, and Apple's arm64 ABI
+documentation linked in `docs\rnsh.md`. No wire protocol or reference pin changed.
+
+Added actual-Darwin tests for controlling tty/resize/literal argv, foreground
+interrupt delivery followed by a fresh session, and cancellation/process-group
+cleanup. Existing terminal-mode restoration, eight endpoint combinations and
+published-native terminal flow tests now run on macOS instead of skipping.
+They still require that actual OS; Windows results do not establish Darwin ABI
+acceptance.
+
+Local `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --nologo -v quiet --filter FullyQualifiedName~Rnsh`:
+**21 passed, 5 explicitly skipped** on Windows. The integrated full build,
+coverage, native publication and multi-megabyte feature evidence is recorded in
+the adjacent RAK milestone (**1,847 passed, 82 skipped**, no warnings/errors).
+**Actual macOS and Linux regression execution awaits hosted CI**; the TODO and
+current platform claims deliberately remain partial until that evidence exists.
+
 ### RAK4631 USB DFU and physical maintenance acceptance
 
 The user authorized DFU, firmware reflashing and device settings without requiring

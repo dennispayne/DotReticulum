@@ -8,7 +8,7 @@ Platform support is specific to each bearer and operation. A managed build or a 
 | --- | --- |
 | Windows x64 | Managed build/test suites and Windows NativeAOT acceptance are exercised. Pipe process ownership and selected serial-device detection have software/hardware evidence; physical radio operation is not established. |
 | Linux x64 | Managed suites and Linux NativeAOT acceptance are exercised. Backbone is Linux-gated. AutoInterface namespace/veth traffic with pinned Python is tested; it does not prove physical LAN or multicast hardware support. |
-| macOS ARM64 | Hosted build, managed test suite, and NativeAOT resource test pass. The rnsh Darwin PTY backend is unavailable. These results do not establish native bearer behavior for every macOS interface. |
+| macOS ARM64 | Hosted build, managed test suite, and NativeAOT resource test pass. The rnsh Darwin PTY backend is implemented but its actual macOS execution is pending. These results do not establish native bearer behavior for every macOS interface. |
 | Android | No Android application target, package, permission workflow, or native USB/Bluetooth provider is implemented. Shared-client policy and some platform branches are source-level implementation only. |
 | Other operating systems and architectures | Not generally implemented or verified. Check each bearer rather than inferring support from .NET socket portability. |
 
