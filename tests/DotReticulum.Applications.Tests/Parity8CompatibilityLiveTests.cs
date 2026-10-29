@@ -89,13 +89,14 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             Assert.Equal(3, (await b.Command($"path {a.HashHex}", "path", Patience)).GetProperty("hops").GetInt32());
         }
 
-        async Task Connect(PyLinkNode initiator, PyLinkNode responder)
+        async Task<string> Connect(PyLinkNode initiator, PyLinkNode responder)
         {
             var before = responder.Count("link_up");
             var established = await initiator.Command($"connect {responder.HashHex}", "link_up", Patience);
             var accepted = await responder.NextAsync("link_up", before, Patience);
             Assert.Equal(established.GetProperty("link_id").GetString(), accepted.GetProperty("link_id").GetString());
             Assert.Equal(1, host!.Router.LinkTableCount);
+            return Assert.IsType<string>(established.GetProperty("link_id").GetString());
         }
 
         async Task Close(PyLinkNode initiator, PyLinkNode responder)
@@ -103,6 +104,14 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             var before = responder.Count("link_closed");
             await initiator.SendLineAsync("close");
             await responder.NextAsync("link_closed", before, Patience);
+        }
+
+        async Task CloseLocally(PyLinkNode endpoint)
+        {
+            var before = endpoint.Count("link_closed");
+            await endpoint.SendLineAsync("close");
+            await endpoint.NextAsync("link_closed", before, Patience);
+            Assert.Equal(4, (await endpoint.Command("stat", "stat", Patience)).GetProperty("status").GetInt32());
         }
 
         async Task WaitForLeafConnection(bool online)
@@ -187,18 +196,27 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             Assert.Equal(2, host.Router.HopsTo(a.Hash));
             Assert.Equal(1, host.Router.HopsTo(b.Hash));
             await Discover();
-            await Connect(b, a);
+            var interruptedLink = await Connect(b, a);
             await Send(a, b, "726573746172742d6162");
             await Send(b, a, "726573746172742d6261");
             await Resource(b, a, fromPython: false, 220_019, "parity8-restart");
-            await Close(b, a);
 
             var pythonIdentity = ready.GetProperty("transport_id").GetString();
             Assert.False(string.IsNullOrEmpty(pythonIdentity));
+            await Send(a, b, "6163746976652d6265666f72652d6372617368");
+            await Send(b, a, "6163746976652d6265666f72652d63726173682d7265706c79");
+            Assert.Equal(2, (await a.Command("stat", "stat", Patience)).GetProperty("status").GetInt32());
+            Assert.Equal(2, (await b.Command("stat", "stat", Patience)).GetProperty("status").GetInt32());
             await WaitForLeafConnection(online: true);
             await router.CrashAsync();
             await WaitForLeafConnection(online: false);
             await Until(() => Assert.IsType<TcpServerPacketInterface>(host.Interfaces.Single().Interface).ClientCount == 1);
+            await Until(() => host.Router.LinkTableCount == 0);
+            var beforeInterruptedSend = b.Count("data");
+            var interruptedSend = await a.Command("send 6d7573742d6e6f742d64656c697665722d61667465722d6372617368", "sent", Patience);
+            Assert.False(interruptedSend.GetProperty("delivered").GetBoolean());
+            Assert.Equal(beforeInterruptedSend, b.Count("data"));
+            await Task.WhenAll(CloseLocally(a), CloseLocally(b));
             sessions = bridge.Sessions;
             await router.RestartAsync();
             Assert.Equal(pythonIdentity, router.Events("ready").Last().GetProperty("transport_id").GetString());
@@ -211,7 +229,8 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
             Assert.True(pythonPath.GetProperty("has_path").GetBoolean());
             Assert.Equal(2, pythonPath.GetProperty("hops").GetInt32());
             await Discover();
-            await Connect(a, b);
+            var recoveredLink = await Connect(a, b);
+            Assert.NotEqual(interruptedLink, recoveredLink);
             await Send(a, b, "707974686f6e2d63726173682d6162");
             await Send(b, a, "707974686f6e2d63726173682d6261");
             await Resource(a, b, fromPython: true, 220_017, "parity8-python-crash-ab");
@@ -225,7 +244,9 @@ public sealed class Parity8CompatibilityLiveTests(ITestOutputHelper output)
                 $"router inbound capacities=2; dropped/retransmitted parts={bridge.Dropped}/{bridge.Retried}, " +
                 $"backpressure waits={bridge.BackpressureWaits}, TCP sessions={bridge.Sessions}; " +
                 "proved packets after TCP reconnect, persisted-identity .NET restart and forced Python-router crash/restart; " +
-                "surviving leaves observed their bearer offline/online, then exchanged proved data and impaired resources both ways.");
+                "crash interrupted an active proved link, detached its .NET forwarding state and prevented further delivery; " +
+                "surviving leaves explicitly closed old links, observed bearer recovery and established a distinct link, " +
+                "then exchanged proved data and impaired resources both ways.");
         }
         finally
         {

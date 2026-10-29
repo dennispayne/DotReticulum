@@ -4,6 +4,46 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Interrupted active-link crash and explicit session recovery
+
+Extended the existing mixed three-hop actual-upstream transport case to kill
+the Python router while its endpoints retain their already proved link, instead
+of closing it before the crash. Both directions first validate actual DATA
+proofs and both endpoint APIs report **ACTIVE (2)**. After the force kill, the
+surviving leaf observes its bearer offline, the .NET TCP child count falls to
+one and the .NET transit link table becomes empty. A further attempted send on
+the old link gets **no validated delivery proof** and the other leaf's actual
+packet-callback count remains unchanged. This negative result follows an
+observed real path and forced bearer outage, not an unexplained timeout.
+
+Both surviving endpoint APIs then explicitly tear down their old links and
+report **CLOSED (4)**. Pinned `Link.py:662-672` defines that teardown and fresh
+keys for new links. After the real Python router restarts with its persisted
+transport identity, the existing discovery/receipt/resource acceptance runs
+over an asserted **different link ID**. The unchanged actual impairment still
+requires **15 distinct resource-part drops / 15 first retries**, bounded
+capacity-one backpressure, exact hashes and bidirectional payloads.
+No reference timer, API or source shim is introduced. This is managed .NET
+transport integration with actual upstream leaves/router, **not** automatic
+endpoint timeout, cryptographic-session resume or native transport acceptance.
+
+Initial exploration unnecessarily created another link immediately after
+closing the previous session and encountered two retained forwarding entries.
+The existing exact-one assertion was kept: the final case instead retains the
+already exercised session through the crash, directly establishing the intended
+active-link boundary without changing production retention policy.
+
+With actual import-verified RNS **a29bfb51c468945c96a1ee22cae0114e993e2391**:
+`DOTRETICULUM_LIVE=1` plus verified Windows reference variables and
+`dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --nologo -v quiet --filter 'FullyQualifiedName~Parity8CompatibilityLiveTests' --logger trx --results-directory TestResults\active-link-crash-reuse-20261029 -- xUnit.MaxParallelThreads=1`:
+**1/1 passed / zero skips / 3m05s**.
+Final `dotnet build DotReticulum.slnx -c Release --nologo -v quiet` and
+`dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet`:
+**zero warnings/errors; 1,850 passed / 84 explicit skips**.
+Production code and its previously measured coverage/native artifact are
+unchanged. Cross-platform repeated-mesh acceptance of this extension remains
+pending; earlier hosted runs do not test it.
+
 ### Shared executable Channel stream acceptance
 
 Added **T057 / C009** without changing its verbatim upstream claim or reference

@@ -23,8 +23,8 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Authorized RAK4631 native rnodeconf USB-triggered DFU, same-version reflash, changed-port recovery and reversible EEPROM-setting persistence/restoration
   - [ ] Remaining physical rnodeconf device/platform and RF acceptance (one RAK4631 verified; one radio cannot establish RF interoperability)
 - [ ] Parity 8 - Compatibility and release acceptance
-  - [ ] Broader mesh acceptance: alternate routes, active-link crash behavior, sustained Channel/resource soak and impaired native-binary/per-bearer matrices
-  - [x] Actual pinned Python-router forced crash/restart with persisted transport identity, surviving leaves, observed bearer outage/recovery and bidirectional impaired resources
+  - [ ] Broader mesh acceptance: alternate routes, automatic active-link outage/timeout behavior, sustained Channel/resource soak and impaired native-binary/per-bearer matrices
+  - [x] Actual pinned Python-router forced crash/restart with persisted transport identity, surviving leaves, interrupted proved link/forwarding-state cleanup, explicit endpoint teardown, distinct recovered link and bidirectional impaired resources
   - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
   - [ ] Darwin rnsh terminal backend and actual macOS feature acceptance (controlling TTY/resize/literal argv/signals/group teardown and native terminal passed; pending mode-state and redirected-exit corrections)
   - [ ] Android host/providers, desktop RNode BLE and other missing/partial applicable software identified in the compatibility ledger
