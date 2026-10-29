@@ -1,10 +1,65 @@
-param([string] $Application, [string] $Python, [string] $Upstream)
+param(
+    [string] $Application,
+    [string] $Python,
+    [string] $Upstream,
+    [bool] $AuthorizeRNodeFirmware = $false,
+    [string] $RNodeUsbSerial,
+    [string] $RNodeFirmwareVersion,
+    [string] $RNodeFlasher
+)
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'TestProcess.ps1')
     $cli = (Resolve-Path -LiteralPath $Application).Path
     $executable = if ([IO.Path]::GetExtension($cli) -eq '.dll') { 'dotnet' } else { $cli }
     $prefix = @(if ($executable -eq 'dotnet') { $cli })
+}
+
+Describe 'Authorized physical RAK4631 maintenance' -Tag Hardware {
+    It 'persists a reversible EEPROM setting across USB DFU reflash and restores the original EEPROM' -Skip:(!$AuthorizeRNodeFirmware) {
+        $RNodeUsbSerial | Should -Not -BeNullOrEmpty
+        $RNodeFirmwareVersion | Should -Match '^\d+\.\d+$'
+        Test-Path -LiteralPath $RNodeFlasher -PathType Leaf | Should -BeTrue
+        function Invoke-RNodeCommand {
+            param([string[]] $Options)
+            $result = Invoke-TestProcess $executable ($prefix + @('rnodeconf', '--usb-serial', $RNodeUsbSerial) + $Options) -TimeoutSeconds 660
+            $result.Code | Should -Be 0 -Because ($result.Error + $result.Output)
+            return $result
+        }
+        $information = Invoke-RNodeCommand @('--info')
+        $information.Output | Should -Match 'RAK4631'
+        $information.Output | Should -Match ('Firmware version:\s+' + [regex]::Escape($RNodeFirmwareVersion) + '\b')
+        $beforePath = Join-Path $TestDrive 'before.eeprom'
+        $null = Invoke-RNodeCommand @('--eeprom-backup', '--backup-file', $beforePath)
+        $before = [IO.File]::ReadAllBytes($beforePath)
+        $before.Length | Should -Be 200
+        $brightness = $before[0xb2]
+        $configuration = Invoke-RNodeCommand @('--config')
+        $configuration.Output | Should -Match ('Display brightness:\s+' + $brightness + '\b')
+        $configuration.Output | Should -Not -Match 'SSID:'
+        $changed = $before.Clone()
+        $changed[0xb2] = $brightness -bxor 1
+        try {
+            $null = Invoke-RNodeCommand @('--display', [string] $changed[0xb2], '--authorize-device-write')
+            $changedPath = Join-Path $TestDrive 'changed.eeprom'
+            $null = Invoke-RNodeCommand @('--eeprom-backup', '--backup-file', $changedPath)
+            ([Convert]::ToHexString([IO.File]::ReadAllBytes($changedPath)) -ceq [Convert]::ToHexString($changed)) |
+                Should -BeTrue -Because 'only the requested brightness byte may change'
+            $null = Invoke-RNodeCommand @('--force-update', '--fw-version', $RNodeFirmwareVersion,
+                '--flasher', $RNodeFlasher, '--state-dir', (Join-Path $TestDrive 'firmware-state'),
+                '--authorize-device-write', '--authorize-flash', '--authorize-firmware-download', '--authorize-unverified-device')
+            $afterPath = Join-Path $TestDrive 'after-reflash.eeprom'
+            $null = Invoke-RNodeCommand @('--eeprom-backup', '--backup-file', $afterPath)
+            ([Convert]::ToHexString([IO.File]::ReadAllBytes($afterPath)) -ceq [Convert]::ToHexString($changed)) |
+                Should -BeTrue -Because 'every EEPROM byte must survive firmware replacement'
+        } finally {
+            $null = Invoke-RNodeCommand @('--display', [string] $brightness, '--authorize-device-write')
+            $restoredPath = Join-Path $TestDrive 'restored.eeprom'
+            $null = Invoke-RNodeCommand @('--eeprom-backup', '--backup-file', $restoredPath)
+            ([Convert]::ToHexString([IO.File]::ReadAllBytes($restoredPath)) -ceq [Convert]::ToHexString($before)) |
+                Should -BeTrue -Because 'every original EEPROM byte must be restored'
+        }
+    }
 }
 
 Describe 'Parity 7 native maintenance safety and placeholder processes' -Tag E2E, Device {

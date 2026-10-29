@@ -70,26 +70,32 @@ public sealed class RnodeconfClient(Stream stream, TimeSpan? responseTimeout = n
     {
         _responses.Remove(0x6d);
         await stream.WriteAsync(RnodeconfCommands.Encode("config-read"), token).ConfigureAwait(false);
-        await ReadUntilAsync(() => Has(0x6d, 74), token).ConfigureAwait(false);
+        await ReadUntilAsync(() => _responses.ContainsKey(0x6d), token).ConfigureAwait(false);
         var sector = _responses[0x6d];
+        if (sector.Length is > 0 and < 74) throw new IOException("Device returned a truncated WiFi configuration sector.");
         string Text(int offset)
         {
             var bytes = sector.AsSpan(offset, 32);
             var end = bytes.IndexOfAny((byte)0, (byte)255);
             return new UTF8Encoding(false, true).GetString(end < 0 ? bytes : bytes[..end]);
         }
-        var psk = Text(33);
         await output.WriteLineAsync("Device configuration:").ConfigureAwait(false);
         await output.WriteLineAsync($"  Bluetooth: {(eeprom[0xb0] == 0x73 ? "Enabled" : "Disabled")}").ConfigureAwait(false);
         await output.WriteLineAsync($"  WiFi: {eeprom[0xba] switch { 1 => "STATION", 2 => "AP", _ => "OFF" }}").ConfigureAwait(false);
-        await output.WriteLineAsync($"  Channel: {(eeprom[0xbb] is >= 1 and <= 14 ? eeprom[0xbb] : 1)}").ConfigureAwait(false);
-        await output.WriteLineAsync($"  SSID: {Text(0)}").ConfigureAwait(false);
-        await output.WriteLineAsync($"  PSK: {(showPsk ? psk : new string('*', psk.Length))}").ConfigureAwait(false);
-        var ip = new System.Net.IPAddress(sector.AsSpan(66, 4)).ToString();
-        var netmask = new System.Net.IPAddress(sector.AsSpan(70, 4)).ToString();
-        if (eeprom[0xba] == 2) { ip = "10.0.0.1"; netmask = "255.255.255.0"; }
-        await output.WriteLineAsync($"  IP Address: {(ip is "0.0.0.0" or "255.255.255.255" ? "DHCP" : ip)}").ConfigureAwait(false);
-        await output.WriteLineAsync($"  Network Mask: {netmask}").ConfigureAwait(false);
+        if (sector.Length == 0)
+            await output.WriteLineAsync("  WiFi configuration sector: not provided by this device.").ConfigureAwait(false);
+        else
+        {
+            var psk = Text(33);
+            await output.WriteLineAsync($"  Channel: {(eeprom[0xbb] is >= 1 and <= 14 ? eeprom[0xbb] : 1)}").ConfigureAwait(false);
+            await output.WriteLineAsync($"  SSID: {Text(0)}").ConfigureAwait(false);
+            await output.WriteLineAsync($"  PSK: {(showPsk ? psk : new string('*', psk.Length))}").ConfigureAwait(false);
+            var ip = new System.Net.IPAddress(sector.AsSpan(66, 4)).ToString();
+            var netmask = new System.Net.IPAddress(sector.AsSpan(70, 4)).ToString();
+            if (eeprom[0xba] == 2) { ip = "10.0.0.1"; netmask = "255.255.255.0"; }
+            await output.WriteLineAsync($"  IP Address: {(ip is "0.0.0.0" or "255.255.255.255" ? "DHCP" : ip)}").ConfigureAwait(false);
+            await output.WriteLineAsync($"  Network Mask: {netmask}").ConfigureAwait(false);
+        }
         await output.WriteLineAsync($"  Display brightness: {eeprom[0xb2]}, timeout: {eeprom[0xb4]}, rotation: {eeprom[0xb8]}").ConfigureAwait(false);
         await output.WriteLineAsync($"  Display address: {(eeprom[0xb3] == 255 ? "Default" : eeprom[0xb3].ToString("x2", System.Globalization.CultureInfo.InvariantCulture))}").ConfigureAwait(false);
         await output.WriteLineAsync($"  Display blanking: {(eeprom[0xb7] == 0x73 && eeprom[0xb4] != 0 ? eeprom[0xb4] + "s" : "Disabled")}").ConfigureAwait(false);

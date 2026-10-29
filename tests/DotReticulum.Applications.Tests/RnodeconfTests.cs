@@ -100,6 +100,30 @@ public sealed class RnodeconfTests
     }
 
     [Fact]
+    public async Task EmptyConfigurationSectorStillReportsEepromButTruncatedSectorFails()
+    {
+        // GenerateRnodeconfConfigurationVectors.py executes the pinned Python readLoop.
+        using var oracle = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,
+            "Fixtures", "rnodeconf-configuration.json")));
+        var empty = oracle.RootElement.GetProperty("empty_sector");
+        var decoded = Assert.Single(new RNodeFrameDecoder().Feed(Convert.FromHexString(
+            empty.GetProperty("frame").GetString()!)));
+        Assert.Equal(empty.GetProperty("decoded").GetString(), Convert.ToHexStringLower(decoded.Payload));
+        using var device = new DeviceSimulator { ConfigurationLength = 0 };
+        using var output = new StringWriter();
+        Assert.Equal(0, await Run(device, ["SIM", "--config"], output));
+        Assert.Contains("Bluetooth: Enabled", output.ToString());
+        Assert.Contains("not provided by this device", output.ToString());
+        Assert.DoesNotContain("SSID:", output.ToString());
+        using var malformed = new DeviceSimulator { ConfigurationLength = 10 };
+        using var error = new StringWriter();
+        Assert.Equal(1, await RnodeconfCli.RunAsync(["SIM", "--config"], TextWriter.Null, error, default,
+            (_, _) => ValueTask.FromResult<Stream>(malformed)));
+        Assert.Contains("truncated", error.ToString());
+        Assert.Empty(new RNodeFrameDecoder().Feed(RNodeProtocol.Frame(0, [])));
+    }
+
+    [Fact]
     public async Task AuthorizedSettingsRequireValidEepromAndHaveSourceOrder()
     {
         using var simulator = new DeviceSimulator();
@@ -226,6 +250,7 @@ public sealed class RnodeconfTests
         public bool Answer { get; init; } = true;
         public bool HardwareError { get; init; }
         public bool Truncated { get; init; }
+        public int ConfigurationLength { get; init; } = 74;
         public byte Platform { get; init; } = 0x70;
         public byte FirmwareMinor { get; init; } = 86;
         public byte[] FirmwareImageHash { get; init; } = new byte[32];
@@ -263,7 +288,7 @@ public sealed class RnodeconfTests
                 Encoding.UTF8.GetBytes("test-network").CopyTo(config, 0);
                 Encoding.UTF8.GetBytes("test-only-password").CopyTo(config, 33);
                 new byte[] { 192, 168, 1, 219, 255, 255, 255, 0 }.CopyTo(config, 66);
-                response = RNodeProtocol.Frame(0x6d, config);
+                response = RNodeProtocol.Frame(0x6d, config.AsSpan(0, ConfigurationLength));
             }
             else
             {
@@ -371,8 +396,11 @@ public sealed class RnodeconfTests
         finally { Directory.Delete(folder, true); }
     }
 
-    [Fact]
-    public async Task UpdateUsesCapturedInstalledToolReopensDeviceAndVerifiesReportedVersion()
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    public async Task UpdateResolvesDfuPortAndRequiresReenumerationAfterInterruptedTouch(bool interruptedTouch, bool bootloaderAppears)
     {
         var folder = OwnedDirectory();
         try
@@ -400,14 +428,29 @@ public sealed class RnodeconfTests
             var opened = 0;
             var selectedPorts = new List<string>();
             var toolCalled = false;
+            var enteredDfu = false;
+            var enumerations = 0;
             var services = new RnodeconfServices
             {
                 Http = http, Delay = (_, _) => Task.CompletedTask,
-                EnumeratePorts = () => opened == 0 ? [new("SIM", "stable-usb-id", "simulator")] : [new("SIM-RECONNECTED", "stable-usb-id", "simulator")],
+                EnumeratePorts = () => opened == 0 ? [new("SIM", "stable-usb-id", "simulator")] :
+                    [new(toolCalled ? "SIM-RECONNECTED" : bootloaderAppears && ++enumerations > 1 ? "SIM-DFU" : "SIM",
+                        "stable-usb-id", "simulator")],
+                EnterDfu = (name, _) =>
+                {
+                    Assert.True(before.Disposed);
+                    Assert.Equal("SIM", name);
+                    enteredDfu = true;
+                    if (interruptedTouch) throw new IOException("USB handle lost during reset");
+                    return Task.CompletedTask;
+                },
                 ExecuteTool = (plan, _) =>
                 {
                     Assert.True(before.Disposed);
+                    Assert.True(enteredDfu);
                     Assert.Contains("dfu", plan.Arguments);
+                    Assert.Contains(interruptedTouch ? "SIM-DFU" : "SIM", plan.Arguments);
+                    Assert.DoesNotContain("-t", plan.Arguments);
                     Assert.DoesNotContain(plan.Arguments, a => a.EndsWith(".py", StringComparison.Ordinal));
                     toolCalled = true;
                     return Task.FromResult(0);
@@ -423,6 +466,13 @@ public sealed class RnodeconfTests
                     selectedPorts.Add(name);
                     return ValueTask.FromResult<Stream>(opened++ == 0 ? before : after);
                 }, services);
+            if (!bootloaderAppears)
+            {
+                Assert.Equal(1, result);
+                Assert.False(toolCalled);
+                Assert.Contains("recovery deadline", error.ToString());
+                return;
+            }
             Assert.True(result == 0, error.ToString());
             Assert.True(toolCalled);
             Assert.Equal(2, opened);

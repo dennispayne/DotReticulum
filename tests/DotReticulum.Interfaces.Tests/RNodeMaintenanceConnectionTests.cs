@@ -15,5 +15,7 @@ public sealed class RNodeMaintenanceConnectionTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await RNodeMaintenanceConnection.OpenSerialAsync("NOT-A-DEVICE", cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => RNodeMaintenanceConnection.EnterDfuAsync("NOT-A-DEVICE", cancellation.Token));
+        await Assert.ThrowsAsync<NotSupportedException>(() => RNodeMaintenanceConnection.EnterDfuAsync("tcp://127.0.0.1"));
     }
 }

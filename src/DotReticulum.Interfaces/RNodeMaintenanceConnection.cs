@@ -1,3 +1,5 @@
+using System.IO.Ports;
+
 namespace DotReticulum.Interfaces;
 
 /// <summary>
@@ -30,6 +32,18 @@ public sealed class RNodeMaintenanceConnection : Stream
             connection.Owner?.Dispose();
             throw;
         }
+    }
+
+    /// <summary>Requests nRF52 DFU by opening at 1200 baud and closing; does not flash firmware.</summary>
+    public static async Task EnterDfuAsync(string port, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(port);
+        if (port.Contains("://", StringComparison.Ordinal))
+            throw new NotSupportedException("DFU entry requires a local USB serial port.");
+        cancellationToken.ThrowIfCancellationRequested();
+        using var serial = NativeSerialPort.Create(port, 1200, Parity.None, 8, StopBits.One, 100, 1000);
+        serial.Open();
+        await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken).ConfigureAwait(false);
     }
 
     public override bool CanRead => _disposed == 0 && _stream.CanRead;

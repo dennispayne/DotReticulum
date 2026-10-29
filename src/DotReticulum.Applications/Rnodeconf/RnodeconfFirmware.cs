@@ -170,7 +170,7 @@ public sealed class RnodeconfFirmware(HttpClient http, string stateDirectory)
         return null;
     }
 
-    public static RnodeconfToolCall FlashPlan(byte platform, RnodeconfFirmwareArtifact artifact, string stateDirectory, string port, int baud, string flasher)
+    public static RnodeconfToolCall FlashPlan(byte platform, RnodeconfFirmwareArtifact artifact, string stateDirectory, string port, int baud, string flasher, bool touch = true)
     {
         if (baud is < 1200 or > 4000000) throw new ArgumentException("Invalid flash baud rate.");
         flasher = ValidateFlasher(flasher, stateDirectory);
@@ -188,7 +188,14 @@ public sealed class RnodeconfFirmware(HttpClient http, string stateDirectory)
             .Select(p => p.Contains(Path.GetFullPath(stateDirectory), StringComparison.Ordinal) ? p.Replace('/', Path.DirectorySeparatorChar) : p).ToArray();
         // Never run Python/scripts shipped in a downloaded archive. An explicitly selected,
         // independently installed executable receives only the source-derived device arguments.
-        return new(Path.GetFullPath(flasher), parts.Skip(parts[0] == "{python}" ? 2 : 1).ToArray());
+        var arguments = parts.Skip(parts[0] == "{python}" ? 2 : 1).ToArray();
+        if (platform == 0x70 && !touch)
+        {
+            if (arguments.Length < 2 || arguments[^2] != "-t" || arguments[^1] != "1200")
+                throw new IOException("The nRF52 flash plan does not contain the expected USB touch option.");
+            arguments = arguments[..^2];
+        }
+        return new(Path.GetFullPath(flasher), arguments);
     }
 
     public static async Task RunToolAsync(RnodeconfToolCall call, bool authorized, CancellationToken token,

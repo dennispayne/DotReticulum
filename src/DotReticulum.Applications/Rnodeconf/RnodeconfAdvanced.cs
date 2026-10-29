@@ -12,6 +12,7 @@ public sealed class RnodeconfServices
     public Func<RnodeconfToolCall, CancellationToken, Task<int>>? ExecuteTool { get; init; }
     public Func<TimeSpan, CancellationToken, Task> Delay { get; init; } = Task.Delay;
     public Func<IReadOnlyList<RnodeconfSerialPort>> EnumeratePorts { get; init; } = RnodeconfSerialDiscovery.Enumerate;
+    public Func<string, CancellationToken, Task> EnterDfu { get; init; } = RNodeMaintenanceConnection.EnterDfuAsync;
     public TimeSpan ToolTimeout { get; init; } = TimeSpan.FromMinutes(10);
     public TimeSpan PortRecoveryTimeout { get; init; } = TimeSpan.FromSeconds(20);
 }
@@ -214,15 +215,36 @@ internal static class RnodeconfAdvanced
             if (artifact.Filename.EndsWith(".zip", StringComparison.Ordinal) && artifact.Filename != "extracted_rnode_firmware.zip")
                 await RnodeconfFirmware.ExtractArchiveAsync(artifact, token).ConfigureAwait(false);
             var partitionHash = await RnodeconfFirmware.PartitionHashAsync(client.Platform, artifact, token).ConfigureAwait(false);
+            await output.WriteLineAsync("Indicating firmware update to the device.").ConfigureAwait(false);
             await client.WriteAuthorizedAsync([RnodeconfCommands.Encode("update-indicator")], true, token).ConfigureAwait(false);
             if (partitionHash is not null)
             {
+                await output.WriteLineAsync("Writing the selected firmware partition hash.").ConfigureAwait(false);
                 await client.WriteAuthorizedAsync([RNodeProtocol.Frame(0x58, partitionHash)], true, token).ConfigureAwait(false);
                 await services.Delay(TimeSpan.FromSeconds(client.Platform == 0x70 ? 14 : 1), token).ConfigureAwait(false);
             }
             var platform = client.Platform;
             stream.Dispose();
-            await FlashAsync(options, services, artifact, state, port, platform, token).ConfigureAwait(false);
+            var touch = true;
+            if (platform == 0x70 && usbSerial is not null)
+            {
+                await output.WriteLineAsync("Requesting USB DFU and locating the bootloader by USB serial identity.").ConfigureAwait(false);
+                string? excludedPort = null;
+                try { await services.EnterDfu(port, token).ConfigureAwait(false); }
+                catch (IOException exception) when (!token.IsCancellationRequested)
+                {
+                    // Windows can lose the serial handle during the 1200-baud reset itself.
+                    // Only a different port with the same USB identity can corroborate that reset.
+                    await output.WriteLineAsync($"USB touch interrupted: {exception.Message} Verifying device re-enumeration.").ConfigureAwait(false);
+                    excludedPort = port;
+                }
+                // Adafruit nrfutil's USB touch waits 1.5 seconds before opening DFU.
+                await services.Delay(TimeSpan.FromMilliseconds(1500), token).ConfigureAwait(false);
+                port = await ResolvePortAsync(port, usbSerial, services, token, excludedPort).ConfigureAwait(false);
+                touch = false;
+            }
+            await output.WriteLineAsync($"Running the installed firmware tool on {port}.").ConfigureAwait(false);
+            await FlashAsync(options, services, artifact, state, port, platform, token, touch).ConfigureAwait(false);
             await services.Delay(TimeSpan.FromSeconds(platform == 0x70 ? 6 : 8), token).ConfigureAwait(false);
             port = await ResolvePortAsync(port, usbSerial, services, token).ConfigureAwait(false);
             await using var reconnected = await openSerial(port, token).ConfigureAwait(false);
@@ -267,13 +289,13 @@ internal static class RnodeconfAdvanced
     }
 
     private static async Task FlashAsync(Dictionary<string, string?> options, RnodeconfServices services, RnodeconfFirmwareArtifact artifact,
-        string state, string port, byte platform, CancellationToken token)
+        string state, string port, byte platform, CancellationToken token, bool touch = true)
     {
         if (artifact.Filename.EndsWith(".zip", StringComparison.Ordinal) && artifact.Filename != "extracted_rnode_firmware.zip")
             await RnodeconfFirmware.ExtractArchiveAsync(artifact, token).ConfigureAwait(false);
         var plan = RnodeconfFirmware.FlashPlan(platform, artifact, state, port,
             int.Parse(options.GetValueOrDefault("baud-flash") ?? "921600", CultureInfo.InvariantCulture),
-            options.GetValueOrDefault("flasher") ?? throw new ArgumentException("Specify an independently installed --flasher executable."));
+            options.GetValueOrDefault("flasher") ?? throw new ArgumentException("Specify an independently installed --flasher executable."), touch);
         var dataRoots = new[] { Path.Combine(state, "update"), Path.Combine(state, "extracted") };
         foreach (var argument in plan.Arguments)
             if (dataRoots.Any(root => argument.StartsWith(root, StringComparison.OrdinalIgnoreCase)) && !File.Exists(argument))
@@ -403,7 +425,8 @@ internal static class RnodeconfAdvanced
         await output.WriteLineAsync($"Installation reset/version/EEPROM verification complete; device backup {backup}. RF operation is unverified.").ConfigureAwait(false);
     }
 
-    private static async Task<string> ResolvePortAsync(string previousPort, string? usbSerial, RnodeconfServices services, CancellationToken token)
+    private static async Task<string> ResolvePortAsync(string previousPort, string? usbSerial, RnodeconfServices services, CancellationToken token,
+        string? excludedPort = null)
     {
         if (usbSerial is null) return previousPort;
         if (services.PortRecoveryTimeout <= TimeSpan.Zero || services.PortRecoveryTimeout > TimeSpan.FromSeconds(20))
@@ -416,7 +439,7 @@ internal static class RnodeconfAdvanced
             if (deadline.IsCancellationRequested) break;
             var matches = services.EnumeratePorts().Where(p => p.UsbSerial == usbSerial).ToArray();
             if (matches.Length > 1) throw new IOException("USB serial matches multiple ports; refusing ambiguous reconnect.");
-            if (matches.Length == 1) return matches[0].Port;
+            if (matches.Length == 1 && !matches[0].Port.Equals(excludedPort, StringComparison.OrdinalIgnoreCase)) return matches[0].Port;
             try { await services.Delay(TimeSpan.FromMilliseconds(500), deadline.Token).ConfigureAwait(false); }
             catch (OperationCanceledException) when (!token.IsCancellationRequested) { break; }
         }

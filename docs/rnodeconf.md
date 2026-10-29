@@ -14,7 +14,7 @@ From a source checkout, use `dotnet run --project src/DotReticulum.Applications 
 
 ## Configuration and operations
 
-The utility opens serial at 115200 baud, 8N1. Opening alone sends no commands. Identification sends detect, version, platform, MCU, board, device-hash, and hash requests and requires a response within three seconds. Port listing does not open a device. `--usb-serial ID` selects one USB identity and can track a changed port after reset; recovery is bounded to 20 seconds. If no stable serial is exposed, the original port is retried and a moved device must be selected again.
+The utility opens serial at 115200 baud, 8N1. Opening alone sends no commands. Identification sends detect, version, platform, MCU, board, device-hash, and hash requests and requires a response within three seconds. Port listing does not open a device. `--usb-serial ID` selects one USB identity and can track a changed port after reset; recovery is bounded to 20 seconds. Windows discovery excludes disconnected registry entries and follows composite USB parents to obtain the physical serial rather than a location-dependent interface identifier. If no stable serial is exposed, the original port is retried and a moved device must be selected again.
 
 | Operation | Options and behavior |
 | --- | --- |
@@ -25,6 +25,22 @@ The utility opens serial at 115200 baud, 8N1. Opening alone sends no commands. I
 | Firmware | `--fw-version`, `--fw-url`, `--nocheck`, `--clear-cache/-C`, `--use-extracted/-E`, `--extract/-e`, `--update/-u`, `--force-update/-U`, `--flash/-f`, and `--autoinstall/-a` control firmware workflows. `--platform`, `--product`, `--model`, and `--hwrev` explicitly select a target. `--flasher` selects an independently installed tool. |
 
 Firmware metadata responses are bounded to 1 MiB and three minutes; firmware downloads to 64 MiB. The native planner contains 45 source-backed model mappings and 126 target/version/flasher plans; these describe plans, not proof of device acceptance. `--fw-version` selects a release, `--fw-url` selects a custom release base, and `--nocheck` disables the upstream-style check. Cache clearing and offline extracted-firmware reuse are explicit operations. Cached hashes are integrity data, not authenticated publisher provenance. Archive expansion is limited to 128 MiB and 128 entries, with traversal, links, and duplicate paths rejected. Extract emits the source's five ESP32 flash components and validates their sizes. Update closes the port before tool execution, then reopens and checks the reported version and EEPROM. When a selected partition hash is available, both target and actual device hashes are queried again after restart and compared in constant time; a mismatch is an error. Changed-port recovery follows the USB identity when it is unique. AVR avrdude, ESP32 esptool, and NRF52 DFU remain external installed tools; downloaded scripts are never executed. Tool processes use argument arrays without a shell, bounded output, cancellation, and a ten-minute deadline.
+
+For nRF52 updates with a discoverable USB serial identity, the native utility
+requests DFU by opening/closing at 1200 baud, resolves the bootloader port by
+that identity, and invokes the installed flasher without touching the old port
+again. Windows may invalidate the serial handle during the reset itself; that
+I/O error is reported and accepted only if a different port with the same USB
+identity actually appears. Firmware version, valid EEPROM, and available
+target/actual firmware hashes are checked after application recovery. Devices
+without a stable identity retain the upstream flasher's `-t 1200` behavior;
+changed-port recovery is not inferred for those devices. The separate
+`--flash`/`--autoinstall` provisioning paths also retain their existing plans.
+
+Non-ESP32 firmware can return a valid empty Wi-Fi configuration sector.
+`--config` still reports the EEPROM-backed device settings and explicitly
+reports the absent Wi-Fi sector; an empty sector is not a timeout or a source
+of invented SSID/IP defaults. Truncated nonempty sectors remain errors.
 
 ## Authorization and security
 
@@ -42,8 +58,24 @@ Native operations require explicit platform/product/model/hardware revision rath
 
 ## Physical device status
 
-A read-only physical query identified a RAK4631/SX1262 on nRF52, firmware 1.86, in Normal mode; its EEPROM checksum is valid and signer remains unverified. A 200-byte native EEPROM backup is available. No physical setting mutation, firmware flash, RF transmission, or recovery has been verified. This is limited device evidence, not general hardware support.
+A Windows x64 RAK4631/SX1262 with firmware 1.86 has passed native executable
+acceptance for software-triggered USB DFU, same-version application reflashing,
+bootloader/application re-enumeration, and EEPROM persistence. The application
+port changed from COM8 (PID `8029`) to bootloader COM10 (PID `002A`) and back
+without a button press. A reversible display-brightness change persisted across
+the flash; all 200 EEPROM bytes were verified and restored to the test's starting
+state. The selected firmware's target and actual SHA-256 hashes were checked.
+EEPROM signer remains unverified. No LoRa radio startup, RF transmission,
+over-air reception, bootloader replacement, or other device/platform acceptance
+is implied.
+
+The physical Pester case is opt-in through `tests\Invoke-PesterTests.ps1`
+with `-AuthorizeRNodeFirmware -RNodeUsbSerial <ID>
+-RNodeFirmwareVersion <installed-release> -RNodeFlasher <installed-executable>`.
+Supply `-Application` for the published native candidate. Stop other serial
+owners first; the test changes/restores brightness and reinstalls the exact
+specified release. Normal CI explicitly skips this hardware case.
 
 ## Verification
 
-`tests/DotReticulum.Applications.Tests/RnodeconfTests.cs` and `RnodeconfFirmwareTests.cs` cover reference command bytes, parsers, authorization, simulator workflows, firmware/cache failures, signing, recovery planning, and process behavior. The capture adapter replaces sleeps and, for read-command capture, EEPROM parsing and response delivery. Reference vectors establish serialization and planning, not unmodified upstream serial or physical operation. Physical acceptance of flash/reset/re-enumeration, EEPROM persistence, RF legality/operation, and hardware recovery remains unverified.
+`tests/DotReticulum.Applications.Tests/RnodeconfTests.cs` and `RnodeconfFirmwareTests.cs` cover reference command bytes, parsers, authorization, simulator workflows, firmware/cache failures, signing, recovery planning, and process behavior. The capture adapter replaces sleeps and, for read-command capture, EEPROM parsing and response delivery. Reference vectors establish serialization and planning, not unmodified upstream serial or physical operation. `tests\Pester\Parity7Device.Tests.ps1` owns the separately authorized physical case described above. RF legality/operation and broader device/platform recovery remain unverified.

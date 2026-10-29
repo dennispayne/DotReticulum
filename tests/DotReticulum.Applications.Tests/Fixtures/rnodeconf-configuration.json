@@ -1,0 +1,9 @@
+{
+  "revision": "a29bfb51c468945c96a1ee22cae0114e993e2391",
+  "source_sha256": "f8b43da8b25802dada7e437011f6282a25697365db94511d7451c1b64e993d0f",
+  "adapter": "Capture download_cfg_sector request; remove request payload for an empty reply; execute original readLoop with owned serial bytes; suppress hardware pacing only.",
+  "empty_sector": {
+    "frame": "c06dc0",
+    "decoded": ""
+  }
+}

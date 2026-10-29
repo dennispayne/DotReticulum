@@ -23,6 +23,16 @@ native executable rather than a managed DLL.
 Python interpreter for reference-dependent cases. Defaults to DOTRETICULUM_PYTHON.
 .PARAMETER Upstream
 Verified pinned reference checkout. Defaults to DOTRETICULUM_UPSTREAM.
+.PARAMETER AuthorizeRNodeFirmware
+Opts into physical RAK4631 EEPROM-setting and same-version DFU reflash acceptance.
+Requires RNodeUsbSerial, RNodeFirmwareVersion and an independently installed RNodeFlasher.
+The test changes and restores display brightness; it never enables the LoRa radio.
+.PARAMETER RNodeUsbSerial
+Stable USB serial identity of the explicitly authorized RAK4631, not its changing COM port.
+.PARAMETER RNodeFirmwareVersion
+Exact installed firmware release to reinstall during authorized physical acceptance.
+.PARAMETER RNodeFlasher
+Absolute path to the independently installed adafruit-nrfutil executable.
 .EXAMPLE
 .\Invoke-PesterTests.ps1 -ToolingOnly
 #>
@@ -34,11 +44,21 @@ param(
     [switch] $GitHosting,
     [switch] $NativePackaging,
     [string] $Python = $env:DOTRETICULUM_PYTHON,
-    [string] $Upstream = $env:DOTRETICULUM_UPSTREAM
+    [string] $Upstream = $env:DOTRETICULUM_UPSTREAM,
+    [switch] $AuthorizeRNodeFirmware,
+    [string] $RNodeUsbSerial,
+    [string] $RNodeFirmwareVersion,
+    [string] $RNodeFlasher
 )
 
 $ErrorActionPreference = 'Stop'
-if (($GitRemote -or $GitHosting -or $NativePackaging) -and $ToolingOnly) { throw 'Application suites cannot be combined with -ToolingOnly.' }
+if (($GitRemote -or $GitHosting -or $NativePackaging -or $AuthorizeRNodeFirmware) -and $ToolingOnly) { throw 'Application suites cannot be combined with -ToolingOnly.' }
+if ($AuthorizeRNodeFirmware -and (!$RNodeUsbSerial -or !$RNodeFirmwareVersion -or !$RNodeFlasher)) {
+    throw '-AuthorizeRNodeFirmware requires -RNodeUsbSerial, -RNodeFirmwareVersion and -RNodeFlasher.'
+}
+if (!$AuthorizeRNodeFirmware -and ($RNodeUsbSerial -or $RNodeFirmwareVersion -or $RNodeFlasher)) {
+    throw 'Physical RNode parameters require -AuthorizeRNodeFirmware.'
+}
 if ($GitRemote -and ([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullOrWhiteSpace($Upstream))) {
     throw '-GitRemote requires -Python and -Upstream, or their DOTRETICULUM_* environment variables.'
 }
@@ -61,11 +81,18 @@ if (!$ToolingOnly) {
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity5Resources.Tests.ps1') -Data @{ Application = $resolved }
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Parity6Interfaces.Tests.ps1') -Data @{ Application = $resolved }
     foreach ($suite in 'Identity', 'NetworkUtilities', 'Shell', 'Device', 'Transfer') {
-        $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot "Pester\Parity7$suite.Tests.ps1") -Data @{
+        $data = @{
             Application = $resolved
             Python = $Python
             Upstream = $Upstream
         }
+        if ($suite -eq 'Device') {
+            $data.AuthorizeRNodeFirmware = [bool] $AuthorizeRNodeFirmware
+            $data.RNodeUsbSerial = $RNodeUsbSerial
+            $data.RNodeFirmwareVersion = $RNodeFirmwareVersion
+            $data.RNodeFlasher = $RNodeFlasher
+        }
+        $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot "Pester\Parity7$suite.Tests.ps1") -Data $data
     }
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\SharedRuntime.Tests.ps1') -Data @{
         Application = $resolved

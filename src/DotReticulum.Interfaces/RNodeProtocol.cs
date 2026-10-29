@@ -90,7 +90,7 @@ public sealed class RNodeFrameDecoder
             {
                 if (_framing && _command >= 0)
                 {
-                    if (!_invalid && !_escape && _length > 0 &&
+                    if (!_invalid && !_escape && (_length > 0 || _command == 0x6d) &&
                         (_command != 0 || _length <= RNodeProtocol.HardwareMtu))
                         frames.Add(new((byte)_command, _buffer.AsSpan(0, _length).ToArray()));
                     else DroppedFrames++;

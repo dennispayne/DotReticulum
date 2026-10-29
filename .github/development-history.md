@@ -4,6 +4,98 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### RAK4631 USB DFU and physical maintenance acceptance
+
+The user authorized DFU, firmware reflashing and device settings without requiring
+their presence at a reset button; Android work is deferred. Executed against the
+single Windows-attached RAK4631/SX1262, application firmware **1.86**, without
+starting the LoRa radio. Fresh EEPROM backups and the exact installed release
+were preserved before mutation. The initial `--normal` diagnostic normalized
+the previously unset operating-mode byte to Normal; no RF mode was selected.
+The subsequent physical acceptance case restores every byte of its own starting
+EEPROM, including the reversible display-brightness setting.
+
+Found and fixed three actual-device issues:
+- Windows serial discovery returned disconnected registry entries and could not
+  resolve composite USB interfaces to their physical serial. Filter against
+  available/configured ports and walk bounded Configuration Manager parents.
+- Upstream's `adafruit-nrfutil -t 1200` successfully entered DFU but reopened
+  obsolete **COM8**, while this board's bootloader enumerated as **COM10**.
+  Update now performs the touch in native .NET, resolves the bootloader by the
+  same USB identity, runs the installed flasher without another touch, and
+  resolves the application afterward. Application PID `8029` and bootloader
+  PID `002A` were observed. Windows sometimes reports the expected invalidated
+  serial handle during the touch; the error is printed and only corroborated
+  same-identity/different-port enumeration permits continuation.
+- RAK firmware returns a valid **empty** `6d` configuration sector, which the
+  decoder dropped and the maintenance client treated as a timeout. Accept that
+  command's empty reply, report EEPROM settings and explicitly disclose the
+  absent Wi-Fi sector; empty packet DATA and truncated nonempty sectors remain
+  rejected. Actual pinned Python `rnodeconf COM8 --config` independently
+  succeeded with the same EEPROM settings. New
+  `GenerateRnodeconfConfigurationVectors.py` executes the original pinned
+  maintenance `readLoop`, recording SHA/source hash and its empty-sector result.
+
+Source: pinned `RNS/Utilities/rnodeconf.py:470-482,1022-1030,3361-3364,3619-3649,3700-3800`;
+official firmware **1.86** `RNode_Firmware.ino` command handlers and
+`Utilities.h` `eeprom_config_dump_all`/`kiss_dump_config`; independently installed
+Adafruit nrfutil **0.5.3.post16**, whose USB touch uses 100 ms open and 1.5 s
+re-enumeration pacing. No reference pin or upstream source was changed.
+Official `rnode_firmware_rak4631.zip` was **243,109 bytes**, SHA-256
+`99cae226cca349a1f567f0a6c0c9a0fd4cc9500ec079a631b18b8d4c29e7aa9c`;
+the selected/application/target partition SHA-256 was
+`25820129029e453de2614b100bfb002ac9ba1162cd63ac75d9d804bbc4b40fdd`.
+These are integrity observations, not publisher/signature authentication.
+The external flasher returned exit zero even for its original missing-COM8
+failure; actual DFU programming, application recovery and firmware/EEPROM checks,
+not that exit status, established this device result.
+
+Validation:
+- Focused `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --nologo -v quiet --filter FullyQualifiedName~Rnodeconf`:
+  **45 passed**, including USB parent traversal, bounded/cyclic/missing identity,
+  changed DFU/application ports, interrupted touch corroboration/failure,
+  empty/truncated config sectors and existing maintenance behavior.
+  Focused `RNodeMaintenanceConnectionTests`: **2 passed**.
+- `Publish-CompatibilityApplication` from
+  `tests\Compatibility\Support\Preparation.ps1` published
+  `artifacts\native-device-ble-darwin` with trimming/AOT warnings as errors and
+  executed native help. Publication was warning-free.
+- Actual Pester **5.7.1**, container
+  `tests\Pester\Parity7Device.Tests.ps1`, native application above,
+  `AuthorizeRNodeFirmware=$true`, explicit owned USB serial, firmware **1.86**
+  and installed `adafruit-nrfutil.exe`: **14 passed**, zero failed/skipped.
+  Native `--config` matched EEPROM brightness; one brightness byte changed;
+  DFU/reflash preserved all **200** EEPROM bytes; restoring brightness reproduced
+  the entire starting EEPROM. No button press was needed.
+  NUnit evidence: `TestResults\rnode-device-2b24b6d711454895928f408929fee243\native-final-pester.xml`.
+  The normal runner now exposes explicit physical opt-in parameters; ordinary
+  CI skips this hardware case rather than claiming acceptance.
+- `pwsh -NoProfile -File tests\Compatibility\Invoke-CompatibilityTests.ps1 -Application artifacts\native-device-ble-darwin\DotReticulum.Applications.exe -Python TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5\reference\python\venv\Scripts\python.exe -Upstream TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5\reference\python\upstream -Implementation DotReticulum -OutputDirectory TestResults\compatibility-desktop-final-20261029`:
+  **36 passed, 1 explicit hosted-retrieval skip**, zero failed, including
+  both-direction compressible/incompressible multi-megabyte native/Python rncp.
+  The already fetched/import-verified pin was reused; this run makes no new
+  hosted retrieval or separate upstream-candidate claim.
+- `pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+  **59 passed, 2 explicit reference-dependent skips**; pinned
+  `tools\Invoke-PowerShellAnalysis.ps1`: **61 tracked files, zero findings**.
+  Full integration build/coverage, also including the concurrently developed
+  BLE/Darwin slices below, passed: **1,847 passed, 82 skipped**, no failures,
+  zero build warnings. Opt-in live xUnit tests were disabled.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --settings tests\coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults\coverage-device-ble-darwin-20261029`
+  and `tests\Get-CoverageSummary.ps1` merged five production reports:
+  overall **22,260/27,010 lines (82.41%)**, **16,112/23,203 branches (69.44%)**.
+  Applications: **76.81%/63.71%** line/branch; Core **96.89%/90.93%**;
+  Crypto **94.83%/94.00%**; Interfaces **82.21%/73.02%**;
+  Transport **91.40%/79.79%**. Native subprocess execution is not measured by
+  managed Coverlet instrumentation.
+
+Physical evidence remains limited to this board/OS/application firmware:
+bootloader replacement, power-loss flashing recovery, actual unplug/replug,
+RF/over-air delivery, Multi, TNC and Weave devices remain unverified. EEPROM
+signer is still unverified; no keys, firmware trust roots or manufacturer
+signatures were replaced. The old read-only-only statements later in this
+history describe their historical boundary, not the current physical status.
+
 ### Zero-argument local compatibility execution
 
 `tests\Compatibility\Invoke-CompatibilityTests.ps1` now runs without parameters.

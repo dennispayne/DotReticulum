@@ -10,13 +10,14 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] RNodeInterface and RNodeMultiInterface full software contracts (serial/TCP accepted; desktop BLE selector/provider still missing)
   - [ ] Desktop RNode `ble://` Nordic UART selection, bonding, GATT notification/write/reconnect provider and platform/device acceptance
   - [ ] I2PInterface
-  - [ ] Android-specific adapters or documented native platform equivalents
+  - [ ] Android-specific adapters or documented native platform equivalents (deferred by user)
   - [ ] Complete UDP/TCP/serial configuration and validate real serial/radio hardware
-  - [ ] Android USB/Bluetooth permission/adaptor contracts and on-device execution
+  - [ ] Android USB/Bluetooth permission/adaptor contracts and on-device execution (deferred by user)
   - [ ] Actual I2P stream delivery after persisted bearer restart (fails on i2pd and Java I2P); SAM readiness alone is insufficient
   - [ ] Authorized physical serial/TNC/RNode/Multi/Weave and Android USB/Bluetooth/RF acceptance (COM8 RNode USB/firmware identification verified; one radio only, RF acceptance explicitly retained as unverified; remaining devices/platform access/settings unavailable; see development history)
 - [ ] Parity 7 - Upstream utility coverage (software accepted; physical device acceptance outstanding)
-  - [ ] Explicitly authorized physical rnodeconf flashing/reset/re-enumeration/EEPROM persistence and RF acceptance (necessary COM8 reflashing conditionally approved; native info/backup verified, no mutation needed/performed; one radio cannot establish RF interoperability)
+  - [x] Authorized RAK4631 native rnodeconf USB-triggered DFU, same-version reflash, changed-port recovery and reversible EEPROM-setting persistence/restoration
+  - [ ] Remaining physical rnodeconf device/platform and RF acceptance (one RAK4631 verified; one radio cannot establish RF interoperability)
 - [ ] Parity 8 - Compatibility and release acceptance
   - [ ] Broader mesh acceptance: Python-router/crash restart, alternate routes, sustained Channel/resource soak and impaired native-binary/per-bearer matrices
   - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
