@@ -4,6 +4,80 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Actual Java I2P local-destination persisted-restart acceptance
+
+The actual Java **I2P 2.14.0** router, not a SAM simulator, now demonstrates
+bidirectional DATA/callbacks before and after a persisted accepting-bearer restart:
+the destination key/address and transport identity remain unchanged and the
+initiator survives. The production .NET bearer passed **1/1 in 65.8 seconds**;
+an independent pinned-upstream-only control passed **1/1 in 95.7 seconds**.
+These are managed contract-integration executions, **not published-NativeAOT or
+shared advertised-claim Compatibility results**.
+
+The distinction was an existing topology policy: Java's normal local-destination
+delivery uses `i2cp.disableLoopback=false`; the previous forced-public-tunnel
+topology sets it `true`. Three-hop client defaults, disabled external I2CP and
+disabled transit remain unchanged. No zero-hop option, relaxed assertion,
+extended four-minute acceptance deadline or reference-side shim was introduced.
+Java 2.14.0 `ClientManager.java:85-86,462-501` establishes this local-versus-tunnel
+boundary; `OutboundClientMessageOneShotJob.java:293-346,474-497` locates lease/cache
+handling but does not prove a specific router bug.
+
+Both forced-public controls exchanged initial DATA but **failed** after restart:
+.NET **1 failed in 240.1 seconds**, pinned Python **1 failed in 240.9 seconds**,
+at the same missing replacement-accepted-peer boundary. This remains a shared
+router/topology recovery blocker, **not a demonstrated native-only defect**.
+No speculative production workaround was added. Separate-router overlay,
+public-tunnel recovery and published-native feature execution remain unverified.
+
+`tests\Interop\Invoke-I2pTopology.ps1` now supports isolated
+`-TestAssemblyPath`, `-NativeRestartOnly` and explicit
+`-JavaLocalDestinationRouting`; child processes do not inherit Actions summary
+paths. It rejects conflicting selectors, missing isolated assemblies and invalid
+Java-only options before router startup. `docs\i2p-interface.md` records exact
+reproduction commands. The four measured invocations used:
+
+```powershell
+$common = @{
+    JavaExecutable = 'TestResults\i2p-tools-java-win\jdk-21.0.12.1+1-jre\bin\java.exe'
+    JavaRouterDirectory = 'TestResults\i2p-tools-java-win\router'
+    TestAssemblyPath = 'TestResults\i2p-isolated-20261029\DotReticulum.Interfaces.Tests.dll'
+    AllowPublicNetwork = $true
+    KeepArtifacts = $true
+    TestTimeoutSeconds = 360
+}
+$reference = @{
+    PythonExecutable = 'TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5\reference\python\venv\Scripts\python.exe'
+    UpstreamPath = 'TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5\reference\python\upstream'
+}
+& tests\Interop\Invoke-I2pTopology.ps1 @common -NativeRestartOnly -SamEndpoint 127.0.0.1:17656
+& tests\Interop\Invoke-I2pTopology.ps1 @common -NativeRestartOnly -JavaLocalDestinationRouting -SamEndpoint 127.0.0.1:17657
+& tests\Interop\Invoke-I2pTopology.ps1 @common @reference -ReferenceRestartOnly -JavaLocalDestinationRouting -SamEndpoint 127.0.0.1:17657
+& tests\Interop\Invoke-I2pTopology.ps1 @common @reference -ReferenceRestartOnly -SamEndpoint 127.0.0.1:17656
+```
+
+Isolated assembly execution avoided concurrent writes to shared build outputs.
+Reference imports verified **RNS 1.5.7/LXMF 1.2.1** at the unchanged pin.
+Sanitized TRX result locations under `TestResults`:
+`i2p-topology-7153a825416449848e4ca81c307d3576\results\i2p-live.trx`
+(.NET local pass),
+`i2p-topology-4845de2435dd45709f358f540845608f\results\i2p-live.trx`
+(upstream local pass),
+`i2p-topology-a63d153cdce94a6fb0b61c889c261ca1\results\i2p-live.trx`
+(.NET public failure), and
+`i2p-topology-f6227fe7ba2d4d82baaf7f3b8e8a84b3\results\i2p-live.trx`
+(upstream public failure). Raw router state/logs may contain keys and are
+**private local artifacts, not safe upload evidence**. Owned router/test
+processes and both SAM listeners were stopped. PSScriptAnalyzer **1.24.0**
+reported zero findings; parser/help, three executable rejection guards and
+diff checks passed. The earlier unconditional failed-Java-restart statement is
+superseded only for the measured local-destination topology.
+
+Parent integration rechecked `pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+**59 passed, 2 explicit missing-reference skips**, and
+`pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
+**61 tracked files, zero findings**. No production source changed in this slice.
+
 ### Windows RNode BLE software slice (not full desktop BLE acceptance)
 
 Added static-native Windows SetupAPI/Bluetooth GATT discovery of paired devices,

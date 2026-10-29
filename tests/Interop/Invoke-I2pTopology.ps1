@@ -42,10 +42,21 @@ Requires public networking and the verified reference.
 .PARAMETER ReferenceRestartOnly
 Selects the upstream-only restart diagnostic test group.
 Requires public networking and the reference; cannot be combined with RunStreamTests.
+.PARAMETER NativeRestartOnly
+Selects only the native persisted-bearer restart and bidirectional DATA test.
+Requires public networking; cannot be combined with the other test selections.
+.PARAMETER JavaLocalDestinationRouting
+Retains Java I2P's default local-to-local destination delivery instead of forcing
+same-router traffic through public tunnels. This is actual SAM/stream delivery,
+not public-overlay or remote-router acceptance. Available only in Java mode.
 .PARAMETER SingleThreadedSam
 Enables i2pd's single-threaded SAM mode for diagnostics. Available only in I2pd mode.
 .PARAMETER NoBuild
 Uses the existing Release test build rather than building before execution.
+.PARAMETER TestAssemblyPath
+Runs an existing test assembly with dotnet vstest instead of building/testing the
+project. Copy its complete output directory first to isolate assembly locks from
+other builds. Cannot be combined with NoBuild.
 .PARAMETER KeepArtifacts
 Retains owned router configuration, logs and test results after success.
 Failed runs retain artifacts regardless of this switch.
@@ -55,6 +66,8 @@ Router SAM startup deadline, from 5 through 180 seconds. Defaults to 30.
 Overall test-process deadline, from 60 through 1800 seconds. Defaults to 1200.
 .EXAMPLE
 .\Invoke-I2pTopology.ps1 -RouterBinary C:\Tools\i2pd.exe
+.EXAMPLE
+.\Invoke-I2pTopology.ps1 -JavaExecutable C:\Java\bin\java.exe -JavaRouterDirectory C:\I2P -AllowPublicNetwork -NativeRestartOnly -JavaLocalDestinationRouting -TestAssemblyPath C:\Git\DotReticulum\TestResults\isolated\DotReticulum.Interfaces.Tests.dll
 #>
 [CmdletBinding(DefaultParameterSetName = 'I2pd')]
 param(
@@ -71,8 +84,11 @@ param(
     [switch] $AllowPublicNetwork,
     [switch] $RunStreamTests,
     [switch] $ReferenceRestartOnly,
+    [switch] $NativeRestartOnly,
+    [Parameter(ParameterSetName = 'Java')][switch] $JavaLocalDestinationRouting,
     [Parameter(ParameterSetName = 'I2pd')][switch] $SingleThreadedSam,
     [switch] $NoBuild,
+    [string] $TestAssemblyPath,
     [switch] $KeepArtifacts,
     [ValidateRange(5, 180)][int] $StartupTimeoutSeconds = 30,
     [ValidateRange(60, 1800)][int] $TestTimeoutSeconds = 1200
@@ -103,6 +119,15 @@ if ($javaRouter) {
 if ($ReferenceRestartOnly) {
     if (-not $AllowPublicNetwork) { throw 'ReferenceRestartOnly requires explicit -AllowPublicNetwork.' }
     if ($RunStreamTests) { throw 'ReferenceRestartOnly and RunStreamTests select separate test groups.' }
+}
+if ($NativeRestartOnly) {
+    if (-not $AllowPublicNetwork) { throw 'NativeRestartOnly requires explicit -AllowPublicNetwork.' }
+    if ($RunStreamTests -or $ReferenceRestartOnly) { throw 'NativeRestartOnly selects a separate test group.' }
+}
+if (-not [string]::IsNullOrWhiteSpace($TestAssemblyPath)) {
+    if ($NoBuild) { throw 'TestAssemblyPath and NoBuild select separate execution modes.' }
+    if (-not (Test-Path -LiteralPath $TestAssemblyPath -PathType Leaf)) { throw 'TestAssemblyPath does not exist.' }
+    $TestAssemblyPath = (Resolve-Path -LiteralPath $TestAssemblyPath).ProviderPath
 }
 if ($RunStreamTests -and -not $AllowPublicNetwork) {
     throw 'Stock RNS I2P sessions need ready tunnels and lease-set discovery. Same-router zero-hop alone is insufficient. Stream tests require explicit -AllowPublicNetwork; isolated mode only tests real SAM destination persistence.'
@@ -184,6 +209,7 @@ function Start-OwnedProcess {
     $start.UseShellExecute = $false
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
+    $null = $start.Environment.Remove('GITHUB_STEP_SUMMARY')
     foreach ($argument in $Arguments) { $start.ArgumentList.Add($argument) }
     foreach ($key in $EnvironmentVariables.Keys) { $start.Environment[$key] = $EnvironmentVariables[$key] }
     $process = [System.Diagnostics.Process]::new()
@@ -269,9 +295,10 @@ try {
         $null = New-Item -ItemType Directory -Path $javaBase, $javaScratch
         Copy-Item -LiteralPath (Join-Path $JavaRouterDirectory 'hosts.txt') -Destination $javaBase
         Copy-Item -LiteralPath $CertificatesDirectory -Destination (Join-Path $javaBase 'certificates') -Recurse
+        $disableLoopback = (-not $JavaLocalDestinationRouting).ToString().ToLowerInvariant()
         @"
 i2cp.disableInterface=true
-i2cp.disableLoopback=true
+i2cp.disableLoopback=$disableLoopback
 i2np.upnp.enable=false
 router.sharePercentage=0
 router.maxParticipatingTunnels=0
@@ -298,7 +325,10 @@ clientApp.0.startOnLoad=true
             'net.i2p.router.Router'
         )
         $routerExecutable = $JavaExecutable
-        Write-Host "Java I2P distribution $JavaRouterDirectory; owned SAM 127.0.0.1:$($endpoint.Port); TCP/UDP transport port $TransportPort; public network; internal loopback and transit disabled; source client tunnel defaults unchanged."
+        Write-Host "Java I2P distribution $JavaRouterDirectory; owned SAM 127.0.0.1:$($endpoint.Port); TCP/UDP transport port $TransportPort; public network; local destination routing $($JavaLocalDestinationRouting.IsPresent); transit disabled; source client tunnel defaults unchanged."
+        if ($JavaLocalDestinationRouting) {
+            Write-Host 'Java default local-to-local I2P delivery enabled: this run does not establish traffic through public tunnels or a remote router.'
+        }
     } else {
     Set-Content -LiteralPath $tunnels -Value '' -Encoding utf8NoBOM
     $network = $AllowPublicNetwork.IsPresent.ToString().ToLowerInvariant()
@@ -415,16 +445,23 @@ yggdrasil = false
     }
     $filter = if ($ReferenceRestartOnly) {
         'FullyQualifiedName~Parity6I2pReferenceRecoveryTests'
+    } elseif ($NativeRestartOnly) {
+        'FullyQualifiedName~Parity6I2pLiveTests.ActualRouterNativeStreamsAreBidirectionalAndPersistAcrossBearerRestart'
     } elseif ($RunStreamTests) {
         'FullyQualifiedName~Parity6I2pLiveTests'
     } else {
         'FullyQualifiedName~Parity6I2pLiveTests.ActualRouterSamDestinationPersistenceWithoutOverlay'
     }
-    $arguments = @(
-        'test', (Join-Path $root 'tests\DotReticulum.Interfaces.Tests\DotReticulum.Interfaces.Tests.csproj'),
-        '-c', 'Release', '--filter', $filter, '--results-directory', $result,
-        '--logger', 'trx;LogFileName=i2p-live.trx'
-    )
+    $arguments = if ([string]::IsNullOrWhiteSpace($TestAssemblyPath)) {
+        @(
+            'test', (Join-Path $root 'tests\DotReticulum.Interfaces.Tests\DotReticulum.Interfaces.Tests.csproj'),
+            '-c', 'Release', '--filter', $filter, '--results-directory', $result,
+            '--logger', 'trx;LogFileName=i2p-live.trx'
+        )
+    } else {
+        @('vstest', $TestAssemblyPath, "--TestCaseFilter:$filter", "--ResultsDirectory:$result",
+            '--Logger:trx;LogFileName=i2p-live.trx')
+    }
     if ($NoBuild) { $arguments += '--no-build' }
     $environment = @{ DOTRETICULUM_I2P_SAM = $SamEndpoint }
     if (-not [string]::IsNullOrWhiteSpace($PythonExecutable)) { $environment.DOTRETICULUM_PYTHON = $PythonExecutable }
@@ -453,7 +490,7 @@ yggdrasil = false
         throw "Expected $expected executed/passed actual-router cases, got total=$($counters.total), passed=$($counters.passed), failed=$($counters.failed). A skipped/missing test is not acceptance."
     }
     $success = $true
-    Write-Host 'Actual-router selected tests passed. Isolated SAM persistence is not streaming or remote-overlay evidence.'
+    Write-Host 'Selected actual-router cases passed; consult the TRX packet assertions and topology. SAM persistence alone is not stream evidence; local destination routing is not public-overlay evidence.'
 }
 finally {
     try { Stop-OwnedProcess $runner }

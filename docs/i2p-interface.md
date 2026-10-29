@@ -55,6 +55,31 @@ Public-overlay acceptance requires explicit operator authorization, a public I2P
 The opt-in topology runner can use either an already-obtained i2pd executable or an already-extracted official Java I2P distribution; it does not download, install, or start a service. The Java branch starts the foreground `net.i2p.router.Router` entry point and enables only its in-process SAM bridge. External I2CP is disabled, proxy/tunnel client applications are not started, and no zero-hop session options are injected. Client tunnel defaults remain three hops inbound and outbound, variance zero.
 
 The Java test profile disables UPnP and router transit (`router.sharePercentage=0`, `router.maxParticipatingTunnels=0`), assigns owned NTCP and UDP transport ports, disables the external I2CP interface and local shortcut, and requires the distribution's public `hosts.txt` and certificate data. Reseed signature validation remains enabled. On Linux, the Java 2.14.0 portable-mode path can recurse while creating temporary context before a global context exists; the runner uses an existing owned configuration directory rather than portable mode. These settings describe the test harness, not native bearer configuration.
+
+The runner's opt-in `-JavaLocalDestinationRouting` retains Java I2P's normal
+local-to-local destination delivery. Java I2P 2.14.0
+`router/java/src/net/i2p/router/client/ClientManager.java:85-86,462-501` defines
+`i2cp.disableLoopback`: when true, even two destinations on the same router must
+send through public tunnels; otherwise the router delivers to its active local
+destination. This option changes router topology, not the SAM client, RNS source,
+framing, packet assertions, or client tunnel lengths. A successful local-route
+test is actual-router stream evidence only, not public-overlay recovery.
+
+Use `-NativeRestartOnly` to select the existing native bidirectional DATA and
+persisted-bearer restart case without unrelated initial mixed-peer cases. Its
+unchanged four-minute deadline, persisted-key comparison, stable initiating child,
+and exact packet assertions still apply. `-ReferenceRestartOnly` separately
+selects the pinned-Python process-restart counterexample.
+
+For concurrent development, first copy the complete Release test-output directory
+into an owned directory under `TestResults`, then supply its
+`DotReticulum.Interfaces.Tests.dll` via `-TestAssemblyPath`. The runner invokes
+`dotnet vstest` on that snapshot instead of building or locking shared project
+outputs. Do not combine it with `-NoBuild`. Test results and router state remain
+unique to each topology run; child processes do not inherit `GITHUB_STEP_SUMMARY`.
+Retained router artifacts are private: Java router diagnostics can include
+session-key material. Do not commit or publish raw router logs or state.
+
 ## Differences from upstream
 
 The .NET implementation uses SAM data sockets directly rather than spawning Python tunnel proxy listeners and threads. It adds bounded queues, peer caps, explicit setup deadlines, finite optional retries, cancellable shutdown, and strict malformed-frame rejection. Native initiators retain a ready SAM session through peer-specific refusal, timeout, or ordinary stream EOF; actual session-control failures recreate it. Upstream tunnel status handling can stop/rebuild a tunnel after a reported setup failure. IFAC size is normalized to the documented 16-byte default rather than reproducing a nullable constructor-order edge in upstream initiators.
@@ -65,4 +90,43 @@ The SAM protocol is implemented using .NET sockets and filesystem APIs. Windows 
 
 ## Verification
 
-`Parity6I2pTests` and `Parity6I2pReferenceRecoveryTests` cover SAM parsing, session lifetime, key persistence, reconnect, peer isolation, bounded queues, and pinned-source vectors using controlled simulators. `Parity6I2pLiveTests` is opt-in against an actual SAM router. Actual-router evidence covers destination persistence and initial native/Python packet exchanges, but native stream recovery after a server bearer restart is not verified: replacement accepted-peer delivery timed out on tested i2pd and Java I2P topologies. Simulator, SAM readiness, and initial traffic do not establish restart, impaired-network, IFAC/routing, or published-native I2P acceptance. Tests target RNS 1.5.7 at `a29bfb51c468945c96a1ee22cae0114e993e2391` and LXMF 1.2.1.
+`Parity6I2pTests` covers SAM parsing, session lifetime, key persistence, reconnect,
+peer isolation, bounded queues, and pinned-source vectors using controlled
+simulators. `Parity6I2pLiveTests` is opt-in against an actual SAM router;
+`Parity6I2pReferenceRecoveryTests` separately exercises actual pinned-Python
+process restart.
+
+On 2026-10-29, Windows x64 Java I2P 2.14.0 with its default local-destination
+routing passed the unchanged managed native-bearer restart case in 65.8 seconds: exact DATA
+packets traveled both directions before and after the connectable bearer was
+disposed/recreated, its persisted key bytes and address were unchanged, and the
+initiating child survived/reconnected. The router process stayed running.
+This is actual same-router SAM/stream delivery, not a simulator, SAM-readiness
+assertion, router restart, or public-overlay/remote-router acceptance.
+The pinned Python-only process-restart case independently passed the same
+local-routing topology in 95.7 seconds, checking actual destination callbacks both
+directions before/after server-process termination and persisted restart, with
+the original initiator process surviving. It is an upstream baseline, not a
+mixed-peer or NativeAOT restart claim.
+
+The same unchanged native case with Java local delivery disabled failed after
+four minutes on 2026-10-29. Initial DATA passed in both directions; after restart
+the replacement destination was SAM-ready with the same persisted key/address,
+but no accepted peer arrived. The surviving initiator timed out during
+`STREAM CONNECT` after its existing 90-second setup budget. Router diagnostics
+showed cached-lease reuse and garlic decryption/unknown-session-tag failures after
+restart. That locates observed failure below the managed packet/framing path;
+it does not yet prove which router cache or recovery policy must change.
+The pinned Python-only baseline with the same forced-tunnel setting also failed
+at its unchanged four-minute deadline after initial bidirectional callbacks:
+the replacement server reused its I2P key, transport identity, and address, but
+never acquired an accepted peer. No .NET bearer was involved in that baseline.
+This is a concrete router/topology recovery blocker shared by the tested
+implementations, not evidence that a native-only framing or persistence change
+would fix public-overlay recovery.
+
+Historical forced-public-tunnel restart attempts on i2pd and Java remain separate
+failed evidence; local-route success does not resolve them. Impaired-network,
+IFAC/routing, published-native I2P, remote-router and router-process restart
+acceptance remain unverified. Tests target RNS 1.5.7 at
+`a29bfb51c468945c96a1ee22cae0114e993e2391` and LXMF 1.2.1.

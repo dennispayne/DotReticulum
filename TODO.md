@@ -14,7 +14,8 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] Android-specific adapters or documented native platform equivalents (deferred by user)
   - [ ] Complete UDP/TCP/serial configuration and validate real serial/radio hardware
   - [ ] Android USB/Bluetooth permission/adaptor contracts and on-device execution (deferred by user)
-  - [ ] Actual I2P stream delivery after persisted bearer restart (fails on i2pd and Java I2P); SAM readiness alone is insufficient
+  - [x] Actual Java I2P local-destination bidirectional DATA before/after persisted bearer restart, independently for .NET and pinned upstream
+  - [ ] I2P public-tunnel delivery after persisted bearer restart (still fails for both .NET and pinned upstream); separate-router overlay and published-native acceptance remain outstanding
   - [ ] Authorized physical serial/TNC/RNode/Multi/Weave and Android USB/Bluetooth/RF acceptance (COM8 RNode USB/firmware identification verified; one radio only, RF acceptance explicitly retained as unverified; remaining devices/platform access/settings unavailable; see development history)
 - [ ] Parity 7 - Upstream utility coverage (software accepted; physical device acceptance outstanding)
   - [x] Authorized RAK4631 native rnodeconf USB-triggered DFU, same-version reflash, changed-port recovery and reversible EEPROM-setting persistence/restoration
