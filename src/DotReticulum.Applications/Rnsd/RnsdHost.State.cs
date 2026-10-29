@@ -32,6 +32,8 @@ public sealed partial class RnsdHost
         public void RestoreState(RuntimeStateSnapshot snapshot)
         {
             host.Router.Engine.Known.RestoreSnapshot(snapshot.KnownDestinations);
+            if (!host.Router.TransportEnabled)
+                snapshot = snapshot with { Paths = [], Tunnels = [], PacketHashes = [] };
             host.Router.ImportState(new TransportStateSnapshot(
                 snapshot.Paths.Select(p => new TransportPathState(p.DestinationHash, p.Timestamp, p.ReceivedFrom, p.Hops, p.Expires,
                     p.RandomBlobs, p.InterfaceHash, p.PacketHash)).ToArray(),

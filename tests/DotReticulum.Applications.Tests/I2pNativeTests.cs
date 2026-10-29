@@ -1,6 +1,7 @@
 using System.Net;
 using DotReticulum.Applications.Rngit;
 using DotReticulum.Applications.Rnsd;
+using DotReticulum.Applications.Runtime;
 using DotReticulum.Core;
 using DotReticulum.Interfaces;
 using DotReticulum.Transport;
@@ -23,7 +24,7 @@ public sealed class I2pNativeTests(ITestOutputHelper output)
 
     [Trait("Category", "Live")]
     [ActualI2pFact]
-    public async Task PublishedProbeExchangesEncryptedDataAndValidatedProofsAcrossFreshProcesses()
+    public async Task PublishedProbeExchangesEncryptedDataAndValidatedProofsAcrossFreshAndPersistedProcesses()
     {
         var sam = Environment.GetEnvironmentVariable("DOTRETICULUM_I2P_SAM")!;
         if (!IPEndPoint.TryParse(sam, out var endpoint) || !IPAddress.IsLoopback(endpoint.Address) ||
@@ -70,10 +71,16 @@ public sealed class I2pNativeTests(ITestOutputHelper output)
                     peers = {bearer.Base32Address}
                 """;
             var announced = new HashSet<I2pPacketPeer>();
-            for (var attempt = 0; attempt < 2; attempt++)
+            for (var attempt = 0; attempt < 3; attempt++)
             {
-                var candidate = Directory.CreateDirectory(Path.Combine(directory, $"candidate-{attempt}")).FullName;
-                await File.WriteAllTextAsync(Path.Combine(candidate, "config"), configuration, deadline.Token);
+                var candidate = Directory.CreateDirectory(Path.Combine(directory, $"candidate-{attempt % 2}")).FullName;
+                if (attempt < 2)
+                    await File.WriteAllTextAsync(Path.Combine(candidate, "config"), configuration, deadline.Token);
+                else
+                {
+                    var state = await new RuntimeStateStore(Path.Combine(candidate, "storage")).LoadAsync(deadline.Token);
+                    Assert.Contains(state.Paths, path => path.DestinationHash.AsSpan().SequenceEqual(destination.Destination.Hash));
+                }
                 var probe = RngitProcess.RunAsync(native,
                     ["rnprobe", "--config", candidate, "-v", "-s", "257", "-n", "1", "-t", "90",
                         "dotreticulum.native.i2p", Convert.ToHexStringLower(destination.Destination.Hash)],
@@ -108,7 +115,8 @@ public sealed class I2pNativeTests(ITestOutputHelper output)
                 Assert.Contains("Sent 1, received 1, packet loss 0%", System.Text.Encoding.UTF8.GetString(result.Output));
             }
             Assert.False(received.Reader.TryRead(out _));
-            output.WriteLine("Two fresh isolated published-native rnprobe processes used only I2P: the receiver announced after each actual stream connected, decrypted both 257-byte packets on their respective accepted children, and each native sender validated the signed delivery proof. No TCP/UDP/shared-instance fallback; this is cold-start native integration, not persisted-candidate recovery, Python interoperability or public-overlay acceptance.");
+            Assert.Equal(3, announced.Count);
+            output.WriteLine("Two fresh isolated published-native rnprobe processes and a third reusing the first configuration/storage used only I2P. The reused storage contained the previous valid path. The receiver announced after each actual stream connected, decrypted all three 257-byte packets on their distinct accepted children, and each native sender validated its signed delivery proof. No TCP/UDP/shared-instance fallback, cache deletion, retry or timer change; this is native startup/restart integration, not Python interoperability or public-overlay acceptance.");
         }
         finally
         {

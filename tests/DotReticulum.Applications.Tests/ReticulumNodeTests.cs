@@ -21,7 +21,7 @@ public class ReticulumNodeTests
     internal static (ReticulumNode Server, ReticulumNode Client, string Dir) Pair() => Pair(out _);
 
     internal static (ReticulumNode Server, ReticulumNode Client, string Dir) Pair(out int port,
-        Action<int, string>? log = null)
+        Action<int, string>? log = null, bool enableClientTransport = false)
     {
         port = FreePort();
         var dir = TempDir();
@@ -39,6 +39,7 @@ public class ReticulumNodeTests
         var client = ReticulumNode.Create(RnsdConfigParser.Parse($"""
             [reticulum]
               share_instance = no
+              enable_transport = {enableClientTransport}
             [interfaces]
               [[C]]
                 type = TCPClientInterface
@@ -130,10 +131,12 @@ public class ReticulumNodeTests
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true); }
     }
 
-    [Fact]
-    public async Task RestartRestoresValidatedPathOnStableConfiguredBearerWithoutNewAnnounce()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RestartRestoresValidatedPathsOnlyWhenTransportIsEnabled(bool enableTransport)
     {
-        var (server, client, directory) = Pair();
+        var (server, client, directory) = Pair(out _, enableClientTransport: true);
         try
         {
             using var identity = Identity.Generate();
@@ -148,12 +151,17 @@ public class ReticulumNodeTests
             Assert.True(await client.RetainDestinationAsync(local.Destination.Hash));
             await client.PersistAsync();
             await client.DisposeAsync();
-            await using var restarted = ReticulumNode.Create(client.Config, client.ConfigDir);
+            await using var restarted = ReticulumNode.Create(client.Config with { EnableTransport = enableTransport }, client.ConfigDir);
             await restarted.StartAsync();
-            Assert.True(restarted.Router.HasPath(local.Destination.Hash));
+            Assert.Equal(enableTransport, restarted.Router.HasPath(local.Destination.Hash));
             using var recalled = restarted.Router.Engine.Known.Recall(local.Destination.Hash);
             Assert.NotNull(recalled);
             Assert.Equal(identity.Hash, recalled.Hash);
+            if (!enableTransport)
+            {
+                await server.Router.AnnounceAsync(local);
+                Assert.True(await restarted.WaitForPathAsync(local.Destination.Hash, TimeSpan.FromSeconds(10)));
+            }
             var connected = await ClientLinks.ConnectAsync(restarted, local.Destination.Hash, TimeSpan.FromSeconds(10), CancellationToken.None);
             Assert.True(connected.Ok, connected.Error);
             var request = connected.Link!.Request("/echo", new byte[] { 7, 8, 9 });

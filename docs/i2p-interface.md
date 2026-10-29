@@ -140,18 +140,26 @@ and both senders validated signed delivery proofs. The configurations contained
 only I2P, without shared-instance, TCP or UDP fallback. This is native integration,
 not Python interoperability or public-overlay acceptance.
 
-An earlier reuse of the first native candidate's configuration failed:
-the second process used a restored path without requesting a new one and
-timed out awaiting its one probe's proof. Whether it sent before stream readiness
-was not directly observed. Native offline sends are discarded;
-the cold-start case must not be cited as persisted-candidate recovery evidence.
+The earlier reused-configuration failure is now resolved for native leaf startup.
+An unchanged executable reproduced it: two fresh processes passed, but a third
+reusing the first configuration/storage sent through its saved path and timed out.
+Pinned `Transport.py:340-355,404-485` restores routes, tunnels and replay hashes
+only in transport mode; our leaf had incorrectly restored them too. The runtime
+now follows that guard, retaining known identities and cached resource proofs.
+The new strict Windows native executable passed all three processes in 65 seconds,
+including the reused storage containing the prior valid route. Each process
+received a fresh announce after its distinct real I2P stream connected, sent one
+encrypted 257-byte packet and validated its signed delivery proof. No storage
+deletion, added retry, increased timer or changed offline-send behavior was used.
+Transport-enabled startup and broader restart modes remain unverified.
+
 An earlier unannounced receiver also timed out during discovery. Explicit
 connected-peer announcements are part of the accepted scenario, not a discovery
 retry fix or a preseeded path/identity.
 
 Historical forced-public-tunnel restart attempts on i2pd and Java remain separate
 failed evidence; local-route success does not resolve them. Impaired-network,
-IFAC/routing, persisted published-candidate readiness, other native platforms,
+IFAC/routing, transport-enabled native startup, other native platforms,
 remote-router and router-process restart acceptance remain unverified.
 Tests target RNS 1.5.7 at
 `a29bfb51c468945c96a1ee22cae0114e993e2391` and LXMF 1.2.1.

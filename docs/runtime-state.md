@@ -70,6 +70,13 @@ announce before restoring paths, and apply current blackhole policy. Tunnel path
 restores them only after a signed synthesis from the same remote transport/interface identity
 arrives on a current bearer. See [transport controls](transport-controls.md).
 
+Only transport-enabled owners restore saved paths, tunnels and the packet replay
+hash list (`Transport.py:340-355,404-485`). A leaf retains known identities and
+cached resource proofs, but must learn fresh routes after startup, including
+when existing transport storage is reopened with transport disabled. This avoids
+treating an old route as evidence that an asynchronous bearer is already ready.
+It does not change offline-send behavior or add implicit probe retries.
+
 Tunnel synthesis follows `Transport.py:2764-2874`: the 176-byte payload is
 `public_key(64) || interface_hash(32) || random_hash(16) || signature(64)`, with the signature
 covering the preceding 112 bytes and the tunnel ID equal to SHA-256 of the first 96 bytes.

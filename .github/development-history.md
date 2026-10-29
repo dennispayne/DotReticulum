@@ -4,6 +4,101 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Transport-only route restoration and native I2P reused-configuration startup
+
+Resolved the previously recorded Windows published-candidate startup failure
+without changing I2P offline writes, probe retries or deadlines. Pinned
+`Transport.py:340-355,404-485` loads replay hashes, routes and tunnels only when
+transport is enabled. Our host restored them for leaves too, allowing an old
+route to bypass discovery before an asynchronous bearer connected.
+`HostStateProvider` now applies the upstream transport-mode guard while still
+restoring known identities and cached resource proofs. Storage schemas and
+transport-enabled restoration remain unchanged.
+
+The existing stable-bearer restart test incorrectly expected leaf route
+restoration. Its replacement exercises both restart modes from actual saved
+transport state: transport mode must restore the route without a new announce;
+leaf mode must retain the identity but require a new route, then complete a real
+link request/response. Before the correction, the disabled-mode case failed and
+the enabled-mode control passed.
+
+The actual-router native case now starts two fresh isolated candidates and a
+third reusing the first configuration/storage unchanged. Before that third
+process, it requires the previous destination path to be present in storage.
+Each process must decrypt exactly 257 bytes at the receiver on its own observed
+accepted I2P child and validate the signed delivery proof. All three are single
+probes with unchanged 90-second deadlines; no extra retries or cache deletion.
+
+The unchanged receipt-clock executable reproduced the original failure:
+fresh candidates passed, reused candidate three sent via its saved route without
+a path request and timed out, **one failed / zero skipped**, **151 seconds**.
+Artifacts:
+`TestResults\i2p-topology-25e99ef9125242209bbfde4c31a0fd1f`.
+The new strict Windows x64 executable passed the same three-process case:
+**one passed / zero skipped**, **65 seconds**. Artifacts:
+`TestResults\i2p-topology-54681e18c5f64d31be047cde2bcada62`.
+Both used actual Java I2P **2.14.0 / SAM 3.1**, local-destination delivery,
+unchanged stock client tunnel settings, transit disabled and no alternate bearer.
+Owned router/test processes were stopped. Private router artifacts remain ignored
+and were not uploaded.
+
+Validation:
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+  zero warnings/errors.
+- `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~ReticulumNodeTests|FullyQualifiedName~RuntimeStateStoreTests|FullyQualifiedName~LifecycleStateTests|FullyQualifiedName~SharedRuntimeTests' --logger trx --results-directory TestResults\leaf-path-restore-focused`:
+  **71 passed / zero skips**.
+- `DOTRETICULUM_LIVE=0 dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --settings tests\coverage.runsettings --collect:'XPlat Code Coverage' --logger trx --results-directory TestResults\leaf-path-restore-coverage -- xUnit.MaxParallelThreads=1`:
+  **1,864 passed / 89 explicit skips / zero failures**.
+  `pwsh -NoProfile -File tests\Get-CoverageSummary.ps1 TestResults\leaf-path-restore-coverage`
+  merged nine reports without double-counting production points:
+
+| Project | Lines | Branches |
+|---|---:|---:|
+| Applications | 10654/13890 (76.70%) | 9191/14468 (63.53%) |
+| Core | 1840/1899 (96.89%) | 1153/1268 (90.93%) |
+| Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+| Interfaces | 4676/5689 (82.19%) | 2538/3477 (72.99%) |
+| Transport | 5070/5546 (91.42%) | 3219/4052 (79.44%) |
+| **Overall** | **22350/27140 (82.35%)** | **16148/23315 (69.26%)** |
+
+- `. tests\Compatibility\Support\Preparation.ps1; Publish-CompatibilityApplication -Directory (Join-Path $PWD 'artifacts\native-leaf-route-policy')`:
+  strict Windows NativeAOT/help passed; executable SHA-256
+  **8a106f3bf7ca3c48231ee905bd14a089f7a52d113a9ce3b19496f1d7070f6e3e**.
+- `$env:DOTRETICULUM_NATIVE_EXE = (Resolve-Path artifacts\native-leaf-route-policy\DotReticulum.Applications.exe).Path; & tests\Interop\Invoke-I2pTopology.ps1 -JavaExecutable (Join-Path $PWD 'TestResults\i2p-tools-java-win\jdk-21.0.12.1+1-jre\bin\java.exe') -JavaRouterDirectory (Join-Path $PWD 'TestResults\i2p-tools-java-win\router') -AllowPublicNetwork -JavaLocalDestinationRouting -PublishedFeatureOnly -NoBuild -SamEndpoint 127.0.0.1:17657 -TestTimeoutSeconds 360 -KeepArtifacts`:
+  the actual three-process native I2P case passed as described above.
+- With the verified reference and new native executable,
+  `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~NativeResourceTests|FullyQualifiedName~RnshNativeTests' --logger trx --results-directory TestResults\leaf-path-restore-live-native -- xUnit.MaxParallelThreads=1`:
+  **two passed / zero skips**, including terminal initiation and exact encrypted/
+  compressed **2,200,017-byte** resource receive/return.
+- `pwsh -NoProfile -File tests\Compatibility\Invoke-CompatibilityTests.ps1 -Application artifacts\native-leaf-route-policy\DotReticulum.Applications.exe -Python TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5\reference\python\venv\Scripts\python.exe -Upstream TestResults\compatibility-local-bc8780635d9341858663c96c7438bcd5\reference\python\upstream -Implementation Both -OutputDirectory TestResults\leaf-path-restore-shared`:
+  native **41 passed / one explicit skip**, actual upstream-to-upstream
+  **40 passed / two explicit skips**, zero failures. T059 also requires exactly
+  one output payload marker. External retrieval was not requested; upstream
+  rnsh additionally requires POSIX. This is the complete canonical shared suite,
+  not a managed replacement or internal API round trip.
+- `pwsh -NoProfile -File tests\Invoke-PesterTests.ps1 -ToolingOnly`:
+  **61 passed / two explicit prerequisite skips**.
+  `pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`:
+  **66 tracked scripts / zero findings**.
+
+The native I2P evidence is bounded startup/restart integration with a managed
+receiver, not shared Compatibility, Python-role execution, public-tunnel recovery,
+transport-enabled native startup or another OS. Native executable flows are not
+included in managed coverage. The live reference pin remains unchanged.
+
+Separately, exact-source full interop **40958443219**, source **b716cc6**,
+failed candidate T001 retrieval on all three platforms:
+`rngit: Could not establish link with <7649a50d84610232d1416b41d2896aff>`.
+No canonical source bundle was produced; upstream and dependent reference cases
+could not execute. This is not a T059 functional verdict or hosted acceptance.
+The three Build jobs and both summary jobs passed; all four Compatibility and
+all three Test jobs failed, including their explicit missing-reference dependency.
+T059 therefore remains locally accepted only. Actual static artifacts for both
+**86a9b72 / 40956391132** and **b716cc6 / 40958442860** contain zero
+Actions/C#/PowerShell findings and the same two known Python fixture warnings;
+all five static jobs passed in each run.
+
 ### Shared resource-sized application requests and responses
 
 Added **T059 / C008**, keeping the same scenario, fixed command, seeded

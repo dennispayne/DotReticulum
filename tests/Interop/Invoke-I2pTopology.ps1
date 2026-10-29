@@ -46,7 +46,7 @@ Requires public networking and the reference; cannot be combined with RunStreamT
 Selects only the native persisted-bearer restart and bidirectional DATA test.
 Requires public networking; cannot be combined with the other test selections.
 .PARAMETER PublishedFeatureOnly
-Runs the published-native rnprobe cold-start encrypted DATA/proof flow using the Applications
+Runs the published-native rnprobe fresh/persisted startup DATA/proof flow using the Applications
 test project. Requires AllowPublicNetwork and an existing DOTRETICULUM_NATIVE_EXE;
 cannot be combined with other test selections. This is native integration,
 not a Python baseline or a public-overlay claim.
@@ -461,7 +461,7 @@ yggdrasil = false
     finally { $transportCheck.Dispose() }
     }
     $filter = if ($PublishedFeatureOnly) {
-        'FullyQualifiedName~I2pNativeTests.PublishedProbeExchangesEncryptedDataAndValidatedProofsAcrossFreshProcesses'
+        'FullyQualifiedName~I2pNativeTests.PublishedProbeExchangesEncryptedDataAndValidatedProofsAcrossFreshAndPersistedProcesses'
     } elseif ($ReferenceRestartOnly) {
         'FullyQualifiedName~Parity6I2pReferenceRecoveryTests'
     } elseif ($NativeRestartOnly) {
