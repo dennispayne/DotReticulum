@@ -65,6 +65,7 @@ if ($GitRemote -and ([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullO
 Import-Module Pester -MinimumVersion 5.7.1 -ErrorAction Stop
 $containers = @(New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Coverage.Tests.ps1'))
 $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\StaticAnalysis.Tests.ps1')
+$containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\BuildArtifacts.Tests.ps1')
 if (!$ToolingOnly) {
     $resolved = (Resolve-Path -LiteralPath $Application).Path
     if ($NativePackaging) {

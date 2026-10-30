@@ -40,8 +40,8 @@ Describe 'PowerShell coverage reporting' -Tag Tooling {
         $overall.Branches.Total | Should -Be 2
 
         $platforms = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'platforms')
-        $linux = New-Item -ItemType Directory -Path (Join-Path $platforms.FullName 'test-results-linux-x64-1')
         foreach ($suite in 'unit', 'integration') {
+            $linux = New-Item -ItemType Directory -Path (Join-Path $platforms.FullName "test-results-$suite-linux-x64-1")
             $index = if ($suite -eq 'unit') { 0 } else { 1 }
             $export = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $coverageScript,
                 (Join-Path $reports.FullName "report-$index"), '-JsonPath', (Join-Path $linux.FullName "coverage-$suite.json"))
@@ -185,12 +185,12 @@ Describe 'PowerShell test runner' -Tag Tooling {
         $result.Error | Should -Match 'fresh coverage directory'
     }
 
-    It 'keeps repeated extended iterations separate without accepting duplicate rows within one iteration' {
+    It 'keeps repeated Integration iterations separate without accepting duplicate rows within one iteration' {
         $directory = New-Item -ItemType Directory -Path (Join-Path $TestDrive 'repeated-platforms')
-        $linux = New-Item -ItemType Directory -Path (Join-Path $directory.FullName 'test-results-linux-x64-1')
-        $extended = New-Item -ItemType Directory -Path (Join-Path $linux.FullName 'extended')
+        $linux = New-Item -ItemType Directory -Path (Join-Path $directory.FullName 'test-results-integration-linux-x64-1')
+        $integration = New-Item -ItemType Directory -Path (Join-Path $linux.FullName 'integration')
         foreach ($iteration in 1, 2) {
-            $group = New-Item -ItemType Directory -Path (Join-Path $extended.FullName "iteration-$iteration")
+            $group = New-Item -ItemType Directory -Path (Join-Path $integration.FullName "iteration-$iteration")
             $cases = if ($iteration -eq 1) { '<test-case name="mesh" result="Success"/>' } else {
                 '<test-case name="mesh" result="Failure"><failure><message>actual resource failure</message></failure></test-case>' +
                 '<test-case name="device" result="Ignored"><reason><message>requires hardware</message></reason></test-case>'
@@ -198,9 +198,9 @@ Describe 'PowerShell test runner' -Tag Tooling {
             "<test-results><test-suite><results>$cases</results></test-suite></test-results>" |
                 Set-Content -LiteralPath (Join-Path $group.FullName 'mesh.xml')
         }
-        $json = Join-Path $linux.FullName 'summary-extended.json'
+        $json = Join-Path $linux.FullName 'summary-integration.json'
         $export = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
-            (Join-Path $PSScriptRoot '..\Get-TestSummary.ps1'), '-Path', $extended.FullName,
+            (Join-Path $PSScriptRoot '..\Get-TestSummary.ps1'), '-Path', $integration.FullName,
             '-IncludeParentDirectory', '-JsonPath', $json)
         $export.Code | Should -Be 0 -Because $export.Error
         $report = Get-Content -LiteralPath $json -Raw | ConvertFrom-Json
@@ -218,7 +218,7 @@ Describe 'PowerShell test runner' -Tag Tooling {
         $duplicate = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
             (Join-Path $PSScriptRoot '..\Get-TestPlatformSummary.ps1'), '-ReportsDirectory', $directory.FullName)
         $duplicate.Code | Should -Not -Be 0
-        $duplicate.Error | Should -Match 'Duplicate extended row iteration-1 / mesh'
+        $duplicate.Error | Should -Match 'Duplicate integration row iteration-1 / mesh'
     }
 
     It 'exports test counts and combines platform tables without losing failure or skip details' {
@@ -234,7 +234,7 @@ Describe 'PowerShell test runner' -Tag Tooling {
 '@ | Set-Content -LiteralPath $input
         $export = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
             (Join-Path $PSScriptRoot '..\Get-TestSummary.ps1'), '-Path', $input,
-            '-JsonPath', (Join-Path $linux.FullName 'summary-native.json'))
+            '-JsonPath', (Join-Path $linux.FullName 'summary-integration.json'))
         $export.Code | Should -Be 0 -Because $export.Error
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
             (Join-Path $PSScriptRoot '..\Get-TestPlatformSummary.ps1'),
@@ -245,24 +245,23 @@ Describe 'PowerShell test runner' -Tag Tooling {
         $result.Output | Should -Match 'Linux.*skipped \(1\).*requires device'
         $result.Output | Should -Match '#### Unit tests'
         $result.Output | Should -Match '#### Integration tests'
-        $result.Output | Should -Match '#### Native tests'
-        $extendedInput = Join-Path $linux.FullName 'extended.xml'
+        $result.Output | Should -Not -Match '#### (Native|Extended) tests'
+        $liveInput = Join-Path $linux.FullName 'live.xml'
         @'
 <test-results><test-suite><results>
 <test-case name="live" result="Success"/>
 <test-case name="hardware" result="Ignored"><reason><message>requires physical adapter</message></reason></test-case>
 </results></test-suite></test-results>
-'@ | Set-Content -LiteralPath $extendedInput
-        $export = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
-            (Join-Path $PSScriptRoot '..\Get-TestSummary.ps1'), '-Path', $extendedInput,
-            '-JsonPath', (Join-Path $linux.FullName 'summary-extended.json'))
-        $export.Code | Should -Be 0 -Because $export.Error
+'@ | Set-Content -LiteralPath $liveInput
+        $export = & (Join-Path $PSScriptRoot '..\Get-TestSummary.ps1') -Path $input, $liveInput `
+            -JsonPath (Join-Path $linux.FullName 'summary-integration.json')
+        $export | Should -Not -BeNullOrEmpty
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File',
             (Join-Path $PSScriptRoot '..\Get-TestPlatformSummary.ps1'),
             '-ReportsDirectory', $directory.FullName)
         $result.Code | Should -Be 0 -Because $result.Error
-        $result.Output | Should -Match '#### Extended tests'
-        $result.Output | Should -Match '\| extended \| 1 / 0 / 1 \| Unavailable \| Unavailable'
+        $result.Output | Should -Not -Match '#### (Native|Extended) tests'
+        $result.Output | Should -Match '\| live \| 1 / 0 / 1 \| Unavailable \| Unavailable'
         $result.Output | Should -Match '\| cli \| 1 / 1 / 1 \| Unavailable \| Unavailable'
         $result.Output | Should -Match 'Linux.*requires physical adapter'
     }

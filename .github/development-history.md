@@ -4,6 +4,60 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Separate Build and Test workflows - local restructuring gate
+
+Replaced the combined workflow and its two periodic wrappers with `build.yml`
+and `test.yml`. Build retains the Linux/Windows/macOS compilation/strict NativeAOT
+matrix and uploads native binaries plus portable managed outputs, including
+MSBuild-owned fixture outputs and the restored coverage collector. A separate
+trusted-main attestation job never executes downloaded artifacts and alone has
+OIDC/attestation write permissions; PR build jobs remain read-only.
+
+Test selects one successful producer run, checks repository/workflow/event,
+complete unexpired artifact inventory and the exact checkout (including PR merge
+parent validation), then uses separate Unit, Integration and Compatibility
+platform matrices without restore/build/publish. Trusted main consumers verify
+GitHub-signed source/workflow provenance before execution. Native/managed
+manifests check runtime, commit and SHA-256; fork-produced artifacts are rejected
+by the downstream workflow. No producer/artifact fallback is allowed.
+
+Bounded Integration remains automatic. Longer live Integration runs Tuesday
+06:00 UTC once and Saturday 06:00 UTC three times, or manually with 1-10
+repetitions against a selected successful main Build. These use the same
+published outputs, not fresh scheduled builds. Native CLI/installation,
+contracts and repeated traffic are Integration components, not separate test
+categories. Compatibility keeps candidate-owned source retrieval, one canonical
+Linux-fetched bundle, the actual-upstream baseline and commit-pinned table links.
+Independent Unit/managed Integration coverage exports remain separate; the
+summary merges raw source points per platform, never percentages.
+
+Local evidence before hosted execution:
+
+- Baseline `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`:
+  zero warnings/errors. `dotnet test DotReticulum.slnx -c Release --no-build
+  --nologo -v quiet`: **1,868 passed, 91 skipped, zero failed**; live mode off.
+- `tests/New-TestBuild.ps1` plus `tests/Invoke-BuiltTests.ps1 -Coverage` executed
+  the packaged assemblies/collector without recompilation: Unit
+  **1,444 passed / 6 skipped**, managed Integration **424 passed / 21 skipped**.
+  Windows-only local run; native/reference opt-ins were not enabled here.
+  Actual directories: `TestResults/ci-portable-unit-3` and
+  `TestResults/ci-portable-integration-4`.
+- `tests/Get-CoverageSummary.ps1 -Results
+  TestResults/ci-portable-unit-3,TestResults/ci-portable-integration-4` merged
+  20 OpenCover files, deduplicating repeated collector attachments/source points.
+  Overall **22,359/27,152 lines (82.35%)**, **16,154/23,325 branches (69.26%)**.
+  Applications 76.72%/63.54%, Core 96.89%/90.93%, Crypto 94.83%/94.00%,
+  Interfaces 82.18%/73.07%, Transport 91.36%/79.29% (line/branch).
+- Focused `BuildArtifacts.Tests.ps1` ran under Pester **5.7.1**; success,
+  wrong producer, fork, missing/expired/duplicate inventory, PR checkout and
+  digest/commit/runtime rejection paths are exercised.
+- `pwsh -NoProfile -File tests/Invoke-PesterTests.ps1 -ToolingOnly`:
+  **83 passed, 2 explicitly skipped, zero failed** (Pester 6.2.0 in the fresh
+  local process; the focused artifact guards also passed under 5.7.1).
+- PSScriptAnalyzer **1.24.0**: **70 tracked PowerShell files, zero findings**.
+  actionlint **1.7.12**: all workflows valid. Hosted Build/Test chaining and
+  actual signed-provenance acceptance are still pending at this local gate.
+
 ### Archiving completed TODO entries
 
 Moved all **35** completed entries from `TODO.md` into

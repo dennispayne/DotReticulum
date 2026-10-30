@@ -4,7 +4,7 @@
 .SYNOPSIS
 Validates a downloaded native build artifact and exports its path for later workflow steps.
 .DESCRIPTION
-Checks the artifact manifest, runtime identifier, commit and executable. Writes
+Checks the artifact manifest, runtime identifier, commit and SHA-256 digest. Writes
 the application path to GITHUB_ENV when running in GitHub Actions.
 .PARAMETER Directory
 Downloaded native artifact directory containing build-manifest.json and its executable.
@@ -35,9 +35,16 @@ if (!(Test-Path -LiteralPath $manifestPath)) { throw "Missing $manifestPath; the
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 if ($manifest.rid -ne $Rid) { throw "Artifact RID '$($manifest.rid)' does not match '$Rid'." }
 if ($Commit -and $manifest.commit -ne $Commit) { throw "Artifact was built from $($manifest.commit), not $Commit." }
+if (!$manifest.executable -or $manifest.executable -cnotmatch '^[A-Za-z0-9._-]+$') {
+    throw 'Artifact executable must be a plain filename.'
+}
 
 $binary = Join-Path (Resolve-Path -LiteralPath $Directory).Path $manifest.executable
 if (!(Test-Path -LiteralPath $binary)) { throw "Executable $binary is missing from the artifact." }
+if ($manifest.sha256 -cnotmatch '^[0-9a-f]{64}$' -or
+    (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant() -cne $manifest.sha256) {
+    throw 'Native artifact digest mismatch.'
+}
 if (!$IsWindows) { chmod +x $binary; if ($LASTEXITCODE -ne 0) { throw 'chmod failed.' } }
 if ($env:GITHUB_ENV) { "$EnvironmentVariable=$binary" | Add-Content -LiteralPath $env:GITHUB_ENV }
 Write-Host "Using native build $($manifest.commit) ($Rid): $binary"

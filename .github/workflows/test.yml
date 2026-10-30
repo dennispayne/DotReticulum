@@ -1,0 +1,453 @@
+name: Test
+run-name: Test / ${{ github.event.workflow_run.head_sha || inputs.build_run_id || github.event_name }}
+
+on:
+  workflow_run:
+    workflows: [Build]
+    types: [completed]
+  schedule:
+    - cron: '0 6 * * 2'
+    - cron: '0 6 * * 6'
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: 'Successful main Build run ID (blank selects newest successful main Build)'
+        type: string
+        default: ''
+      full_integration:
+        description: 'Include longer live Integration checks'
+        type: boolean
+        default: false
+      iterations:
+        description: 'Longer Integration repetitions (1-10)'
+        type: number
+        default: 1
+
+permissions:
+  contents: read
+  actions: read
+  attestations: read
+
+concurrency:
+  group: test-${{ github.event.workflow_run.head_branch || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: pwsh
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  source:
+    name: Select exact Build
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run-id: ${{ steps.source.outputs.run-id }}
+      commit: ${{ steps.checkout.outputs.commit }}
+      attested: ${{ steps.source.outputs.attested }}
+      full-integration: ${{ steps.mode.outputs.full-integration }}
+      iterations: ${{ steps.mode.outputs.iterations }}
+    steps:
+      - name: Checkout trusted workflow controls
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Pin producing run, commit and complete artifact inventory
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_BUILD: ${{ inputs.build_run_id }}
+        run: ./tests/Resolve-TestBuild.ps1 -RunId $env:REQUESTED_BUILD
+
+      - name: Read the producing checkout manifest without executing artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.source.outputs.run-id }}
+          name: native-linux-x64
+          path: artifacts/source
+
+      - name: Preserve the exact main or PR merge checkout
+        id: checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRODUCING_RUN: ${{ steps.source.outputs.run-id }}
+        run: ./tests/Resolve-TestBuild.ps1 -RunId $env:PRODUCING_RUN -NativeManifest artifacts/source/build-manifest.json
+
+      - name: Select Integration cadence
+        id: mode
+        env:
+          REQUESTED_FULL: ${{ inputs.full_integration }}
+          REQUESTED_ITERATIONS: ${{ inputs.iterations }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          $full = $env:GITHUB_EVENT_NAME -eq 'schedule' -or $env:REQUESTED_FULL -eq 'true'
+          $iterations = if ($env:GITHUB_EVENT_NAME -eq 'schedule') {
+            if ($env:SCHEDULE -eq '0 6 * * 6') { 3 } else { 1 }
+          } elseif ($env:REQUESTED_ITERATIONS) {
+            $value = 0
+            if (![int]::TryParse($env:REQUESTED_ITERATIONS, [ref]$value)) { throw 'Integration repetitions must be an integer.' }
+            $value
+          } else { 1 }
+          if ($iterations -lt 1 -or $iterations -gt 10) { throw 'Integration repetitions must be between 1 and 10.' }
+          "full-integration=$($full.ToString().ToLowerInvariant())" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          "iterations=$iterations" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+  compatibility:
+    name: Compatibility (${{ matrix.rid }})
+    needs: source
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: &platforms
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+    steps:
+      - name: Checkout exact producing source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify and use Build artifacts
+        uses: ./.github/actions/use-build
+        with:
+          run-id: ${{ needs.source.outputs.run-id }}
+          commit: ${{ needs.source.outputs.commit }}
+          attested: ${{ needs.source.outputs.attested }}
+          rid: ${{ matrix.rid }}
+          native: 'true'
+
+      - name: Install Pester
+        run: ./tests/Install-Pester.ps1
+
+      - name: Run shared scenarios, retrieving the reference with this native candidate
+        run: ./tests/Compatibility/Invoke-CompatibilityTests.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Implementation DotReticulum -FetchReference -ReferenceDirectory "$env:RUNNER_TEMP/candidate-reference" -Gateway rmap.world -Label '${{ matrix.rid }}' -NoJobSummary
+
+      - name: Retain the canonical candidate-fetched source
+        if: ${{ !cancelled() && matrix.rid == 'linux-x64' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reference-source-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/candidate-reference/reference.bundle
+            ${{ runner.temp }}/candidate-reference/reference-provenance.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Retain Compatibility evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compatibility-${{ matrix.rid }}-${{ github.run_attempt }}
+          path: TestResults/compatibility/
+          if-no-files-found: warn
+          retention-days: 14
+
+  unit:
+    name: Unit (${{ matrix.rid }})
+    needs: source
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: *platforms
+    steps:
+      - name: Checkout exact producing source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Verify and use Build artifacts
+        uses: ./.github/actions/use-build
+        with:
+          run-id: ${{ needs.source.outputs.run-id }}
+          commit: ${{ needs.source.outputs.commit }}
+          attested: ${{ needs.source.outputs.attested }}
+          rid: ${{ matrix.rid }}
+          managed: 'true'
+
+      - name: Run built Unit tests with production coverage
+        env:
+          DOTRETICULUM_LIVE: '0'
+          BUILD_COMMIT: ${{ needs.source.outputs.commit }}
+        run: ./tests/Invoke-BuiltTests.ps1 -Directory artifacts/managed -Rid '${{ matrix.rid }}' -Commit $env:BUILD_COMMIT -Filter 'Category=Unit' -ResultsDirectory TestResults/unit -Coverage
+
+      - name: Export Unit results and independent coverage
+        if: ${{ !cancelled() }}
+        run: |
+          ./tests/Get-TestSummary.ps1 -Path TestResults/unit -Title 'Unit tests' -JsonPath TestResults/summary-unit.json
+          ./tests/Get-CoverageSummary.ps1 TestResults/unit -JsonPath TestResults/coverage-unit.json
+
+      - name: Retain Unit evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-unit-${{ matrix.rid }}-${{ github.run_attempt }}
+          path: TestResults/
+          if-no-files-found: warn
+          retention-days: 14
+
+  integration:
+    name: Integration (${{ matrix.rid }})
+    needs: [source, compatibility]
+    if: ${{ always() && !cancelled() && needs.source.result == 'success' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix: *platforms
+    env:
+      DOTRETICULUM_LIVE: '0'
+      BUILD_COMMIT: ${{ needs.source.outputs.commit }}
+    steps:
+      - name: Checkout exact producing source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Verify and use Build artifacts
+        id: artifacts
+        uses: ./.github/actions/use-build
+        with:
+          run-id: ${{ needs.source.outputs.run-id }}
+          commit: ${{ needs.source.outputs.commit }}
+          attested: ${{ needs.source.outputs.attested }}
+          rid: ${{ matrix.rid }}
+          managed: 'true'
+          native: 'true'
+
+      - name: Reuse the canonical candidate-fetched reference
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true
+        with:
+          name: reference-source-${{ github.run_attempt }}
+          path: artifacts/reference
+
+      - name: Provision pinned Python peers
+        run: |
+          $bundle = Join-Path $PWD 'artifacts/reference/reference.bundle'
+          if (Test-Path -LiteralPath $bundle) {
+            $python = if ($IsWindows) { 'python' } else { 'python3' }
+            ./tests/Initialize-Reference.ps1 -Bundle $bundle -Directory (Join-Path $env:RUNNER_TEMP 'pinned-python') -Python $python
+          } else {
+            Write-Warning 'Canonical source is unavailable; Python-peer Integration cases cannot execute.'
+          }
+
+      - name: Run built managed Integration tests with production coverage
+        if: ${{ !cancelled() && steps.artifacts.outcome == 'success' }}
+        run: ./tests/Invoke-BuiltTests.ps1 -Directory artifacts/managed -Rid '${{ matrix.rid }}' -Commit $env:BUILD_COMMIT -Filter 'Category!=Unit&Category!=Live' -ResultsDirectory TestResults/integration/managed -Coverage
+
+      - name: Run bounded native resource and Buffer Integration
+        if: ${{ !cancelled() && steps.artifacts.outcome == 'success' }}
+        env:
+          DOTRETICULUM_LIVE: '1'
+        run: |
+          ./tests/Invoke-BuiltTests.ps1 -Directory artifacts/managed -Rid '${{ matrix.rid }}' -Commit $env:BUILD_COMMIT -Filter 'FullyQualifiedName~NativeResourceTests' -ResultsDirectory TestResults/integration/resources -Assembly DotReticulum.Applications.Tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (!$env:DOTRETICULUM_PYTHON -or !$env:DOTRETICULUM_UPSTREAM) {
+            throw 'Native Buffer Integration requires the candidate-fetched, verified reference.'
+          }
+          ./tests/Invoke-BuiltTests.ps1 -Directory artifacts/managed -Rid '${{ matrix.rid }}' -Commit $env:BUILD_COMMIT -Filter 'FullyQualifiedName~NativeBufferTests&Category!=NativeSoak' -ResultsDirectory TestResults/integration/buffer -Assembly DotReticulum.Applications.Tests
+
+      - name: Run CLI and installation Integration
+        if: ${{ !cancelled() && steps.artifacts.outcome == 'success' }}
+        run: |
+          ./tests/Install-Pester.ps1
+          Import-Module Pester -RequiredVersion 5.7.1
+          $configuration = New-PesterConfiguration
+          $configuration.Run.Container = @('Coverage', 'StaticAnalysis', 'BuildArtifacts', 'Parity8Packaging') | ForEach-Object {
+            New-PesterContainer -Path "tests/Pester/$_.Tests.ps1" -Data @{ Application = $env:DOTRETICULUM_NATIVE_EXE }
+          }
+          $configuration.Run.PassThru = $true
+          $configuration.Output.Verbosity = 'Detailed'
+          $configuration.TestResult.Enabled = $true
+          $configuration.TestResult.OutputPath = 'TestResults/integration/cli/native-cli.xml'
+          $result = Invoke-Pester -Configuration $configuration
+          if ($result.FailedCount -gt 0 -or $result.Result -ne 'Passed' -or $result.PassedCount -eq 0) { exit 1 }
+
+      - name: Run native contract and mixed-peer Integration
+        if: ${{ !cancelled() && steps.artifacts.outcome == 'success' }}
+        run: ./tests/Invoke-ContractIntegration.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary
+
+      - name: Run longer scheduled or manual Integration
+        if: ${{ !cancelled() && steps.artifacts.outcome == 'success' && needs.source.outputs.full-integration == 'true' }}
+        env:
+          INTEGRATION_ITERATIONS: ${{ needs.source.outputs.iterations }}
+          DOTRETICULUM_LIVE: '1'
+          DOTRETICULUM_BUFFER_SOAK: '1'
+        run: |
+          if (!$env:DOTRETICULUM_PYTHON -or !$env:DOTRETICULUM_UPSTREAM) {
+            throw 'Longer Integration requires the candidate-fetched, verified reference.'
+          }
+          $failed = $false
+          for ($iteration = 1; $iteration -le [int]$env:INTEGRATION_ITERATIONS; $iteration++) {
+            $directory = "TestResults/integration/iteration-$iteration"
+            ./tests/Invoke-BuiltTests.ps1 -Directory artifacts/managed -Rid '${{ matrix.rid }}' -Commit $env:BUILD_COMMIT -Filter 'Category=Live' -ResultsDirectory $directory
+            if ($LASTEXITCODE -ne 0) { $failed = $true }
+            ./tests/Get-TestSummary.ps1 -Path $directory -Title "Integration iteration $iteration" -JsonPath "$directory/summary.json"
+            $report = Get-Content -LiteralPath "$directory/summary.json" -Raw | ConvertFrom-Json
+            if (($report.Rows | Measure-Object -Property Passed -Sum).Sum -lt 1) {
+              Write-Error "Integration iteration $iteration has no passing executed tests." -ErrorAction Continue
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+
+      - name: Export Integration results and independent managed coverage
+        if: ${{ !cancelled() }}
+        run: |
+          ./tests/Get-TestSummary.ps1 -Path TestResults/integration, TestResults/contract-integration/contract-integration.xml -IncludeParentDirectory -Title 'Integration tests' -JsonPath TestResults/summary-integration.json
+          ./tests/Get-CoverageSummary.ps1 TestResults/integration/managed -JsonPath TestResults/coverage-integration.json
+
+      - name: Retain Integration evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-integration-${{ matrix.rid }}-${{ github.run_attempt }}
+          path: TestResults/
+          if-no-files-found: warn
+          retention-days: 14
+
+  upstream-baseline:
+    name: Compatibility / Upstream
+    needs: [source, compatibility]
+    if: ${{ always() && !cancelled() && needs.source.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact producing source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+
+      - name: Reuse the canonical candidate-fetched source
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: reference-source-${{ github.run_attempt }}
+          path: artifacts/reference
+
+      - name: Provision the verified pinned reference
+        run: ./tests/Initialize-Reference.ps1 -Bundle artifacts/reference/reference.bundle -Directory "$env:RUNNER_TEMP/pinned-python" -Python python3
+
+      - name: Install Pester
+        run: ./tests/Install-Pester.ps1
+
+      - name: Execute the same shared scenarios with upstream as the candidate
+        run: ./tests/Compatibility/Invoke-CompatibilityTests.ps1 -Implementation Upstream -ReferenceDirectory artifacts/reference -NoJobSummary
+
+      - name: Retain upstream Compatibility evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compatibility-upstream-${{ github.run_attempt }}
+          path: TestResults/compatibility/
+          if-no-files-found: warn
+          retention-days: 14
+
+  compatibility-summary:
+    name: Summarize Compatibility
+    needs: [source, compatibility, upstream-baseline]
+    if: ${{ always() && !cancelled() && needs.source.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact producing source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+
+      - name: Download Compatibility reports
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: compatibility-*-${{ github.run_attempt }}
+          path: TestResults/compatibility-platforms
+
+      - name: Summarize actual shared test outcomes
+        run: |
+          $directory = 'TestResults/compatibility-platforms'
+          $null = New-Item -ItemType Directory -Force -Path $directory
+          $summary = & ./tests/Compatibility/New-CompatibilitySummary.ps1 -ReportsDirectory $directory -Commit '${{ needs.source.outputs.commit }}'
+          $summary
+          $summary | Set-Content -LiteralPath TestResults/compatibility-all-platforms.md -Encoding utf8
+          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+  test-summary:
+    name: Summarize Unit and Integration
+    needs: [source, unit, integration]
+    if: ${{ always() && !cancelled() && needs.source.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact producing source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+
+      - name: Download Unit and Integration evidence
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: test-results-*-${{ github.run_attempt }}
+          path: TestResults/test-platforms
+
+      - name: Summarize independent suites and merged coverage
+        run: |
+          $directory = 'TestResults/test-platforms'
+          $null = New-Item -ItemType Directory -Force -Path $directory
+          $summary = & ./tests/Get-TestPlatformSummary.ps1 -ReportsDirectory $directory
+          $summary
+          $summary | Set-Content -LiteralPath TestResults/tests-all-platforms.md -Encoding utf8
+          $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          foreach ($rid in 'linux-x64', 'osx-arm64', 'win-x64') {
+            $groups = @('unit', 'integration' | ForEach-Object {
+              Join-Path $directory "test-results-$_-$rid-${{ github.run_attempt }}/$_"
+            })
+            if (@($groups | Where-Object { !(Test-Path -LiteralPath $_) }).Count -gt 0) {
+              "Merged production coverage ($rid): unavailable; both suite artifacts are required." | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+              continue
+            }
+            $summary = & ./tests/Get-CoverageSummary.ps1 -Results $groups -JsonPath "TestResults/coverage-merged-$rid.json"
+            "#### Merged managed production coverage ($rid)" | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+            $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          }
+
+      - name: Retain consolidated reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-summary-${{ github.run_attempt }}
+          path: |
+            TestResults/tests-all-platforms.md
+            TestResults/coverage-merged-*.json
+          if-no-files-found: warn
+          retention-days: 14

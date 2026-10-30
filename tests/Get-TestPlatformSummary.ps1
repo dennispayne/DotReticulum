@@ -7,7 +7,7 @@ Combines saved test summaries into cross-platform Markdown tables.
 Reads summary JSON artifacts beneath ReportsDirectory and reports platform
 counts, failures and skips. Missing platforms remain explicitly unavailable.
 .PARAMETER ReportsDirectory
-Directory containing downloaded test-results-<rid>-* artifact directories with
+Directory containing downloaded test-results-<suite>-<rid>-* artifact directories with
 suite summary JSON and optional independent Unit/Integration coverage JSON.
 .EXAMPLE
 .\Get-TestPlatformSummary.ps1 -ReportsDirectory ..\TestResults\platforms
@@ -42,16 +42,14 @@ function Format-CoverageCell($Row) {
 '### Test results - all platforms'
 ''
 'Cells show **passed / failed / skipped**. Unavailable means no result was received.'
-$suites = @('unit', 'integration', 'native')
-if (Get-ChildItem -LiteralPath $ReportsDirectory -Recurse -File -Filter 'summary-extended.json') {
-    $suites += 'extended'
-}
+$suites = @('unit', 'integration')
 foreach ($suite in $suites) {
     $reports = @{}
     $names = [Collections.Generic.HashSet[string]]::new()
     $details = [Collections.Generic.List[string]]::new()
     foreach ($rid in $platforms.Keys) {
-        $files = @(Get-ChildItem -LiteralPath $ReportsDirectory -Directory -Filter "test-results-$rid-*" |
+        $files = @(Get-ChildItem -LiteralPath $ReportsDirectory -Directory |
+            Where-Object { $_.Name -match "^test-results-($suite-)?$rid-[0-9]+$" } |
             ForEach-Object { Get-ChildItem -LiteralPath $_.FullName -File -Filter "summary-$suite.json" })
         if ($files.Count -gt 1) { throw "Multiple $suite reports for $rid." }
         $reports[$rid] = @{}
@@ -93,11 +91,11 @@ foreach ($suite in $suites) {
         ''
         '</details>'
     }
-    if ($suite -in 'native', 'extended') { continue }
     $coverage = @{}
     $projects = [Collections.Generic.HashSet[string]]::new()
     foreach ($rid in $platforms.Keys) {
-        $files = @(Get-ChildItem -LiteralPath $ReportsDirectory -Directory -Filter "test-results-$rid-*" |
+        $files = @(Get-ChildItem -LiteralPath $ReportsDirectory -Directory |
+            Where-Object { $_.Name -match "^test-results-($suite-)?$rid-[0-9]+$" } |
             ForEach-Object { Get-ChildItem -LiteralPath $_.FullName -File -Filter "coverage-$suite.json" })
         if ($files.Count -gt 1) { throw "Multiple $suite coverage reports for $rid." }
         $coverage[$rid] = @{}

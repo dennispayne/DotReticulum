@@ -1,0 +1,169 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'tools/**'
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - 'DotReticulum.slnx'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'NuGet.Config'
+      - 'global.json'
+      - '.editorconfig'
+      - 'PSScriptAnalyzerSettings.psd1'
+      - 'assets/branding/*.ps1'
+      - '!**/*.md'
+      - '!docs/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'tools/**'
+      - '.github/workflows/**'
+      - '.github/actions/**'
+      - 'DotReticulum.slnx'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'NuGet.Config'
+      - 'global.json'
+      - '.editorconfig'
+      - 'PSScriptAnalyzerSettings.psd1'
+      - 'assets/branding/*.ps1'
+      - '!**/*.md'
+      - '!docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  build:
+    name: Build (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout producing commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Install Linux NativeAOT prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          sudo apt-get install -y clang zlib1g-dev
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Restore and build
+        run: |
+          dotnet restore DotReticulum.slnx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build DotReticulum.slnx -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./tests/New-TestBuild.ps1 -Directory artifacts/managed -Rid '${{ matrix.rid }}' -Commit (git rev-parse HEAD)
+
+      - name: Publish native binaries
+        run: |
+          if ($IsWindows) {
+            $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer'
+            $env:PATH = "$installer;$env:PATH"
+            $installation = & (Join-Path $installer 'vswhere.exe') -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            if (!$installation) { throw 'MSVC NativeAOT tools are unavailable.' }
+            $setup = Join-Path $installation 'VC/Auxiliary/Build/vcvars64.bat'
+          }
+          foreach ($target in @(
+            @{ Project = 'src/DotReticulum.Applications/DotReticulum.Applications.csproj'; Directory = 'artifacts/native'; Name = 'DotReticulum.Applications' },
+            @{ Project = 'tests/Fixtures/ChannelBufferConsumer/ChannelBufferConsumer.csproj'; Directory = 'artifacts/native/buffer-consumer'; Name = 'ChannelBufferConsumer' }
+          )) {
+            $publish = @('publish', $target.Project, '-c', 'Release', '-r', '${{ matrix.rid }}',
+              '-p:PublishAot=true', '-p:ILLinkTreatWarningsAsErrors=true', '-p:IlcTreatWarningsAsErrors=true', '-o', $target.Directory)
+            if ($IsWindows) { & $env:ComSpec /c "call `"$setup`" >nul && dotnet $($publish -join ' ')" }
+            else { dotnet @publish }
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $executable = $target.Name + $(if ($IsWindows) { '.exe' } else { '' })
+            $binary = Join-Path $target.Directory $executable
+            & (Join-Path $PWD $binary) --help
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            [ordered]@{
+              commit = (git rev-parse HEAD); rid = '${{ matrix.rid }}'; executable = $executable
+              sha256 = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
+            } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $target.Directory 'build-manifest.json') -Encoding utf8
+          }
+
+      - name: Upload native build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-${{ matrix.rid }}
+          path: artifacts/native/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload managed test build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: managed-${{ matrix.rid }}
+          path: |
+            artifacts/managed/managed.tar
+            artifacts/managed/managed-manifest.json
+          if-no-files-found: error
+          retention-days: 14
+
+  attest:
+    name: Attest trusted Build artifacts
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download this Build's artifacts without executing them
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: artifacts
+
+      - name: Attest native binaries and portable managed builds
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            artifacts/native-*/*
+            artifacts/native-*/buffer-consumer/*
+            artifacts/managed-*/managed*

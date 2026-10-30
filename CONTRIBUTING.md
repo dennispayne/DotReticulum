@@ -55,25 +55,42 @@ help: `Get-Help .\tests\Invoke-Tests.ps1 -Full` shows usage without running test
 Renamed entry points replace the previous lowercase/underscore names; update
 local commands accordingly. Tooling tests guard entry-point naming and help discovery.
 
-### Scheduled live integration and mixed meshes
+### Build and Test
 
-The weekly `interop-test.yml` and `e2e-mesh-test.yml` workflows reuse Build and
-Test, including fresh three-platform native artifacts and candidate-owned
-reference retrieval. They do not download an old successful build/reference.
-Normal pushes keep the bounded default suite; extended runs explicitly enable
-the live xUnit integration cases or repeat the mixed-router/resource-loss,
-reconnect and published-daemon tunnel-restoration cases.
+`build.yml` compiles the solution and publishes NativeAOT binaries on Linux,
+macOS and Windows. It uploads portable managed test outputs and the exact native
+binaries. A separate, non-executing attestation job signs trusted main-branch
+artifacts; PR builds retain read-only permissions and are not attested.
+
+After a successful Build, `test.yml` runs separate **Unit**, **Integration** and
+**Compatibility** platform matrices against that producer's exact commit and
+artifacts, without rebuilding. Trusted main artifacts require verified signed
+provenance, matching commit/runtime manifests and SHA-256 digests. Downstream
+jobs have only read permissions and no persisted checkout credentials.
+Fork-produced artifacts are not executed by the downstream `workflow_run`.
+Compatibility retains its actual-upstream baseline and canonical candidate-owned
+reference retrieval.
+
+Normal Build completion runs bounded checks. Longer live checks, mesh/recovery,
+native CLI/installation and repeated traffic all belong to **Integration**, not
+additional test categories. Scheduled Test runs select and pin the newest
+successful main Build: Tuesday 06:00 UTC runs longer Integration once; Saturday
+06:00 UTC repeats it three times. Manual runs can select an explicit Build:
 
 ```powershell
-gh workflow run interop-test.yml
-gh workflow run e2e-mesh-test.yml -f iterations=3
+gh workflow run build.yml
+gh workflow run test.yml -f build_run_id=123456789
+gh workflow run test.yml -f full_integration=true -f iterations=3
 ```
 
-Iterations are bounded to 1-10 and every failure remains a failure, even if a
-later round passes. Extended results have their own cross-platform Test table,
-not Compatibility rows or instrumented coverage. Hardware/I2P prerequisites
-still skip explicitly. Existing mixed-mesh cases do not establish Python-router
-crash recovery, alternate routes, sustained Channel soak or every native bearer.
+Selection is recorded before downloading; missing/expired artifacts fail rather
+than falling back to another run or rebuilding. Repetitions are bounded to 1-10
+and preserve every failure, even if a later round passes. Integration results
+retain component and iteration labels in one platform table. Unit and managed
+Integration coverage remain independent; their merged coverage is a union of
+source points, not added/averaged percentages. Separately launched native
+executables are not instrumented. Hardware/I2P prerequisites still skip
+explicitly; these checks do not establish acceptance for every bearer/device.
 
 ### Static analysis
 

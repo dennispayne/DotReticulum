@@ -8,7 +8,7 @@ Reads OpenCover reports from a results directory, deduplicates shared code and
 rejects missing production modules. Returns exit code 2 for invalid reports.
 Optionally saves deduplicated hit/total counts as JSON for cross-platform summaries.
 .PARAMETER Results
-Results directory searched recursively for coverage.opencover.xml reports.
+Results directories searched recursively for coverage.opencover.xml reports.
 Reports must collectively contain every production module.
 .PARAMETER JsonPath
 Optional output file for deduplicated per-project and overall coverage counts.
@@ -19,7 +19,7 @@ When omitted, only the Markdown summary is emitted.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory, Position = 0)]
-    [string] $Results,
+    [string[]] $Results,
     [string] $JsonPath
 )
 

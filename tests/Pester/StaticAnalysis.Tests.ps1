@@ -39,7 +39,7 @@ BeforeAll {
     }
 }
 
-Describe 'Same-run native artifact selection' -Tag Tooling {
+Describe 'Exact-producer native artifact selection' -Tag Tooling {
     It 'exports the verified <Variable> executable' -ForEach @(
         @{ Variable = 'DOTRETICULUM_NATIVE_EXE' }
         @{ Variable = 'DOTRETICULUM_BUFFER_CONSUMER' }
@@ -48,7 +48,8 @@ Describe 'Same-run native artifact selection' -Tag Tooling {
         $null = New-Item -ItemType Directory -Path $directory
         $binary = Join-Path $directory 'candidate.exe'
         Set-Content -LiteralPath $binary -Value 'Not executed by artifact validation.'
-        @{ rid = 'test-rid'; commit = 'verified-commit'; executable = 'candidate.exe' } |
+        @{ rid = 'test-rid'; commit = 'verified-commit'; executable = 'candidate.exe'
+            sha256 = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant() } |
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'build-manifest.json')
         $environmentFile = Join-Path $directory 'github-env'
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', (Join-Path $PSScriptRoot '..\Set-NativeBuild.ps1'),
@@ -61,11 +62,14 @@ Describe 'Same-run native artifact selection' -Tag Tooling {
     It 'rejects a consumer artifact with <Problem> before exporting it' -ForEach @(
         @{ Problem = 'a mismatched source commit'; Commit = 'other-commit'; Binary = $true; Expected = 'Artifact was built from' }
         @{ Problem = 'a missing executable'; Commit = 'verified-commit'; Binary = $false; Expected = 'is missing from the artifact' }
+        @{ Problem = 'a corrupted executable'; Commit = 'verified-commit'; Binary = $true; Expected = 'digest mismatch' }
+        @{ Problem = 'an executable outside the artifact'; Commit = 'verified-commit'; Binary = $true; Expected = 'plain filename'; Executable = '../candidate.exe' }
     ) {
         $directory = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
         $null = New-Item -ItemType Directory -Path $directory
         if ($Binary) { Set-Content -LiteralPath (Join-Path $directory 'candidate.exe') -Value 'Not executed.' }
-        @{ rid = 'test-rid'; commit = $Commit; executable = 'candidate.exe' } |
+        @{ rid = 'test-rid'; commit = $Commit; executable = $(if ($Executable) { $Executable } else { 'candidate.exe' })
+            sha256 = '0' * 64 } |
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'build-manifest.json')
         $environmentFile = Join-Path $directory 'github-env'
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', (Join-Path $PSScriptRoot '..\Set-NativeBuild.ps1'),
