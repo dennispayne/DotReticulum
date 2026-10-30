@@ -158,8 +158,13 @@ An actual-router follow-up changed only the candidate's `enable_transport` to
 Both fresh processes passed, but the reused candidate sent its single probe
 using the saved I2P path and timed out: zero of one received.
 The otherwise identical leaf control passed. This is a measured
-transport-enabled native restart failure, not accepted recovery; an independent
-upstream transport-enabled control has not yet been run. No cached-path deletion,
+transport-enabled native restart failure, not accepted recovery. An independent
+control with actual pinned-upstream `rnprobe` candidates and the same .NET
+receiver also passed both fresh processes, then failed the reused process:
+sent one, received zero, exit two. Upstream imports were verified; its persisted
+destination table was present. This reproduces the failure independently,
+not passing transport-enabled recovery or an all-upstream topology.
+No cached-path deletion,
 offline-send buffering, added retry or longer deadline was introduced to mask it.
 Broader restart modes remain unverified.
 

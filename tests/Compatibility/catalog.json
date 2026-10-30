@@ -3,87 +3,87 @@
     {
       "id": "C001",
       "claim": "The ``rngit`` utility provides full Git repository hosting and interaction over Reticulum.",
-      "citation": {"path": "docs/source/git.rst", "lines": "33"}
+      "citation": {"path": "docs/source/git.rst", "lines": "33", "uri": "https://reticulum.network/manual/git.html#the-rngit-utility"}
     },
     {
       "id": "C002",
       "claim": "Coordination-less globally unique addressing and identification",
-      "citation": {"path": "README.md", "lines": "39"}
+      "citation": {"path": "README.md", "lines": "39", "uri": "https://reticulum.network/manual/whatis.html#what-does-reticulum-offer"}
     },
     {
       "id": "C003",
       "claim": "Asymmetric X25519 encryption and Ed25519 signatures as a basis for all communication",
-      "citation": {"path": "README.md", "lines": "46"}
+      "citation": {"path": "README.md", "lines": "46", "uri": "https://reticulum.network/manual/whatis.html#what-does-reticulum-offer"}
     },
     {
       "id": "C004",
       "claim": "Unforgeable packet delivery confirmations",
-      "citation": {"path": "README.md", "lines": "54"}
+      "citation": {"path": "README.md", "lines": "54", "uri": "https://reticulum.network/manual/whatis.html#what-does-reticulum-offer"}
     },
     {
       "id": "C005",
       "claim": "Authentication and virtual network segmentation on all supported interface types",
-      "citation": {"path": "README.md", "lines": "59"}
+      "citation": {"path": "README.md", "lines": "59", "uri": "https://reticulum.network/manual/whatis.html#what-does-reticulum-offer"}
     },
     {
       "id": "C006",
       "claim": "Reliable and efficient transfer of arbitrary amounts of data",
-      "citation": {"path": "README.md", "lines": "63"}
+      "citation": {"path": "README.md", "lines": "63", "uri": "https://reticulum.network/manual/whatis.html#what-does-reticulum-offer"}
     },
     {
       "id": "C007",
       "claim": "Fully self-configuring multi-hop routing over heterogeneous carriers",
-      "citation": {"path": "README.md", "lines": "40"}
+      "citation": {"path": "README.md", "lines": "40", "uri": "https://reticulum.network/manual/whatis.html#what-does-reticulum-offer"}
     },
     {
       "id": "C008",
       "claim": "Lightweight, flexible and expandable Request/Response mechanism",
-      "citation": {"path": "README.md", "lines": "67"}
+      "citation": {"path": "README.md", "lines": "67", "uri": "https://reticulum.network/manual/whatis.html#what-does-reticulum-offer"}
     },
     {
       "id": "C009",
       "claim": "Reliable sequential delivery with Channel and Buffer mechanisms",
-      "citation": {"path": "README.md", "lines": "71"}
+      "citation": {"path": "README.md", "lines": "71", "uri": "https://reticulum.network/manual/whatis.html#what-does-reticulum-offer"}
     },
     {
       "id": "C010",
       "claim": "With the ``rnid`` utility, you can generate, manage and view Reticulum Identities.",
-      "citation": {"path": "docs/source/using.rst", "lines": "386"}
+      "citation": {"path": "docs/source/using.rst", "lines": "386", "uri": "https://reticulum.network/manual/using.html#the-rnid-utility"}
     },
     {
       "id": "C011",
       "claim": "import Reticulum identity in hex, base32 or base64 format",
-      "citation": {"path": "docs/source/using.rst", "lines": "459"}
+      "citation": {"path": "docs/source/using.rst", "lines": "459", "uri": "https://reticulum.network/manual/using.html#the-rnid-utility"}
     },
     {
       "id": "C012",
       "claim": "Saves the public identity to a file.",
-      "citation": {"path": "RNS/Identity.py", "lines": "675"}
+      "citation": {"path": "RNS/Identity.py", "lines": "675", "uri": "https://reticulum.network/manual/reference.html#RNS.Identity.pub_to_file"}
     },
     {
       "id": "C013",
       "claim": "Validates the signature of a signed message.",
-      "citation": {"path": "RNS/Identity.py", "lines": "930"}
+      "citation": {"path": "RNS/Identity.py", "lines": "930", "uri": "https://reticulum.network/manual/reference.html#RNS.Identity.validate"}
     },
     {
       "id": "C020",
       "claim": "Resources can auto-compress data",
-      "citation": {"path": "docs/source/understanding.rst", "lines": "421"}
+      "citation": {"path": "docs/source/understanding.rst", "lines": "421", "uri": "https://reticulum.network/manual/understanding.html#resources"}
     },
     {
       "id": "C021",
       "claim": "Run rncp on the receiving system, specifying which identities are allowed to send files:",
-      "citation": {"path": "docs/source/using.rst", "lines": "622"}
+      "citation": {"path": "docs/source/using.rst", "lines": "622", "uri": "https://reticulum.network/manual/using.html#the-rncp-utility"}
     },
     {
       "id": "C022",
       "claim": "allow authenticated clients to fetch files",
-      "citation": {"path": "docs/source/using.rst", "lines": "676"}
+      "citation": {"path": "docs/source/using.rst", "lines": "676", "uri": "https://reticulum.network/manual/using.html#the-rncp-utility"}
     },
     {
       "id": "C030",
       "claim": "When using ``-R`` to query a remote transport instance, you must also specify ``-i`` with the path to a management identity file that is authorized for remote management on the target system.",
-      "citation": {"path": "docs/source/using.rst", "lines": "381"}
+      "citation": {"path": "docs/source/using.rst", "lines": "381", "uri": "https://reticulum.network/manual/using.html#the-rnstatus-utility"}
     }
   ]
 }

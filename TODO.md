@@ -17,7 +17,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] Android USB/Bluetooth permission/adaptor contracts and on-device execution (deferred by user)
   - [x] Actual Java I2P local-destination bidirectional DATA before/after persisted bearer restart, independently for .NET and pinned upstream
   - [x] Windows published-native fresh and reused-configuration I2P encrypted DATA and validated proofs over actual Java local-destination streams
-  - [ ] I2P public-tunnel delivery after persisted bearer restart (still fails for both .NET and pinned upstream); separate-router overlay, transport-enabled native persisted startup (fresh succeeds, reused-state probe fails) and broader published-native acceptance remain outstanding
+  - [ ] I2P public-tunnel delivery after persisted bearer restart (still fails for both .NET and pinned upstream); separate-router overlay, successful transport-enabled persisted startup (fresh succeeds, reused-state probe independently fails for native and pinned upstream candidates) and broader published-native acceptance remain outstanding
   - [ ] Authorized physical serial/TNC/RNode/Multi/Weave and Android USB/Bluetooth/RF acceptance (one Windows RAK receive-only startup/reconfiguration/off/reopen verified; one radio only, RF acceptance explicitly retained as unverified; remaining devices/platform access/settings unavailable; see development history)
 - [ ] Parity 7 - Upstream utility coverage (software accepted; physical device acceptance outstanding)
   - [x] Authorized RAK4631 native rnodeconf USB-triggered DFU, same-version reflash, changed-port recovery and reversible EEPROM-setting persistence/restoration
@@ -50,7 +50,7 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [x] Shared ordered bidirectional Channel stream delivery through actual CLI consumers and pinned upstream message codecs (T057; all four candidates passed in hosted run 40915647175; broader Buffer APIs/loss/soak remain outstanding)
   - [x] Shared small and resource-sized nested management responses (T053/T058; all four hosted candidates accepted)
   - [x] Expand identity/cryptographic failures, forged delivery proofs, authenticated management requests and fixed-upstream-peer file-transfer/IFAC acceptance (37 distinct cases, 17 quoted claims; 37/37 passed for all four candidates, all 12 CI jobs green in run 40634153580)
-  - [ ] Verified primary-source citation browsing links (Git destination resolved; derived NomadNet page link failed; external URI scheme and line anchors unverified; no GitHub fallback)
+  - [x] Verified primary-source citation browsing links for all 17 current claims (official manual HTTPS sections/API anchors and matching text verified; website 1.5.5 remains distinct from pinned 1.5.7 source; no guessed NomadNet links or GitHub fallback)
   - [x] Approved Verb-Noun standalone PowerShell entry points, discoverable help for every declared parameter and updated workflow/documentation callers
   - [x] Zero-argument local Compatibility runner with automatic native/reference preparation and fresh results directories
   - [x] `interop-test.yml` (all 12 jobs passed in run 40961479281)

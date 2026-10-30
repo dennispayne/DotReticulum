@@ -4,6 +4,89 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Verified official-manual navigation for every current advertised claim
+
+Added optional `citation.uri` values to all **17** existing catalog claims,
+without changing IDs, quotations, source paths/lines or test definitions.
+Actual HTTPS requests to the primary `reticulum.network` manual returned
+200; every selected fragment exists as a real HTML `id`, and every claim
+matches visible page text after removing only source inline-code formatting,
+HTML markup and whitespace. The links use actual manual section/API anchors,
+not invented source-line fragments, a guessed NomadNet page or a GitHub
+fallback. Read-only discovery retains the existing separate `CitationUri`
+field and **42 distinct tests**. Summary Test IDs still target test code.
+
+The fetched website explicitly identifies itself as **Reticulum Network Stack
+1.5.5 documentation**. It is navigation, not a version-pinned oracle:
+the executable reference remains **1.5.7 / a29bfb51c468945c96a1ee22cae0114e993e2391**.
+The exact pinned quotations still pass `Assert-CompatibilitySourceCitations`.
+The previous unverified custom-URI/NomadNet proposal is not used.
+
+Verified page/anchor groups: C001 `git.html#the-rngit-utility`;
+C002–C009 `whatis.html#what-does-reticulum-offer`;
+C010/C011 `using.html#the-rnid-utility`;
+C012 `reference.html#RNS.Identity.pub_to_file`;
+C013 `reference.html#RNS.Identity.validate`;
+C020 `understanding.html#resources`;
+C021/C022 `using.html#the-rncp-utility`;
+C030 `using.html#the-rnstatus-utility`.
+All are under `https://reticulum.network/manual/`.
+
+Decoded HTML re-encoded as UTF-8 had these SHA-256 values at verification:
+
+| Page | SHA-256 |
+|---|---|
+| git | `8247ed02b1b018da67d3f1df0d73bbb671ae87da96d8104abe10cde2c8f71eaf` |
+| whatis | `2fcb2d47f207c624e8b3a19d86486092b33b2210352a29b632996dc6ed2366f4` |
+| using | `f4034725d7a92f38f485a3a7ea1923f2f6f4ef3c9171dc931c10ea9644a9626e` |
+| reference | `b01576bcfced98e7e28222f8c1f545cb048b4930e93145f9211ded6bdbec1787` |
+| understanding | `616cf0fb2e9ec385971d22cef2c31a3f239c37e2ba53175b7a8932a3aa36a35e` |
+
+`tests\Invoke-PesterTests.ps1 -ToolingOnly`: **65 passed / two prerequisite skips**.
+`tests\Compatibility\Get-CompatibilityTests.ps1 -IncludeUncoveredClaims`:
+42 distinct test IDs / 17 claim IDs, all rows exposing the verified URI,
+without downloads, installation or processes.
+After dot-sourcing `tests\Compatibility\Support\Catalog.ps1`,
+`Assert-CompatibilitySourceCitations -Upstream TestResults\compatibility-rmap-full-reference\python\upstream`:
+all **17** pinned quotations/path/line ranges passed.
+
+### Independent upstream control of transport-enabled I2P persisted startup
+
+Executed the same actual Java I2P 2.14.0 local-destination
+fresh/fresh/reused-process experiment with the **actual pinned upstream
+`rnprobe`** candidate, using `tests\Interop\reference_cli.py` for checked
+imports and invocation only. The receiver remained the same managed .NET
+endpoint, with its decrypted-packet assertions and connected-peer announces;
+this is an independent upstream-candidate control, not an all-upstream
+topology or shared Compatibility result.
+
+Both fresh upstream processes exited zero after sending encrypted 257-byte
+DATA, actual receiver callbacks and validated signed replies. Process three
+reused the first configuration and nonempty upstream `storage\destination_table`,
+selected the saved I2P path, and exited **2**, **sent one / received zero**.
+The experimental test therefore **failed one case in 116 seconds**, matching
+the native transport-enabled failure shape rather than establishing passing
+recovery. No reference protocol shim, cached-state deletion, buffering,
+extra attempt or longer deadline was added.
+
+Command:
+`tests\Interop\Invoke-I2pTopology.ps1 -JavaExecutable TestResults\i2p-tools-java-win\jdk-21.0.12.1+1-jre\bin\java.exe -JavaRouterDirectory TestResults\i2p-tools-java-win\router -AllowPublicNetwork -JavaLocalDestinationRouting -PublishedFeatureOnly -NoBuild -SamEndpoint 127.0.0.1:17657 -TestTimeoutSeconds 600 -KeepArtifacts`.
+For this temporary control only, the selected C# test invoked the verified
+Python interpreter and existing reference CLI adapter instead of the native
+executable, enabled candidate transport, and checked upstream's actual
+persisted-table filename. Pin:
+`a29bfb51c468945c96a1ee22cae0114e993e2391`, RNS 1.5.7/LXMF 1.2.1.
+Actual TRX:
+`TestResults\i2p-topology-db73d1e44ffc4869a1982661d01a27c0\results\i2p-live.trx`.
+
+The temporary test edits were removed; `I2pNativeTests.cs` again matches the
+committed positive leaf test. The restored solution build passed with zero
+warnings/errors. Owned Java PID **44304** and SAM listener **17657** were
+verified stopped. Private router/destination state is retained only in the
+ignored local result directory. This resolves the previously outstanding
+upstream control, not successful transport-enabled persisted startup or
+public-overlay restart acceptance.
+
 ### Bounded diagnostics for the remaining native reverse-stream failure
 
 The separately published public SDK consumer now reports outbound close and
@@ -184,8 +267,9 @@ timing out before proof. The transport case failed in **154 seconds**; overall
 experimental execution was **one passed / one failed / zero skips**. This
 narrows the outstanding acceptance boundary; it is not passing transport
 recovery. The existing offline-send discard and transport-mode path restoration
-are source-grounded behavior, so neither was changed speculatively. An independent
-pinned-upstream transport-enabled control remains outstanding.
+are source-grounded behavior, so neither was changed speculatively. The later
+independent pinned-upstream transport-enabled control above reproduced the
+fresh-success/reused-failure sequence; it did not establish passing recovery.
 
 Command:
 `tests\Interop\Invoke-I2pTopology.ps1 -JavaExecutable TestResults\i2p-tools-java-win\jdk-21.0.12.1+1-jre\bin\java.exe -JavaRouterDirectory TestResults\i2p-tools-java-win\router -AllowPublicNetwork -JavaLocalDestinationRouting -PublishedFeatureOnly -NoBuild -SamEndpoint 127.0.0.1:17657 -TestTimeoutSeconds 600 -KeepArtifacts`
