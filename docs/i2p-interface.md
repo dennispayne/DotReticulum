@@ -173,7 +173,13 @@ connected-peer announcements are part of the accepted scenario, not a discovery
 retry fix or a preseeded path/identity.
 
 Historical forced-public-tunnel restart attempts on i2pd and Java remain separate
-failed evidence; local-route success does not resolve them. Impaired-network,
+failed evidence; local-route success does not resolve them. A subsequent Windows
+rerun confirmed the exact Java/PowerShell inbound Allow rules covered the active
+Private profile before execution. Both managed .NET and actual all-upstream
+forced-public cases again exchanged initial DATA but failed to obtain a
+replacement accepted peer within their unchanged four-minute deadlines.
+Late firewall approval therefore does not explain those reproduced failures;
+other network/router causes remain undiagnosed. Impaired-network,
 IFAC/routing, successful transport-enabled native persisted startup, other native platforms,
 remote-router and router-process restart acceptance remain unverified.
 Tests target RNS 1.5.7 at

@@ -4,6 +4,57 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Public-tunnel I2P restart rerun after Windows firewall approval
+
+The user reported that the PowerShell 7/OpenJDK firewall prompts may have
+been approved only after earlier tests ended, and authorized a rerun.
+Before execution, read-only inspection of the ActiveStore confirmed enabled
+inbound Allow rules for the exact PowerShell 7 executable and the exact
+Java executable used by the topology runner, covering **Private and Public**.
+The active Windows network profile was **Private**. No firewall rule or
+setting was changed by the agent. This establishes that these program rules
+were present before the rerun, not that every possible network restriction
+has been excluded.
+
+At source **b68f6c8**, reran both original forced-public-tunnel cases against
+actual Java I2P **2.14.0**, without `-JavaLocalDestinationRouting`:
+`i2cp.disableLoopback=true`, original client tunnel defaults, unchanged
+four-minute case deadlines, packet/callback assertions and persisted keys.
+Both still failed at the same missing replacement-accepted-peer boundary:
+
+| Candidate | Actual result | Case duration | Observed boundary |
+|---|---|---:|---|
+| Managed .NET bearer | 0 passed / 1 failed / 0 skipped | 240.10 seconds | Initial bidirectional packet assertions passed; persisted accepting bearer restarted, but no replacement accepted child; surviving initiator timed out in SAM `stream_connect` |
+| Actual pinned Python, both endpoints | 0 passed / 1 failed / 0 skipped | 240.90 seconds | Both pre-restart callbacks passed; replacement retained destination key/address and transport identity, but no replacement accepted peer |
+
+Common invocation:
+`tests\Interop\Invoke-I2pTopology.ps1 -JavaExecutable TestResults\i2p-tools-java-win\jdk-21.0.12.1+1-jre\bin\java.exe -JavaRouterDirectory TestResults\i2p-tools-java-win\router -AllowPublicNetwork -NoBuild -SamEndpoint 127.0.0.1:17656 -TestTimeoutSeconds 360 -KeepArtifacts`.
+The .NET invocation added `-NativeRestartOnly`. The upstream invocation added
+`-ReferenceRestartOnly -TransportPort 63375 -PythonExecutable TestResults\compatibility-rmap-full-reference\python\venv\Scripts\python.exe -UpstreamPath TestResults\compatibility-rmap-full-reference\python\upstream`.
+Actual checked imports remained RNS **1.5.7** at
+**a29bfb51c468945c96a1ee22cae0114e993e2391**, LXMF **1.2.1**.
+
+The first upstream invocation stopped before any router/test execution:
+the runner's TCP-selected ephemeral transport port failed its UDP bind
+preflight with Windows access-denied. This is setup failure, not a third
+executed test or a reference failure. An explicit supported transport-port
+override, **63375** (already used successfully by the immediately preceding
+.NET router), passed both preflights and allowed the actual upstream control.
+No retry-until-pass, deadline increase or protocol/source change was used.
+
+Actual TRX locations:
+`TestResults\i2p-topology-93326d6102b84e66a85c25815e0953b2\results\i2p-live.trx`
+(.NET) and
+`TestResults\i2p-topology-7721ae518bbc4b7ebf60b3b93bc7d337\results\i2p-live.trx`
+(upstream). Router PIDs **26580/70376** and SAM listener **17656** were
+verified stopped. Private router/destination state remains ignored local
+evidence, not uploaded or committed.
+
+Late approval therefore does **not** explain these two reproduced failures.
+They remain a shared router/topology recovery limitation, not a demonstrated
+native-only defect. This does not reclassify the separate transport-enabled
+saved-route startup experiment or establish a precise router root cause.
+
 ### Hosted acceptance of verified citation metadata
 
 Exact-source **def455c**, normal Build/Test **40981123118**, passed **all
