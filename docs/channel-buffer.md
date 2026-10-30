@@ -78,8 +78,16 @@ Repeated mesh run **40972052711** passed the long case three times each on
 Linux and Windows, but only two of three macOS executions passed. The failed
 macOS execution completed the exact 16 MB outbound stream, then timed out
 waiting for the Python return writer's completion event; it retained one TCP
-session and both intended frame losses. Its cause is unresolved, so repeated
-cross-platform acceptance remains open. Longer soak and broader bearers remain unverified.
+session and both intended frame losses.
+
+With bounded native progress/logging and periodic observations of the actual
+upstream Channel, the predetermined **five** focused repetitions in run
+**40977768560**, source **4604778**, all passed on every desktop target.
+All **15** executions retained the byte/hash/loss/session/active-EOF assertions;
+wire behavior and deadlines were unchanged. This establishes that bounded
+repeat result, not a root cause or retrospective fix for the earlier macOS
+failure, which was not reproduced and remains unresolved. Longer soak and
+broader bearers remain unverified.
 
 ### Proofs and the bounded reorder window
 

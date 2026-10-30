@@ -4,6 +4,60 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Five-repeat published-native Buffer execution accepted on all desktop targets
+
+Exact-source **4604778**, focused Build/Test **40977768560**, passed **all
+12 jobs**. Its predetermined five repetitions passed on Windows/Linux/macOS:
+**15 actual executions**, each requiring the 16 MB outbound/8 MB return,
+compressed/plain observations, exact bytes/hashes, two intended Channel
+frame losses, one surviving TCP session and EOF on the still-active Channel/link.
+This is bounded native/Python integration, not shared Compatibility or prolonged
+soak. No protocol behavior, retry timer, receive capacity or test deadline was
+changed for this run.
+
+Downloaded all three actual test artifacts and inspected their TRX and
+`summary-extended.json`; actual durations in seconds:
+
+| Iteration | Linux | macOS | Windows |
+|---|---:|---:|---:|
+| 1 | 69.82 | 84.67 | 75.21 |
+| 2 | 73.89 | 94.68 | 81.24 |
+| 3 | 73.54 | 90.54 | 82.04 |
+| 4 | 73.50 | 94.98 | 80.06 |
+| 5 | 73.50 | 97.52 | 81.92 |
+
+Actual Summarize Test **123819979569** preserves five distinct
+**1/0/0** rows per platform and the four ordinary native Buffer cases
+**4/0/0** per platform. The Unit/Integration/Native counts match the earlier
+31a8ea9 table below and were independently checked in these new artifacts.
+Downloaded all four actual Compatibility reports: **42 distinct passed cases**
+each; actual renderer **123814151085** contains 42 rows/four Passed cells each.
+The redundant automatic push run **40977769434** was superseded/cancelled by
+the focused dispatch, not a failing test.
+
+The new bounded diagnostics recorded actual macOS link RTTs of approximately
+**0.185–0.349 seconds** and ongoing return-stream progress. They did **not**
+reproduce or explain the earlier macOS timeout in **40972052711**. Passing
+five repeats is not a retrospective fix or a root-cause claim; that historical
+intermittent failure remains explicitly unresolved.
+
+A separate local timing control temporarily changed only the bridge delay
+from **20 to 200 ms per direction**, retaining 2 Mbit/s, the same native binary,
+payloads, loss and unchanged deadlines. It failed the **outbound** 60-second
+wait with **15,056,273 bytes** received, no EOF, next RX sequence **972** and
+no reorder gap: measurable progress, not the original reverse-phase failure.
+It did not exercise the return loss and does not diagnose the macOS result.
+With the previously recorded live/soak/native artifact settings, command:
+`dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v quiet --filter "FullyQualifiedName~PublishedPublicStreamsSustainBidirectionalByteExactDeliveryAcrossConstrainedLostFrames" --logger trx --results-directory TestResults\buffer-high-latency-control -- xUnit.MaxParallelThreads=1`.
+Actual TRX:
+`TestResults\buffer-high-latency-control\dennis_DENNIS-PC_2026-10-29_20_41_38_net10.0.trx`.
+The temporary delay edit was removed; the restored solution build passed
+with zero warnings/errors. No deadline was increased.
+
+Static **40977769517** passed all five jobs. Actual downloaded SARIF and
+summary **123810914720** contain zero Actions/C#/PowerShell findings and the
+same two existing Python warnings; the observer introduced no new finding.
+
 ### Verified official-manual navigation for every current advertised claim
 
 Added optional `citation.uri` values to all **17** existing catalog claims,
@@ -120,8 +174,9 @@ Local validation:
 - `tools\Invoke-PowerShellAnalysis.ps1`: **66 scripts / zero findings**.
 - `TestResults\actionlint-1.7.12\actionlint.exe .github\workflows\ci-build-test.yml .github\workflows\e2e-mesh-test.yml .github\workflows\interop-test.yml`: passed.
 
-Hosted focused repetition and diagnosis remain pending; this local pass does
-not resolve or supersede the recorded macOS failure.
+Hosted focused repetition subsequently passed five times on every desktop
+target, as recorded above. Neither those passes nor this local pass explain
+or retrospectively resolve the recorded earlier macOS failure.
 
 ### Repeated native streaming: Linux/Windows accepted, macOS residual failure
 

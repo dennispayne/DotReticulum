@@ -30,7 +30,8 @@ contracts and acceptance boundaries. Completed historical phases are not repeate
   - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
   - [x] Windows/Linux/macOS separately published public Buffer reader/writer consumer: exact bidirectional compressed/binary streams and EOF on an active link
   - [x] Windows native constrained Buffer streaming: exact 16 MB outbound/8 MB return, actual Channel loss in both directions, one surviving TCP session and active-link EOF
-  - [ ] Cross-platform repeated native constrained Buffer streaming acceptance (Linux/Windows 3/3; macOS 2/3, reverse-send timeout remains unresolved); longer Channel/resource soak and broader impaired bearer matrices remain outstanding
+  - [x] Five-repeat Windows/Linux/macOS native constrained Buffer streaming: exact 16 MB outbound/8 MB return, real loss both ways and active-link EOF
+  - [ ] Diagnose the earlier intermittent macOS reverse-send timeout (not reproduced in the subsequent five-repeat run); longer Channel/resource soak and broader impaired bearer matrices remain outstanding
   - [x] Darwin rnsh terminal backend and actual macOS feature acceptance (controlling TTY/resize/literal argv/signals/group teardown, all endpoint combinations, delayed first read, mode restoration, native terminal and actual Python roles passed in run 40926579478; upstream EOF race remains an explicit negative result)
   - [ ] Android host/providers, desktop RNode BLE and other missing/partial applicable software identified in the compatibility ledger
   - [ ] Per-interface interoperability and hardware evidence; untested platforms/devices remain unverified
