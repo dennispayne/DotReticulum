@@ -34,6 +34,7 @@ stdout protocol: lines starting with "@@" followed by JSON (other lines are RNS 
   {"event":"buffer_progress", "size", "observed_at"}         stream 1 crossed another megabyte
   {"event":"buffer_status", "received", "eof", ...}          reply to bufferstatus; real Channel/reader observations
   {"event":"buffer_done", "size", "sha256", ...}             stream 1 of the channel reached EOF
+  {"event":"buffer_send_state", "next_tx_sequence", ...}    periodic actual state while the upstream writer is running
   {"event":"buffer_sent", "size", "sha256"}                  reply to bufsend (stream 2 written and closed)
 stdin commands: announce [hex] | path <hex> | request_path <hex> <s> | connect <desthash hex> |
   send <hex> | close | stat | identify | resource <size> <seed> <random|text> [metadata-text] |
@@ -407,10 +408,26 @@ def main(loglevel=RNS.LOG_WARNING):
             elif cmd == "bufsend":
                 size, seed, mode = int(parts[1]), parts[2], parts[3]
                 payload = make_payload(seed, size, mode)
-                writer = RNS.Buffer.create_writer(int(parts[4]) if len(parts) > 4 else 2, link.get_channel())
-                writer.write(payload)
-                writer.flush()
-                writer.close()
+                channel = link.get_channel()
+                writer = RNS.Buffer.create_writer(int(parts[4]) if len(parts) > 4 else 2, channel)
+                observing_done = threading.Event()
+
+                def observe_writer():
+                    while not observing_done.wait(2):
+                        emit({"event": "buffer_send_state", "next_tx_sequence": channel._next_sequence,
+                              "pending": [[envelope.sequence, envelope.tries] for envelope in list(channel._tx_ring)],
+                              "window": channel.window, "link_status": link.status, "rtt": link.rtt,
+                              "observed_at": time.time()})
+
+                observer = threading.Thread(target=observe_writer, daemon=True)
+                observer.start()
+                try:
+                    writer.write(payload)
+                    writer.flush()
+                    writer.close()
+                finally:
+                    observing_done.set()
+                    observer.join(timeout=2)
                 emit({"event": "buffer_sent", "size": size, "sha256": sha256(payload)})
             elif cmd == "quit":
                 break

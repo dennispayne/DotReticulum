@@ -40,7 +40,7 @@ on:
       extended_suite:
         description: Optional live integration suite, separate from shared Compatibility
         type: choice
-        options: [none, interop, mesh]
+        options: [none, interop, mesh, buffer]
         default: none
       iterations:
         description: Extended suite repetitions (1-10, failures remain failures)
@@ -49,7 +49,7 @@ on:
   workflow_call:
     inputs:
       extended_suite:
-        description: Optional live integration suite (none, interop or mesh)
+        description: Optional live integration suite (none, interop, mesh or buffer)
         type: string
         default: none
       iterations:
@@ -104,7 +104,7 @@ jobs:
           EXTENDED_SUITE: ${{ inputs.extended_suite }}
           EXTENDED_ITERATIONS: ${{ inputs.iterations }}
         run: |
-          if ($env:EXTENDED_SUITE -notin @('interop', 'mesh')) { throw 'Unknown extended test suite.' }
+          if ($env:EXTENDED_SUITE -notin @('interop', 'mesh', 'buffer')) { throw 'Unknown extended test suite.' }
           $iterations = 0
           if (![int]::TryParse($env:EXTENDED_ITERATIONS, [ref]$iterations) -or $iterations -lt 1 -or $iterations -gt 10) {
             throw 'Extended test iterations must be an integer from 1 through 10.'
@@ -318,12 +318,12 @@ jobs:
         run: ./tests/Invoke-ContractIntegration.ps1 -Application $env:DOTRETICULUM_NATIVE_EXE -Label '${{ matrix.rid }}' -NoJobSummary
 
       - name: Run optional live integration or repeated mixed-mesh acceptance
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && (inputs.extended_suite == 'interop' || inputs.extended_suite == 'mesh') }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && (inputs.extended_suite == 'interop' || inputs.extended_suite == 'mesh' || inputs.extended_suite == 'buffer') }}
         env:
           EXTENDED_SUITE: ${{ inputs.extended_suite }}
           EXTENDED_ITERATIONS: ${{ inputs.iterations }}
           DOTRETICULUM_LIVE: '1'
-          DOTRETICULUM_BUFFER_SOAK: ${{ inputs.extended_suite == 'mesh' && '1' || '0' }}
+          DOTRETICULUM_BUFFER_SOAK: ${{ (inputs.extended_suite == 'mesh' || inputs.extended_suite == 'buffer') && '1' || '0' }}
         run: |
           if (!$env:DOTRETICULUM_PYTHON -or !$env:DOTRETICULUM_UPSTREAM) {
             throw 'Extended acceptance requires the same-run candidate-fetched, verified reference.'
@@ -331,7 +331,9 @@ jobs:
           foreach ($name in 'GITHUB_STEP_SUMMARY', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STATE') {
             Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
           }
-          $filter = if ($env:EXTENDED_SUITE -eq 'interop') { 'Category=Live' } else {
+          $filter = if ($env:EXTENDED_SUITE -eq 'interop') { 'Category=Live' } elseif ($env:EXTENDED_SUITE -eq 'buffer') {
+            'FullyQualifiedName~PublishedPublicStreamsSustainBidirectionalByteExactDeliveryAcrossConstrainedLostFrames'
+          } else {
             'FullyQualifiedName~Parity8CompatibilityLiveTests|FullyQualifiedName~LiveMixedTransportTests|FullyQualifiedName~Parity4NativeTransportTests|FullyQualifiedName~PublishedPublicStreamsSustainBidirectionalByteExactDeliveryAcrossConstrainedLostFrames'
           }
           $failed = $false
@@ -349,7 +351,7 @@ jobs:
           if ($failed) { exit 1 }
 
       - name: Summarize extended integration separately
-        if: ${{ !cancelled() && (inputs.extended_suite == 'interop' || inputs.extended_suite == 'mesh') }}
+        if: ${{ !cancelled() && (inputs.extended_suite == 'interop' || inputs.extended_suite == 'mesh' || inputs.extended_suite == 'buffer') }}
         run: |
           $summary = & ./tests/Get-TestSummary.ps1 -Path TestResults/extended -IncludeParentDirectory -Title 'Extended integration (${{ matrix.rid }})' -JsonPath TestResults/summary-extended.json
           $summary

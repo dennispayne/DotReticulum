@@ -4,6 +4,123 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Bounded diagnostics for the remaining native reverse-stream failure
+
+The separately published public SDK consumer now reports outbound close and
+inbound megabyte progress, and supplies the existing node log callback. The
+thin Python adapter observes the actual pinned Channel's transmit sequence,
+pending sequences/attempts, adaptive window, link status and RTT every two
+seconds while the unchanged upstream buffered writer runs. Its observer is
+stopped/joined when the command ends. No reference protocol method, retry
+timer, production behavior or test deadline changed.
+
+The existing Build/Test workflow accepts optional `extended_suite=buffer`
+with the same bounded 1–10 iterations and individual outcome reporting as
+mesh. It selects only the existing 16 MB/8 MB constrained, bidirectionally
+lossy native case; normal CI and the scheduled full mesh selection are
+unchanged. This is a focused diagnostic execution, not broader bearer or
+prolonged-soak acceptance.
+
+Local validation:
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: zero warnings/errors.
+- After same-process MSVC initialization,
+  `dotnet publish tests\Fixtures\ChannelBufferConsumer\ChannelBufferConsumer.csproj -c Release -r win-x64 -o artifacts\native-buffer-state-diagnostics -p:PublishAot=true -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true --nologo -v quiet`
+  and native `--help`: passed. Consumer SHA-256
+  `17ddff265777a32ede8407ad63e87d6ea5655578d336f39bfe94c9a7ae6ff3e2`.
+- With actual fetched/import-checked upstream and live/soak/native artifact
+  settings,
+  `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo -v quiet --filter "FullyQualifiedName~NativeBufferTests|FullyQualifiedName~NativeResourceTests|FullyQualifiedName~RnshNativeTests" --logger trx --results-directory TestResults\native-buffer-state-diagnostics -- xUnit.MaxParallelThreads=1`:
+  **seven passed**, no skips/failures. The constrained case took **83.10 seconds**;
+  actual periodic upstream transmit/retry snapshots were inspected.
+- `tests\Invoke-PesterTests.ps1 -ToolingOnly`: **65 passed / two prerequisite skips**.
+- `tools\Invoke-PowerShellAnalysis.ps1`: **66 scripts / zero findings**.
+- `TestResults\actionlint-1.7.12\actionlint.exe .github\workflows\ci-build-test.yml .github\workflows\e2e-mesh-test.yml .github\workflows\interop-test.yml`: passed.
+
+Hosted focused repetition and diagnosis remain pending; this local pass does
+not resolve or supersede the recorded macOS failure.
+
+### Repeated native streaming: Linux/Windows accepted, macOS residual failure
+
+Exact-source **31a8ea9**, repeated mesh **40972052711**, completed with
+**11 of 12 jobs passed**. Builds, all four Compatibility candidates, Linux
+and Windows Test and both summaries passed. macOS Test failed only extended
+iteration two's native Buffer endurance case; other ordinary macOS gates
+passed. Downloaded all three actual `test-results-*-1` artifacts and inspected
+each `summary-extended.json` and actual native test TRX:
+
+| Extended iteration | Linux passed/failed/skipped | macOS passed/failed/skipped | Windows passed/failed/skipped |
+|---|---:|---:|---:|
+| 1 | 8/0/0 | 8/0/0 | 8/0/0 |
+| 2 | 8/0/0 | 7/1/0 | 8/0/0 |
+| 3 | 8/0/0 | 8/0/0 | 8/0/0 |
+
+This preserves the **71 passed / one failed** actual executions, not a fully
+green repeated gate. Actual native 16 MB/8 MB flow timings were Linux
+**75.06/75.27/75.45 seconds**, Windows approximately **78/80/83 seconds**,
+and successful macOS **89.03/82.40 seconds**. All successful flows recovered
+the two deliberately lost Channel frames, retained one TCP session and
+completed exact bytes/hashes and EOF on the still-active Channel/link.
+
+Failed macOS iteration two observed the entire **16,000,000-byte** outbound
+stream with exact expected SHA-256, **489 compressed / 549 plain** chunks and
+upstream EOF. It then timed out waiting **60 seconds** for the actual Python
+`bufsend` command's `buffer_sent` event; total test duration was **112 seconds**.
+The bridge recorded **one session / two dropped frames**. No peer error or
+native completion was observed. Existing diagnostics do not establish whether
+the return writer was blocked on Channel delivery/retry or another cause;
+this is explicitly unresolved, not attributed to macOS scheduling or to
+upstream without evidence.
+
+The actual Summarize Test job **123806800968** preserves the failed iteration.
+No retry, timeout increase, reference-side workaround or weakened assertion
+was applied to make it green. The three-repeat cross-platform constrained
+streaming checkbox remains open. Normal CI at this exact source is wholly
+green, as recorded below; that does not erase this separate extended failure.
+
+### Hosted acceptance of Channel loss recovery and the verified gateway
+
+Exact-source **31a8ea9**, normal Build/Test **40972053518**, completed with
+**all 12 jobs passed**. All three native Builds, four Compatibility candidates,
+three Tests and both summaries passed. Actual Summarize Compatibility job
+**123795264988** rendered **42 distinct rows with four Passed cells each**,
+including actual candidate-owned reference retrieval. Separately downloaded
+all four actual reports from the same-source repeated-mesh run **40972052711**:
+**42/42**, no skips/failures or duplicate IDs, for Upstream/Linux/macOS/Windows
+at the unchanged pin.
+
+Downloaded all three normal `test-results-*-1` artifacts; actual counts are
+**passed / failed / skipped**, not distinct capability totals:
+
+| Suite | Linux | macOS | Windows |
+|---|---:|---:|---:|
+| Unit | 1445 / 0 / 5 | 1445 / 0 / 5 | 1444 / 0 / 6 |
+| Integration | 434 / 0 / 11 | 430 / 0 / 15 | 426 / 0 / 19 |
+| Native executable/CLI/contract integration | 207 / 0 / 4 | 200 / 0 / 11 | 206 / 0 / 5 |
+
+Actual native Buffer TRX files contain all **four** healthy/lossy,
+compressible/random cases passed on every platform. Actual Summarize Test
+job **123798552078** rendered **4/0/0** in all three Buffer cells. Linux Unit
+is green after the KISS startup/disposal correction; the old 575d0f1 failure
+is not relabeled. Strict same-run native artifact production/reuse remained
+enforced. The separate repeated constrained run subsequently completed with
+the macOS residual failure recorded above.
+
+Static **40972053470** passed all five jobs. Downloaded actual SARIF and
+rendered summary **123792345140** confirm zero Actions/C#/PowerShell findings
+and the same two existing Python warnings.
+
+Local default-gateway end-to-end execution:
+`tests\Compatibility\Invoke-CompatibilityTests.ps1 -Application artifacts\native-channel-retention-final\DotReticulum.Applications.exe -Implementation Both -FetchReference -ReferenceDirectory TestResults\compatibility-rmap-full-reference -OutputDirectory TestResults\compatibility-rmap-full -NoJobSummary`
+passed **42/42 native cases**, including initially missing objects and
+**100,256 network bundle bytes**. The Windows Python candidate separately
+reported **40 passed / one failed / one explicit POSIX skip**: its real Git
+helper established a link but failed bundle verification after **401 seconds**.
+That is an explicit Windows upstream-helper negative result, not a native
+wire failure or a passing Windows Upstream Git claim. The actual hosted
+Upstream baseline is Linux and passed T001 without changing the reference.
+No reference-side patch, increased deadline or substituted fetch was added.
+
 ### Verified alternate public gateway after hosted reference-link failures
 
 Exact-source **ef4f5ae** normal **40970422887** and repeated mesh
@@ -170,7 +287,8 @@ Validation:
 Managed coverage does not measure separately launched native executables.
 Normal CI selects the four short native Buffer cases; scheduled/manual mesh
 explicitly enables and repeats the bounded native endurance case. Exact-source
-hosted correction/repeated cross-platform acceptance is pending. This does not
+hosted correction acceptance subsequently passed in 40972053518; repeated
+cross-platform acceptance remains open after 40972052711's macOS failure. This does not
 close prolonged soak, impaired native/per-bearer, physical radio or Android
 requirements; Android remains deferred.
 
