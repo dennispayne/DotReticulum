@@ -4,6 +4,22 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Hosted acceptance of verified citation metadata
+
+Exact-source **def455c**, normal Build/Test **40981123118**, passed **all
+12 jobs**. Downloaded all four actual Compatibility reports: **42 distinct
+passed cases each**. Actual renderer **123824862526** contains 42 rows with
+four Passed cells and executing-commit test-code links, without new columns.
+Citation navigation remains in the catalog/read-only discovery metadata;
+the existing execution-report schema does not export `CitationUri`.
+
+Downloaded all three actual test artifacts and checked independent
+Unit/Integration/Native counts; they match the earlier 31a8ea9 table below,
+with zero failures. Actual Test summary **123828293625** renders the ordinary
+public Buffer cases **4/0/0** on each OS. This normal run does not repeat the
+opt-in five-iteration endurance execution; that remains separately accepted
+at **4604778 / 40977768560**, not inferred from ordinary CI.
+
 ### Five-repeat published-native Buffer execution accepted on all desktop targets
 
 Exact-source **4604778**, focused Build/Test **40977768560**, passed **all
