@@ -119,10 +119,18 @@ jobs:
             $binary = Join-Path $target.Directory $executable
             & (Join-Path $PWD $binary) --help
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $directory = (Resolve-Path -LiteralPath $target.Directory).Path
+            $files = @(Get-ChildItem -LiteralPath $directory -Recurse -File | ForEach-Object {
+              [ordered]@{
+                path = [IO.Path]::GetRelativePath($directory, $_.FullName).Replace('\', '/')
+                sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              }
+            })
             [ordered]@{
               commit = (git rev-parse HEAD); rid = '${{ matrix.rid }}'; executable = $executable
               sha256 = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
-            } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $target.Directory 'build-manifest.json') -Encoding utf8
+              files = $files
+            } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $target.Directory 'build-manifest.json') -Encoding utf8
           }
 
       - name: Upload native build
@@ -130,6 +138,7 @@ jobs:
         with:
           name: native-${{ matrix.rid }}
           path: artifacts/native/
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
 

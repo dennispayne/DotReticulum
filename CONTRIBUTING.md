@@ -64,7 +64,9 @@ artifacts; PR builds retain read-only permissions and are not attested.
 
 After a successful Build, `test.yml` runs separate **Unit**, **Integration** and
 **Compatibility** platform matrices against that producer's exact commit and
-artifacts, without rebuilding. Trusted main artifacts require verified signed
+artifacts, without rebuilding. Integration restores the application's MSBuild
+metadata only for the versioning-tool check; it does not compile another binary.
+Trusted main artifacts require verified signed
 provenance, matching commit/runtime manifests and SHA-256 digests. Downstream
 jobs have only read permissions and no persisted checkout credentials.
 Fork-produced artifacts are not executed by the downstream `workflow_run`.
@@ -74,8 +76,10 @@ reference retrieval.
 Normal Build completion runs bounded checks. Longer live checks, mesh/recovery,
 native CLI/installation and repeated traffic all belong to **Integration**, not
 additional test categories. Scheduled Test runs select and pin the newest
-successful main Build: Tuesday 06:00 UTC runs longer Integration once; Saturday
-06:00 UTC repeats it three times. Manual runs can select an explicit Build:
+successful main Build: Tuesday 06:00 UTC runs live Integration once; Saturday
+06:00 UTC repeats the mixed-mesh/recovery and constrained native Buffer cases
+three times. Manual full Integration includes the constrained native case too.
+Manual runs can select an explicit Build:
 
 ```powershell
 gh workflow run build.yml

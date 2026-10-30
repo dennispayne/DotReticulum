@@ -4,6 +4,59 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Build/Test handoff - first hosted evidence and integration correction
+
+Source **4737ad2**, Build **41074780906**: all three platform builds and the
+trusted attestation job passed. Test **41075483394** started automatically from
+that exact successful producer. Its three Unit jobs, three native Compatibility
+jobs, actual-upstream baseline and Compatibility renderer passed. Downloaded all
+four real Compatibility reports into `TestResults/split-initial-compatibility`:
+all **42** distinct cases passed for all four candidates, with test-code links
+to **4737ad2**, not a later default-branch revision.
+
+The first hosted Integration execution exposed a genuine missing prerequisite:
+without project restore metadata, the existing `GetBuildVersion` Pester check
+cannot import Nerdbank.GitVersioning's MSBuild target (`MSB4057`). Kept the test
+intact and added a narrow application-project restore before tooling checks;
+this restores imports, not another application/test binary. In an isolated clean
+worktree, the target failed before restore, then returned **1.5.7.92** and source
+**4737ad2d56** after restore, with no compiled DLLs produced. The owned worktree
+was removed. Exact logs: `TestResults/ci-version-before-restore.log` and
+`TestResults/ci-version-after-restore.json`.
+
+Also made uninstrumented VSTest execution omit coverage settings entirely:
+the settings file enables its collector even without `/Collect`. A packaged
+Core run passed **171/171** with no coverage files after this correction.
+Merged coverage explicitly selects Unit plus managed Integration directories,
+never native-wrapper/repetition output.
+
+Native manifests now bind the complete published file inventory, including
+sidecar libraries and macOS app-bundle contents; signed manifest verification
+therefore protects more than the top-level executable. Hidden published files
+are retained. Added changed/unlisted dependency rejection cases: focused Pester
+**5.7.1**, **28 passed**; fresh-process ToolingOnly **85 passed / 2 skipped**.
+PSScriptAnalyzer remains **70 files / zero findings**; actionlint is clean.
+The Saturday selection retains the previous bounded mixed-mesh/recovery and
+constrained Buffer subset rather than expanding it to every live case.
+
+Independently ran `gh attestation verify` on the actual Windows binary from
+Build **41074780906**, requiring this repository, Build workflow, exact source,
+main ref and GitHub-hosted runner identity: passed. Altering one byte failed
+(no attestation for the changed SHA-256); requiring another source digest also
+failed. Actual verification JSON/logs are under
+`TestResults/signed-build-4737ad2`; no modified binary was executed.
+
+Static analysis **41074780739** completed all five jobs. Actual downloaded SARIF
+has C#/PowerShell **zero** findings, the same **two** existing Python warnings,
+and **three Actions cache-poisoning warnings** on dynamic producer checkouts
+under schedule/manual triggers. The query cannot follow the PowerShell
+producer validator: those triggers accept only successful same-repository
+**main** Builds, the manifest must match the API's source SHA, and consumers
+require signed source/workflow provenance before running binaries. Untrusted PR
+artifacts are accepted only from same-repository workflow_run feedback (whose
+default-branch cache access is read-only); forks are rejected. The warnings
+remain visible, not suppressed or relabeled as a zero-findings scan.
+
 ### Separate Build and Test workflows - local restructuring gate
 
 Replaced the combined workflow and its two periodic wrappers with `build.yml`
@@ -16,13 +69,16 @@ OIDC/attestation write permissions; PR build jobs remain read-only.
 Test selects one successful producer run, checks repository/workflow/event,
 complete unexpired artifact inventory and the exact checkout (including PR merge
 parent validation), then uses separate Unit, Integration and Compatibility
-platform matrices without restore/build/publish. Trusted main consumers verify
+platform matrices without build/publish. Integration restores application
+MSBuild metadata only for the versioning-tool check, not another binary.
+Trusted main consumers verify
 GitHub-signed source/workflow provenance before execution. Native/managed
 manifests check runtime, commit and SHA-256; fork-produced artifacts are rejected
 by the downstream workflow. No producer/artifact fallback is allowed.
 
 Bounded Integration remains automatic. Longer live Integration runs Tuesday
-06:00 UTC once and Saturday 06:00 UTC three times, or manually with 1-10
+06:00 UTC once; Saturday 06:00 UTC preserves the mixed-mesh/recovery/constrained
+Buffer selection for three repetitions. Manual full Integration allows 1-10
 repetitions against a selected successful main Build. These use the same
 published outputs, not fresh scheduled builds. Native CLI/installation,
 contracts and repeated traffic are Integration components, not separate test

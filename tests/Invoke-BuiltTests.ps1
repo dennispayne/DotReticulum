@@ -80,8 +80,10 @@ try {
         $reportsBefore = @(Get-ChildItem -LiteralPath $ResultsDirectory -Filter coverage.opencover.xml -Recurse).Count
         $arguments = @('vstest', (Join-Path $root $testAssembly), "/TestCaseFilter:$Filter",
             "/ResultsDirectory:$ResultsDirectory", "/Logger:trx;LogFileName=$name.trx",
-            "/TestAdapterPath:$collector", "/Settings:$(Join-Path $root 'tests\coverage.runsettings')")
-        if ($Coverage) { $arguments += '/Collect:XPlat Code Coverage' }
+            "/TestAdapterPath:$collector")
+        if ($Coverage) {
+            $arguments += '/Collect:XPlat Code Coverage', "/Settings:$(Join-Path $root 'tests\coverage.runsettings')"
+        }
         & dotnet @arguments -- xUnit.MaxParallelThreads=1
         if ($LASTEXITCODE -ne 0) { $failed = $true }
         $trx = Join-Path $ResultsDirectory "$name.trx"

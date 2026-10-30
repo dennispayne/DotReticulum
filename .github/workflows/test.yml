@@ -52,6 +52,8 @@ jobs:
       attested: ${{ steps.source.outputs.attested }}
       full-integration: ${{ steps.mode.outputs.full-integration }}
       iterations: ${{ steps.mode.outputs.iterations }}
+      integration-filter: ${{ steps.mode.outputs.integration-filter }}
+      constrained-streams: ${{ steps.mode.outputs.constrained-streams }}
     steps:
       - name: Checkout trusted workflow controls
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -96,8 +98,15 @@ jobs:
             $value
           } else { 1 }
           if ($iterations -lt 1 -or $iterations -gt 10) { throw 'Integration repetitions must be between 1 and 10.' }
+          $repeatedMesh = $env:SCHEDULE -eq '0 6 * * 6'
+          $filter = if ($repeatedMesh) {
+            'FullyQualifiedName~Parity8CompatibilityLiveTests|FullyQualifiedName~LiveMixedTransportTests|FullyQualifiedName~Parity4NativeTransportTests|FullyQualifiedName~PublishedPublicStreamsSustainBidirectionalByteExactDeliveryAcrossConstrainedLostFrames'
+          } else { 'Category=Live' }
+          $constrained = $repeatedMesh -or ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch' -and $full)
           "full-integration=$($full.ToString().ToLowerInvariant())" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
           "iterations=$iterations" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          "integration-filter=$filter" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          "constrained-streams=$($constrained.ToString().ToLowerInvariant())" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
 
   compatibility:
     name: Compatibility (${{ matrix.rid }})
@@ -115,6 +124,7 @@ jobs:
           - os: macos-latest
             rid: osx-arm64
     steps:
+      # Scheduled/manual producers are main-only; source validates the run and checkout before execution.
       - name: Checkout exact producing source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -280,6 +290,9 @@ jobs:
       - name: Run CLI and installation Integration
         if: ${{ !cancelled() && steps.artifacts.outcome == 'success' }}
         run: |
+          # The versioning-tool check evaluates a restored MSBuild target; no binary is rebuilt.
+          dotnet restore src/DotReticulum.Applications/DotReticulum.Applications.csproj --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./tests/Install-Pester.ps1
           Import-Module Pester -RequiredVersion 5.7.1
           $configuration = New-PesterConfiguration
@@ -301,8 +314,9 @@ jobs:
         if: ${{ !cancelled() && steps.artifacts.outcome == 'success' && needs.source.outputs.full-integration == 'true' }}
         env:
           INTEGRATION_ITERATIONS: ${{ needs.source.outputs.iterations }}
+          INTEGRATION_FILTER: ${{ needs.source.outputs.integration-filter }}
           DOTRETICULUM_LIVE: '1'
-          DOTRETICULUM_BUFFER_SOAK: '1'
+          DOTRETICULUM_BUFFER_SOAK: ${{ needs.source.outputs.constrained-streams == 'true' && '1' || '0' }}
         run: |
           if (!$env:DOTRETICULUM_PYTHON -or !$env:DOTRETICULUM_UPSTREAM) {
             throw 'Longer Integration requires the candidate-fetched, verified reference.'
@@ -310,7 +324,7 @@ jobs:
           $failed = $false
           for ($iteration = 1; $iteration -le [int]$env:INTEGRATION_ITERATIONS; $iteration++) {
             $directory = "TestResults/integration/iteration-$iteration"
-            ./tests/Invoke-BuiltTests.ps1 -Directory artifacts/managed -Rid '${{ matrix.rid }}' -Commit $env:BUILD_COMMIT -Filter 'Category=Live' -ResultsDirectory $directory
+            ./tests/Invoke-BuiltTests.ps1 -Directory artifacts/managed -Rid '${{ matrix.rid }}' -Commit $env:BUILD_COMMIT -Filter $env:INTEGRATION_FILTER -ResultsDirectory $directory
             if ($LASTEXITCODE -ne 0) { $failed = $true }
             ./tests/Get-TestSummary.ps1 -Path $directory -Title "Integration iteration $iteration" -JsonPath "$directory/summary.json"
             $report = Get-Content -LiteralPath "$directory/summary.json" -Raw | ConvertFrom-Json
@@ -430,7 +444,8 @@ jobs:
           $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
           foreach ($rid in 'linux-x64', 'osx-arm64', 'win-x64') {
             $groups = @('unit', 'integration' | ForEach-Object {
-              Join-Path $directory "test-results-$_-$rid-${{ github.run_attempt }}/$_"
+              $coveragePath = if ($_ -eq 'integration') { 'integration/managed' } else { 'unit' }
+              Join-Path $directory "test-results-$_-$rid-${{ github.run_attempt }}/$coveragePath"
             })
             if (@($groups | Where-Object { !(Test-Path -LiteralPath $_) }).Count -gt 0) {
               "Merged production coverage ($rid): unavailable; both suite artifacts are required." | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY

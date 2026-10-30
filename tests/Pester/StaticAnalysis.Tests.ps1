@@ -49,8 +49,9 @@ Describe 'Exact-producer native artifact selection' -Tag Tooling {
         $binary = Join-Path $directory 'candidate.exe'
         Set-Content -LiteralPath $binary -Value 'Not executed by artifact validation.'
         @{ rid = 'test-rid'; commit = 'verified-commit'; executable = 'candidate.exe'
-            sha256 = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant() } |
-            ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory 'build-manifest.json')
+            sha256 = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
+            files = @(@{ path = 'candidate.exe'; sha256 = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant() }) } |
+            ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $directory 'build-manifest.json')
         $environmentFile = Join-Path $directory 'github-env'
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', (Join-Path $PSScriptRoot '..\Set-NativeBuild.ps1'),
             '-Directory', $directory, '-Rid', 'test-rid', '-Commit', 'verified-commit', '-EnvironmentVariable', $Variable) `
@@ -77,6 +78,30 @@ Describe 'Exact-producer native artifact selection' -Tag Tooling {
             -Environment @{ GITHUB_ENV = $environmentFile }
         $result.Code | Should -Not -Be 0
         $result.Error | Should -Match $Expected
+        Test-Path -LiteralPath $environmentFile | Should -BeFalse
+    }
+
+    It 'rejects changed or additional native dependencies before exporting the executable' -ForEach @('changed', 'additional') {
+        $directory = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path $directory
+        $binary = Join-Path $directory 'candidate.exe'
+        $dependency = Join-Path $directory 'library.so'
+        Set-Content -LiteralPath $binary -Value 'Not executed.'
+        Set-Content -LiteralPath $dependency -Value 'Original native dependency.'
+        $files = @($binary, $dependency | ForEach-Object {
+            @{ path = [IO.Path]::GetFileName($_); sha256 = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant() }
+        })
+        @{ rid = 'test-rid'; commit = 'verified-commit'; executable = 'candidate.exe'
+            sha256 = $files[0].sha256; files = $files } | ConvertTo-Json -Depth 5 |
+            Set-Content -LiteralPath (Join-Path $directory 'build-manifest.json')
+        if ($_ -eq 'changed') { Set-Content -LiteralPath $dependency -Value 'Tampered dependency.' }
+        else { Set-Content -LiteralPath (Join-Path $directory 'extra.so') -Value 'Unlisted dependency.' }
+        $environmentFile = Join-Path $TestDrive "$_-github-env"
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', (Join-Path $PSScriptRoot '..\Set-NativeBuild.ps1'),
+            '-Directory', $directory, '-Rid', 'test-rid', '-Commit', 'verified-commit') `
+            -Environment @{ GITHUB_ENV = $environmentFile }
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'Native artifact file (digest|inventory) mismatch'
         Test-Path -LiteralPath $environmentFile | Should -BeFalse
     }
 }
