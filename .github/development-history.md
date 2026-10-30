@@ -4,6 +4,94 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Separated Build/Test workflows - completed hosted acceptance
+
+Final workflow source **6b75124**: Build **41088695081** passed its three
+platform builds plus the isolated provenance job. Automatic Test
+**41089380916** passed **all 13 jobs**, including separate Unit, Integration and
+Compatibility matrices, the actual-upstream baseline and both rendered
+summaries. Consumers verified the signed, exact-commit artifacts; Test did not
+rebuild the application/test binaries. Published resource/Buffer,
+CLI/installation and mixed-peer contract checks actually executed.
+
+Downloaded the actual reports with `gh run download 41089380916` (patterns
+`compatibility-*`, `test-summary-*`, `test-results-*`) into
+`TestResults/split-last-automatic`. Ran
+`.\tests\Compatibility\New-CompatibilitySummary.ps1 -ReportsDirectory
+TestResults\split-last-automatic -Commit 6b75124bf285dbc3daa7efadc054b5a6c674f075`
+and checked every data row: **42/42** distinct cases passed in each of the
+Upstream/Linux/macOS/Windows columns, with links to the executing source.
+The actual consolidated Test artifact contains these execution counts, all
+with **zero failures**; cells are **passed / skipped**:
+
+| Suite | Linux | macOS | Windows |
+| --- | --- | --- | --- |
+| Unit | 1,445 / 5 | 1,445 / 5 | 1,444 / 6 |
+| Bounded Integration | 664 / 15 | 653 / 26 | 655 / 24 |
+
+Independent managed coverage exports remain separate. Overall percentages are
+**lines / branches**; native child executables are not measured by Coverlet:
+
+| Suite | Linux | macOS | Windows |
+| --- | --- | --- | --- |
+| Unit | 61.25 / 48.86 | 60.10 / 48.34 | 60.16 / 48.46 |
+| Managed Integration | 54.02 / 39.38 | 53.03 / 38.92 | 53.11 / 39.08 |
+
+Each platform's merged JSON unions **20** raw reports by source-point identity,
+not percentages. Per-project merged percentages are **lines / branches**:
+
+| Project | Linux | macOS | Windows |
+| --- | --- | --- | --- |
+| Applications | 76.31 / 62.93 | 76.52 / 63.12 | 76.57 / 63.39 |
+| Core | 96.89 / 90.77 | 96.89 / 90.69 | 96.89 / 90.93 |
+| Crypto | 94.83 / 94.00 | 94.83 / 94.00 | 94.83 / 94.00 |
+| Interfaces | 86.56 / 75.80 | 82.02 / 73.07 | 82.25 / 73.18 |
+| Transport | 91.70 / 79.78 | 91.31 / 79.29 | 91.58 / 79.70 |
+| Overall | 83.12 / 69.36 | 82.20 / 68.98 | 82.33 / 69.25 |
+
+Overall covered/total points: Linux **22,570/27,152 lines,
+16,178/23,325 branches**; macOS **22,320/27,152, 16,090/23,325**;
+Windows **22,355/27,152, 16,153/23,325**. The uploaded consolidated Markdown
+also preserves the independent suites' per-project tables.
+
+Selective retry was exercised on prior source **3de3ca7**, using successful
+Build **41080742076** and automatic Test **41081464313**. Attempt 1 genuinely
+failed Linux's external `rngit` request after a timeout; no canonical source
+was fabricated, and dependent reference checks failed explicitly. Ran
+`gh run rerun 41081464313 --job 124152049547`: Linux retrieval and its dependent
+jobs passed in attempt 2, without rebuilding or changing producer. Confirmed
+the three original Unit artifact IDs and untouched macOS/Windows Compatibility
+artifact IDs stayed identical. Retried reports/reference retained group **1**,
+and both complete summaries passed. The original failure remains in attempt
+history, not hidden by a later passing iteration. Corrected earlier Test
+**41078391476** was superseded while macOS Integration was still running;
+its cancelled summary is not a failing test.
+
+Also executed `gh workflow run test.yml --ref main -f
+build_run_id=41080742076 -f full_integration=true -f iterations=1`.
+Manual Test **41085042694** passed **all 13 jobs**, using those same signed
+**3de3ca7** outputs. All four Compatibility columns again passed **42/42**.
+Integration totals were Linux **728 passed / 21 skipped**, macOS
+**716 / 33**, Windows **717 / 32**, with zero failures. Within those totals,
+the additional longer iteration executed Linux **64 / 6**, macOS **63 / 7**,
+Windows **62 / 8**. Inspected actual TRX: the opt-in constrained-loss native
+Buffer case passed on all three platforms. Reports are retained locally under
+`TestResults/split-manual-full`. This exercises manual producer selection and
+the shared longer execution path, not an actual cron invocation or the
+Saturday three-repeat cadence. Hardware/other opt-in skips remain unverified.
+
+Final Static analysis **41088695071** passed all five jobs. Downloaded actual
+SARIF (`analysis-*`) into `TestResults/static-6b75124-reports`: C# **0**,
+PowerShell **0**, Actions **3** cache-poisoning query warnings, Python the same
+**2** existing warnings. The Actions warnings and validator/cache-boundary
+explanation below remain visible; successful scanning is not zero findings.
+Actionlint **1.7.12** accepted the final concurrency expression. No fork PR was
+launched solely for acceptance; its producer guards have focused local coverage.
+
+Rechecked the archive after hosted acceptance: **35** completed entries in
+`docs/archive/completed-todos.md`, **19** unchecked entries retained in
+`TODO.md`. No additional roadmap capability was checked off by restructuring CI.
+
 ### Preserving read-only PR and feature-branch feedback
 
 The initial split conservatively rejected fork heads and non-main manual Build
