@@ -29,7 +29,7 @@ permissions:
   attestations: read
 
 concurrency:
-  group: test-${{ github.event.workflow_run.head_branch || github.ref }}-${{ github.event_name }}
+  group: test-${{ github.event.workflow_run.head_repository.full_name || github.repository }}-${{ github.event.workflow_run.head_branch || github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 defaults:

@@ -25,6 +25,9 @@ only their own same-group reports. Full workflow retries create a new group.
 Build uploads also explicitly replace their own artifacts on a whole-run retry.
 There is still no fallback to another producing run or reference pin.
 
+Concurrency also includes the producing repository, not just its branch: a
+fork PR whose branch is named `main` must not cancel trusted main feedback.
+
 Follow-up validation: focused Pester **5.7.1**, **31 passed / zero failed**;
 PSScriptAnalyzer **70 files / zero findings**; actionlint clean. Downloaded the
 actual Windows/macOS native artifacts from corrected Build **41077696247**,
