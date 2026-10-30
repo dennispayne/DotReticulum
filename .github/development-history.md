@@ -4,6 +4,15 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Archiving completed TODO entries
+
+Moved all **35** completed entries from `TODO.md` into
+`docs/archive/completed-todos.md`, preserving their exact wording, evidence and
+historical workflow names. All **19** outstanding entries remain unchanged.
+Compared both entry sets against `git show HEAD:TODO.md`; no completed entry
+was lost and no outstanding item was removed or checked off. This is a
+documentation-only archive, not new implementation or acceptance evidence.
+
 ### Public-tunnel I2P restart rerun after Windows firewall approval
 
 The user reported that the PowerShell 7/OpenJDK firewall prompts may have
