@@ -81,7 +81,7 @@ Describe 'Exact-producer native artifact selection' -Tag Tooling {
         Test-Path -LiteralPath $environmentFile | Should -BeFalse
     }
 
-    It 'rejects changed or additional native dependencies before exporting the executable' -ForEach @('changed', 'additional') {
+    It 'rejects changed or additional native dependencies (<_>) before exporting the executable' -ForEach @('changed', 'additional', 'hidden') {
         $directory = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
         $null = New-Item -ItemType Directory -Path $directory
         $binary = Join-Path $directory 'candidate.exe'
@@ -95,7 +95,11 @@ Describe 'Exact-producer native artifact selection' -Tag Tooling {
             sha256 = $files[0].sha256; files = $files } | ConvertTo-Json -Depth 5 |
             Set-Content -LiteralPath (Join-Path $directory 'build-manifest.json')
         if ($_ -eq 'changed') { Set-Content -LiteralPath $dependency -Value 'Tampered dependency.' }
-        else { Set-Content -LiteralPath (Join-Path $directory 'extra.so') -Value 'Unlisted dependency.' }
+        else {
+            $extra = Join-Path $directory $(if ($_ -eq 'hidden') { '.extra.so' } else { 'extra.so' })
+            Set-Content -LiteralPath $extra -Value 'Unlisted dependency.'
+            if ($IsWindows -and $_ -eq 'hidden') { (Get-Item -LiteralPath $extra -Force).Attributes = [IO.FileAttributes]::Hidden }
+        }
         $environmentFile = Join-Path $TestDrive "$_-github-env"
         $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', (Join-Path $PSScriptRoot '..\Set-NativeBuild.ps1'),
             '-Directory', $directory, '-Rid', 'test-rid', '-Commit', 'verified-commit') `

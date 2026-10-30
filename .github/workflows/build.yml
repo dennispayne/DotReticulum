@@ -120,7 +120,7 @@ jobs:
             & (Join-Path $PWD $binary) --help
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             $directory = (Resolve-Path -LiteralPath $target.Directory).Path
-            $files = @(Get-ChildItem -LiteralPath $directory -Recurse -File | ForEach-Object {
+            $files = @(Get-ChildItem -LiteralPath $directory -Recurse -File -Force | ForEach-Object {
               [ordered]@{
                 path = [IO.Path]::GetRelativePath($directory, $_.FullName).Replace('\', '/')
                 sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -141,6 +141,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
+          overwrite: true
 
       - name: Upload managed test build
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -151,6 +152,7 @@ jobs:
             artifacts/managed/managed-manifest.json
           if-no-files-found: error
           retention-days: 14
+          overwrite: true
 
   attest:
     name: Attest trusted Build artifacts

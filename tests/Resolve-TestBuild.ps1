@@ -49,14 +49,15 @@ if (!$RunId) {
     $RunId = [string]$run.id
 }
 $run = Read-GitHub "repos/$Repository/actions/runs/$RunId"
-if ($run.repository.full_name -cne $Repository -or $run.head_repository.full_name -cne $Repository -or
+if ($run.repository.full_name -cne $Repository -or
+    ($run.head_repository.full_name -cne $Repository -and $run.event -ne 'pull_request') -or
     $run.path -cne '.github/workflows/build.yml' -or $run.status -ne 'completed' -or
     $run.conclusion -ne 'success' -or $run.head_sha -cnotmatch '^[0-9a-f]{40}$' -or
     $run.event -notin 'push', 'pull_request', 'workflow_dispatch') {
-    throw 'Producer must be a successful Build from this repository; fork-produced artifacts are not executed downstream.'
+    throw 'Producer must be a successful Build running in this repository.'
 }
 $trusted = $run.event -in 'push', 'workflow_dispatch' -and $run.head_branch -eq 'main'
-if (!$trusted -and (!$eventData.workflow_run -or $run.event -ne 'pull_request')) {
+if (!$trusted -and !$eventData.workflow_run) {
     throw 'Scheduled/manual Test requires a successful main Build.'
 }
 $artifacts = Read-GitHub "repos/$Repository/actions/runs/$RunId/artifacts?per_page=100"
@@ -76,6 +77,7 @@ if ($NativeManifest) {
     }
     if ($manifest.commit -cne $run.head_sha) {
         if ($trusted) { throw 'Main Build manifest does not match the producing commit.' }
+        if ($run.event -ne 'pull_request') { throw 'Feature Build manifest does not match the producing commit.' }
         $merge = Read-GitHub "repos/$Repository/git/commits/$($manifest.commit)"
         if (@($merge.parents).Count -ne 2 -or $merge.parents[1].sha -cne $run.head_sha) {
             throw 'PR Build manifest is not a merge of the producing head commit.'

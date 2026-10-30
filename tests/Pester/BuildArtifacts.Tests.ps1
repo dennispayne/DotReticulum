@@ -64,9 +64,9 @@ Describe 'Cross-workflow Build selection' -Tag Tooling {
         { & $resolver -RunId 42 -Repository example/project -EventPath '' } | Should -Throw
     }
 
-    It 'rejects fork-produced artifacts even when the Build itself succeeded' {
-        $script:run.head_repository.full_name = 'untrusted/fork'
-        { & $resolver -RunId 42 -Repository example/project -EventPath '' } | Should -Throw '*fork-produced*'
+    It 'rejects a foreign producing repository even when the Build itself succeeded' {
+        $script:run.repository.full_name = 'untrusted/fork'
+        { & $resolver -RunId 42 -Repository example/project -EventPath '' } | Should -Throw '*running in this repository*'
     }
 
     It 'fails missing, expired or duplicate artifact inventory instead of selecting another run' -ForEach @('missing', 'expired', 'duplicate') {
@@ -93,6 +93,20 @@ Describe 'Cross-workflow Build selection' -Tag Tooling {
         @{ workflow_run = @{ id = 42 } } | ConvertTo-Json | Set-Content -LiteralPath $eventFile
         & $resolver -Repository example/project -EventPath $eventFile
         Get-Content -LiteralPath $env:GITHUB_OUTPUT | Should -Contain 'attested=false'
+    }
+
+    It 'preserves <Kind> feedback only through read-only workflow_run execution' -ForEach @(
+        @{ Kind = 'fork PR'; Event = 'pull_request'; HeadRepository = 'untrusted/fork' }
+        @{ Kind = 'feature-branch Build'; Event = 'workflow_dispatch'; HeadRepository = 'example/project' }
+    ) {
+        $script:run.event = $Event
+        $script:run.head_branch = 'feature'
+        $script:run.head_repository.full_name = $HeadRepository
+        $eventFile = Join-Path $TestDrive 'feedback-event.json'
+        @{ workflow_run = @{ id = 42 } } | ConvertTo-Json | Set-Content -LiteralPath $eventFile
+        & $resolver -Repository example/project -EventPath $eventFile
+        Get-Content -LiteralPath $env:GITHUB_OUTPUT | Should -Contain 'attested=false'
+        { & $resolver -RunId 42 -Repository example/project -EventPath '' } | Should -Throw '*main Build*'
     }
 
     It 'preserves PR merge testing but rejects an unrelated or misreported main checkout' {

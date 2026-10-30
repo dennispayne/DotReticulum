@@ -69,7 +69,9 @@ metadata only for the versioning-tool check; it does not compile another binary.
 Trusted main artifacts require verified signed
 provenance, matching commit/runtime manifests and SHA-256 digests. Downstream
 jobs have only read permissions and no persisted checkout credentials.
-Fork-produced artifacts are not executed by the downstream `workflow_run`.
+PRs (including forks) and feature-branch Builds retain read-only `workflow_run`
+feedback without attestation; scheduled/manual Test accepts only trusted main
+Builds. No test job receives secrets or write permissions.
 Compatibility retains its actual-upstream baseline and canonical candidate-owned
 reference retrieval.
 
@@ -95,6 +97,11 @@ Integration coverage remain independent; their merged coverage is a union of
 source points, not added/averaged percentages. Separately launched native
 executables are not instrumented. Hardware/I2P prerequisites still skip
 explicitly; these checks do not establish acceptance for every bearer/device.
+
+Selective job retries retain the source gate's report group, so unchanged
+platform reports and the canonical reference remain available. Retried jobs
+replace only their own report artifact; rerunning the whole workflow creates a
+new group. Retries never select a different Build or silently rebuild.
 
 ### Static analysis
 

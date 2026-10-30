@@ -4,6 +4,37 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Preserving read-only PR and feature-branch feedback
+
+The initial split conservatively rejected fork heads and non-main manual Build
+runs. Restored the pre-existing feedback scope without weakening trusted Test
+selection: the producing workflow must still run in this repository, and PR
+merge parents/feature checkout commits must match its API metadata. Fork PRs and
+feature Builds are accepted only from their actual `workflow_run` completion,
+whose jobs have explicit read-only permissions, no repository secrets and
+read-only default-branch cache access. They are never presented as attested
+main builds. Scheduled/manual Test continues to reject all non-main producers.
+Focused guards exercise both allowed feedback paths and the corresponding
+manual rejection. Automatic bounded Integration retains its 45-minute job
+deadline; only explicitly selected longer Integration receives 120 minutes.
+
+Pinned Test artifact/report grouping to the source job's attempt, rather than
+each retried job's newer `github.run_attempt`. Selective retries can reuse the
+same canonical reference and unchanged suite/platform evidence; they replace
+only their own same-group reports. Full workflow retries create a new group.
+Build uploads also explicitly replace their own artifacts on a whole-run retry.
+There is still no fallback to another producing run or reference pin.
+
+Follow-up validation: focused Pester **5.7.1**, **31 passed / zero failed**;
+PSScriptAnalyzer **70 files / zero findings**; actionlint clean. Downloaded the
+actual Windows/macOS native artifacts from corrected Build **41077696247**,
+verified each signed application manifest against source **c5e6384** and the
+trusted Build workflow, then checked every application/consumer inventory byte
+with the hidden-file-aware validator: all four inventories passed. Main ruleset
+**24729312** contains deletion/non-fast-forward protection only, so no required
+status-check names needed migration. Fork/feature feedback has focused guard
+coverage, not a separately executed hosted PR acceptance claim.
+
 ### Build/Test handoff - first hosted evidence and integration correction
 
 Source **4737ad2**, Build **41074780906**: all three platform builds and the
@@ -54,7 +85,8 @@ producer validator: those triggers accept only successful same-repository
 **main** Builds, the manifest must match the API's source SHA, and consumers
 require signed source/workflow provenance before running binaries. Untrusted PR
 artifacts are accepted only from same-repository workflow_run feedback (whose
-default-branch cache access is read-only); forks are rejected. The warnings
+default-branch cache access is read-only); the later feedback follow-up above
+also admits fork PRs without privileges. The warnings
 remain visible, not suppressed or relabeled as a zero-findings scan.
 
 ### Separate Build and Test workflows - local restructuring gate
@@ -73,8 +105,9 @@ platform matrices without build/publish. Integration restores application
 MSBuild metadata only for the versioning-tool check, not another binary.
 Trusted main consumers verify
 GitHub-signed source/workflow provenance before execution. Native/managed
-manifests check runtime, commit and SHA-256; fork-produced artifacts are rejected
-by the downstream workflow. No producer/artifact fallback is allowed.
+manifests check runtime, commit and SHA-256. The initial local gate rejected fork
+heads; the subsequent read-only feedback follow-up restores their prior scope.
+No producer/artifact fallback is allowed.
 
 Bounded Integration remains automatic. Longer live Integration runs Tuesday
 06:00 UTC once; Saturday 06:00 UTC preserves the mixed-mesh/recovery/constrained

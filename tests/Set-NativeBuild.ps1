@@ -48,7 +48,7 @@ if ($manifest.sha256 -cnotmatch '^[0-9a-f]{64}$' -or
 }
 $root = (Resolve-Path -LiteralPath $Directory).Path
 $expected = @{}
-if (@($manifest.files).Count -eq 0) { throw 'Native artifact has no file inventory.' }
+if ($null -eq $manifest.files -or @($manifest.files).Count -eq 0) { throw 'Native artifact has no file inventory.' }
 foreach ($file in $manifest.files) {
     if (!$file.path -or $file.path -match '^[\\/]|\\|:|[\r\n]|(^|/)\.\.?(/|$)' -or
         $file.path -eq 'build-manifest.json' -or $expected.ContainsKey($file.path) -or
@@ -57,7 +57,7 @@ foreach ($file in $manifest.files) {
     }
     $expected[$file.path] = $file.sha256
 }
-$actual = @(Get-ChildItem -LiteralPath $root -Recurse -File | ForEach-Object {
+$actual = @(Get-ChildItem -LiteralPath $root -Recurse -File -Force | ForEach-Object {
     [IO.Path]::GetRelativePath($root, $_.FullName).Replace('\', '/')
 } | Where-Object {
     $_ -ne 'build-manifest.json' -and
