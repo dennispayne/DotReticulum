@@ -1,3 +1,4 @@
+[![Build](https://github.com/dennispayne/DotReticulum/actions/workflows/build.yml/badge.svg)](https://github.com/dennispayne/DotReticulum/actions/workflows/build.yml) [![Test](https://github.com/dennispayne/DotReticulum/actions/workflows/test.yml/badge.svg)](https://github.com/dennispayne/DotReticulum/actions/workflows/test.yml)
 <p align="center">
   <img src="assets/branding/dotreticulum.svg" width="240" height="240" alt="DotReticulum: Reticulum network motif on a purple hexagon">
 </p>
