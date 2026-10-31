@@ -4,6 +4,28 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Root decluttering without changing build discovery
+
+Moved `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` into `.github`, the standard
+GitHub discovery location; moved `ACCESSIBILITY.md` to `docs/accessibility.md`
+and repository-wide `PSScriptAnalyzerSettings.psd1` alongside its runner in
+`tools`. Updated README navigation, contributing-guide relative links, current
+agent guidance and the analyzer's default/help text. Historical archive and
+command records retain their original paths.
+
+Kept the solution, `Directory.Build.props`, SDK/version and formatting files
+at root: their scope covers both production and test projects. `README.md`,
+`LICENSE` and the single active `TODO.md` also remain at root. Removed only
+obsolete root-settings literals from Build filters; `tools/**` already includes
+the relocated settings for push and PR feedback.
+
+Local tooling gates: `tools/Invoke-PowerShellAnalysis.ps1` using relocated
+settings and pinned analyzer **1.24.0** analyzed **72 files / zero findings**;
+Pester **6.2.0** `StaticAnalysis.Tests.ps1` **13 passed**, zero failed/skipped.
+Actionlint **1.7.12** accepted Build, `Get-Help -Full` discovered analyzer help,
+and `git diff --cached --check` passed. No production code, project path,
+compiler setting or NativeAOT behavior changed.
+
 ### Main-branch dynamic coverage badges
 
 Added a Shields endpoint generator using Test's merged managed Unit/Integration

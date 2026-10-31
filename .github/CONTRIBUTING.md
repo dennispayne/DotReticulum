@@ -113,7 +113,7 @@ new group. Retries never select a different Build or silently rebuild.
 
 ### Static analysis
 
-The [Static analysis workflow](.github/workflows/codeql.yml) uses CodeQL advanced
+The [Static analysis workflow](workflows/codeql.yml) uses CodeQL advanced
 setup for Actions, C# and Python, plus PSScriptAnalyzer for all tracked PowerShell
 scripts, modules and data files (including tests). It runs on relevant PR/push
 changes, weekly Monday at 05:00 UTC, or manually. CodeQL retains its default query
@@ -126,7 +126,7 @@ Install-Module PSScriptAnalyzer -RequiredVersion 1.24.0 -Scope CurrentUser -Repo
 .\tools\Invoke-PowerShellAnalysis.ps1
 ```
 
-`PSScriptAnalyzerSettings.psd1` selects focused correctness/security rules and
+`tools/PSScriptAnalyzerSettings.psd1` selects focused correctness/security rules and
 approved function verbs, not a blanket formatting policy. Enabled warnings and
 errors fail the PowerShell job after writing SARIF. Use narrow suppressions with
 a justification for genuine exceptions; public IFAC test fixture values are not
@@ -178,7 +178,7 @@ averaged or added. The existing merged coverage report still counts each line
 and branch covered by either suite once. These are managed test-process coverage
 measurements, not coverage of separately launched native executables.
 
-Live Python harnesses require `DOTRETICULUM_UPSTREAM` to point at an unmodified working checkout of the Reticulum-hosted upstream, currently `a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7), and `DOTRETICULUM_PYTHON` to select the reference venv. They verify the imported source and Git revision; LXMF harnesses also verify the pinned package version (1.2.1). Obtain updates with our .NET `rngit fetch`, verify the resulting objects and materialize a working checkout locally; the GitHub repository is only a secondary comparison mirror. See [rngit.md](docs/rngit.md). Existing vectors and their reproduction generators still identify the older revision that actually generated them; reproducing those requires that historical checkout rather than the current live pin. Disclose reference-side shims and non-default peer limits. Unsupported test modes must explicitly skip rather than return a false pass.
+Live Python harnesses require `DOTRETICULUM_UPSTREAM` to point at an unmodified working checkout of the Reticulum-hosted upstream, currently `a29bfb51c468945c96a1ee22cae0114e993e2391` (RNS 1.5.7), and `DOTRETICULUM_PYTHON` to select the reference venv. They verify the imported source and Git revision; LXMF harnesses also verify the pinned package version (1.2.1). Obtain updates with our .NET `rngit fetch`, verify the resulting objects and materialize a working checkout locally; the GitHub repository is only a secondary comparison mirror. See [rngit.md](../docs/rngit.md). Existing vectors and their reproduction generators still identify the older revision that actually generated them; reproducing those requires that historical checkout rather than the current live pin. Disclose reference-side shims and non-default peer limits. Unsupported test modes must explicitly skip rather than return a false pass.
 
 ### Run shared compatibility locally
 

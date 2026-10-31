@@ -71,7 +71,7 @@ dotnet run --project src/DotReticulum.Applications -- rnsd --help
 | Utilities | [rnid](docs/rnid.md), [rnstatus/rnpath/rnprobe](docs/network-utilities.md), [rncp and rnx](docs/rncp-rnx.md), [rnsh](docs/rnsh.md), [rnodeconf](docs/rnodeconf.md), [upstream placeholders](docs/upstream-placeholders.md) |
 | Git over Reticulum | [rngit, git-remote-rns, rngcs](docs/rngit.md) |
 | Compatibility | [Contract reference](docs/compatibility-contracts.md), [mixed Python/.NET mesh](docs/compatibility-mesh.md) |
-| Project | [Installing](docs/installation.md), [Contributing](CONTRIBUTING.md), [TODO](TODO.md), [development history](.github/development-history.md) |
+| Project | [Installing](docs/installation.md), [Contributing](.github/CONTRIBUTING.md), [TODO](TODO.md), [development history](.github/development-history.md) |
 
 ## Compatibility
 
@@ -106,7 +106,7 @@ do not establish alternate routes, RF or impaired meshes.
 Source quotations are checked against the fetched pin; `CitationUri`
 stays blank until primary-source navigation is verified (no GitHub fallback).
 Windows rncp peer cases disclose a file-retention workaround in
-[Contributing](CONTRIBUTING.md#moving-to-a-new-upstream-release).
+[Contributing](.github/CONTRIBUTING.md#moving-to-a-new-upstream-release).
 
 | Area | Status |
 | --- | --- |
@@ -136,7 +136,7 @@ dotnet test DotReticulum.slnx -c Release
 dotnet publish src/DotReticulum.Applications/DotReticulum.Applications.csproj -c Release -r <rid> -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true
 ```
 
-`<rid>` is `win-x64`, `linux-x64` or `osx-arm64`. The default suite needs no Python; live tests are opt-in and need the pinned reference. See [CONTRIBUTING.md](CONTRIBUTING.md). CI builds and tests on Windows, Linux and macOS and runs a NativeAOT publish with an encrypted multi-megabyte resource round trip on each.
+`<rid>` is `win-x64`, `linux-x64` or `osx-arm64`. The default suite needs no Python; live tests are opt-in and need the pinned reference. See [contributing guidance](.github/CONTRIBUTING.md). CI builds and tests on Windows, Linux and macOS and runs a NativeAOT publish with an encrypted multi-megabyte resource round trip on each.
 
 ## Versioning
 
@@ -146,7 +146,7 @@ A DotReticulum version is **the upstream RNS release it targets plus a build num
 - The last component is the git height from [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning): commits since `version.json` last changed. It rises with every commit and resets when the upstream number changes.
 - Tool `--version` output reports the upstream RNS version the tool is compatible with ("reference RNS 1.5.7").
 
-So `1.5.7.42` is the forty-second build aimed at RNS 1.5.7. A version number names the target, not completed parity. To move to a newer upstream, see [Moving to a new upstream release](CONTRIBUTING.md#moving-to-a-new-upstream-release).
+So `1.5.7.42` is the forty-second build aimed at RNS 1.5.7. A version number names the target, not completed parity. To move to a newer upstream, see [Moving to a new upstream release](.github/CONTRIBUTING.md#moving-to-a-new-upstream-release).
 
 ### Releases
 
@@ -154,8 +154,8 @@ A release is a `v<version>` tag (for example `v1.5.7.42`) on `main`. Create it w
 
 ## Contributing
 
-Contributions are welcome; read [CONTRIBUTING.md](CONTRIBUTING.md). The [development history](.github/development-history.md) is a condensed historical reference.
-See [ACCESSIBILITY.md](ACCESSIBILITY.md) for accessibility goals, limitations and reporting.
+Contributions are welcome; read [contributing guidance](.github/CONTRIBUTING.md). The [development history](.github/development-history.md) is a condensed historical reference.
+See [accessibility guidance](docs/accessibility.md) for accessibility goals, limitations and reporting.
 
 ## License
 

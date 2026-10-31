@@ -11,8 +11,8 @@ including tests. Writes findings before returning exit code 1 for warnings/error
 Git working tree whose tracked PowerShell files are analyzed.
 Defaults to this script's parent directory, the repository root.
 .PARAMETER Settings
-PSScriptAnalyzer settings file. Defaults to PSScriptAnalyzerSettings.psd1 in
-this script's parent directory.
+PSScriptAnalyzer settings file. Defaults to PSScriptAnalyzerSettings.psd1
+alongside this script.
 .PARAMETER Report
 Output SARIF file. Parent directories are created as needed.
 Defaults to TestResults\analysis\powershell.sarif beneath the repository root.
@@ -22,7 +22,7 @@ Defaults to TestResults\analysis\powershell.sarif beneath the repository root.
 [CmdletBinding()]
 param(
     [string] $Repository = (Split-Path $PSScriptRoot -Parent),
-    [string] $Settings = (Join-Path $PSScriptRoot '..\PSScriptAnalyzerSettings.psd1'),
+    [string] $Settings = (Join-Path $PSScriptRoot 'PSScriptAnalyzerSettings.psd1'),
     [string] $Report = (Join-Path $PSScriptRoot '..\TestResults\analysis\powershell.sarif')
 )
 

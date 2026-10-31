@@ -63,7 +63,7 @@ cleanup/restart paths.
 - Protocol-level tests: corresponding `tests/DotReticulum.*.Tests`; actual
   pinned-peer tests and adapters: `tests/Interop` plus focused live test files.
 - Every new vector generator belongs beside its owning tests and must execute
-  upstream. Consult `CONTRIBUTING.md` and existing `Generate*.py` files for the
+  upstream. Consult `.github/CONTRIBUTING.md` and existing `Generate*.py` files for the
   verified convention.
 - Remaining work is in `TODO.md`; historical completed scope is in `docs/archive/plan.md` and
   `.github/development-history.md`. Do not infer that a checked module-level
