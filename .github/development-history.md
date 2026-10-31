@@ -44,6 +44,39 @@ is the dynamic run title (`Test request / manual`), not the static workflow
 name. Correcting request discrimination to the exact workflow path preserves
 the API-backed trust guard; no failed evidence is promoted to acceptance.
 
+Correction **0f47558**: focused Pester **56 passed**, no failures/skips;
+pinned analyzer remains **72 files / zero findings** and actionlint passes.
+Build **41176424582** passed all three platforms and attestation. Static
+analysis **41176424713** passed all jobs; downloaded actual SARIF again has
+Actions/C#/PowerShell **0** and Python only the documented RSA test warning.
+Alerts **3-5** remain fixed; **1-2** retain the scoped **used in tests**
+dispositions. No scan rule was disabled and no open alert was dismissed simply
+to obtain a green workflow.
+
+Executed `gh workflow run test-request.yml --ref main -f
+build_run_id=41175352671 -f full_integration=true -f iterations=1`.
+Request **41176424279** succeeded and triggered read-only Test **41176446814**,
+whose **13 jobs all passed**, using exact signed **a492f21** Build artifacts
+without rebuilding. Downloaded reports under `TestResults/scan-request-full-reports`:
+**42/42** shared Compatibility cases passed in all four columns. Integration
+totals are Linux **765 passed / 21 skipped**, macOS **753 / 33**, Windows
+**754 / 32**, all zero failures. The additional live iteration contributed
+Linux **64 / 6**, macOS **63 / 7**, Windows **62 / 8**, with the original
+cadence/filter preserved. Request and automatic Test ran concurrently without
+cancelling each other. This verifies the manual request handoff and shared
+longer path; actual Tuesday/Saturday cron invocation remains unobserved here.
+
+Final automatic Test **41176715759** at **0f47558** also passed all **13 jobs**
+in attempt **2**. Its first attempt genuinely timed out fetching the external
+reference on Linux/macOS and correctly failed dependent reference checks.
+`gh run rerun 41176715759 --failed` retried those failures against the same
+Build; no timeouts/assertions were weakened and the failed attempt is retained.
+Actual downloaded reports (`TestResults/scan-final-automatic-reports`) show
+**42/42** Compatibility rows passing in all four columns, Unit
+Linux/macOS **1,445 passed / 5 skipped**, Windows **1,444 / 6**, and bounded
+Integration Linux **702 / 15**, macOS **691 / 26**, Windows **693 / 24**, all
+zero failures. Final API check still reports **zero open code-scanning alerts**.
+
 Local gates: warning-free `dotnet build DotReticulum.slnx -c Release --nologo
 -v quiet`; `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v
 quiet`: **1,868 passed / 91 skipped**, no failures. The first baseline had one
