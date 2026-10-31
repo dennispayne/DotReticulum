@@ -1,4 +1,7 @@
 [![Build](https://github.com/dennispayne/DotReticulum/actions/workflows/build.yml/badge.svg)](https://github.com/dennispayne/DotReticulum/actions/workflows/build.yml) [![Test](https://github.com/dennispayne/DotReticulum/actions/workflows/test.yml/badge.svg)](https://github.com/dennispayne/DotReticulum/actions/workflows/test.yml) [![CodeQL](https://github.com/dennispayne/DotReticulum/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/dennispayne/DotReticulum/actions/workflows/github-code-scanning/codeql) [![Static analysis](https://github.com/dennispayne/DotReticulum/actions/workflows/codeql.yml/badge.svg)](https://github.com/dennispayne/DotReticulum/actions/workflows/codeql.yml)
+![Linux coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdennispayne%2FDotReticulum%2Fmain%2Fassets%2Fcoverage%2Flinux-x64.json)
+![macOS coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdennispayne%2FDotReticulum%2Fmain%2Fassets%2Fcoverage%2Fosx-arm64.json)
+![Windows coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdennispayne%2FDotReticulum%2Fmain%2Fassets%2Fcoverage%2Fwin-x64.json)
 <p align="center">
   <img src="assets/branding/dotreticulum.svg" width="240" height="240" alt="DotReticulum: Reticulum network motif on a purple hexagon">
 </p>
