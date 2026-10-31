@@ -25,8 +25,7 @@ outside Build/Static-analysis triggers, preventing a publication loop.
 Local coverage/Pester suite **6.2.0**: **57 passed / 4 skipped**, zero failures.
 Pinned PSScriptAnalyzer **1.24.0**: **72 tracked files / zero findings**.
 Actionlint **1.7.12** accepted the workflow and `Get-Help -Full` discovers the
-generator's synopsis/parameter descriptions. Hosted publication and actual
-public badge endpoint acceptance remain to be recorded after deployment.
+generator's synopsis/parameter descriptions.
 
 Bootstrap **41225040520** succeeded, publishing commit **35a92ca** on main
 from Test **41176715759** attempt **2**. All three public Shields SVG endpoints
@@ -41,6 +40,25 @@ API `head_sha` can identify a later default-branch head, not the tested producer
 Publisher now reads the exact source SHA from Test's producer-derived run title
 and verifies it against the successful same-repository main Build API inventory.
 It never labels the later badge-only commit as the measured source.
+
+Final source **83b4b7c**: Build **41225498470** passed all three targets plus
+attestation; Static analysis **41225498459** passed all jobs with actual
+Actions/C#/PowerShell SARIF **0**, only the existing Python RSA test exception.
+Test **41225772523** passed all **13 jobs**; actual shared reports contain
+**42/42** passing rows in every candidate column. The earlier source's Test
+**41225395849** was superseded/cancelled, not a failed acceptance run.
+
+Automatic `workflow_run` publication **41227103496** passed and committed
+**e6ef185** directly on main. Compared all three published JSON messages
+against the actual Test summary's merged hit/total counts: Linux **83.14%**,
+macOS **82.28%**, Windows **82.34%**, all exact. Public raw JSON endpoints
+returned those values. Source metadata identifies Test **41225772523**
+attempt **1** and tested commit **83b4b7c**, not the publication commit.
+Shields rendered all three bootstrap SVGs with HTTP **200**; its configured
+five-minute cache may briefly display the previous value after updates.
+The automatic JSON commit triggered neither Build nor Static analysis;
+GitHub-managed dependency submission is independent. Final scanning API
+reported **zero open alerts**. No additional TODO capability was checked off.
 
 ### Scan-warning remediation - read-only execution and test-only exceptions
 
