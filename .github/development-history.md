@@ -26,6 +26,18 @@ Actionlint **1.7.12** accepted Build, `Get-Help -Full` discovered analyzer help,
 and `git diff --cached --check` passed. No production code, project path,
 compiler setting or NativeAOT behavior changed.
 
+Preserved concurrent user README badge additions by merging **32a061d**
+without overwriting either change. Hosted source **d6acb1d**: Build
+**41241552941** passed all three targets and attestation; Static analysis
+**41241552952** passed all jobs. Actual downloaded SARIF has Actions/C#/
+PowerShell **0**, Python only the existing RSA test exception. Test
+**41241893756** passed all **13 jobs**; downloaded shared reports contain
+**42/42** passing rows in all four candidate columns. GitHub's actual community
+profile API recognizes `.github/CONTRIBUTING.md` and
+`.github/CODE_OF_CONDUCT.md`. Generated badge update **9b09177** was integrated
+separately rather than overwritten. Root now contains nine necessary top-level
+files instead of thirteen.
+
 ### Main-branch dynamic coverage badges
 
 Added a Shields endpoint generator using Test's merged managed Unit/Integration
