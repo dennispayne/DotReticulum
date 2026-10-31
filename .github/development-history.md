@@ -4,6 +4,57 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Scan-warning remediation - read-only execution and test-only exceptions
+
+Moved schedule/manual inputs to `test-request.yml`. Its main-only, read-only
+job pins a successful main Build and uploads non-executable cadence JSON.
+`test.yml` now executes exclusively through `workflow_run` completion of Build
+or Test request, so dynamic producer checkouts no longer run in schedule/manual
+default-branch cache-write contexts. The consumer validates the request run's
+repository, path, main branch, event, conclusion and artifact inventory before
+download, then validates typed request fields and the exact main Build.
+Tuesday live/once, Saturday bounded mesh/three repetitions, manual 1-10
+repetitions, PR/fork feedback and selective-retry report grouping are preserved.
+Neither workflow gains write permissions or secrets.
+
+The Linux-only real AutoInterface adapter now creates its owned config directory
+with mode **0700** and its plaintext upstream config exclusively with mode
+**0600**, then unlinks the file immediately after initialization, including
+initialization failure. The pinned reference still reads its actual native
+configuration format; no shim or encryption substitute was added. Existing
+C# live acceptance now asserts mode **0600** and immediate removal in both raw
+and IFAC cases. The parent still cleans the entire owned directory on exit.
+
+Kept the vector generator's ephemeral RSA-1024 key and added the narrow
+test-only rationale next to its creation: upstream EEPROM signatures occupy
+exactly **128 bytes**. A larger key would invalidate the reference fixture;
+this is legacy protocol acceptance, not a recommended production primitive.
+GitHub Python alerts **1** and **2** were already dismissed; their dispositions
+will retain explicit test-only explanations rather than suppressing a rule.
+Actions alerts **3-5** await a new hosted scan to close as fixed.
+
+Local gates: warning-free `dotnet build DotReticulum.slnx -c Release --nologo
+-v quiet`; `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v
+quiet`: **1,868 passed / 91 skipped**, no failures. The first baseline had one
+intermittent `FailedReplacementPreservesOldFileAndCountersForRetry` failure;
+its immediate focused rerun and subsequent full solution run passed unchanged.
+Focused `BuildArtifacts.Tests.ps1` Pester **5.7.1**: **55 passed**, no failures
+or skips. Pinned PSScriptAnalyzer **1.24.0**, **72 tracked files / zero
+findings**; actionlint **1.7.12** accepted both workflows. The tracked-script
+scan also includes the separate, unfinished badge helper; that badge work is
+not part of this milestone.
+
+Executed the updated adapter/live assertions in the existing owned WSL Linux
+topology checkout, with its actual verified reference
+**a29bfb51c468945c96a1ee22cae0114e993e2391** and isolated LXMF **1.2.1**
+environment, via `tests/Interop/Invoke-AutoTopology.ps1 -Build`: **2 passed,
+zero skipped**, real Python/.NET raw and IFAC traffic. No physical NIC was
+changed; owned namespaces/veth were removed by the runner. The checkout is the
+prior Linux acceptance snapshot with the updated adapter/test/coordinator,
+not a claim that every current source path ran on Linux. Actual TRX:
+`/home/dennis/dotreticulum-parity6-92dfd28911ec44f98a0dd6ade55ba2a8/TestResults/auto-live-ef0a1558/auto-live.trx`;
+local log `TestResults/scan-auto-private-config.log`.
+
 ### Separated Build/Test workflows - completed hosted acceptance
 
 Final workflow source **6b75124**: Build **41088695081** passed its three

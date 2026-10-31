@@ -1,0 +1,57 @@
+name: Test request
+run-name: Test request / ${{ github.event.schedule || 'manual' }}
+
+on:
+  schedule:
+    - cron: '0 6 * * 2'
+    - cron: '0 6 * * 6'
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: 'Successful main Build run ID (blank selects newest successful main Build)'
+        type: string
+        default: ''
+      full_integration:
+        description: 'Include longer live Integration checks'
+        type: boolean
+        default: false
+      iterations:
+        description: 'Longer Integration repetitions (1-10)'
+        type: number
+        default: 1
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: test-request-${{ github.event.schedule || 'manual' }}
+  cancel-in-progress: true
+
+jobs:
+  request:
+    name: Pin main Build and cadence
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout trusted main workflow controls only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Write non-executing request
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_BUILD: ${{ inputs.build_run_id }}
+        run: ./tests/New-TestRequest.ps1 -RunId $env:REQUESTED_BUILD -OutputPath test-request.json
+
+      - name: Retain exact Build request
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-request-${{ github.run_attempt }}
+          path: test-request.json
+          if-no-files-found: error
+          retention-days: 14

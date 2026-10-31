@@ -18,6 +18,8 @@ from RNS.Utilities import rnodeconf as reference
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
+# Test-only legacy wire exception: upstream EEPROM signatures occupy exactly
+# 128 bytes. This ephemeral RSA-1024 key is discarded, never a production signer.
 private = rsa.generate_private_key(public_exponent=65537, key_size=1024)
 public = private.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
 info = bytes([0x10, 0x12, 1]) + struct.pack(">II", 42, 1700000000)

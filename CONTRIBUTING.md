@@ -77,7 +77,8 @@ reference retrieval.
 
 Normal Build completion runs bounded checks. Longer live checks, mesh/recovery,
 native CLI/installation and repeated traffic all belong to **Integration**, not
-additional test categories. Scheduled Test runs select and pin the newest
+additional test categories. The trusted **Test request** workflow owns schedule
+and manual inputs, selecting and pinning the newest
 successful main Build: Tuesday 06:00 UTC runs live Integration once; Saturday
 06:00 UTC repeats the mixed-mesh/recovery and constrained native Buffer cases
 three times. Manual full Integration includes the constrained native case too.
@@ -85,9 +86,16 @@ Manual runs can select an explicit Build:
 
 ```powershell
 gh workflow run build.yml
-gh workflow run test.yml -f build_run_id=123456789
-gh workflow run test.yml -f full_integration=true -f iterations=3
+gh workflow run test-request.yml -f build_run_id=123456789
+gh workflow run test-request.yml -f full_integration=true -f iterations=3
 ```
+
+Test request runs only on main with read permissions, executes no dynamic
+producing source or Build artifacts, and uploads only the exact Build ID and
+cadence as JSON. Test runs exclusively on completion of Build or Test request;
+it validates the request producer's repository/workflow/main/event/success and
+request fields before accepting that exact main Build. Ordinary automatic
+Build feedback and each requested cadence have separate concurrency groups.
 
 Selection is recorded before downloading; missing/expired artifacts fail rather
 than falling back to another run or rebuilding. Repetitions are bounded to 1-10

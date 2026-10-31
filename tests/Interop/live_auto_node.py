@@ -74,7 +74,7 @@ def main():
     if canonical_source != git_blob.replace(b"\r\n", b"\n"):
         raise RuntimeError("Actual imported AutoInterface differs from the pinned Git blob beyond checkout line endings")
     config_dir = Path(args.config).resolve()
-    config_dir.mkdir(parents=True, exist_ok=False)
+    config_dir.mkdir(mode=0o700, parents=True, exist_ok=False)
     ifac = ""
     if args.ifac_name:
         ifac = (f"    network_name = {args.ifac_name}\n"
@@ -97,8 +97,17 @@ def main():
         f"    data_port = {args.data_port}\n"
         + ifac
     )
-    (config_dir / "config").write_text(config, encoding="utf-8")
-    RNS.Reticulum(configdir=str(config_dir), loglevel=RNS.LOG_WARNING)
+    config_path = config_dir / "config"
+    # Upstream consumes plaintext configuration; restrict it at creation and
+    # remove it immediately after loading, including initialization failures.
+    descriptor = os.open(config_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as config_file:
+            config_file.write(config)
+        config_mode = config_path.stat().st_mode & 0o777
+        RNS.Reticulum(configdir=str(config_dir), loglevel=RNS.LOG_WARNING)
+    finally:
+        config_path.unlink()
     matches = [i for i in RNS.Transport.interfaces if isinstance(i, AutoInterface) and i.name == "AutoLive"]
     if len(matches) != 1:
         raise RuntimeError(f"Expected exactly one real AutoInterface, found {len(matches)}")
@@ -137,6 +146,8 @@ def main():
         "dest": destination.hash.hex(),
         "native_dest": native_destination.hash.hex(),
         "ifac_size": interface.ifac_size if args.ifac_name else None,
+        "config_mode": config_mode,
+        "config_removed": not config_path.exists(),
         **snapshot(interface),
     })
 

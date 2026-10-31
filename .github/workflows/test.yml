@@ -1,27 +1,10 @@
 name: Test
-run-name: Test / ${{ github.event.workflow_run.head_sha || inputs.build_run_id || github.event_name }}
+run-name: Test / ${{ github.event.workflow_run.name }} / ${{ github.event.workflow_run.head_sha }}
 
 on:
   workflow_run:
-    workflows: [Build]
+    workflows: [Build, Test request]
     types: [completed]
-  schedule:
-    - cron: '0 6 * * 2'
-    - cron: '0 6 * * 6'
-  workflow_dispatch:
-    inputs:
-      build_run_id:
-        description: 'Successful main Build run ID (blank selects newest successful main Build)'
-        type: string
-        default: ''
-      full_integration:
-        description: 'Include longer live Integration checks'
-        type: boolean
-        default: false
-      iterations:
-        description: 'Longer Integration repetitions (1-10)'
-        type: number
-        default: 1
 
 permissions:
   contents: read
@@ -29,7 +12,7 @@ permissions:
   attestations: read
 
 concurrency:
-  group: test-${{ github.event.workflow_run.head_repository.full_name || github.repository }}-${{ github.event.workflow_run.head_branch || github.ref }}-${{ github.event_name }}
+  group: test-${{ github.event.workflow_run.head_repository.full_name || github.repository }}-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.name }}-${{ github.event.workflow_run.name == 'Test request' && github.event.workflow_run.display_title || 'automatic' }}
   cancel-in-progress: true
 
 defaults:
@@ -43,17 +26,17 @@ env:
 jobs:
   source:
     name: Select exact Build
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       run-id: ${{ steps.source.outputs.run-id }}
       commit: ${{ steps.checkout.outputs.commit }}
       attested: ${{ steps.source.outputs.attested }}
-      full-integration: ${{ steps.mode.outputs.full-integration }}
-      iterations: ${{ steps.mode.outputs.iterations }}
-      integration-filter: ${{ steps.mode.outputs.integration-filter }}
-      constrained-streams: ${{ steps.mode.outputs.constrained-streams }}
+      full-integration: ${{ steps.source.outputs.full-integration }}
+      iterations: ${{ steps.source.outputs.iterations }}
+      integration-filter: ${{ steps.source.outputs.integration-filter }}
+      constrained-streams: ${{ steps.source.outputs.constrained-streams }}
       report-attempt: ${{ steps.mode.outputs.report-attempt }}
     steps:
       - name: Checkout trusted workflow controls
@@ -61,12 +44,28 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Validate request producer before downloading data
+        if: github.event.workflow_run.name == 'Test request'
+        id: request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./tests/Resolve-TestBuild.ps1 -RequestProducerOnly
+
+      - name: Download trusted non-executable request
+        if: github.event.workflow_run.name == 'Test request'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          name: ${{ steps.request.outputs.request-artifact }}
+          path: artifacts/request
+
       - name: Pin producing run, commit and complete artifact inventory
         id: source
         env:
           GH_TOKEN: ${{ github.token }}
-          REQUESTED_BUILD: ${{ inputs.build_run_id }}
-        run: ./tests/Resolve-TestBuild.ps1 -RunId $env:REQUESTED_BUILD
+          REQUEST_PATH: ${{ github.event.workflow_run.name == 'Test request' && 'artifacts/request/test-request.json' || '' }}
+        run: ./tests/Resolve-TestBuild.ps1 -RequestPath $env:REQUEST_PATH
 
       - name: Read the producing checkout manifest without executing artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -81,33 +80,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PRODUCING_RUN: ${{ steps.source.outputs.run-id }}
-        run: ./tests/Resolve-TestBuild.ps1 -RunId $env:PRODUCING_RUN -NativeManifest artifacts/source/build-manifest.json
+          REQUEST_PATH: ${{ github.event.workflow_run.name == 'Test request' && 'artifacts/request/test-request.json' || '' }}
+        run: ./tests/Resolve-TestBuild.ps1 -RunId $env:PRODUCING_RUN -RequestPath $env:REQUEST_PATH -NativeManifest artifacts/source/build-manifest.json
 
-      - name: Select Integration cadence
+      - name: Retain report group across selective retries
         id: mode
-        env:
-          REQUESTED_FULL: ${{ inputs.full_integration }}
-          REQUESTED_ITERATIONS: ${{ inputs.iterations }}
-          SCHEDULE: ${{ github.event.schedule }}
         run: |
-          $full = $env:GITHUB_EVENT_NAME -eq 'schedule' -or $env:REQUESTED_FULL -eq 'true'
-          $iterations = if ($env:GITHUB_EVENT_NAME -eq 'schedule') {
-            if ($env:SCHEDULE -eq '0 6 * * 6') { 3 } else { 1 }
-          } elseif ($env:REQUESTED_ITERATIONS) {
-            $value = 0
-            if (![int]::TryParse($env:REQUESTED_ITERATIONS, [ref]$value)) { throw 'Integration repetitions must be an integer.' }
-            $value
-          } else { 1 }
-          if ($iterations -lt 1 -or $iterations -gt 10) { throw 'Integration repetitions must be between 1 and 10.' }
-          $repeatedMesh = $env:SCHEDULE -eq '0 6 * * 6'
-          $filter = if ($repeatedMesh) {
-            'FullyQualifiedName~Parity8CompatibilityLiveTests|FullyQualifiedName~LiveMixedTransportTests|FullyQualifiedName~Parity4NativeTransportTests|FullyQualifiedName~PublishedPublicStreamsSustainBidirectionalByteExactDeliveryAcrossConstrainedLostFrames'
-          } else { 'Category=Live' }
-          $constrained = $repeatedMesh -or ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch' -and $full)
-          "full-integration=$($full.ToString().ToLowerInvariant())" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-          "iterations=$iterations" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-          "integration-filter=$filter" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
-          "constrained-streams=$($constrained.ToString().ToLowerInvariant())" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
           "report-attempt=$env:GITHUB_RUN_ATTEMPT" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
 
   compatibility:

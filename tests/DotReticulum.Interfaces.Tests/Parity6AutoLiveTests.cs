@@ -56,6 +56,8 @@ public sealed class Parity6AutoLiveTests(ITestOutputHelper output)
         Assert.Equal("a29bfb51c468945c96a1ee22cae0114e993e2391", ready.GetProperty("revision").GetString());
         Assert.Equal("1.5.7", ready.GetProperty("rns_version").GetString());
         Assert.Equal("1.2.1", ready.GetProperty("lxmf_version").GetString());
+        Assert.Equal(0x180, ready.GetProperty("config_mode").GetInt32());
+        Assert.True(ready.GetProperty("config_removed").GetBoolean());
         using var fixture = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "parity6-auto.json")));
         Assert.Equal(fixture.RootElement.GetProperty("auto_source_canonical_lf_sha256").GetString(),
             ready.GetProperty("auto_canonical_lf_sha256").GetString());
