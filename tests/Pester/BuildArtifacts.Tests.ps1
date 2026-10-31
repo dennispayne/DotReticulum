@@ -286,6 +286,15 @@ Describe 'Cross-workflow Build selection' -Tag Tooling {
             Should -Throw '*Unknown Test request schedule*'
         Should -Invoke gh -Times 0 -Exactly
     }
+
+    It 'discriminates Test request runs by static workflow path rather than dynamic run name' {
+        $workflow = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\.github\workflows\test.yml') -Raw
+        $discriminator = "github.event.workflow_run.path == '.github/workflows/test-request.yml'"
+        $workflow | Should -Not -Match 'workflow_run\.name\s*=='
+        $workflow | Should -Match ([regex]::Escape("group: test-`${{ github.event.workflow_run.head_repository.full_name || github.repository }}-`${{ github.event.workflow_run.head_branch }}-`${{ github.event.workflow_run.path }}-`${{ $discriminator && github.event.workflow_run.display_title || 'automatic' }}"))
+        ([regex]::Matches($workflow, [regex]::Escape("if: $discriminator"))).Count | Should -Be 2
+        ([regex]::Matches($workflow, [regex]::Escape("REQUEST_PATH: `${{ $discriminator && 'artifacts/request/test-request.json' || '' }}"))).Count | Should -Be 2
+    }
 }
 
 Describe 'Portable managed Build validation' -Tag Tooling {

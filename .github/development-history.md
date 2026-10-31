@@ -29,9 +29,20 @@ Kept the vector generator's ephemeral RSA-1024 key and added the narrow
 test-only rationale next to its creation: upstream EEPROM signatures occupy
 exactly **128 bytes**. A larger key would invalidate the reference fixture;
 this is legacy protocol acceptance, not a recommended production primitive.
-GitHub Python alerts **1** and **2** were already dismissed; their dispositions
-will retain explicit test-only explanations rather than suppressing a rule.
-Actions alerts **3-5** await a new hosted scan to close as fixed.
+GitHub Python alerts **1** and **2** were already dismissed; updated both
+dispositions to **used in tests**, with the verified file-protection and legacy
+wire-format explanations. No query-wide suppression was added. Hosted Static
+analysis **41175352638** at **a492f21** completed all five jobs: actual SARIF
+has Actions/C#/PowerShell **zero** findings and only the deliberately retained
+RSA test warning in Python. The plaintext query no longer reports the protected
+file. Actions alerts **3-5** automatically closed as **fixed**; the actual
+GitHub code-scanning API now reports **zero open alerts**.
+
+The first manual request producer **41175366993** succeeded, but its Test
+consumer **41175393771** exposed a GitHub event-contract mismatch: `run.name`
+is the dynamic run title (`Test request / manual`), not the static workflow
+name. Correcting request discrimination to the exact workflow path preserves
+the API-backed trust guard; no failed evidence is promoted to acceptance.
 
 Local gates: warning-free `dotnet build DotReticulum.slnx -c Release --nologo
 -v quiet`; `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v

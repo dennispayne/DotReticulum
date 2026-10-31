@@ -12,7 +12,7 @@ permissions:
   attestations: read
 
 concurrency:
-  group: test-${{ github.event.workflow_run.head_repository.full_name || github.repository }}-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.name }}-${{ github.event.workflow_run.name == 'Test request' && github.event.workflow_run.display_title || 'automatic' }}
+  group: test-${{ github.event.workflow_run.head_repository.full_name || github.repository }}-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.path }}-${{ github.event.workflow_run.path == '.github/workflows/test-request.yml' && github.event.workflow_run.display_title || 'automatic' }}
   cancel-in-progress: true
 
 defaults:
@@ -45,14 +45,14 @@ jobs:
           persist-credentials: false
 
       - name: Validate request producer before downloading data
-        if: github.event.workflow_run.name == 'Test request'
+        if: github.event.workflow_run.path == '.github/workflows/test-request.yml'
         id: request
         env:
           GH_TOKEN: ${{ github.token }}
         run: ./tests/Resolve-TestBuild.ps1 -RequestProducerOnly
 
       - name: Download trusted non-executable request
-        if: github.event.workflow_run.name == 'Test request'
+        if: github.event.workflow_run.path == '.github/workflows/test-request.yml'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           github-token: ${{ github.token }}
@@ -64,7 +64,7 @@ jobs:
         id: source
         env:
           GH_TOKEN: ${{ github.token }}
-          REQUEST_PATH: ${{ github.event.workflow_run.name == 'Test request' && 'artifacts/request/test-request.json' || '' }}
+          REQUEST_PATH: ${{ github.event.workflow_run.path == '.github/workflows/test-request.yml' && 'artifacts/request/test-request.json' || '' }}
         run: ./tests/Resolve-TestBuild.ps1 -RequestPath $env:REQUEST_PATH
 
       - name: Read the producing checkout manifest without executing artifacts
@@ -80,7 +80,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PRODUCING_RUN: ${{ steps.source.outputs.run-id }}
-          REQUEST_PATH: ${{ github.event.workflow_run.name == 'Test request' && 'artifacts/request/test-request.json' || '' }}
+          REQUEST_PATH: ${{ github.event.workflow_run.path == '.github/workflows/test-request.yml' && 'artifacts/request/test-request.json' || '' }}
         run: ./tests/Resolve-TestBuild.ps1 -RunId $env:PRODUCING_RUN -RequestPath $env:REQUEST_PATH -NativeManifest artifacts/source/build-manifest.json
 
       - name: Retain report group across selective retries
