@@ -28,6 +28,20 @@ Actionlint **1.7.12** accepted the workflow and `Get-Help -Full` discovers the
 generator's synopsis/parameter descriptions. Hosted publication and actual
 public badge endpoint acceptance remain to be recorded after deployment.
 
+Bootstrap **41225040520** succeeded, publishing commit **35a92ca** on main
+from Test **41176715759** attempt **2**. All three public Shields SVG endpoints
+returned HTTP **200** and their exact platform percentages. An older-run
+dispatch **41225102662** succeeded without altering the badge commit or source
+metadata. Build **41225032365** passed its three platform jobs and attestation;
+Static analysis **41225032342** completed all jobs. Actual SARIF has Actions,
+C# and PowerShell **0**, Python only the existing RSA test exception.
+
+The Test run created after badge publication demonstrates that `workflow_run`
+API `head_sha` can identify a later default-branch head, not the tested producer.
+Publisher now reads the exact source SHA from Test's producer-derived run title
+and verifies it against the successful same-repository main Build API inventory.
+It never labels the later badge-only commit as the measured source.
+
 ### Scan-warning remediation - read-only execution and test-only exceptions
 
 Moved schedule/manual inputs to `test-request.yml`. Its main-only, read-only

@@ -51,13 +51,14 @@ jobs:
           $run = Invoke-GitHub "repos/$repo/actions/runs/$env:TEST_RUN_ID" $null
           if ($run.path -cne '.github/workflows/test.yml' -or $run.conclusion -ne 'success' -or
               $run.event -ne 'workflow_run' -or $run.head_branch -ne 'main' -or
-              !$run.display_title.StartsWith('Test / Build / ', [StringComparison]::Ordinal) -or
+              $run.display_title -cnotmatch '^Test / Build / (?<source>[0-9a-f]{40})$' -or
               $run.head_repository.full_name -cne $repo -or $run.repository.full_name -cne $repo) {
             throw 'Badge publication requires a successful automatic main Test.'
           }
-          $builds = Invoke-GitHub "repos/$repo/actions/workflows/build.yml/runs?head_sha=$($run.head_sha)&branch=main&status=success&per_page=100" $null
+          $sourceCommit = $Matches.source
+          $builds = Invoke-GitHub "repos/$repo/actions/workflows/build.yml/runs?head_sha=$sourceCommit&branch=main&status=success&per_page=100" $null
           if (!@($builds.workflow_runs | Where-Object {
-              $_.head_sha -ceq $run.head_sha -and $_.head_repository.full_name -ceq $repo -and
+              $_.head_sha -ceq $sourceCommit -and $_.head_repository.full_name -ceq $repo -and
               $_.head_branch -eq 'main' -and $_.event -in 'push', 'workflow_dispatch'
           }).Count) { throw 'Test does not identify a successful trusted main Build.' }
           $artifacts = Invoke-GitHub "repos/$repo/actions/runs/$($run.id)/artifacts?per_page=100" $null
@@ -87,7 +88,7 @@ jobs:
             @{ path = "assets/coverage/$($platform.Rid).json"; mode = '100644'; type = 'blob'; content = (Get-Content -LiteralPath $output -Raw) }
           })
           $entries += @{ path = 'assets/coverage/source.json'; mode = '100644'; type = 'blob'; content = (@{
-            runId = $run.id; attempt = $run.run_attempt; commit = $run.head_sha; url = $run.html_url
+            runId = $run.id; attempt = $run.run_attempt; commit = $sourceCommit; url = $run.html_url
           } | ConvertTo-Json) }
           $newTree = Invoke-GitHub "repos/$repo/git/trees" @{ base_tree = $commit.tree.sha; tree = $entries }
           $newCommit = Invoke-GitHub "repos/$repo/git/commits" @{
