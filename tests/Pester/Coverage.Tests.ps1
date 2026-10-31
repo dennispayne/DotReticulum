@@ -6,6 +6,28 @@ BeforeAll {
 }
 
 Describe 'PowerShell coverage reporting' -Tag Tooling {
+    It 'creates a locale-independent badge from merged counts' {
+        $report = Join-Path $TestDrive 'badge-coverage.json'
+        $badge = Join-Path $TestDrive 'badge.json'
+        @{ ReportCount = 20; Rows = @(@{ Name = 'Overall'; Lines = @{ Hit = 22570; Total = 27152 } }) } |
+            ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $report
+        & (Join-Path $PSScriptRoot '..\New-CoverageBadge.ps1') -Report $report -Output $badge -Label 'Linux line coverage'
+        $result = Get-Content -LiteralPath $badge -Raw | ConvertFrom-Json
+        $result.message | Should -Be '83.12%'
+        $result.schemaVersion | Should -Be 1
+        $result.label | Should -Be 'Linux line coverage'
+    }
+
+    It 'rejects fabricated or unavailable badge coverage' {
+        $report = Join-Path $TestDrive 'invalid-badge-coverage.json'
+        foreach ($counts in @(@{ Hit = 2; Total = 1 }, @{ Hit = 0; Total = 0 }, @{ Hit = 0.5; Total = 1 })) {
+            @{ ReportCount = 1; Rows = @(@{ Name = 'Overall'; Lines = $counts }) } |
+                ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $report
+            { & (Join-Path $PSScriptRoot '..\New-CoverageBadge.ps1') -Report $report -Output (Join-Path $TestDrive 'invalid-badge.json') -Label Coverage } |
+                Should -Throw '*Invalid coverage*'
+        }
+    }
+
     It 'merges complementary line and branch hits once and excludes test assemblies' {
         $projects = Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot '..\..\src') -Directory |
             ForEach-Object { Get-ChildItem -LiteralPath $_.FullName -File -Filter '*.csproj' }

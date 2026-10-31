@@ -4,6 +4,30 @@ Historical reference only: this file records milestone outcomes and verification
 
 ## Reference pins and provenance
 
+### Main-branch dynamic coverage badges
+
+Added a Shields endpoint generator using Test's merged managed Unit/Integration
+covered/total line counts. Invalid, absent or zero-total evidence fails, never
+becomes a zero-percent/success badge. Per-platform JSON and source provenance
+are published only under `assets/coverage` on **main**, as requested; no badge
+branch or external coverage service is used.
+
+The isolated **Coverage badges** workflow accepts successful same-repository
+automatic main Tests with a corresponding successful main Build, downloads
+only the consolidated summary, never executes its contents, validates all three
+coverage files, then performs a non-force Git API commit against the current
+main head. It preserves unrelated concurrent repository contents and fails
+on a concurrent ref conflict. Source metadata prevents older completions or
+selective retries from overwriting newer evidence. Only this publication job
+receives `contents: write`; Test remains read-only. Generated JSON paths are
+outside Build/Static-analysis triggers, preventing a publication loop.
+
+Local coverage/Pester suite **6.2.0**: **57 passed / 4 skipped**, zero failures.
+Pinned PSScriptAnalyzer **1.24.0**: **72 tracked files / zero findings**.
+Actionlint **1.7.12** accepted the workflow and `Get-Help -Full` discovers the
+generator's synopsis/parameter descriptions. Hosted publication and actual
+public badge endpoint acceptance remain to be recorded after deployment.
+
 ### Scan-warning remediation - read-only execution and test-only exceptions
 
 Moved schedule/manual inputs to `test-request.yml`. Its main-only, read-only

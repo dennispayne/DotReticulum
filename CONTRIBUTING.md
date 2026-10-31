@@ -350,4 +350,14 @@ Set `DOTRETICULUM_NATIVE_EXE` to the published NativeAOT Applications executable
 
 ## Review
 
+Coverage badges use the same merged managed Unit/Integration source-point
+counts as Test's summary, not native-process coverage or an average of suites.
+After successful automatic main Test runs, **Coverage badges** updates only
+`assets/coverage/*.json` on `main`. Those paths do not trigger Build or Static
+analysis, and publication does not rebuild or execute downloaded artifacts.
+`assets/coverage/source.json` records the Test run, attempt and tested commit;
+older runs cannot overwrite newer published results. Manual bootstrap uses
+`gh workflow run coverage-badges.yml -f test_run_id=<successful-automatic-main-Test-id>`.
+Shields endpoint badges read the public raw JSON, with a five-minute cache.
+
 Explain upstream wire compatibility and license implications. Keep the interoperability table honest: unit vectors are not live-node interop. Preserve the Reticulum License and copyright notices.
