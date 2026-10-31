@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "label": "macOS line coverage",
+  "message": "82.26%",
+  "color": "brightgreen",
+  "cacheSeconds": 300
+}
