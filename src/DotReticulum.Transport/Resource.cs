@@ -184,6 +184,8 @@ public sealed class Resource : IDisposable, IAsyncDisposable
     private Task _assemblyWork = Task.CompletedTask;
     private int _terminalPosted;
     private bool _disposed;
+    private bool _disposeRequested;
+    private bool _terminalCallbackLease;
     private ResourceStorage? _completedStorage;
     private byte[]? _data;
     private Action<Resource>? _progressCallback;
@@ -1326,7 +1328,32 @@ public sealed class Resource : IDisposable, IAsyncDisposable
         if (Interlocked.Exchange(ref _terminalPosted, 1) == 0 && Concluded is { } callback)
         {
             if (InternalCallback) callback(this);
-            else _link.Post(() => callback(this));
+            else
+            {
+                // Reserve before releasing the protocol lock, not when the queued callback starts.
+                _terminalCallbackLease = Status == ResourceStatus.Complete && !IsInitiator;
+                _link.PostResourceCallback(() =>
+                {
+                    try
+                    {
+                        foreach (Action<Resource> observer in callback.GetInvocationList())
+                        {
+                            try { observer(this); }
+                            catch (Exception ex) { _link.Log($"Resource {Convert.ToHexStringLower(Hash)} concluded observer failed: {ex.Message}"); }
+                        }
+                    }
+                    finally { ReleaseTerminalCallbackLease(); }
+                }, ReleaseTerminalCallbackLease);
+            }
+        }
+    }
+
+    private void ReleaseTerminalCallbackLease()
+    {
+        lock (_link.Gate)
+        {
+            _terminalCallbackLease = false;
+            if (_disposeRequested) Dispose();
         }
     }
 
@@ -1358,6 +1385,11 @@ public sealed class Resource : IDisposable, IAsyncDisposable
         {
             if (_disposed) return;
             CancelLocked();
+            if (_terminalCallbackLease)
+            {
+                _disposeRequested = true;
+                return;
+            }
             ReleaseReceiveStorage();
             _link.ForgetCompletedResource(this);
             _disposed = true;

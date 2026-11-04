@@ -25,7 +25,9 @@ public sealed partial class Link
     /// <summary>Called when an accepted incoming resource starts transferring.</summary>
     public Action<Resource>? ResourceStarted { get; set; }
 
-    /// <summary>Called when an accepted incoming resource concludes (completed, failed or corrupt).</summary>
+    /// <summary>Called when an accepted incoming resource concludes (completed, failed or corrupt).
+    /// Completed data remains readable throughout the synchronous callback, including during link teardown.
+    /// Capture an independent <see cref="Resource.OpenRead"/> stream here for later asynchronous consumption.</summary>
     public Action<Resource>? ResourceReceived { get; set; }
 
     /// <summary>Upstream <c>expected_rate</c> in bits per second, once a transfer provided a measurement.</summary>
@@ -48,6 +50,9 @@ public sealed partial class Link
     }
 
     internal void Post(Action action) => _mgr.Dispatch(action);
+
+    internal void PostResourceCallback(Action action, Action rejected) =>
+        _mgr.DispatchAsync(() => { action(); return ValueTask.CompletedTask; }, rejected);
 
     internal void SendPrebuilt(Packet packet) => SendProofPacket(packet);
 
