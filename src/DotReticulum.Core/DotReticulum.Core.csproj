@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DotReticulum.Crypto\DotReticulum.Crypto.csproj" />
+    <InternalsVisibleTo Include="DotReticulum.Core.Tests" />
   </ItemGroup>
 
   <PropertyGroup>

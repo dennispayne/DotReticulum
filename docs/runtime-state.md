@@ -103,6 +103,17 @@ Configuration, runtime/Git/I2P identities, initial Git statistics and non-overwr
 files share this boundary. The filesystem must support hard links (verified on Windows NTFS
 and Linux ext4); unsupported filesystems fail explicitly rather than falling back to a racy
 overwrite. Atomic replacement of an intentionally updated state generation is separate.
+On Windows, ordinary paths are made absolute and normalized before conversion to
+`\\?\` (local) or `\\?\UNC\` (UNC); existing extended/device prefixes are preserved.
+This keeps create-only publication usable beyond `MAX_PATH` without requiring a
+caller `longPathAware` manifest or a registry setting. Published Windows NativeAOT
+`rncp -p` processes verified concurrent identity creation and restart at paths over
+650 characters containing Unicode, spaces, `#` and `%`, through local, extended-local,
+loopback UNC and extended-UNC paths. The UNC tests use an explicitly authorized
+writable `DOTRETICULUM_PUBLICATION_UNC_ROOT` and otherwise skip with a reason;
+loopback administrative-share evidence is not remote SMB-server acceptance.
+The helper does not delete staging files: its caller owns cleanup on success,
+collision and failure. Native error context retains both paths and the OS error.
 Local private ratchets use
 `destination-ratchets/<destination-hash>.v1.msgpack`, a deliberate .NET format:
 `{"payload": binary, "signature": binary}`. The signed payload map holds `version=1`,
