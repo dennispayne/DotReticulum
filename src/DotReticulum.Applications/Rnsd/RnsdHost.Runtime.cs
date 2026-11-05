@@ -47,6 +47,7 @@ public sealed partial class RnsdHost
         if (_configuration.EnableRemoteManagement)
             new ManagementRemoteService(HandleReadOnlyManagement, _configuration.RemoteManagementAllowed,
                 error => _log(1, $"Remote management: {error.Message}")).Register(Router.TransportIdentity, Router.RegisterLocalDestination);
+        InitializeProbeResponder();
         _blackholeService = new BlackholeService(_blackholes, _configuration.Blackholes, BlackholeService.NativeFetcher(Router));
         if (_configuration.Blackholes.Publish) _blackholeService.RegisterPublisher(Router.TransportIdentity, Router.RegisterLocalDestination);
         _blackholes.Changed += RemoveBlackholedPaths;
@@ -167,6 +168,7 @@ public sealed partial class RnsdHost
         {
             if (_discovery is not null) await _discovery.TickAsync(token).ConfigureAwait(false);
             await TickDiscoveryAdvertisementsAsync(token).ConfigureAwait(false);
+            await TickProbeAnnouncementsAsync(token).ConfigureAwait(false);
             if (_blackholeService is not null) await _blackholeService.TickAsync(token).ConfigureAwait(false);
             var now = DateTimeOffset.UtcNow;
             if (now - lastClean >= TimeSpan.FromMinutes(15))

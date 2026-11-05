@@ -67,9 +67,13 @@ public sealed partial class TransportRouter
 
     /// <summary>
     /// Proves a received packet to its sender: a PROOF packet addressed to the packet's truncated hash carrying the destination identity's
-    /// signature of the full hash (implicit proof, the upstream default), sent back on the interface the packet arrived on.
+    /// signature of the full hash, using the configured implicit/explicit policy, sent back on the interface the packet arrived on.
     /// </summary>
-    public async ValueTask ProveAsync(LocalDestination destination, ReceivedPacket received, bool explicitProof = false, CancellationToken cancellationToken = default)
+    public ValueTask ProveAsync(LocalDestination destination, ReceivedPacket received, CancellationToken cancellationToken = default) =>
+        ProveAsync(destination, received, explicitProof: !_options.UseImplicitProof, cancellationToken);
+
+    /// <summary>Proves a packet with an explicit caller-selected format rather than the owner default.</summary>
+    public async ValueTask ProveAsync(LocalDestination destination, ReceivedPacket received, bool explicitProof, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(destination);
         ArgumentNullException.ThrowIfNull(received);
