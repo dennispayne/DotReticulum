@@ -87,7 +87,8 @@ def main():
         "cases": observations,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    with args.output.open("w", encoding="utf-8", newline="\n") as output:
+        output.write(json.dumps(result, indent=2) + "\n")
     print(f"Wrote {len(observations)} actual startup/proof observations to {args.output}")
 
 
