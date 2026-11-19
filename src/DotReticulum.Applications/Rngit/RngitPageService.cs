@@ -58,7 +58,7 @@ public sealed partial class RngitPageService
     /// <summary>The host's announced identities, used only to link a known upstream's public page.</summary>
     public KnownDestinations? KnownDestinations { get; set; }
 
-    /// <summary>Wall clock for upstream synchronization age; generation time uses a monotonic clock.</summary>
+    /// <summary>Wall clock for displayed ages and upstream synchronization; generation time uses a monotonic clock.</summary>
     public TimeProvider Clock { get; set; } = TimeProvider.System;
 
     public Task<object?> HandleAsync(string path, object? data, Identity? caller, CancellationToken cancellationToken) =>

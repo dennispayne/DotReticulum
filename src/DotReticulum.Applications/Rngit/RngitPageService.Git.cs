@@ -352,9 +352,9 @@ public sealed partial class RngitPageService
         View(repo);
         return await Page(content.ToString(), Navigation(repo.Group, repo.Name, (file.Length > 0 ? Escape(file) + " / " : "") + "commits"), "commits", token).ConfigureAwait(false);
     }
-    private static string RelativeTime(long timestamp)
+    private string RelativeTime(long timestamp)
     {
-        var seconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - timestamp;
+        var seconds = Clock.GetUtcNow().ToUnixTimeSeconds() - timestamp;
         if (seconds < 60) return "just now";
         static string Ago(long count, string unit) => $"{count} {unit}{(count == 1 ? "" : "s")} ago";
         if (seconds < 3600) return Ago(seconds / 60, "minute");

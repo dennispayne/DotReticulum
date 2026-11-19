@@ -78,7 +78,11 @@ public sealed class RngitPageTests : IDisposable
         var seeded = false;
         var differences = new List<string>();
         var initialConfiguration = RngitHostConfiguration.Load(directory);
-        var standardService = new RngitPageService(new(initialConfiguration), initialConfiguration) { RepositoryDestinationHash = new byte[16] };
+        var standardService = new RngitPageService(new(initialConfiguration), initialConfiguration)
+        {
+            RepositoryDestinationHash = new byte[16],
+            Clock = new FixtureClock(1700000000L + 2 * 31536000 + 1)
+        };
         foreach (var vector in fixture.RootElement.GetProperty("cases").EnumerateArray())
         {
             var name = vector.GetProperty("name").GetString()!;

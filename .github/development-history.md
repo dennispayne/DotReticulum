@@ -4031,3 +4031,16 @@ See [TODO.md](../TODO.md) for active scope. At the 2026-10-26 history boundary t
 - **Timezone-aware fixtures:** compare the captured local date fields in the execution timezone, retaining UTC values, precision and other exact bytes. Verify day rollover (including `TZ=Pacific/Kiritimati`) rather than freezing machine-local expectations.
 - **Evidence boundaries:** a successful publish/`--help`, loopback, vector, simulator, healthy SAM session or leaf-only topology is not broader acceptance. Require missing-object/nonzero-byte evidence for incremental Git fetch; distinguish reference configuration limits from wire failures; keep live, native, physical and hosted evidence separately labeled.
 - **Ownership and diagnosis:** bounded queues/backpressure, explicit owner cleanup and process lifetimes prevent one peer/observer failure from taking down unrelated work. Callback exceptions must be diagnosed; optional observers must not gate protocol processing.
+
+## 2026-11-18: Current origin/main test and Rngit page clock
+
+The latest public `origin/main` was `b846754408ec39afb54cbfd7ee6c325ed8560438`.
+Its first full test run exposed a stale time-dependent `rngit` page expectation:
+the captured 2023 commit entries changed from “2 years ago” to “3 years ago”.
+`RngitPageService` now derives relative ages from its injected `Clock`, and the
+existing differential page test freezes that clock at the captured two-year
+observation. No wire format or reference vector changed.
+
+- `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --artifacts-path C:\Git\dennispayne\DotReticulum.Ecosystem\artifacts\builds\dotreticulum-clock-test --filter FullyQualifiedName~ActualPinnedPagesAndDownloadsMatchDifferentialBytes --logger "console;verbosity=minimal"`: **1 passed**.
+- `dotnet build DotReticulum.slnx -c Release`: **passed**.
+- `dotnet test DotReticulum.slnx -c Release`: **1,868 passed, 91 explicitly skipped, 0 failed**.
