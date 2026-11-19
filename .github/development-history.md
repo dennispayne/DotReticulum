@@ -4044,3 +4044,16 @@ observation. No wire format or reference vector changed.
 - `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --artifacts-path C:\Git\dennispayne\DotReticulum.Ecosystem\artifacts\builds\dotreticulum-clock-test --filter FullyQualifiedName~ActualPinnedPagesAndDownloadsMatchDifferentialBytes --logger "console;verbosity=minimal"`: **1 passed**.
 - `dotnet build DotReticulum.slnx -c Release`: **passed**.
 - `dotnet test DotReticulum.slnx -c Release`: **1,868 passed, 91 explicitly skipped, 0 failed**.
+
+## 2026-11-18: Ecosystem stack changes ported to current public main
+
+Ported the four ecosystem-required stack changes (`2331aee`, `e52da39`,
+`64b76f6`, `4989f05`) onto current public main at `b846754`, retaining the
+Rngit clock correction from `4c3698f`. The resource observer queue was merged
+with current main's outbound packet receipt tracking rather than replacing it.
+The integration adds the configured proof/probe options required by the
+ecosystem and keeps reference-vector generation independent of checkout path.
+This is a feature branch; public `main` remains unchanged.
+
+- `dotnet build DotReticulum.slnx -c Release`: **passed**.
+- `dotnet test DotReticulum.slnx -c Release`: **1,892 passed, 96 skipped, 0 failed** across five test projects. Live and platform-specific tests remain skipped unless their opt-in environment is enabled.
