@@ -102,6 +102,27 @@ accepted-child and discovered interfaces, not merely to parsed configuration.
 `connect_timeout` is seconds (default 5); omitted `max_reconnect_tries` leaves
 recovery unbounded in attempts but cancellation-aware.
 
+`use_implicit_proof` defaults to yes and controls single-destination packet
+proofs:64-byte signatures when enabled, or32-byte packet hashes followed by
+64-byte signatures when disabled. It does not change link proofs. The router's
+ordinary `ProveAsync` uses its owner policy; its existing boolean overload
+retains an explicit caller-selected format.
+
+`respond_to_probes` defaults to no. When enabled on a transport owner, the
+`rnstransport.probe` destination uses its transport identity, proves valid
+encrypted packets without an application subscriber and refuses links.
+Nontransport and shared-client instances do not host duplicate responders.
+The first unsolicited announce occurs strictly after15seconds, then strictly
+after each two-hour interval, using the existing one-second maintenance loop.
+Path requests can solicit announcements independently. Transport statistics
+report a detached `probe_responder` hash. These global policies require restart.
+`ProofProbePolicyTests` executes nine actual-primary startup/proof observations
+plus strict timing, cancellation, failure reporting and recovery. Windows
+NativeAOT/actual-primary probe and receipt checks exercise both formats, both
+directions, a native transport hop and abrupt identity-preserving restart;
+see development history for exact scope and commands. New Linux replay and
+other bearers are not inferred.
+
 Unrecognized or ineffective controls are rejected, including
 `panic_on_interface_error` (native top-level/child failure ownership is fixed).
 Type-specific settings are validated against their bearer, not silently applied

@@ -21,6 +21,9 @@ public sealed class TransportRouterOptions
     /// <summary>Upstream <c>enable_transport</c>: rebroadcast announces, answer path requests from the path table and forward packets for others.</summary>
     public bool TransportEnabled { get; init; }
 
+    /// <summary>Upstream <c>use_implicit_proof</c>; link proofs retain their separate explicit format.</summary>
+    public bool UseImplicitProof { get; init; } = true;
+
     /// <summary>The transport identity; its hash is the transport id. Generated (ephemeral) when null.</summary>
     public Identity? TransportIdentity { get; init; }
 

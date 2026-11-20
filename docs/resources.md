@@ -59,6 +59,19 @@ byte array, preserving the existing in-memory API when explicitly requested.
 than `Int32.MaxValue` must use streaming rather than `Data`.
 Dispose the resource when finished. Returned read streams are independently
 owned. Link teardown also disposes outstanding file-backed results.
+An external synchronous `ResourceReceived`/`Concluded` callback for a completed
+incoming resource reserves its data lifetime before entering the bounded observer
+queue. Peer teardown or explicit disposal cannot invalidate `OpenRead()`, `Data`
+or metadata during that callback. Open an independently owned reader inside the
+callback for later asynchronous processing; retaining only the resource is not a
+lease after the callback returns. Multicast observers are isolated and failures
+are logged with the resource hash. No observer runs under the protocol lock.
+Disposal requested while the callback is queued or running releases owned storage
+when the callback returns, including when it throws; rejected notifications release
+their reservation too. `DisposeAsync()` still joins assembly work, but does not wait
+for an observer (which may itself call disposal). Manager shutdown keeps its bounded
+observer wait rather than waiting indefinitely for arbitrary application code.
+No payload copy or additional unbounded callback queue is introduced.
 Request/response internal completion consumes and disposes its resource
 without depending on optional observer dispatch. Multipart state is
 in-process only; it is deleted on failure,
@@ -187,4 +200,4 @@ Fixture generation alone is not live/native execution evidence.
 
 `Link.DrainResourceWorkAsync()` joins owned input-proxy and assembly jobs, including cancellation callbacks. Link closure tracks asynchronous cancellation and required cleanup; mandatory resource work is joined even when the optional-observer wait expires. A non-cooperative caller stream or synchronous callback can delay shutdown; the library does not abandon required cleanup. Internal request/response settlement is independent of optional observer dispatch. Optional notification overload is diagnosed and may reject a notification without undoing settled protocol state.
 
-The focused xUnit coverage is in `tests/DotReticulum.Transport.Tests/Parity5ResourceTests.cs`, `ResourceTests.cs`, `ResourceVectorTests.cs` and `Parity5ResourceStorageTests.cs`. It covers reference-generated vectors, malformed inputs, ownership, cancellation, queue release, file-backed transfers, quotas and storage cleanup. Live mixed-transport tests exercise resource traffic with Python nodes at 1,024- and 16,384-byte bottlenecks, including streamed multipart responses. Windows x64 native `rncp` tests exercise encrypted/compressed multi-megabyte transfers and a 70-MiB spill flow; hosted NativeAOT resource tests also exercise Windows x64, Linux x64 and macOS ARM64. These results do not establish physical-radio support, arbitrary filesystem support, cross-restart resume or platform-wide parity. See [TODO.md](../TODO.md) for missing and unverified capabilities.
+The focused xUnit coverage is in `tests/DotReticulum.Transport.Tests/Parity5ResourceTests.cs`, `ResourceTests.cs`, `ResourceVectorTests.cs`, `Parity5ResourceStorageTests.cs` and `ResourceCallbackLifetimeTests.cs`. It covers reference-generated vectors, malformed inputs, ownership, cancellation, queue release, file-backed transfers, quotas and storage cleanup. The callback lifetime regressions delay ordinary observers until after peer teardown for single-segment and 4-MiB multipart memory/file data; they also exercise disposal from observers, running-observer shutdown, throwing observers, no subscribers, full queues and rejected shutdown notifications on Windows/Linux. These deterministic stack tests are not a live Python application replay. Live mixed-transport tests exercise resource traffic with Python nodes at 1,024- and 16,384-byte bottlenecks, including streamed multipart responses. Windows x64 native `rncp` tests exercise encrypted/compressed multi-megabyte transfers and a 70-MiB spill flow; hosted NativeAOT resource tests also exercise Windows x64, Linux x64 and macOS ARM64. These results do not establish physical-radio support, arbitrary filesystem support, cross-restart resume or platform-wide parity. See [TODO.md](../TODO.md) for missing and unverified capabilities.

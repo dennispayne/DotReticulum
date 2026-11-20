@@ -91,7 +91,7 @@ public sealed partial class RnsdHost : IAsyncDisposable
         {
             stats["transport_uptime"] = _startedAt == default ? 0d : (DateTimeOffset.UtcNow - _startedAt).TotalSeconds;
             stats["network_id"] = _networkIdentity?.Hash;
-            stats["probe_responder"] = null;
+            stats["probe_responder"] = _probeDestination?.Destination.Hash.ToArray();
         }
         return stats;
     }
@@ -143,6 +143,7 @@ public sealed partial class RnsdHost : IAsyncDisposable
             {
                 TransportEnabled = config.EnableTransport && session.Role != SharedInstanceRole.Client,
                 TransportIdentity = identity,
+                UseImplicitProof = config.UseImplicitProof,
                 IsIdentityBlocked = blackholes.IsBlackholed,
                 InboundDataCapacity = config.Routing.InboundDataCapacity,
                 InboundAnnounceCapacity = config.Routing.InboundAnnounceCapacity,

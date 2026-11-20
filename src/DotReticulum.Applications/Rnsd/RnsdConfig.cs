@@ -127,6 +127,8 @@ public sealed record RnsdConfig(bool EnableTransport, int LogLevel, IReadOnlyLis
     public RnsdRoutingConfig Routing { get; init; } = new();
     public string? NetworkIdentityPath { get; init; }
     public bool EnableRemoteManagement { get; init; }
+    public bool RespondToProbes { get; init; }
+    public bool UseImplicitProof { get; init; } = true;
     public bool EnableInterfaceManagement { get; init; } = true;
     public IReadOnlyList<byte[]> RemoteManagementAllowed { get; init; } = [];
     public IReadOnlyDictionary<string, string> ReticulumOptions { get; init; } = new Dictionary<string, string>();
@@ -234,7 +236,7 @@ public static partial class RnsdConfigParser
         }
 
         ValidateKeys(reticulum, "reticulum",
-            $"enable_transport static_transport_identity share_instance instance_name shared_instance_type shared_instance_port instance_control_port rpc_key network_identity enable_remote_management enable_interface_management remote_management_allowed discover_interfaces required_discovery_value interface_discovery_sources autoconnect_discovered_interfaces autoconnect_unverified_implementations autoconnect_interface_mode autoconnect_interface_gravity autoconnect_announces_to_internal publish_blackhole blackhole_sources blackhole_update_interval {RoutingGlobalKeys}");
+            $"enable_transport static_transport_identity share_instance instance_name shared_instance_type shared_instance_port instance_control_port rpc_key network_identity enable_remote_management enable_interface_management remote_management_allowed respond_to_probes use_implicit_proof discover_interfaces required_discovery_value interface_discovery_sources autoconnect_discovered_interfaces autoconnect_unverified_implementations autoconnect_interface_mode autoconnect_interface_gravity autoconnect_announces_to_internal publish_blackhole blackhole_sources blackhole_update_interval {RoutingGlobalKeys}");
         ValidateKeys(logging, "logging", "loglevel logtimestamps");
         var enableTransport = reticulum.TryGetValue("enable_transport", out var et) && ParseBool(et, "enable_transport");
         var routing = ParseRouting(reticulum);
@@ -403,6 +405,8 @@ public static partial class RnsdConfigParser
             LoggingOptions = logging,
             NetworkIdentityPath = Value("network_identity"),
             EnableRemoteManagement = Bool("enable_remote_management"),
+            RespondToProbes = Bool("respond_to_probes"),
+            UseImplicitProof = Bool("use_implicit_proof", true),
             EnableInterfaceManagement = Bool("enable_interface_management", true),
             RemoteManagementAllowed = Hashes(reticulum, "remote_management_allowed"),
             SharedInstance = new SharedInstanceOptions

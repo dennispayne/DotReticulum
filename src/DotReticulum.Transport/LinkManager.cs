@@ -23,7 +23,8 @@ public sealed class LinkManager : IAsyncDisposable
     private readonly Dictionary<string, Link> _active = [];
     private readonly Channel<(Packet Packet, IPacketInterface? Interface, TaskCompletionSource? Sent, PacketReceipt? Receipt)> _outbound =
         System.Threading.Channels.Channel.CreateBounded<(Packet, IPacketInterface?, TaskCompletionSource?, PacketReceipt?)>(WorkQueueCapacity);
-    private readonly Channel<Func<ValueTask>> _callbacks = System.Threading.Channels.Channel.CreateBounded<Func<ValueTask>>(WorkQueueCapacity);
+    private sealed record ObserverWork(Func<ValueTask> Invoke, Action? Rejected);
+    private readonly Channel<ObserverWork> _callbacks = System.Threading.Channels.Channel.CreateBounded<ObserverWork>(WorkQueueCapacity);
     private readonly Channel<Func<ValueTask>> _requests = System.Threading.Channels.Channel.CreateBounded<Func<ValueTask>>(WorkQueueCapacity);
     private readonly SemaphoreSlim _observerSlots = new(ObserverConcurrency, ObserverConcurrency);
     private readonly SemaphoreSlim _requestSlots = new(RequestConcurrency, RequestConcurrency);
@@ -134,23 +135,27 @@ public sealed class LinkManager : IAsyncDisposable
 
     internal void Dispatch(Action action) => DispatchAsync(() => { action(); return ValueTask.CompletedTask; });
 
-    internal void DispatchAsync(Func<ValueTask> action)
+    internal void DispatchAsync(Func<ValueTask> action, Action? rejected = null)
     {
+        var work = new ObserverWork(action, rejected);
         lock (_gate)
         {
             if (_stopping)
             {
-                if (!_callbacks.Writer.TryWrite(action)) Report("Link callback queue is full; observer notification rejected.");
-                return;
+                if (_callbacks.Writer.TryWrite(work)) return;
             }
-            if (!_disposed && !_suspended)
+            else if (!_disposed && !_suspended)
             {
                 EnsureStarted();
-                if (!_callbacks.Writer.TryWrite(action)) Report("Link callback queue is full; observer notification rejected.");
-                return;
+                if (_callbacks.Writer.TryWrite(work)) return;
+            }
+            else
+            {
+                if (StartInvocation(action, _observerSlots, out _)) return;
             }
         }
-        if (!StartInvocation(action, _observerSlots, out _)) Report("Link observer concurrency exhausted after shutdown; notification rejected.");
+        rejected?.Invoke();
+        Report("Link observer queue or concurrency exhausted; notification rejected.");
     }
 
     internal bool DispatchRequest(Action action) => DispatchRequestAsync(_ => { action(); return ValueTask.CompletedTask; });
@@ -294,7 +299,7 @@ public sealed class LinkManager : IAsyncDisposable
             var cts = new CancellationTokenSource();
             var token = cts.Token;
             _loops = [Task.Run(() => PumpAsync(token)),
-                Task.Run(() => WorkLoopAsync(_callbacks.Reader, _observerSlots, token)),
+                Task.Run(() => ObserverLoopAsync(token)),
                 Task.Run(() => WorkLoopAsync(_requests.Reader, _requestSlots, token)),
                 Task.Run(() => TickLoopAsync(token))];
             _cts = cts;
@@ -338,8 +343,11 @@ public sealed class LinkManager : IAsyncDisposable
             await Task.WhenAll(cleanup).ConfigureAwait(false);
             while (_callbacks.Reader.TryRead(out var callback))
             {
-                if (!StartInvocation(callback, _observerSlots, out _))
+                if (!StartInvocation(callback.Invoke, _observerSlots, out _))
+                {
+                    callback.Rejected?.Invoke();
                     Report("Link observer concurrency exhausted during shutdown; notification rejected.");
+                }
             }
             Task[] executing;
             lock (_gate) executing = [.. _invocations];
@@ -497,10 +505,29 @@ public sealed class LinkManager : IAsyncDisposable
                 if (queue.TryRead(out var action) && !StartInvocation(action, slots, out _))
                     Report("Application work concurrency exhausted; queued work rejected.");
             }
+
         }
         catch (OperationCanceledException)
         {
         }
+    }
+
+    private async Task ObserverLoopAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (await _callbacks.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
+            {
+                await _observerSlots.WaitAsync(ct).ConfigureAwait(false);
+                _observerSlots.Release();
+                if (_callbacks.Reader.TryRead(out var work) && !StartInvocation(work.Invoke, _observerSlots, out _))
+                {
+                    work.Rejected?.Invoke();
+                    Report("Application observer concurrency exhausted; queued work rejected.");
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
     }
 
     private async Task TickLoopAsync(CancellationToken ct)

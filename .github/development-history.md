@@ -4031,3 +4031,29 @@ See [TODO.md](../TODO.md) for active scope. At the 2026-10-26 history boundary t
 - **Timezone-aware fixtures:** compare the captured local date fields in the execution timezone, retaining UTC values, precision and other exact bytes. Verify day rollover (including `TZ=Pacific/Kiritimati`) rather than freezing machine-local expectations.
 - **Evidence boundaries:** a successful publish/`--help`, loopback, vector, simulator, healthy SAM session or leaf-only topology is not broader acceptance. Require missing-object/nonzero-byte evidence for incremental Git fetch; distinguish reference configuration limits from wire failures; keep live, native, physical and hosted evidence separately labeled.
 - **Ownership and diagnosis:** bounded queues/backpressure, explicit owner cleanup and process lifetimes prevent one peer/observer failure from taking down unrelated work. Callback exceptions must be diagnosed; optional observers must not gate protocol processing.
+
+## 2026-11-18: Current origin/main test and Rngit page clock
+
+The latest public `origin/main` was `b846754408ec39afb54cbfd7ee6c325ed8560438`.
+Its first full test run exposed a stale time-dependent `rngit` page expectation:
+the captured 2023 commit entries changed from “2 years ago” to “3 years ago”.
+`RngitPageService` now derives relative ages from its injected `Clock`, and the
+existing differential page test freezes that clock at the captured two-year
+observation. No wire format or reference vector changed.
+
+- `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --artifacts-path C:\Git\dennispayne\DotReticulum.Ecosystem\artifacts\builds\dotreticulum-clock-test --filter FullyQualifiedName~ActualPinnedPagesAndDownloadsMatchDifferentialBytes --logger "console;verbosity=minimal"`: **1 passed**.
+- `dotnet build DotReticulum.slnx -c Release`: **passed**.
+- `dotnet test DotReticulum.slnx -c Release`: **1,868 passed, 91 explicitly skipped, 0 failed**.
+
+## 2026-11-18: Ecosystem stack changes ported to current public main
+
+Ported the four ecosystem-required stack changes (`2331aee`, `e52da39`,
+`64b76f6`, `4989f05`) onto current public main at `b846754`, retaining the
+Rngit clock correction from `4c3698f`. The resource observer queue was merged
+with current main's outbound packet receipt tracking rather than replacing it.
+The integration adds the configured proof/probe options required by the
+ecosystem and keeps reference-vector generation independent of checkout path.
+This is a feature branch; public `main` remains unchanged.
+
+- `dotnet build DotReticulum.slnx -c Release`: **passed**.
+- `dotnet test DotReticulum.slnx -c Release`: **1,892 passed, 96 skipped, 0 failed** across five test projects. Live and platform-specific tests remain skipped unless their opt-in environment is enabled.
