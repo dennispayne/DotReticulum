@@ -4080,3 +4080,45 @@ shims; this remains an in-process comparison, not live page transport evidence.
   Hosted run **44781916342** also failed to establish a link. CI still requires
   a successful .NET retrieval in the same run; it has no old bundle or page
   snapshot fallback.
+
+### Public reference retrieval controls
+
+Hosted Test **44781916342**, attempt 1, found the reference destination via
+`rmap.world:4242` at 13 hops on all three platforms but failed to establish a
+link, before listing Git refs. The previous run **44550197538** fetched on all
+three platforms with a seven-hop path. Separate local Windows controls used
+`tests\Receive-Reference.ps1` with fresh destinations and the same parent seed:
+
+| Candidate | Gateway | Result |
+| --- | --- | --- |
+| Current native (`874d5a0`) | `rmap.world` | 16 hops; fetched and verified the pin |
+| Previously passing native (`17e0b85`, Build **44549473073**) | `rmap.world` | 13 hops; fetched and verified the pin |
+| Pinned upstream Python | `rmap.world` | Established a link and listed refs; timed out fetching objects |
+| Current native (`874d5a0`) | `reticulum.thecryptosquid.com` | Found a 12-hop path; failed to establish a link |
+| Pinned upstream Python | `reticulum.thecryptosquid.com` | Resolved the path; failed to establish a link before listing refs |
+
+Native runs supplied `-Application <published-exe> -Directory <fresh-dir>
+-TimeoutSeconds 160` and the alternate runs supplied
+`-Gateway reticulum.thecryptosquid.com`. Python runs supplied
+`-Python <isolated-python> -Upstream <verified-checkout> -Directory <fresh-dir>`
+with `-TimeoutSeconds 160` for `rmap.world` and `-TimeoutSeconds 125` for the
+alternate gateway. Both successful native fetches received **1,205,150 bytes**
+over Reticulum with the pin initially absent, passed strict Git validation at
+the unchanged pin/tree, and saw remote head `f55c0c6ea618ebae33e7d3ab2e37b200ce0b0d81`.
+The fresh current-native bundle was provisioned with `tests\Initialize-Reference.ps1`;
+`dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo --filter 'FullyQualifiedName~ActualPinnedPagesAndDownloadsMatchDifferentialBytes' --logger 'console;verbosity=detailed'`
+passed against that checkout.
+
+The public handshake failure is not specific to the new .NET build or a fixed
+hop-count limit. Client logs do not establish which public relay or endpoint
+dropped or failed to answer the handshake. No retry policy, deadline, gateway
+default, or source pin was changed.
+
+Hosted Test **44781916342**, attempt 2, reused the exact Build but fetched
+fresh. All three native clients established links and listed the same remote
+HEAD. The `/git/fetch` response then stalled: the last reported progress was
+**2.7% macOS, 7.0% Linux, and 38.8% Windows**; all returned "The request failed
+or timed out." No verified reference bundle was published. This independently
+distinguishes intermittent link establishment from a later stalled resource
+transfer; a specific relay, endpoint, or resource failure mechanism remains
+unconfirmed.
