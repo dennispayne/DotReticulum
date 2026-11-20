@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -7,27 +8,44 @@ using DotReticulum.Transport;
 
 namespace DotReticulum.Applications.Tests;
 
+public sealed class RngitPageReferenceFactAttribute : FactAttribute
+{
+    public RngitPageReferenceFactAttribute()
+    {
+        if (Environment.GetEnvironmentVariable("DOTRETICULUM_LIVE") != "1" &&
+            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOTRETICULUM_PYTHON")) &&
+            string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOTRETICULUM_UPSTREAM")))
+            Skip = "Fresh page comparisons require DOTRETICULUM_PYTHON and DOTRETICULUM_UPSTREAM.";
+    }
+}
+
 // Actual RNS 1.5.7 pages.py at a29bfb51c468945c96a1ee22cae0114e993e2391.
-// GenerateRngitPageVectors.py records source SHA-256, actual imports and visible fixture shims.
+// GenerateRngitPageVectors.py records source SHA-256, actual imports and visible shims.
 [Trait("Category", "Integration")]
 public sealed class RngitPageTests : IDisposable
 {
     private readonly string directory = Path.Combine(Directory.GetCurrentDirectory(), "rngit-pages-" + Guid.NewGuid().ToString("N"));
-    private readonly JsonDocument fixture;
+    private static readonly byte[] Webp = "RIFF\0\0\0\0WEBP"u8.ToArray();
     private readonly string groupPath;
     private readonly string repoPath;
     public RngitPageTests()
     {
-        fixture = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "rngit-pages.json")));
-        Directory.CreateDirectory(directory);
         groupPath = Path.Combine(directory, "repositories");
         Directory.CreateDirectory(groupPath);
         repoPath = Path.Combine(groupPath, "demo");
-        var bundle = Path.Combine(directory, "fixture.bundle");
-        File.WriteAllBytes(bundle, Convert.FromHexString(fixture.RootElement.GetProperty("bundle").GetString()!));
-        Run(["clone", "--bare", bundle, repoPath]);
-        Run(["--git-dir=" + repoPath, "config", "repository.description", "Page fixture"]);
         Configure();
+    }
+    private void CreateRepository()
+    {
+        var source = Path.Combine(directory, "source");
+        Run(["init", "--initial-branch=main", source]);
+        File.WriteAllText(Path.Combine(source, "hello.txt"), "Hello world\n");
+        File.WriteAllBytes(Path.Combine(source, "image.webp"), Webp);
+        Run(["-C", source, "add", "."]);
+        Run(["-C", source, "-c", "user.name=Pages", "-c", "user.email=pages@example.invalid",
+            "-c", "commit.gpgSign=false", "commit", "-m", "Page inputs"]);
+        Run(["-C", source, "branch", "feature/\u00e9+"]);
+        Run(["clone", "--bare", source, repoPath]);
     }
     private void Configure(string extra = "") => File.WriteAllText(Path.Combine(directory, "config"),
         $"[rngit]\nnode_name = Test Node\n{extra}\n[repositories]\npublic = {groupPath}\n[access]\npublic = r:all\n[pages]\nunicode_icons = true\nmedia_conversion = false\n");
@@ -44,7 +62,6 @@ public sealed class RngitPageTests : IDisposable
     }
     public void Dispose()
     {
-        fixture.Dispose();
         if (!Directory.Exists(directory)) return;
         foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
             File.SetAttributes(file, FileAttributes.Normal);
@@ -61,32 +78,52 @@ public sealed class RngitPageTests : IDisposable
         JsonValueKind.Array => element.EnumerateArray().Select(Request).ToArray(),
         _ => throw new InvalidDataException(),
     };
-    private void Seed()
+    private void Seed(JsonElement files)
     {
-        foreach (var file in fixture.RootElement.GetProperty("seed").EnumerateObject())
+        foreach (var file in files.EnumerateObject())
         {
             var path = Path.Combine(groupPath, file.Name.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllBytes(path, Convert.FromHexString(file.Value.GetString()!));
         }
     }
-    [Fact]
+    [RngitPageReferenceFact]
     public async Task ActualPinnedPagesAndDownloadsMatchDifferentialBytes()
     {
-        Assert.Equal("a29bfb51c468945c96a1ee22cae0114e993e2391", fixture.RootElement.GetProperty("upstream").GetString());
-        using var caller = Identity.FromPrivateKey(Convert.FromHexString(fixture.RootElement.GetProperty("private_key").GetString()!));
+        var python = Environment.GetEnvironmentVariable("DOTRETICULUM_PYTHON");
+        var upstream = Environment.GetEnvironmentVariable("DOTRETICULUM_UPSTREAM");
+        Assert.False(string.IsNullOrWhiteSpace(python), "Set DOTRETICULUM_PYTHON to the isolated reference interpreter.");
+        Assert.False(string.IsNullOrWhiteSpace(upstream), "Set DOTRETICULUM_UPSTREAM to the pinned reference checkout.");
+        var timestamp = TimeProvider.System.GetUtcNow().ToUnixTimeSeconds();
+        var referencePath = Path.Combine(directory, "reference");
+        var output = Path.Combine(directory, "reference.json");
+        var script = Path.Combine(PresentationProcessFixture.RepositoryRoot(), "tests", "DotReticulum.Applications.Tests", "GenerateRngitPageVectors.py");
+        var reference = await RngitProcess.RunAsync(python!, [script,
+            "--work-directory", referencePath, "--output", output, "--timestamp", timestamp.ToString(CultureInfo.InvariantCulture)],
+            directory, timeout: TimeSpan.FromSeconds(90), maxOutputBytes: 1024 * 1024,
+            environment: new Dictionary<string, string?> { ["PYTHONPATH"] = Path.GetFullPath(upstream!), ["PYTHONUTF8"] = "1" });
+        Assert.True(reference.Code == 0, reference.Error + Encoding.UTF8.GetString(reference.Output));
+        using var document = JsonDocument.Parse(await File.ReadAllTextAsync(output));
+        var fixture = document.RootElement;
+        Assert.Equal("a29bfb51c468945c96a1ee22cae0114e993e2391", fixture.GetProperty("upstream").GetString());
+        Assert.Equal("1.5.7", fixture.GetProperty("rns_version").GetString());
+        var cases = fixture.GetProperty("cases");
+        Assert.NotEmpty(cases.EnumerateArray());
+        Run(["clone", "--bare", Path.Combine(referencePath, "fixture.bundle"), repoPath]);
+        Run(["--git-dir=" + repoPath, "config", "repository.description", "Page fixture"]);
+        using var caller = Identity.FromPrivateKey(Convert.FromHexString(fixture.GetProperty("private_key").GetString()!));
         var seeded = false;
         var differences = new List<string>();
         var initialConfiguration = RngitHostConfiguration.Load(directory);
         var standardService = new RngitPageService(new(initialConfiguration), initialConfiguration)
         {
             RepositoryDestinationHash = new byte[16],
-            Clock = new FixtureClock(1700000000L + 2 * 31536000 + 1)
+            Clock = new FixtureClock(timestamp)
         };
-        foreach (var vector in fixture.RootElement.GetProperty("cases").EnumerateArray())
+        foreach (var vector in cases.EnumerateArray())
         {
             var name = vector.GetProperty("name").GetString()!;
-            if (vector.TryGetProperty("seeded", out _) && !seeded) { Seed(); seeded = true; }
+            if (vector.TryGetProperty("seeded", out _) && !seeded) { Seed(fixture.GetProperty("seed")); seeded = true; }
             var hasMetadata = vector.TryGetProperty("upstream_config", out var upstreamConfig);
             if (hasMetadata)
             {
@@ -106,7 +143,8 @@ public sealed class RngitPageTests : IDisposable
             var configuration = RngitHostConfiguration.Load(directory);
             var diagnostics = new List<string>();
             var service = hasMetadata || vector.TryGetProperty("blocked_anonymous", out _) || vector.TryGetProperty("statistics", out _)
-                ? new RngitPageService(new(configuration), configuration, diagnostics.Add) { RepositoryDestinationHash = new byte[16] } : standardService;
+                ? new RngitPageService(new(configuration), configuration, diagnostics.Add)
+                    { RepositoryDestinationHash = new byte[16], Clock = new FixtureClock(timestamp) } : standardService;
             if (vector.TryGetProperty("clock_timestamp", out var clock))
                 service.Clock = new FixtureClock(clock.GetInt64());
             if (vector.TryGetProperty("known_source", out var knownSource))
@@ -126,7 +164,7 @@ public sealed class RngitPageTests : IDisposable
             if (vector.TryGetProperty("response", out var expected))
             {
                 var bytes = Assert.IsType<byte[]>(result);
-                var expectedText = LocalizeFixtureDates(Encoding.UTF8.GetString(Convert.FromHexString(expected.GetString()!)));
+                var expectedText = Encoding.UTF8.GetString(Convert.FromHexString(expected.GetString()!));
                 var actualText = NormalizeGenerationTime(Encoding.UTF8.GetString(bytes));
                 if (vector.TryGetProperty("redact_source", out var redaction))
                 {
@@ -172,22 +210,11 @@ public sealed class RngitPageTests : IDisposable
             else Assert.Null(result);
         }
         Assert.True(differences.Count == 0, string.Join("\n\n", differences));
+        CompareFormatting(fixture);
     }
     private sealed class FixtureClock(long timestamp) : TimeProvider
     {
-        private static readonly TimeZoneInfo FixtureTimeZone =
-            TimeZoneInfo.CreateCustomTimeZone("Fixture UTC-05", TimeSpan.FromHours(-5), "Fixture UTC-05", "Fixture UTC-05");
-
         public override DateTimeOffset GetUtcNow() => DateTimeOffset.FromUnixTimeSeconds(timestamp);
-        public override TimeZoneInfo LocalTimeZone => FixtureTimeZone;
-    }
-    private static string LocalizeFixtureDates(string text)
-    {
-        // The unchanged oracle captured epoch 1700000000 in UTC-05:00; upstream renders local time.
-        var date = DateTimeOffset.FromUnixTimeSeconds(1700000000).LocalDateTime;
-        return Regex.Replace(text, @"2023-11-14(?!T)(?: 17:13(?::20)?)?", match =>
-            date.ToString(match.Length switch { 10 => "yyyy-MM-dd", 16 => "yyyy-MM-dd HH:mm", _ => "yyyy-MM-dd HH:mm:ss" },
-                System.Globalization.CultureInfo.InvariantCulture));
     }
     private static string NormalizeGenerationTime(string text)
     {
@@ -198,18 +225,10 @@ public sealed class RngitPageTests : IDisposable
         return text[..match.Index] + " - Unknown generation time`f";
     }
     [Fact]
-    public void GenerationTimesMatchPinnedPrettytimeRoundingAndUnits()
+    public void GenerationTimeRejectsNonFiniteDurations()
     {
-        foreach (var vector in fixture.RootElement.GetProperty("generation_times").EnumerateArray())
-            Assert.Equal(vector.GetProperty("output").GetString(), RngitPageService.GenerationTime(vector.GetProperty("seconds").GetDouble()));
         Assert.Throws<ArgumentOutOfRangeException>(() => RngitPageService.GenerationTime(double.NaN));
         Assert.Throws<ArgumentOutOfRangeException>(() => RngitPageService.GenerationTime(double.PositiveInfinity));
-    }
-    [Fact]
-    public void ProvenanceSyncAgesMatchPinnedCompactPrettytime()
-    {
-        foreach (var vector in fixture.RootElement.GetProperty("sync_ages").EnumerateArray())
-            Assert.Equal(vector.GetProperty("output").GetString(), RngitPageService.SyncAge(vector.GetProperty("seconds").GetDouble()));
     }
     [Fact]
     public async Task ConcurrentRequestsMeasureGenerationTimeAndPreserveLiteralUnknownText()
@@ -232,30 +251,25 @@ public sealed class RngitPageTests : IDisposable
             Assert.StartsWith("Unknown generation time\n", parts[3]);
         }
     }
-    [Fact]
-    public void MarkdownUsesActualPinnedBlockInlineAndPlainCodeVectors()
+    private static void CompareFormatting(JsonElement fixture)
     {
-        foreach (var vector in fixture.RootElement.GetProperty("markdown").EnumerateArray())
+        foreach (var vector in fixture.GetProperty("generation_times").EnumerateArray())
+            Assert.Equal(vector.GetProperty("output").GetString(), RngitPageService.GenerationTime(vector.GetProperty("seconds").GetDouble()));
+        foreach (var vector in fixture.GetProperty("sync_ages").EnumerateArray())
+            Assert.Equal(vector.GetProperty("output").GetString(), RngitPageService.SyncAge(vector.GetProperty("seconds").GetDouble()));
+        foreach (var vector in fixture.GetProperty("markdown").EnumerateArray())
             Assert.Equal(vector.GetProperty("output").GetString(),
                 MarkdownMicron.Format(vector.GetProperty("input").GetString()!, vector.GetProperty("scope").GetString()));
-    }
-    [Fact]
-    public void StatsChartsUseActualPinnedColorGradientAndPixelVectors()
-    {
         static long[] Data(JsonElement value) => value.EnumerateArray().Select(i => i.GetInt64()).ToArray();
         static string[] Labels(JsonElement value) => value.EnumerateArray().Select(i => i.GetString()!).ToArray();
-        foreach (var chart in fixture.RootElement.GetProperty("charts").EnumerateArray())
+        foreach (var chart in fixture.GetProperty("charts").EnumerateArray())
             Assert.Equal(chart.GetProperty("output").GetString(),
                 RngitPageService.RenderChart(Data(chart.GetProperty("data")), Labels(chart.GetProperty("labels")), "10b981", "1c5e71"));
-        var combined = fixture.RootElement.GetProperty("combined_chart");
+        var combined = fixture.GetProperty("combined_chart");
         Assert.Equal(combined.GetProperty("output").GetString(), RngitPageService.RenderCombinedChart(
             Data(combined.GetProperty("views")), Data(combined.GetProperty("fetches")), Data(combined.GetProperty("pushes")),
             Data(combined.GetProperty("downloads")), Labels(combined.GetProperty("labels"))));
-    }
-    [Fact]
-    public void SizeFormattingMatchesPythonBinaryFloatRounding()
-    {
-        foreach (var size in fixture.RootElement.GetProperty("sizes").EnumerateArray())
+        foreach (var size in fixture.GetProperty("sizes").EnumerateArray())
             Assert.Equal(size.GetProperty("output").GetString(), RngitPageService.Size(size.GetProperty("bytes").GetInt64()));
     }
     [Fact]
@@ -280,6 +294,7 @@ public sealed class RngitPageTests : IDisposable
     [InlineData("%00")]
     public async Task DownloadsRejectUnsafePaths(string path)
     {
+        CreateRepository();
         var config = RngitHostConfiguration.Load(directory);
         var service = new RngitPageService(new(config), config);
         var request = new Dictionary<object, object?> { ["var_g"] = "public", ["var_r"] = "demo", ["var_path"] = path };
@@ -288,7 +303,7 @@ public sealed class RngitPageTests : IDisposable
     [Fact]
     public async Task SourceStatsUnavailableAndPermissionGateNeverLeakCounters()
     {
-        Configure();
+        CreateRepository();
         File.WriteAllText(repoPath + ".allowed", "stats:all\n");
         var config = RngitHostConfiguration.Load(directory);
         var service = new RngitPageService(new(config), config);
@@ -305,6 +320,7 @@ public sealed class RngitPageTests : IDisposable
     [Fact]
     public async Task DiagnosticCallbackFailureDoesNotDisablePageProcessing()
     {
+        CreateRepository();
         var config = RngitHostConfiguration.Load(directory);
         var service = new RngitPageService(new(config), config, _ => throw new InvalidOperationException("Observer failure"));
         var request = new Dictionary<object, object?> { ["var_g"] = "public", ["var_r"] = "demo", ["var_thanks"] = "y" };
@@ -315,6 +331,7 @@ public sealed class RngitPageTests : IDisposable
     [Fact]
     public async Task MediaComponentsPreserveUtf8PlusAndSlashInGitReferences()
     {
+        CreateRepository();
         var config = RngitHostConfiguration.Load(directory);
         var service = new RngitPageService(new(config), config);
         var blob = new Dictionary<object, object?> { ["var_g"] = "public", ["var_r"] = "demo", ["var_ref"] = "feature/é+", ["var_path"] = "image.webp" };
@@ -324,11 +341,12 @@ public sealed class RngitPageTests : IDisposable
         Assert.Contains(path, Encoding.UTF8.GetString(page));
         var media = Assert.IsType<FileResponse>(await service.HandleAsync("/media",
             new Dictionary<object, object?> { ["key"] = "k", ["path"] = path }, null, CancellationToken.None));
-        Assert.Equal(Convert.FromHexString(fixture.RootElement.GetProperty("files").GetProperty("image.webp").GetString()!), media.Data);
+        Assert.Equal(Webp, media.Data);
     }
     [Fact]
     public async Task GitSymlinksDisplayTargetsButAreNeverFollowedOrDownloaded()
     {
+        CreateRepository();
         var target = Run(["--git-dir=" + repoPath, "hash-object", "-w", "--stdin"], Encoding.UTF8.GetBytes("../outside-secret"));
         Run(["--git-dir=" + repoPath, "read-tree", "HEAD"]);
         Run(["--git-dir=" + repoPath, "update-index", "--add", "--cacheinfo", "120000," + target + ",link"]);
@@ -350,7 +368,10 @@ public sealed class RngitPageTests : IDisposable
     [RngitUnixFact]
     public async Task DownloadAndArtifactRejectFilesystemLinkEscapes()
     {
-        Seed();
+        CreateRepository();
+        var release = Path.Combine(repoPath + ".releases", "v1");
+        Directory.CreateDirectory(Path.Combine(release, "artifacts"));
+        File.WriteAllText(Path.Combine(release, "META"), "tag = v1\nstatus = published\ncreated = 1700000000\n");
         var outside = Path.Combine(directory, "outside");
         File.WriteAllText(outside, "must not be returned");
         var artifact = Path.Combine(repoPath + ".releases", "v1", "artifacts", "escape");

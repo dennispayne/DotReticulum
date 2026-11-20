@@ -4057,3 +4057,26 @@ This is a feature branch; public `main` remains unchanged.
 
 - `dotnet build DotReticulum.slnx -c Release`: **passed**.
 - `dotnet test DotReticulum.slnx -c Release`: **1,892 passed, 96 skipped, 0 failed** across five test projects. Live and platform-specific tests remain skipped unless their opt-in environment is enabled.
+
+## 2026-11-20: Fresh expected output for Rngit page integration
+
+Hosted Test run **44550197538** compared a newly rendered commit age ("3 years
+ago") against a checked-in page snapshot ("2 years ago"). The upstream source
+pin had not changed. The integration now executes the verified RNS 1.5.7
+checkout at `a29bfb51c468945c96a1ee22cae0114e993e2391` on each test run, creates
+the repository and expected outputs in an owned temporary directory, and
+compares fresh .NET responses using the same clock and inputs. It no longer
+ships a page snapshot or rewrites stored dates. The Python adapter records source
+hashes and retains the disclosed generation-time and optional-highlighter
+shims; this remains an in-process comparison, not live page transport evidence.
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: **passed**, zero warnings.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo --logger "console;verbosity=minimal"`:
+  **1,888 passed, 96 skipped, 0 failed** on Windows with the reference paths
+  configured. The source checkout was verified from the candidate-fetched
+  bundle from run **44550197538**, not counted as a new network fetch.
+- A new Windows NativeAOT `tests/Receive-Reference.ps1` attempt through
+  `rmap.world` with a 90-second limit discovered the host but timed out.
+  Hosted run **44781916342** also failed to establish a link. CI still requires
+  a successful .NET retrieval in the same run; it has no old bundle or page
+  snapshot fallback.
