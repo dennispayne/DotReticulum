@@ -4057,3 +4057,179 @@ This is a feature branch; public `main` remains unchanged.
 
 - `dotnet build DotReticulum.slnx -c Release`: **passed**.
 - `dotnet test DotReticulum.slnx -c Release`: **1,892 passed, 96 skipped, 0 failed** across five test projects. Live and platform-specific tests remain skipped unless their opt-in environment is enabled.
+
+## 2026-11-20: Fresh expected output for Rngit page integration
+
+Hosted Test run **44550197538** compared a newly rendered commit age ("3 years
+ago") against a checked-in page snapshot ("2 years ago"). The upstream source
+pin had not changed. The integration now executes the verified RNS 1.5.7
+checkout at `a29bfb51c468945c96a1ee22cae0114e993e2391` on each test run, creates
+the repository and expected outputs in an owned temporary directory, and
+compares fresh .NET responses using the same clock and inputs. It no longer
+ships a page snapshot or rewrites stored dates. The Python adapter records source
+hashes and retains the disclosed generation-time and optional-highlighter
+shims; this remains an in-process comparison, not live page transport evidence.
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: **passed**, zero warnings.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo --logger "console;verbosity=minimal"`:
+  **1,888 passed, 96 skipped, 0 failed** on Windows with the reference paths
+  configured. The source checkout was verified from the candidate-fetched
+  bundle from run **44550197538**, not counted as a new network fetch.
+- A new Windows NativeAOT `tests/Receive-Reference.ps1` attempt through
+  `rmap.world` with a 90-second limit discovered the host but timed out.
+  Hosted run **44781916342** also failed to establish a link. CI still requires
+  a successful .NET retrieval in the same run; it has no old bundle or page
+  snapshot fallback.
+
+### Public reference retrieval controls
+
+Hosted Test **44781916342**, attempt 1, found the reference destination via
+`rmap.world:4242` at 13 hops on all three platforms but failed to establish a
+link, before listing Git refs. The previous run **44550197538** fetched on all
+three platforms with a seven-hop path. Separate local Windows controls used
+`tests\Receive-Reference.ps1` with fresh destinations and the same parent seed:
+
+| Candidate | Gateway | Result |
+| --- | --- | --- |
+| Current native (`874d5a0`) | `rmap.world` | 16 hops; fetched and verified the pin |
+| Previously passing native (`17e0b85`, Build **44549473073**) | `rmap.world` | 13 hops; fetched and verified the pin |
+| Pinned upstream Python | `rmap.world` | Established a link and listed refs; timed out fetching objects |
+| Current native (`874d5a0`) | `reticulum.thecryptosquid.com` | Found a 12-hop path; failed to establish a link |
+| Pinned upstream Python | `reticulum.thecryptosquid.com` | Resolved the path; failed to establish a link before listing refs |
+
+Native runs supplied `-Application <published-exe> -Directory <fresh-dir>
+-TimeoutSeconds 160` and the alternate runs supplied
+`-Gateway reticulum.thecryptosquid.com`. Python runs supplied
+`-Python <isolated-python> -Upstream <verified-checkout> -Directory <fresh-dir>`
+with `-TimeoutSeconds 160` for `rmap.world` and `-TimeoutSeconds 125` for the
+alternate gateway. Both successful native fetches received **1,205,150 bytes**
+over Reticulum with the pin initially absent, passed strict Git validation at
+the unchanged pin/tree, and saw remote head `f55c0c6ea618ebae33e7d3ab2e37b200ce0b0d81`.
+The fresh current-native bundle was provisioned with `tests\Initialize-Reference.ps1`;
+`dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-build --nologo --filter 'FullyQualifiedName~ActualPinnedPagesAndDownloadsMatchDifferentialBytes' --logger 'console;verbosity=detailed'`
+passed against that checkout.
+
+The public handshake failure is not specific to the new .NET build or a fixed
+hop-count limit. Client logs do not establish which public relay or endpoint
+dropped or failed to answer the handshake. No retry policy, deadline, gateway
+default, or source pin was changed.
+
+Hosted Test **44781916342**, attempt 2, reused the exact Build but fetched
+fresh. All three native clients established links and listed the same remote
+HEAD. The `/git/fetch` response then stalled: the last reported progress was
+**2.7% macOS, 7.0% Linux, and 38.8% Windows**; all returned "The request failed
+or timed out." No verified reference bundle was published. This independently
+distinguishes intermittent link establishment from a later stalled resource
+transfer; a specific relay, endpoint, or resource failure mechanism remains
+unconfirmed.
+
+## 2026-11-21: Multiple public gateway experiment
+
+On Windows, compared isolated fresh clients using the existing native
+`DotReticulum.Applications.exe` (version `1.5.7.124`, SHA-256
+`dc161d901a5f7770eb9f9154c468a95539422978f0d048c46f4c6a2ff5f18eed`).
+Each used `share_instance = no`, `enable_transport = no`, a fresh identity,
+the same single-default-branch request, and the same seed through
+`7f2b3b9b524c9386316379af1313b43a5e4f7a5d`; the target pin was confirmed
+absent before every fetch. The first seed came from the GitHub comparison
+mirror; the controls fetched that same seed from the first local repository.
+This is an incremental fetch, not a full network clone.
+
+The [RMAP service page](https://rmap.world/services.html) advertises
+`rmap.world:4242` as a public TCP entry point. The
+[ReticulumNet community page](https://www.reticulumnet.nl/en/community/)
+advertises `node.reticulumnet.nl:4242` as public and open. These are operator
+self-descriptions, not independently verified reputations, security policies,
+or guarantees. ReticulumNet also says its node is connected to RMAP, so these
+interfaces do not establish independent upstream routes.
+
+The initial dual-interface fetch finished in 27.8 seconds. Then the following
+sequential controls used `DotReticulum.Applications.exe rngit fetch
+rns://7649a50d84610232d1416b41d2896aff/reticulum/reticulum <repository.git>
+--config <config> --single-branch --timeout 300`, sampling established TCP
+connections by the native process ID:
+
+| Configured gateways | Connected gateways observed | Time | Result |
+| --- | --- | --- | --- |
+| RMAP | RMAP | 38.8 s | success; 12-hop path |
+| ReticulumNet | ReticulumNet | 27.6 s | success; 11-hop path |
+| Both | Both | 27.5 s | success; 11-hop path |
+
+Each control received 1,205,887 Git bundle bytes over Reticulum and passed
+`git --git-dir <repository.git> fsck --full --strict`; the target commit
+`a29bfb51c468945c96a1ee22cae0114e993e2391` and its tree
+`24d4c393de9fd57b933836cea68891fd953ab060` were verified. The advertised
+default HEAD was `606a16911d64cdbcef8ea8babb85aa8fa2f78e79`; that observation
+does not move the pin or authenticate the publisher. Durations include process
+startup; the table uses a sampling loop and is not a benchmark. Logs label
+interfaces by type only, so they do not identify which gateway carried the
+dual-interface transfer. These single successful trials do not establish
+reliability, failover, simultaneous multipath transfer, or a full-clone result.
+Neither the user's existing configuration nor CI gateway settings were changed.
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: passed,
+  zero warnings and errors.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo --logger
+  "console;verbosity=minimal"`: 1,887 passed, 97 skipped, 0 failed; no
+  reference environment was configured for this baseline.
+
+## 2026-11-22: Two gateways for Compatibility retrieval
+
+The shared Compatibility runner now supplies `rmap.world:4242` and
+`node.reticulumnet.nl:4242` as separate interfaces to both native candidates
+and the upstream retrieval baseline. The standalone retrieval script retains
+its single-gateway default; its optional second gateway and port are recorded
+in provenance. The claim asserts the configured gateway list against both
+candidate and canonical provenance. The pinned revision, required missing
+objects, nonzero network bytes and strict Git verification remain unchanged.
+An empty additional-gateway argument explicitly retains single-gateway mode.
+The operator and shared-backbone limitations noted above still apply.
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: passed,
+  zero warnings and errors.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo --logger
+  "console;verbosity=minimal"`: 1,887 passed, 97 skipped, 0 failed;
+  no verified reference environment was configured.
+- The Compatibility harness and Git retrieval claim ran with Pester 5.7.1:
+  18 passed, 2 explicitly skipped. The claim consumed the verified result
+  of the second native retrieval below. The module path was isolated because
+  this machine also has Pester 6 installed; loading both versions in one
+  PowerShell process fails.
+- `pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`: 72 tracked
+  files analyzed, 0 findings. Compatibility discovery also completed.
+- Two fresh Windows native runs of `tests\Receive-Reference.ps1` with
+  `-Gateway rmap.world -AdditionalGateway node.reticulumnet.nl
+  -TimeoutSeconds 300` used the mirror-parent seed. The first discovered the
+  destination at 11 hops but failed to establish a link. The second reached
+  it at 12 hops, transferred 1,205,887 bundle bytes and passed strict Git
+  checks, with the pin initially absent and the expected pinned tree.
+  The advertised head was `606a16911d64cdbcef8ea8babb85aa8fa2f78e79`.
+  This does not establish that the additional interface prevents failures;
+  the hosted run below provides one additional cross-platform observation.
+
+### Hosted two-gateway results
+
+PR #48 Build **45047706035** built and published all three native platforms
+for head `8c46291408fcde930707a62ad03af164e940f520`. Its downstream Test
+**45048061743** checked out PR merge commit
+`08a7a12040483c3c6fdad6342615542ba8e86985` and passed all jobs, including
+Unit, Integration, and both summary jobs. Static analysis **45047706022**
+also completed successfully; successful execution alone is not a claim that
+CodeQL found no issues.
+
+The 42 shared Compatibility cases each passed with no skips on each of
+Upstream, native Linux x64, native macOS arm64 and native Windows x64. T001
+passed in all four columns in the generated summary. The three uploaded
+candidate provenance files each record both configured gateways, an initially
+missing pin, 1,205,887 network bundle bytes, and the expected pinned tree.
+The advertised head remained `606a16911d64cdbcef8ea8babb85aa8fa2f78e79`.
+The canonical Linux source was reused for the pinned Python environment;
+the Upstream candidate independently fetched over Reticulum.
+
+Hosted Unit totals (passed / skipped) were Linux 1,445 / 5, macOS 1,445 / 5,
+and Windows 1,444 / 6. The uploaded `test-summary-1` artifact contains the
+separate Integration counts, skip reasons, and per-project and overall
+managed coverage. The Compatibility summary links its 42 rows to the
+executing merge commit. The tests use live loopback peers and the public
+seeded fetch; they do not prove a full network clone, physical bearer support,
+publisher authentication, route failover, or durable public-network reliability.

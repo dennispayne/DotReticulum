@@ -46,6 +46,9 @@ Preparation defaults to the reference subdirectory of OutputDirectory.
 .PARAMETER Gateway
 Reticulum TCP gateway hostname or IPv4 address for hosted reference retrieval.
 Defaults to rmap.world.
+.PARAMETER AdditionalGateway
+Second TCP gateway for hosted reference retrieval, using port 4242.
+Defaults to node.reticulumnet.nl; pass an empty string to use only Gateway.
 .PARAMETER Prepare
 Publishes the native candidate when Application is omitted, enables FetchReference
 and chooses fresh results/reference directories when omitted. Runs automatically
@@ -70,6 +73,7 @@ param(
     [switch] $FetchReference,
     [string] $ReferenceDirectory,
     [string] $Gateway = 'rmap.world',
+    [AllowEmptyString()] [string] $AdditionalGateway = 'node.reticulumnet.nl',
     [switch] $Prepare
 )
 $ErrorActionPreference = 'Stop'
@@ -111,6 +115,7 @@ foreach ($candidate in $implementations) {
         Application = $native; Python = $Python; Upstream = $Upstream; Revision = $revision
         OutputDirectory = $directory; Implementation = $candidate; ReferenceDirectory = $referenceRoot
         FetchReference = ($FetchReference -and $candidate -eq 'DotReticulum'); Gateway = $Gateway
+        AdditionalGateway = $AdditionalGateway
     }
     $null = Get-CompatibilityDiscovery $context
     $configuration = New-CompatibilityConfiguration $context

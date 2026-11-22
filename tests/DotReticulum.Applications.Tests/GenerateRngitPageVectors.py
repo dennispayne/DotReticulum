@@ -1,7 +1,7 @@
-"""Execute pinned pages.py, not a page reimplementation.
+"""Render fresh expected responses from pinned pages.py in a test-owned directory.
 
-Only fixture timing is normalized: the default base template's GEN_TIME token
-is replaced with Unknown generation time. This is not live-node evidence.
+Page ages use a clock shared with the candidate. The default base template's
+GEN_TIME token is replaced with Unknown generation time. This is not live-node evidence.
 Optional Pygments is disabled to exercise its documented plain-literal fallback.
 All generated Git repositories live in the explicitly supplied project directory.
 """
@@ -33,12 +33,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--work-directory", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--timestamp", type=int, required=True)
     args = parser.parse_args()
-    verify_reference()
+    verify_reference(require_lxmf=True)
     for key in list(os.environ):
         if key.startswith("GIT_"):
             os.environ.pop(key)
     os.environ["GIT_TERMINAL_PROMPT"] = "0"
+    server.time.time = lambda: float(args.timestamp)
     RNS.loglevel = -1
     root = Path(args.work_directory).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -170,7 +172,9 @@ def main():
         vector = dict(name=name, route=route, request=request, identified=caller is not None, **settings)
         try:
             response = routes[route](route, request, bytes(16), bytes(16), caller, 0)
-        except Exception as error:
+        except TypeError as error:
+            if name != "work_download_absent":
+                raise
             vector["upstream_exception"] = type(error).__name__ + ": " + str(error)
             cases.append(vector)
             return
@@ -260,17 +264,19 @@ def main():
 
     group["stats"] = [owner.TGT_ALL]
     original_time = server.time.time
-    server.time.time = lambda: 1700000100.0
+    stats_now = 1700000100
+    stats_day = server.time.strftime("%Y-%m-%d", server.time.localtime(stats_now))
+    server.time.time = lambda: float(stats_now)
     try:
         for title, metric in [
             ("stats_empty", {}),
-            ("stats_activity", {"view": {"2023-11-14": 2}, "fetch": {"2023-11-14": 3},
-                                "push": {"2023-11-14": 1}, "download": {"2023-11-14": 1},
-                                "release_download": {"2023-11-14": 1}}),
+            ("stats_activity", {"view": {stats_day: 2}, "fetch": {stats_day: 3},
+                                "push": {stats_day: 1}, "download": {stats_day: 1},
+                                "release_download": {stats_day: 1}}),
         ]:
             owner.stats = {"pages": {"front": {}}, "groups": {"public": {"view": {}, "repositories": {"demo": metric}}}}
             call(title, "/page/stats.mu", request(), repository_allowed="stats:all\n",
-                 statistics=mp.packb(owner.stats).hex(), stats_timestamp=1700000100)
+                 statistics=mp.packb(owner.stats).hex(), stats_timestamp=stats_now)
     finally:
         server.time.time = original_time
         group["stats"] = []
@@ -440,16 +446,16 @@ def main():
                                                ("rnid.py", rnid), ("RNS.__init__.py", RNS),
                                                ("Identity.py", import_module("RNS.Identity")),
                                                ("Reticulum.py", import_module("RNS.Reticulum"))]},
-        "shims": ["GEN_TIME token replaced in fixture base template", "Stats-only clock frozen at 1700000100",
+        "shims": ["GEN_TIME token replaced in fixture base template", f"Shared page clock frozen at {args.timestamp}",
+                  "Stats-only clock frozen at 1700000100",
                   "Optional Pygments disabled; literal fallback", "Process-local ambient GIT_* overrides removed",
                   "Repository core.quotePath=false for UTF-8 names", "Node __new__ avoids starting listeners/jobs; real source permissions/handlers run"],
         "provenance_settings": ["Provenance-only clock frozen at 1700000100",
                                 "Metadata populated through real server private fork/mirror readers from persisted Git config",
                                 "Standalone Reticulum __new__ singleton permits real Identity.recall and cache-use bookkeeping without listeners",
                                 "Synthetic credentialed-source reference bytes retained; tests explicitly redact only presented source URL"],
-        "files": {name: content.hex() for name, content in files.items()}, "head": git("rev-parse", "HEAD", cwd=bare),
         "private_key": bytes(range(64)).hex(), "cases": cases, "markdown": vectors,
-        "bundle": bundle.read_bytes().hex(), "seed": seed, "charts": charts, "combined_chart": combined,
+        "seed": seed, "charts": charts, "combined_chart": combined,
         "sizes": [{"bytes": size, "output": RNS.prettysize(size)}
                   for size in [-9223372036854775808, -2675, -1000, -1, 0, 1, 999, 1000, 1005, 1015, 2675, 262144, 262145, 999995, 999999,
                                1000000, 2675000000, 9223372036854775807]],

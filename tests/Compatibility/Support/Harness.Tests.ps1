@@ -99,6 +99,35 @@ Describe 'Compatibility harness' {
         }
     }
 
+    Context 'Reference gateway configuration' {
+        BeforeAll {
+            . (Join-Path $PSScriptRoot 'Reference.ps1')
+        }
+
+        It 'configures each gateway as a separate TCP interface and records its port' {
+            $network = New-ReferenceGatewayConfiguration -Gateway 'first.example' -AdditionalGateway 'second.example' -Port 4242
+            @($network.Gateways).Count | Should -Be 2
+            $network.Gateways[0].host | Should -BeExactly 'first.example'
+            $network.Gateways[1].host | Should -BeExactly 'second.example'
+            @($network.Gateways | Where-Object port -NE 4242).Count | Should -Be 0
+            $network.Configuration | Should -Match '(?m)^  \[\[CI gateway 1\]\]$'
+            $network.Configuration | Should -Match '(?m)^    target_host = first\.example$'
+            $network.Configuration | Should -Match '(?m)^  \[\[CI gateway 2\]\]$'
+            $network.Configuration | Should -Match '(?m)^    target_host = second\.example$'
+            ([regex]::Matches($network.Configuration, '(?m)^    type = TCPClientInterface$')).Count | Should -Be 2
+        }
+
+        It 'allows a single gateway and rejects malformed or duplicate gateways' {
+            $network = New-ReferenceGatewayConfiguration -Gateway 'first.example' -AdditionalGateway ''
+            @($network.Gateways).Count | Should -Be 1
+            $network.Configuration | Should -Not -Match 'CI gateway 2'
+            { New-ReferenceGatewayConfiguration -Gateway 'first.example' -AdditionalGateway 'bad/gateway' } |
+                Should -Throw '*Gateway must be a DNS hostname or IPv4 address*'
+            { New-ReferenceGatewayConfiguration -Gateway 'first.example' -AdditionalGateway 'FIRST.EXAMPLE' } |
+                Should -Throw '*gateways must be distinct*'
+        }
+    }
+
     Context 'Compatibility discovery contracts' {
         It 'includes every claim test file in both discovery and execution containers' {
             $metadata = @(Get-CompatibilityDiscovery)
