@@ -1,246 +1,133 @@
 # Mixed Python/.NET mesh compatibility
 
-This documents the mixed Python/.NET mesh behavior exercised by the opt-in live test. DotReticulum is experimental and independent; this test is not a release certification or a claim of full interoperability.
-The live reference is Reticulum-hosted RNS 1.5.7 at
-`a29bfb51c468945c96a1ee22cae0114e993e2391`; each existing Python
-adapter verifies its checkout, actual imported module path and version through
-`tests/Interop/reference_environment.py`. There are no reference-side shims in
-this mesh.
-The small `parity8_transport_node.py` leaf adapter wraps the existing adapter's
-link callback to select the public `PROVE_ALL` destination policy for both
-incoming and outgoing destinations. Without that peer setting, the generic
-adapter's outbound destination defaults to `PROVE_NONE`, so a responder-to-
-initiator packet is delivered but has no requested proof. This is endpoint
-configuration, not a change to upstream code or proof behavior.
+This chapter describes the mixed Python/.NET meshes that the opt-in live tests build, what each topology exercises, and where its evidence stops. DotReticulum is experimental and independent. These tests are not a release certification or a claim of full interoperability.
 
-Source contracts reviewed at that pin: `RNS/Resource.py` `__watchdog_job`
-(receiver timeout and missing-part re-request), `receive_part`, `request_next`
-and `request` (map-hash-based part selection and retransmission);
-`RNS/Link.py` `teardown`, `__watchdog_job` and `__update_keepalive`; and
-`RNS/Interfaces/TCPInterface.py` `reconnect`
-(the upstream five-second reconnect interval). The bearer observes the existing
-packet codec's resource context and packet hash; it creates no protocol bytes.
+## The reference peers
 
-## Exercised behavior
+The live reference is Reticulum-hosted RNS 1.5.7 at `a29bfb51c468945c96a1ee22cae0114e993e2391`. Each Python adapter verifies its checkout, its actual imported module path and its version through `tests/Interop/reference_environment.py`. There are no reference-side shims in this mesh.
 
-`LiveMixedTransportTests` exercises unknown-path discovery, announces,
-proved encrypted datagrams, links and teardown between Python leaves on opposite
-sides of **two actual transports**, one pinned Python and one .NET.
-`Parity4TransportLiveTests` adds IFAC, a lost announce, 64 kbit/s serialization,
-40 ms RTT, TCP reconnect and tunnels. `Parity5TransferLiveTests` adds .NET endpoint
-Channel loss/retry/exhaustion, streams, bidirectional multi-megabyte resources,
-two MTUs and fresh-link recovery. These cases cover separate transport and transfer contracts.
+One peer setting is not a default. The small `parity8_transport_node.py` leaf adapter wraps the existing adapter's link callback to select the public `PROVE_ALL` destination policy for both incoming and outgoing destinations. Without it, the generic adapter's outbound destination defaults to `PROVE_NONE`, so a responder-to-initiator packet is delivered but carries no requested proof. This is endpoint configuration, not a change to upstream code or proof behavior.
 
-`Parity8CompatibilityLiveTests` exercises the impaired-resource and restart
-topology using the existing verified adapters and their C# process owner:
+The following source contracts were reviewed at that pin:
+
+- `RNS/Resource.py`: `__watchdog_job` (receiver timeout and missing-part re-request), `receive_part`, `request_next` and `request` (map-hash-based part selection and retransmission).
+- `RNS/Link.py`: `teardown`, `__watchdog_job` and `__update_keepalive`.
+- `RNS/Interfaces/TCPInterface.py`: `reconnect` (the upstream five-second reconnect interval).
+
+The impairment bearer only observes the existing packet codec's resource context and packet hash. It creates no protocol bytes.
+
+## Transports between leaves
+
+The simplest mixed mesh places Python leaves on opposite sides of **two actual transports**, one pinned Python and one .NET. `LiveMixedTransportTests` exercises unknown-path discovery, announces, proved encrypted datagrams, links and teardown across it.
+
+Other suites extend the same idea to separate contracts:
+
+- `Parity4TransportLiveTests` adds IFAC, a lost announce, 64 kbit/s serialization, 40 ms RTT, TCP reconnect and tunnels.
+- `Parity5TransferLiveTests` adds .NET endpoint Channel loss, retry and exhaustion, streams, bidirectional multi-megabyte resources, two MTUs and fresh-link recovery.
+
+## Impaired resources and router restarts
+
+`Parity8CompatibilityLiveTests` builds an impaired path through both kinds of transport, using the existing verified adapters and their C# process owner:
 
 ```text
 Python leaf A -- Python transport -- impaired TCP -- .NET transport -- Python leaf B
 ```
 
-Both leaf processes stay running throughout; the Python transport is later
-force-killed and restarted with its persisted identity. C# owns
-topology, impairment, assertions and bounded cleanup; Python invokes only the
-actual upstream APIs. The resource payloads are generated by the existing
-upstream adapter, and C# compares sender/receiver lengths and SHA-256 digests.
+Both leaf processes stay running throughout. The Python transport is later force-killed and restarted with its persisted identity. C# owns the topology, the impairment, the assertions and bounded cleanup; Python invokes only the actual upstream APIs. The resource payloads are generated by the existing upstream adapter, and C# compares sender and receiver lengths and SHA-256 digests.
 
 The test requires:
 
 - Three-hop paths in both directions, crossing both transports.
-- Incompressible 2,200,017-byte A-to-B and 2,200,019-byte B-to-A resources.
-- A complete initial four-part window for each resource, followed by three
-  deliberately lost **resource data parts in each direction**, not
-  delimiters or unrelated packets. Every dropped packet's reference hash must
-  reappear after loss in its original direction; completed sender/receiver
-  status and exactly one resource conclusion are required. Five transfers must
-  observe exactly **20 initial parts passed, 15 dropped and 15 retried**.
-- Twenty milliseconds of delay per forwarded frame in both directions,
-  capacity-one wait-on-full bearer queues, and reference-default bounded .NET
-  router ingress queues. Actual bearer backpressure must be observed, and no
-  router ingress-drop counter may increase during any resource transfer.
-- Explicit link teardown, transport TCP disconnect/reconnect, a reverse-initiated
-  new link, and proved encrypted packet delivery in both directions.
-- Complete disposal/recreation of the .NET router using its persisted identity,
-  surviving peer reconnection, fresh route discovery, new links, proved packets
-  both ways and another resource with three lost/retransmitted parts.
-- Force-killing the actual Python transport while a proved link is active,
-  observed bearer/forwarding-state detachment, no further proved delivery,
-  explicit teardown by both surviving endpoints, persisted-identity Python
-  restart, a distinct recovered link, and proved DATA/resources in both directions.
+- Incompressible resources of 2,200,017 bytes from A to B and 2,200,019 bytes from B to A.
+- A complete initial four-part window for each resource, followed by three deliberately lost **resource data parts in each direction** — not delimiters or unrelated packets. Every dropped packet's reference hash must reappear after the loss in its original direction, and completed sender/receiver status with exactly one resource conclusion is required. Across five transfers, exactly **20 initial parts pass, 15 are dropped and 15 are retried**.
+- Twenty milliseconds of delay per forwarded frame in both directions, capacity-one wait-on-full bearer queues, and reference-default bounded .NET router ingress queues. Actual bearer backpressure must be observed, and no router ingress-drop counter may increase during any resource transfer.
+- Explicit link teardown, a transport TCP disconnect and reconnect, a reverse-initiated new link, and proved encrypted packet delivery in both directions.
+- Complete disposal and recreation of the .NET router with its persisted identity, surviving-peer reconnection, fresh route discovery, new links, proved packets both ways, and another resource with three lost and retransmitted parts.
+- Force-killing the actual Python transport while a proved link is active, observed bearer and forwarding-state detachment, no further proved delivery, explicit teardown by both surviving endpoints, a persisted-identity Python restart, a distinct recovered link, and proved DATA and resources in both directions.
 
-The bounded bearer rejects malformed/unbounded frames and retains hashes for
-the deliberately lost parts (15 across the bounded recovery scenario) plus
-at most four initial parts per direction. It applies
-application-frame loss above TCP, because ordinary TCP packet loss would merely
-exercise the operating system's reliable stream, not RNS resource recovery.
-This is a repeatable loopback impairment, not evidence from radio hardware or
-an uncontrolled wide-area network.
+### How the loss is applied
 
-The initial four-part quota counts distinct packet hashes, not replayed frames;
-replays of those initial parts must not consume the later loss budget either.
-Its small per-direction initial set is reset for each transfer. Replay handling
-has a focused failing-then-passing fixture regression. Forwarded-part counts
-alone are not callback-level proof of an upstream throughput estimate; actual
-receiver state and resource failure observations remain relevant diagnostics.
+The bounded bearer rejects malformed or unbounded frames. It retains hashes for the deliberately lost parts (15 across the bounded recovery scenario) plus at most four initial parts per direction.
 
-The controlled-loss scenario uses the pinned default ingress capacities
-**1,024/128/128/8**, not its earlier two-slot override
-(`Transport.py:143-146`). A two-slot queue can drop part of an initial resource
-burst independently of the bearer, confounding this isolated loss scenario.
-Before/after drop counters and shutdown snapshots now expose that distinction.
-Independent saturation/priority assertions retain their deliberately tiny
-queues and reference vectors in `Parity4RoutingTests`; this does not establish
-live recovery from simultaneous router overflow and bearer loss.
+Loss is applied to application frames above TCP. Ordinary TCP packet loss would only exercise the operating system's reliable stream, not RNS resource recovery. This is a repeatable loopback impairment, not evidence from radio hardware or an uncontrolled wide-area network.
+
+The initial four-part quota counts distinct packet hashes, not replayed frames, and replays of those initial parts must not consume the later loss budget either. The small per-direction initial set is reset for each transfer. Replay handling has a focused failing-then-passing fixture regression. Forwarded-part counts alone are not callback-level proof of an upstream throughput estimate; actual receiver state and resource failure observations remain relevant diagnostics.
+
+### Router queues
+
+The controlled-loss scenario uses the pinned default ingress capacities **1,024/128/128/8** (`Transport.py:143-146`), not its earlier two-slot override. A two-slot queue can drop part of an initial resource burst independently of the bearer, which would confound this isolated loss scenario. Before/after drop counters and shutdown snapshots now expose that distinction.
+
+Independent saturation and priority assertions keep their deliberately tiny queues and reference vectors in `Parity4RoutingTests`. This does not establish live recovery from simultaneous router overflow and bearer loss.
 
 ## Automatic endpoint timeout and fresh-session recovery
 
-`ManagedAndPinnedEndpointsAutomaticallyTimeOutAfterRouterCrashAndRecoverWithFreshLinks`
-adds a separate managed live case, accepted in all three repetitions on
-Windows/Linux/macOS in hosted run 40956389129:
+`ManagedAndPinnedEndpointsAutomaticallyTimeOutAfterRouterCrashAndRecoverWithFreshLinks` is a separate managed live case. It passed all three repetitions on Windows, Linux and macOS in hosted run 40956389129.
 
 ```text
 .NET endpoint -- .NET transport -- impaired TCP -- Python transport -- Python endpoint
 ```
 
-It runs both initiator roles, proves exact DATA receipt in both directions,
-then force-kills the actual Python transport. The .NET endpoint's connection
-to its surviving router stays up; otherwise local interface removal would
-close the link immediately instead of exercising its watchdog. A post-crash
-send must obtain no proof or peer receipt. Both endpoints must automatically
-report **TIMEOUT**, correlated to the old link ID, with no `close` command.
-The old .NET link must leave its manager, the peer must report CLOSED, and the
-surviving router must remain running.
+The case runs both initiator roles and proves exact DATA receipt in both directions, then force-kills the actual Python transport. The .NET endpoint's connection to its surviving router stays up; otherwise local interface removal would close the link immediately instead of exercising its watchdog.
 
-The deadline derives from the actual endpoints' RTT/stale intervals,
-`KEEPALIVE_TIMEOUT_FACTOR`, `STALE_GRACE` and two default five-second upstream
-watchdog polling intervals. Excessive observed budgets fail the bounded case;
-the maximum guard derives from the unchanged default maximum stale interval
-plus this case's 90-second handshake bound, timeout factor and grace
-(1,095 seconds), rather than assuming every loaded-runner RTT fits a four-minute
-ceiling. The actual wait still uses each observed session's derived deadline,
-not that maximum or a fixed sleep. Neither reference timers nor production
-policies are changed. Before fresh
-links, the case observes actual leaf TCP reconnection, new route availability
-and a newly received announce rather than trusting an old cached path.
-Restarted Python transport, both endpoint processes and the .NET router retain
-their identities; distinct new links must then prove exact DATA both ways.
+After the crash:
 
-The thin upstream callback adapter only adds its actual link ID to closure
-observations. Acceptance covers both .NET roles and default watchdog expiry,
-not active-link resumption or impaired published-native execution.
+- A send must obtain no proof or peer receipt.
+- Both endpoints must automatically report **TIMEOUT**, correlated to the old link ID, without any `close` command.
+- The old .NET link must leave its manager, the peer must report CLOSED, and the surviving router must keep running.
 
-The reference DATA adapter also observes the actual receipt status after
-registering its delivery callback: a proof can validate before that registration.
-`PinnedReceiptObserverRecognizesAnAlreadyValidatedDeliveryProof` deliberately
-registers late, then requires actual DELIVERED/proved receipts and exact peer
-bytes in both directions. This is a thin observation-race regression, not a
-reference-side timer change or a new compatibility capability.
+The deadline derives from the actual endpoints' RTT and stale intervals, `KEEPALIVE_TIMEOUT_FACTOR`, `STALE_GRACE`, and two default five-second upstream watchdog polling intervals. Excessive observed budgets fail the bounded case. The maximum guard (1,095 seconds) derives from the unchanged default maximum stale interval plus this case's 90-second handshake bound, timeout factor and grace, rather than assuming every loaded-runner RTT fits a four-minute ceiling. The actual wait still uses each observed session's derived deadline, not that maximum or a fixed sleep. Neither the reference timers nor production policies are changed.
 
-Link DATA receipt deadlines start after the bounded outbound pump's bearer
-write attempt returns, not while the packet waits behind earlier writes or
-inside the write. This follows the pinned Link branch's receipt creation after
-transmission (`Transport.py:1456-1458,1599-1602`). The native receipt is already
-registered to authenticate a proof arriving during asynchronous I/O; its
-provisional send-start timestamp excludes queue wait too. This preserves the
-reference RTT factor, five-millisecond minimum
-and strict expiry boundary. Deterministic queued-write cases exercise both
-roles, actual send timestamps and subsequent validated proofs; ordinary
-post-send expiry remains separately tested. This corrects local scheduling,
-not the remote watchdog policy or the impaired-network acceptance assertions.
+Before establishing fresh links, the case observes actual leaf TCP reconnection, new route availability and a newly received announce, rather than trusting an old cached path. The restarted Python transport, both endpoint processes and the .NET router keep their identities, and distinct new links must then prove exact DATA both ways.
+
+The thin upstream callback adapter only adds its actual link ID to closure observations. Acceptance covers both .NET roles and default watchdog expiry, not active-link resumption or impaired published-native execution.
+
+### Receipt observation and deadlines
+
+The reference DATA adapter also observes the actual receipt status after registering its delivery callback, because a proof can validate before that registration. `PinnedReceiptObserverRecognizesAnAlreadyValidatedDeliveryProof` deliberately registers late, then requires actual DELIVERED/proved receipts and exact peer bytes in both directions. This is a thin observation-race regression, not a reference-side timer change or a new compatibility capability.
+
+Link DATA receipt deadlines start after the bounded outbound pump's bearer write attempt returns, not while the packet waits behind earlier writes or inside the write. This follows the pinned Link branch, which creates the receipt after transmission (`Transport.py:1456-1458,1599-1602`). The native receipt is already registered so that it can authenticate a proof arriving during asynchronous I/O, and its provisional send-start timestamp also excludes queue wait. This preserves the reference RTT factor, the five-millisecond minimum and the strict expiry boundary. Deterministic queued-write cases exercise both roles, actual send timestamps and subsequent validated proofs; ordinary post-send expiry remains separately tested. This corrects local scheduling, not the remote watchdog policy or the impaired-network acceptance assertions.
 
 ## Fresh sessions through a surviving alternate route
 
-`SurvivingDotNetAlternateRouteCarriesFreshBidirectionalLinksAfterPinnedPrimaryRouterCrash`
-adds a bounded Windows/Linux/macOS managed case with two non-transport Python
-endpoints, accepted in all three repetitions of hosted run 40956389129.
-Both connect to the actual pinned primary Python transport and, separately,
-to a surviving .NET backup transport.
+`SurvivingDotNetAlternateRouteCarriesFreshBidirectionalLinksAfterPinnedPrimaryRouterCrash` is a bounded Windows/Linux/macOS managed case with two non-transport Python endpoints. It passed all three repetitions of hosted run 40956389129. Both endpoints connect to the actual pinned primary Python transport and, separately, to a surviving .NET backup transport.
 
-The initial two-hop paths must name the actual primary transport's next-hop
-identity, and a link must prove exact DATA both ways. Starting the backup and
-observing its actual accepted connections must not change those selected paths.
-After force-killing the primary, both leaves must observe its TCP interface
-offline while the .NET backup stays running.
+The initial two-hop paths must name the actual primary transport's next-hop identity, and a link must prove exact DATA both ways. Starting the backup and observing its actual accepted connections must not change those selected paths. After the primary is force-killed, both leaves must observe its TCP interface go offline while the .NET backup stays running.
 
-Fresh announcements, with a strictly newer whole-second emission timebase,
-must propagate through the backup. This follows the pinned
-`Transport.py:2232-2240` replacement rule, without clearing either endpoint's
-path cache or changing upstream policy. The Python adapter now reports the
-actual public `Transport.next_hop()` value alongside its existing path
-observations. Both endpoints must select the .NET backup identity, still at
-two hops; the backup must have direct one-hop paths to both leaves.
+Fresh announcements, with a strictly newer whole-second emission timebase, must then propagate through the backup. This follows the pinned replacement rule in `Transport.py:2232-2240`, without clearing either endpoint's path cache or changing upstream policy. The Python adapter reports the actual public `Transport.next_hop()` value alongside its existing path observations. Both endpoints must select the .NET backup identity, still at two hops, and the backup must have direct one-hop paths to both leaves.
 
-Each initiator role then establishes a distinct fresh link, proves exact DATA
-both ways and correlates both endpoint closure callbacks to that link.
-Forwarding entries must increase for those actual routed links. They do not
-vanish immediately on encrypted endpoint teardown: the pinned transport
-retains validated entries until its traffic timeout or interface removal
-(`Transport.py:152,873-881`). Neither leaf nor the surviving router restarts.
+Each initiator role then establishes a distinct fresh link, proves exact DATA both ways, and correlates both endpoint closure callbacks to that link. Forwarding entries must increase for those actual routed links. They do not vanish immediately on encrypted endpoint teardown: the pinned transport retains validated entries until its traffic timeout or interface removal (`Transport.py:152,873-881`). Neither leaf nor the surviving router restarts.
 
-This is managed integration evidence for fresh-announcement route replacement,
-not shared Compatibility, a cached-alternate guarantee, automatic route
-replacement without announcements, active-session migration, a native-binary
-matrix or physical-bearer acceptance.
+This is managed integration evidence for fresh-announcement route replacement. It is not shared Compatibility, a cached-alternate guarantee, automatic route replacement without announcements, active-session migration, a native-binary matrix or physical-bearer acceptance.
 
 ## Cold initial-window reference limitation
 
-The recovery scenario now injects loss **after** the initial window establishes
-a measured throughput estimate. The previous cold-window recovery requirement
-has not been declared satisfied or silently patched into success.
+The recovery scenario now injects loss **after** the initial window has established a measured throughput estimate. The earlier cold-window recovery requirement has not been declared satisfied or silently patched into success.
 
-`PinnedUpstreamOnlyColdWindowLossNegativeControlCancelsBeforeItsFirstRepair`
-uses two actual pinned Python transports and Python leaves, with no .NET
-forwarder. Both cases negotiate the normal 16,384-byte TCP path MTU and drop three
-of the initial four resource parts. With no added delay, the 220,019-byte resource
-completes with exact bytes and three observed retransmissions. With an explicit
-120 ms per frame, the unmodified sender cancels before the receiver's first
-repair; the receiver still has an active link, one part, three outstanding parts
-and all 16 retries. The test requires the actual sender timeout diagnostic,
-both FAILED resource callbacks, zero repaired drops and an observed receiver
-repair budget later than the cancellation. Its passing result is **evidence
-of a negative reference behavior**, not successful resource recovery.
+`PinnedUpstreamOnlyColdWindowLossNegativeControlCancelsBeforeItsFirstRepair` uses two actual pinned Python transports and Python leaves, with no .NET forwarder. Both of its cases negotiate the normal 16,384-byte TCP path MTU and drop three of the initial four resource parts:
 
-At this pin, `Resource.py:561-571` derives cold EIFR from handshake cost and RTT
-until `receive_part` measures a complete window (`842-940`). Receiver first-repair
-timing (`601-612`) can then exceed the sender's part-request budget (`642-649`).
-The local 120 ms control observed approximately **120 seconds** before first
-repair versus sender cancellation after **102 seconds**, with the link still
-active. No upstream timers, MTU, loss count or protocol are modified.
-This proves a reference limitation, not that it is the sole cause of previously
-observed macOS link timeouts. Cold-window recovery remains outside the passing
-measured-window claim. This integration control is not a shared Compatibility
-claim or an Upstream compatibility pass.
+- With no added delay, the 220,019-byte resource completes with exact bytes and three observed retransmissions.
+- With an explicit 120 ms per frame, the unmodified sender cancels before the receiver's first repair. The receiver still has an active link, one part, three outstanding parts and all 16 retries.
 
-## Run
+The test requires the actual sender timeout diagnostic, both FAILED resource callbacks, zero repaired drops, and an observed receiver repair budget later than the cancellation. Its passing result is **evidence of a negative reference behavior**, not successful resource recovery.
 
-Set `DOTRETICULUM_LIVE=1`, `DOTRETICULUM_UPSTREAM` to the pinned checkout and
-`DOTRETICULUM_PYTHON` to the isolated reference interpreter, then run:
+At this pin, `Resource.py:561-571` derives the cold EIFR from handshake cost and RTT until `receive_part` measures a complete window (`842-940`). The receiver's first-repair timing (`601-612`) can then exceed the sender's part-request budget (`642-649`). The local 120 ms control observed approximately **120 seconds** before the first repair, against sender cancellation after **102 seconds**, with the link still active. No upstream timers, MTU, loss count or protocol are modified.
+
+This proves a reference limitation, not that it is the sole cause of previously observed macOS link timeouts. Cold-window recovery remains outside the passing measured-window claim. This integration control is not a shared Compatibility claim or an Upstream compatibility pass.
+
+## Running the tests
+
+Set `DOTRETICULUM_LIVE=1`, `DOTRETICULUM_UPSTREAM` to the pinned checkout and `DOTRETICULUM_PYTHON` to the isolated reference interpreter, then run:
 
 ```powershell
 dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --filter "FullyQualifiedName~Parity8CompatibilityLiveTests" --logger "console;verbosity=normal"
 ```
 
-Without the opt-in, the tests explicitly skip. With it enabled, missing reference
-inputs, process failures, transfer failures and timeouts fail; there are no
-successful early returns. Every listener is loopback-only, every process/config
-directory belongs to the test, and every wait has a bounded lifetime.
+Without the opt-in, the tests explicitly skip. With it enabled, missing reference inputs, process failures, transfer failures and timeouts all fail; there are no successful early returns. Every listener is loopback-only, every process and config directory belongs to the test, and every wait has a bounded lifetime.
 
-## What this test does not prove
+## What these tests do not prove
 
-The test is opt-in and runs when `DOTRETICULUM_LIVE=1` and the pinned
-reference checkout and isolated Python interpreter are configured. The managed
-suite and published native feature flows are exercised separately in CI; this
-case runs the managed test process and does not establish an impaired
-published-native router.
+The tests are opt-in and run only when `DOTRETICULUM_LIVE=1` is set and the pinned reference checkout and isolated Python interpreter are configured. The managed suite and the published native feature flows are exercised separately in CI. These cases run in the managed test process and do not establish an impaired published-native router.
 
-The recovery case restarts the managed .NET router and force-kills/restarts the
-Python router, without promising preservation of live links across either
-restart. That resource case explicitly closes old endpoints; the separate
-automatic-timeout case requires watchdog expiry and distinct recovered links.
-The separate alternate-route case covers fresh sessions after new announcements,
-not active-link session resumption or every alternate-route topology.
-Mass-client overload, prolonged
-soak, physical bearers, other platforms, and impaired published-native execution
-are not covered. Router queue exhaustion remains separate from this
-controlled-loss case; its pressure assertion applies only to the capacity-one
-impairment bearer.
+The recovery case restarts the managed .NET router and force-kills and restarts the Python router, without promising that live links survive either restart. That resource case explicitly closes old endpoints; the separate automatic-timeout case requires watchdog expiry and distinct recovered links. The separate alternate-route case covers fresh sessions after new announcements, not active-link session resumption or every alternate-route topology.
+
+Mass-client overload, prolonged soak, physical bearers, other platforms and impaired published-native execution are not covered. Router queue exhaustion remains separate from this controlled-loss case; its pressure assertion applies only to the capacity-one impairment bearer.

@@ -1,42 +1,154 @@
 # TCP and serial interfaces
 
-TCP and serial interfaces carry Reticulum packets over HDLC-framed streams. A TCP client can optionally use port-zero KISS framing; a TCP server uses HDLC for accepted peers. Each accepted peer has an independent ingress identity.
+The TCP and serial interfaces carry Reticulum packets over byte streams, using HDLC framing to separate packets. Use the TCP server and client interfaces to connect peers over the Internet or private IPv4 and IPv6 networks. Use the serial interface to run Reticulum directly over a serial port, a wire pair, or any device that passes serial data transparently, such as a data radio.
 
-## TCP configuration
+## TCP server interface
 
-`TCPClientInterface` requires `target_host` and `target_port`. Optional keys are `connect_timeout` (5 seconds), `max_reconnect_tries` (unlimited by default), `kiss_framing` (false), `i2p_tunneled` (false), `fixed_mtu`, and generic `bitrate`. Reconnect delay is five seconds. `i2p_tunneled` controls native tunnel synthesis for clients; server children remain HDLC. TCP_NODELAY is enabled.
+The TCP server interface listens for incoming connections from TCP client interfaces. Many clients can connect to the same server at once, and each accepted client becomes a separate peer interface with its own ingress identity, so routing can exclude the peer a packet arrived from.
 
-`TCPServerInterface` requires `listen_port`. `listen_ip` or `device` selects the bind address; the native daemon also supports a port-only wildcard IPv4 bind. `port` is an alias for the server port. `prefer_ipv6` defaults false. The native server admits at most 64 clients by default; `fixed_mtu` and queue limits are native API controls. Server constructors defer hostname/device resolution until `StartAsync`.
+```
+# Listen on all IPv4 addresses on port 4242.
+[[TCP Server Interface]]
+  type = TCPServerInterface
+  enabled = yes
+  listen_ip = 0.0.0.0
+  listen_port = 4242
 
-TCP fixed MTU disables bitrate-driven MTU autoconfiguration while link MTU negotiation remains available. Offline sends are discarded with diagnostics. A native send failure is diagnosed; a failed child is isolated from other peers.
+# Or bind to the address of a specific
+# network device, preferring IPv6.
+[[TCP Server Interface]]
+  type = TCPServerInterface
+  enabled = yes
+  device = eth0
+  prefer_ipv6 = yes
+  port = 4242
+```
 
-## Serial configuration
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `listen_port` | required | Port to listen on. `port` is an alias. |
+| `listen_ip` | wildcard IPv4 | Address to bind |
+| `device` | none | Network device whose address is used for the bind |
+| `prefer_ipv6` | `no` | Use the device's IPv6 address when it has both |
+| `fixed_mtu` | none | Fixed hardware MTU, at least 500 bytes |
+| `i2p_tunneled` | `no` | Use the I2P socket timeout and keepalive profile |
+| `bitrate` | 10 Mbit/s | Generic bitrate estimate |
 
-`SerialInterface` requires `port`; supported settings are `speed` (9600), `parity` (none), `databits` (8), and `stopbits` (1). Hardware MTU is 564 bytes. DTR and RTS remain asserted as in pyserial even when handshake flow control is disabled. Stream constructors accept either an owned duplex stream or a reopenable factory. A supplied stream is one-shot. Source-style runtime operation enables reconnect for a port; the standalone constructor defaults it off.
+If you give only a port, the native daemon binds to all IPv4 addresses. Hostname and device resolution is deferred until the interface starts. The native server admits at most 64 clients. Upstream has no client limit. Accepted peers always use HDLC framing.
 
-Serial uses alternating opening and closing HDLC flags. Partial frames expire after more than 100 ms idle. A port or reopenable factory retries open/read failures every five seconds. One serial driver open call is synchronous and cannot itself be interrupted by a cancellation token.
+## TCP client interface
 
-## Native API and behaviour
+The TCP client interface connects to a TCP server interface. It tolerates intermittent IP links: if the connection drops, the interface reconnects once the other end reappears.
 
-`TcpClientPacketInterface`, `TcpServerPacketInterface`, and `SerialPacketInterface` start explicitly and asynchronously dispose owned resources. Client address resolution tries resolved addresses in order within one timeout; accepted server peers are separate interfaces. Receive queues and send operations are bounded. Concurrent writes serialize before framing allocation. Cancellation interrupts owned reads/writes; a failed ambiguous active write is not replayed after reconnect. TCP/serial byte accounting reports actual framed/unframed boundaries described by diagnostics.
+```
+# target_host can be a hostname or an
+# IPv4 or IPv6 address.
+[[TCP Client Interface]]
+  type = TCPClientInterface
+  enabled = yes
+  target_host = 127.0.0.1
+  target_port = 4242
+```
 
-### TCP and serial transport details
+You can also use the client to reach programs or devices that expose KISS on a TCP port, such as software soundmodems:
 
-The source TCP client enables TCP_NODELAY. On Linux, ordinary TCP uses a 24-second TCP user timeout and keepalive idle/interval/count of 5/2/12 seconds; I2P TCP uses 45 seconds and 10/9/5 seconds. Darwin sets keepalive and a five-second idle time. Native code configures matching supported platform options where implemented. A configured TCP client `connect_timeout` defaults to five seconds; `max_reconnect_tries` counts actual connection calls after the initial call in the reference contract. Native address fallback tries resolver results in order within one shared timeout, unlike upstream's first-address-only behavior.
+```
+[[TCP KISS Interface]]
+  type = TCPClientInterface
+  enabled = yes
+  kiss_framing = yes
+  target_host = 127.0.0.1
+  target_port = 8001
+  fixed_mtu = 500
+```
 
-TCP fixed MTU disables bitrate-driven MTU autoconfiguration while link MTU negotiation remains enabled. Port-zero KISS applies only to initiating clients; accepted TCP server children always use HDLC. A KISS client must not request Reticulum transport tunnel synthesis. Native servers cap clients at 64; standalone client reconnection remains opt-in, while daemon runtime supplies source-style reconnect.
+Only use `kiss_framing` for external KISS devices and programs, never between Reticulum TCP client and server interfaces. A KISS client does not request the Reticulum transport tunnel that an HDLC client does.
 
-Serial source defaults are 9600 baud, 8/N/1, no handshake, and MTU 564. Partial data is checked on an 80 ms polling loop and expires after more than 100 ms idle. Port/factory reopen uses a five-second delay and source's 500 ms post-open settle period. The driver open call is synchronous; cancellation can be checked before opening and during asynchronous settling, but cannot interrupt a native driver blocked inside open. Supplied streams remain owned one-shot streams.
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `target_host` | required | Host name or address to connect to |
+| `target_port` | required | Port to connect to |
+| `connect_timeout` | 5 seconds | Time allowed for one connection attempt |
+| `max_reconnect_tries` | unlimited | Connection attempts after the initial one |
+| `kiss_framing` | `no` | Use port-zero KISS framing instead of HDLC |
+| `fixed_mtu` | none | Fixed hardware MTU, at least 500 bytes |
+| `i2p_tunneled` | `no` | Use the I2P socket timeout and keepalive profile |
+| `bitrate` | 10 Mbit/s | Generic bitrate estimate |
 
-The receive side uses bounded queues: native stream buffering is capped at 256 queued frames plus the producer frame and decoded frames from a 4096-byte read buffer. TCP send admission is serialized before frame allocation; queued callers retain input memory rather than allocating framed copies. Offline TCP sends are discarded with a diagnostic counter, matching source behavior. Serial counts decoded receive bytes, while transmitted byte accounting includes HDLC framing.
-## Platform notes
+The reconnect delay is five seconds. Resolved addresses are tried in order within one shared connection timeout. Upstream connects only to the first resolved address.
 
-The TCP and stream abstractions are exercised on Windows x64 and Linux x64. macOS ARM64 builds and managed tests pass, but rnsh's Darwin PTY backend is unavailable. Generic stream/socket tests do not establish device-driver or physical serial support. See [interface platforms](interface-platforms.md).
+## Serial interface
+
+```
+[[Serial Interface]]
+  type = SerialInterface
+  enabled = yes
+
+  # Serial port for the device
+  port = /dev/ttyUSB0
+
+  # Set the serial baud rate and other
+  # configuration parameters.
+  speed = 115200
+  databits = 8
+  parity = none
+  stopbits = 1
+```
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `port` | required | Serial port name |
+| `speed` | 9600 | Baud rate. Also the default bitrate estimate. |
+| `databits` | 8 | Data bits (5–8) |
+| `parity` | `none` | `none`, `even` or `odd` |
+| `stopbits` | 1 | Stop bits (1 or 2) |
+
+The serial port runs with no handshake, but DTR and RTS stay asserted, as they do with pyserial. Hardware MTU is 564 bytes and the default IFAC size is 8 bytes. The daemon reopens a failed port after five seconds.
+
+## Behaviour
+
+### TCP
+
+- `fixed_mtu` disables bitrate-driven MTU autoconfiguration. Link MTU negotiation remains available.
+- TCP_NODELAY is enabled.
+- On Linux, ordinary TCP uses a 24-second TCP user timeout and keepalive idle, interval and count of 5 s, 2 s and 12. With `i2p_tunneled`, these become 45 seconds and 10 s, 9 s and 5. On macOS, keepalive is enabled with a 5-second idle time (10 seconds with `i2p_tunneled`). These match the upstream values. On Windows, only TCP_NODELAY is set.
+- Port-zero KISS applies only to initiating clients. A KISS client does not request a Reticulum transport tunnel.
+- `max_reconnect_tries` counts actual connection calls after the initial call.
+- Sends while offline are discarded and counted in diagnostics, as in upstream.
+- Send admission is serialized before a frame is allocated, so queued callers hold their own input memory rather than framed copies.
+- A failed accepted child is isolated from the other peers.
+
+### Serial
+
+- Frames use alternating opening and closing HDLC flags.
+- Partial data is checked on an 80 ms polling loop and expires after more than 100 ms idle.
+- A port or reopenable stream factory retries open and read failures every five seconds, followed by upstream's 500 ms settle period after each open.
+- The driver open call is synchronous. Cancellation is checked before opening and during the settle period, but cannot interrupt a driver blocked inside open.
+- Received byte counts are decoded bytes. Transmitted byte counts include HDLC framing.
+
+### Library API
+
+`TcpClientPacketInterface`, `TcpServerPacketInterface` and `SerialPacketInterface` are started explicitly and dispose their owned resources asynchronously. The serial interface accepts a port name, an owned duplex stream or a reopenable stream factory. A supplied stream is one-shot and cannot reconnect.
+
+The standalone TCP client and serial constructors leave reconnection off by default. The daemon turns it on to match upstream. Server queue limits and `fixed_mtu` are also available as native options.
+
+Receive buffering is bounded at 256 queued frames plus the producer's frame and the frames decoded from one 4096-byte read buffer. Cancellation interrupts owned reads and writes. A write that failed ambiguously is not replayed after reconnecting.
 
 ## Differences from upstream
 
-The native parser rejects malformed escapes and overlong frames rather than accepting malformed escape sequences or forwarding an oversized serial prefix. The server caps clients at 64; upstream has no cap. Standalone TCP and serial constructors retain opt-in reconnect behavior, while daemon wiring selects source-style reconnect. Native TCP honors its explicit connection timeout; upstream parses that setting but uses a fixed five-second timeout. The native client tries multiple DNS results, while upstream uses the first result.
+- The native decoders reject malformed escapes and overlong frames. Upstream accepts malformed escape sequences and can forward an oversized serial prefix.
+- The TCP server admits at most 64 clients. Upstream has no limit.
+- Native TCP honours `connect_timeout`. Upstream parses the setting but uses a fixed five-second timeout.
+- The native client tries every resolved address in order. Upstream uses only the first.
+- Standalone TCP and serial constructors make reconnection opt-in. Daemon wiring selects upstream-style reconnection.
+
+## Platform notes
+
+TCP and stream handling is exercised on Windows x64 and Linux x64. macOS ARM64 builds and passes the managed tests. Generic stream and socket tests do not establish device-driver or physical serial support. See [interface platforms](interface-platforms.md).
 
 ## Verification
 
-`Parity6StreamTests` and `GenerateParity6StreamVectors.py` exercise pinned TCP framing/reconnect and serial parsing/configuration with simulated sockets and ports. No physical serial device is opened by vector generation. These tests are software evidence, not live Python TCP/KISS exchange or physical serial acceptance.
+- `Parity6StreamTests` exercises TCP framing and reconnection, and serial parsing and configuration, against simulated sockets and ports.
+- `GenerateParity6StreamVectors.py` produces vectors from the pinned source. It never opens a physical serial device.
+
+These tests are software evidence. They are not a live Python TCP or KISS exchange, and not physical serial acceptance.

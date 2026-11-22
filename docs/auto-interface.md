@@ -1,47 +1,92 @@
 # AutoInterface
 
-AutoInterface discovers Reticulum peers on IPv6 multicast links and carries one packet per UDP datagram. The .NET bearer is a spawning interface: each discovered address is represented by an independently routable child. The parent does not transmit application packets itself.
+The `AutoInterface` lets you communicate with other discoverable Reticulum nodes over any local Ethernet or WiFi medium. It uses IPv6 link-local multicast for peer discovery and UDP for packet transport, one packet per datagram. It does not need routers, DHCP servers or any other IP infrastructure on the network.
 
-## Configuration
+Link-local IPv6 must be available on your system. If you run firewall software, allow UDP traffic on the discovery and data ports (29716 and 42671 by default).
 
-Enable `type = AutoInterface` in an interface section. Supported type-specific keys are:
+## Example configuration
+
+```
+# A bare-minimum AutoInterface. It will talk to all
+# reachable peers on all usable network devices.
+[[Default Interface]]
+  type = AutoInterface
+  enabled = yes
+
+# A more specific configuration.
+[[Default Interface]]
+  type = AutoInterface
+  enabled = yes
+
+  # Separate Reticulum networks on the same
+  # LAN can use different group IDs.
+  group_id = reticulum
+
+  # temporary (default) or permanent
+  multicast_address_type = permanent
+
+  # Use only these devices...
+  devices = wlan0,eth1
+
+  # ...or use all suitable devices except these.
+  ignored_devices = tun0,eth0
+```
+
+## Options
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `group_id` | `reticulum` | UTF-8 discovery group discriminator |
-| `discovery_scope` | `link` | `link`, `admin`, `site`, `organisation`, or `global` |
-| `multicast_address_type` | `temporary` | Multicast address type; unrecognized values use the temporary form |
+| `group_id` | `reticulum` | UTF-8 discovery group name |
+| `discovery_scope` | `link` | `link`, `admin`, `site`, `organisation` or `global` |
+| `multicast_address_type` | `temporary` | `temporary` or `permanent`. Unrecognized values use the temporary form. |
 | `discovery_port` | `29716` | IPv6 multicast discovery port (1–65534) |
 | `data_port` | `42671` | Peer datagram port (1–65535) |
-| `devices` | empty | Selected network device names or stable interface IDs |
-| `ignored_devices` | empty | Devices excluded from selection |
-| `bitrate` | `10000000` bit/s | Generic configured estimate; native options expose `ConfiguredBitrate` |
+| `devices` | empty | Network device names or stable interface IDs to use |
+| `ignored_devices` | empty | Devices to exclude |
+| `bitrate` | 10 Mbit/s | Generic bitrate estimate |
 
-The native options also bound peers to 128 and each peer receive queue to 32 frames by default. These are library settings, not additional INI keys. Group names only distinguish discovery groups; the discovery token is not authentication.
+The group ID only separates discovery groups. Its discovery token can be computed by anyone who knows the group ID, so it is not authentication. Use IFAC if you need access control.
 
 ## Behaviour
 
-The multicast address is derived from the UTF-8 group ID and scope. Discovery announcements use a SHA-256 token over the group ID and canonical IPv6 source address. Only IPv6 link-local sources with a valid token create peers. Interface selection excludes loopback and follows the reference's platform-specific device exclusions. Each peer sends and receives raw UDP datagrams without HDLC framing or an added envelope.
+AutoInterface is a spawning interface. Every discovered peer address becomes its own child interface that can be routed independently. The parent itself carries no application packets, and packets are never reflected back to the peer they came from.
 
-The bearer observes a 1.92-second startup warmup, announces every 1.6 seconds, and runs maintenance every four seconds. Peers expire after 22 seconds (27.5 seconds on Android). Duplicate frames are suppressed for less than 750 ms using a bounded 48-entry cache. Receive queues and peer counts are bounded; full queues drop new datagrams with diagnostics. A child disconnect or device failure does not terminate unrelated peers. Selected-device disappearance closes its socket session; a later return reopens it.
-
-The parent exposes `AutoPacketInterface(AutoPacketInterfaceOptions? options = null)`. Subscribe to `ChildConnected` before `StartAsync`, or let `PacketInterfaceManager` adopt children. The parent and children report a 1196-byte hardware MTU and support MTU discovery. The default IFAC size is 16 bytes when IFAC is enabled and no size is configured.
+- **Discovery.** The multicast address is derived from the group ID and scope. Each announcement carries a token, `SHA256(UTF8(group_id) || canonical_unscoped_source_address_UTF8)`. Only IPv6 link-local sources with a valid token become peers. As in upstream, a datagram whose first 32 bytes match the token is accepted even if it has trailing bytes. Announcements from your own address are treated as echoes, not peers.
+- **Timing.** The interface waits 1.92 seconds after startup, announces every 1.6 seconds and runs maintenance every four seconds. Reverse announcements follow after 5.2 seconds, and own-echo carrier state expires after 6.5 seconds. Peers expire after 22 seconds (27.5 seconds on Android).
+- **Data.** Peers exchange raw UDP datagrams with no HDLC framing or added envelope. Duplicate frames seen within 750 ms are suppressed using a bounded 48-entry cache.
+- **Device changes.** If a selected device disappears, its sockets are closed. They are reopened when it returns. The listener is replaced if a device's link-local address changes. A device or peer failure does not affect unrelated peers. Device setup failures are diagnosed and retried during maintenance. If no selected device is usable, the interface stays passive and reports why.
+- **MTU and IFAC.** The parent and children report a 1196-byte hardware MTU and support MTU discovery. With IFAC enabled and no size configured, the IFAC size is 16 bytes.
 
 ### Discovery details
 
-The scope field maps to IPv6 multicast scope values: link 2, admin 4, site 5, organisation 8, and global 14. The multicast address uses group-hash bytes 2–13 and the selected temporary/permanent multicast flag. Discovery sends on `discovery_port`; the reverse discovery listener uses that port plus one. The token is `SHA256(UTF8(group_id) || canonical_unscoped_source_address_UTF8)`. A matching 32-byte token prefix is accepted even if a datagram has trailing bytes, matching upstream. This token is publicly computable by anyone who knows the group ID.
+Scopes map to IPv6 multicast scope values: link 2, admin 4, site 5, organisation 8 and global 14. The multicast address uses bytes 2–13 of the group hash and the temporary or permanent multicast flag. Discovery is sent on `discovery_port`, and the reverse discovery listener uses that port plus one.
 
-The bearer selects the last IPv6 link-local address on each selected device, joins multicast on that interface index, and uses the paired data socket to preserve source address. Windows uses wildcard discovery binds; other source branches bind to group/local-address selection. The parent itself carries no data: every discovered address is a child, and packets are not reflected to ingress. Own-address announcements are treated as echoes, not peers. Reverse announcements follow after 5.2 seconds; own-echo carrier state expires after 6.5 seconds. A listener is replaced if the selected link-local address changes.
+On each selected device, the interface uses the last IPv6 link-local address, joins the multicast group on that interface index, and uses a paired data socket so the source address is preserved. On Windows, discovery sockets bind to the wildcard address. Other platforms follow the upstream branches that bind to the group or local address. Device selection excludes loopback and follows upstream's platform-specific exclusions.
 
-The default maximum of 128 peers and 32 queued frames per peer bounds queued payload storage to 5,160,960 bytes at the maximum 1260-byte frame size (1196-byte packet MTU plus up to 64 IFAC bytes). Each peer may also have one active transmit. Calls competing for the same peer send are rejected rather than accumulated in unbounded caller memory. Device setup failures are isolated, retried on maintenance, and diagnosed; no usable selected device leaves a diagnosed passive interface.
-## Platform notes
+### Bounds
 
-IPv6 multicast membership and link-local addressing are required. Windows x64 and Linux x64 are exercised; the opt-in multicast test checks actual OS/device capability and explicitly skips when prerequisites are absent. Managed tests do not establish multicast support on a particular physical network. Android permissions, mobile network information, BSD behavior, and untested platforms remain unverified. See [interface platforms](interface-platforms.md).
+By default the interface accepts up to 128 peers and queues up to 32 frames per peer. At the largest frame size of 1260 bytes (the 1196-byte MTU plus up to 64 IFAC bytes), this caps queued payload storage at 5,160,960 bytes. When a peer's receive queue is full, new datagrams are dropped and counted. Each peer has at most one active transmit. A competing send to the same peer is rejected rather than held in caller memory without limit.
+
+### Library API
+
+The parent is `AutoPacketInterface(AutoPacketInterfaceOptions? options = null)`. Subscribe to `ChildConnected` before calling `StartAsync`, or let `PacketInterfaceManager` adopt the children. The peer limit (128) and per-peer queue size (32) are library options, not configuration keys. `ConfiguredBitrate` holds the configured bitrate.
 
 ## Differences from upstream
 
-The .NET implementation bounds peer count, receive queues, and concurrent peer sends; it drops on a full receive queue rather than allowing a stalled callback to block maintenance. It rejects malformed/oversized datagrams and discovery from non-link-local sources. Startup and disposal are explicit and cancellable. Initial selected devices are not dynamically reselected, though their disappearance/reappearance is handled. No Android permission acquisition or native network-information adapter is provided.
+- Peer count, receive queues and concurrent peer sends are bounded. A full receive queue drops datagrams instead of letting a stalled callback block maintenance.
+- Malformed or oversized datagrams, and discovery from non-link-local sources, are rejected.
+- Startup and disposal are explicit and cancellable.
+- The initially selected devices are not reselected dynamically, though their disappearance and return are handled.
+- No Android permission acquisition or native network-information adapter is provided.
+
+## Platform notes
+
+IPv6 multicast membership and link-local addressing are required. Windows x64 and Linux x64 are exercised. The opt-in multicast test checks the actual OS and device capability and skips explicitly when prerequisites are absent. Managed tests do not establish multicast support on any particular physical network. Android permissions, mobile network information and BSD behaviour are unverified. See [interface platforms](interface-platforms.md).
 
 ## Verification
 
-`AutoInterfaceTests` covers deterministic behavior. `Parity6AutoLiveTests` exercises two Linux network namespaces with the pinned Python implementation in raw and IFAC modes when explicitly enabled; this verifies software namespace interoperability, not physical LAN or mobile support. `Parity6AutoMulticastTests` is a separate opt-in local multicast self-echo check. Reference vectors and live adapters verify the pinned RNS 1.5.7 source at `a29bfb51c468945c96a1ee22cae0114e993e2391`.
+- `AutoInterfaceTests` covers deterministic behaviour.
+- `Parity6AutoLiveTests`, when explicitly enabled, runs the pinned Python implementation and the .NET interface in two Linux network namespaces, in raw and IFAC modes. This is software interoperability across namespaces, not physical LAN or mobile support.
+- `Parity6AutoMulticastTests` is a separate opt-in local multicast self-echo check.
+
+Reference vectors and live adapters use the pinned RNS 1.5.7 source at `a29bfb51c468945c96a1ee22cae0114e993e2391`.

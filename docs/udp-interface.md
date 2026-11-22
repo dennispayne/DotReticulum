@@ -1,25 +1,74 @@
 # UDP interface
 
-UDP carries one Reticulum packet per datagram, without additional framing. The interface can receive, forward, or do both using independent endpoints.
+A UDP interface carries Reticulum packets over IP networks, either private networks or the Internet. Each Reticulum packet travels in one UDP datagram, with no additional framing. Because UDP can also send to a broadcast address, it gives you an easy way to reach every peer on a local network segment.
 
-## Configuration
+If your goal is simply to reach all peers in your local Ethernet or WiFi broadcast domain, the [AutoInterface](auto-interface.md) is usually the better choice. Broadcast UDP has performance costs, especially on WiFi.
 
-Enable `type = UDPInterface` in an interface section. Type-specific keys are `listen_ip`, `listen_port`, `forward_ip`, `forward_port`, `port`, and `device`. `port` supplies only a direction's missing port. A receive endpoint needs an address (or `device`) and port; forwarding needs a destination address (or `device`) and port. At least one complete direction is required. `device` supplies its first IPv4 broadcast address only where an address was omitted. The default address family is IPv4. Generic `bitrate` defaults to 10 Mbit/s; hardware MTU is 1064 bytes.
+## Example configuration
 
-The native `UdpPacketInterfaceOptions` API permits separate receive and forwarding configuration and asynchronous hostname resolution. Direct endpoint constructors also support matching IPv4 or IPv6 endpoints. Port zero is available for native ephemeral receive binds; the resulting local endpoint is exposed after startup.
+```
+# This example enables communication with other
+# local Reticulum peers over UDP broadcast.
+[[UDP Interface]]
+  type = UDPInterface
+  enabled = yes
+
+  listen_ip = 0.0.0.0
+  listen_port = 4242
+  forward_ip = 255.255.255.255
+  forward_port = 4242
+
+  # Instead of listen_ip and forward_ip, you can
+  # name a network device. Its first IPv4 broadcast
+  # address is used for any address you leave out.
+  # device = eth0
+  # port = 4242
+
+  # You can also communicate with a single host.
+  # listen_ip = 10.55.0.15
+  # listen_port = 4242
+  # forward_ip = 10.55.0.16
+  # forward_port = 4242
+```
+
+## Options
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `listen_ip` | none | Address to receive on |
+| `listen_port` | none | Port to receive on |
+| `forward_ip` | none | Address to send datagrams to |
+| `forward_port` | none | Port to send datagrams to |
+| `port` | none | Fills in `listen_port` or `forward_port` when that key is missing |
+| `device` | none | Network device whose first IPv4 broadcast address fills in a missing `listen_ip` or `forward_ip` |
+| `bitrate` | 10 Mbit/s | Generic bitrate estimate |
+
+The interface can receive, forward or do both. Receiving needs an address (or `device`) and a port. Forwarding needs a destination address (or `device`) and a port. At least one complete direction is required, and an enabled interface with neither fails to load. The default address family is IPv4. Hardware MTU is 1064 bytes.
 
 ## Behaviour
 
-The interface binds a receive socket only when reception is configured. Forwarding sends a packet as a datagram to the configured endpoint. Hostname resolution uses the configured family; a literal address of another family is rejected. Datagrams larger than hardware MTU plus the bounded IFAC allowance are discarded. Sends are serialized and cancellation-aware. A receive-only interface rejects send attempts, while a forward-only receive stream remains alive until cancellation or disposal.
+A receive socket is bound only when reception is configured. Forwarding sends each packet as one datagram to the configured endpoint. Hostnames are resolved using the configured address family, and a literal address of another family is rejected. Datagrams larger than the hardware MTU plus the bounded IFAC allowance are discarded. Sends are serialized and cancellation-aware.
 
-## Platform notes
+A receive-only interface rejects send attempts. A forward-only interface keeps its receive stream open until cancellation or disposal.
 
-The implementation uses .NET sockets and network-interface enumeration. Windows x64 and Linux x64 are exercised. Loopback and simulator tests do not establish broadcast delivery on a physical LAN, IPv6 multicast behavior, or platform-specific interface routing.
+### Library API
+
+The native `UdpPacketInterfaceOptions` API configures receive and forwarding separately and resolves hostnames asynchronously at startup. Direct endpoint constructors also accept matching IPv4 or IPv6 endpoints. Port zero requests an ephemeral receive port, and the bound local endpoint is exposed after startup.
 
 ## Differences from upstream
 
-The native API supports explicit IPv6 endpoints and asynchronous startup resolution. Invalid or incomplete endpoint pairs fail explicitly; unused incomplete pairs are diagnosed. A receive-only send fails explicitly instead of reproducing the reference's caught missing-field exception. Bounded datagram input and serialized sends prevent unbounded buffering.
+- The native API supports explicit IPv6 endpoints and asynchronous startup resolution.
+- Invalid or incomplete endpoint pairs fail explicitly, and unused incomplete pairs are diagnosed.
+- A send on a receive-only interface fails explicitly. The reference instead raises and catches a missing-field exception.
+- Datagram input is bounded and sends are serialized, so nothing is buffered without limit.
+
+## Platform notes
+
+The implementation uses .NET sockets and network-interface enumeration. Windows x64 and Linux x64 are exercised. Loopback and simulator tests do not establish broadcast delivery on a physical LAN, IPv6 multicast behaviour or platform-specific interface routing.
 
 ## Verification
 
-`Parity6UdpTests` covers receive-only, forward-only, combined configuration, port precedence, resolution, malformed/oversized datagrams, and lifecycle behavior. `GenerateParity6UdpVectors.py` executes the pinned RNS 1.5.7 constructor at `a29bfb51c468945c96a1ee22cae0114e993e2391` with ephemeral loopback listeners. These tests are software evidence, not physical-network interoperability.
+- `Parity6UdpTests` covers receive-only, forward-only and combined configuration, port precedence, resolution, malformed and oversized datagrams, and lifecycle behaviour.
+- `GenerateParity6UdpVectors.py` executes the pinned RNS 1.5.7 constructor at `a29bfb51c468945c96a1ee22cae0114e993e2391` with ephemeral loopback listeners.
+
+These tests are software evidence, not physical-network interoperability.

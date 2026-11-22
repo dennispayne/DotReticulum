@@ -1,33 +1,66 @@
-# Weave serial interface
+# Weave interface
 
-Weave is a serial WDCL device and endpoint-switch protocol, not Ethernet. The native interface publishes independently routable endpoint children; packets are sent through those children rather than broadcast by the parent.
+The Weave interface connects Reticulum to a Weave device over a serial port. Weave devices speak WDCL, a device and endpoint-switch protocol; it is not Ethernet. Each remote endpoint the device reports becomes an independently routable child interface, and packets are sent through those children rather than broadcast by the parent.
 
-## Configuration
+## Example configuration
 
-Enable `type = WeaveInterface` and provide `port`. `name` comes from the interface section. The reference type-specific constructor consumes no serial speed or flow-control settings: the device requires 3,000,000 baud, 8N1, and no flow control. Generic `bitrate` sets the reported estimate (default 250,000 bit/s); it is not the serial baud. Generic IFAC defaults to 16 bytes and is applied by the manager, not the serial framing layer.
+```
+[[Weave Interface]]
+  type = WeaveInterface
+  enabled = yes
+  port = /dev/ttyUSB0
+```
 
-The library API is `WeavePacketInterface(portName, WeaveOptions)` or an owned stream-factory overload. Native timer and resource limits in `WeaveOptions` are not INI keys: handshake timeout defaults to 2 seconds, reconnect delay to 5 seconds, peer expiry to 20 seconds (checked every 22 seconds), peer limit to 256, receive queue to 256 frames, and transmit queue to 256 frames / 256 KiB. Display storage is bounded to 32 KiB.
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `port` | required | Serial port for the device |
+| `bitrate` | 250,000 bit/s | Generic bitrate estimate. This is not the serial baud rate. |
+
+The section name becomes the interface name. There are no serial speed or flow-control settings, because the device always runs at 3,000,000 baud, 8N1, with no flow control. The default IFAC size is 16 bytes; IFAC is applied by the interface manager, not the serial framing layer. Hardware MTU is 1024 bytes.
 
 ## Behaviour
 
-WDCL commands use big-endian fields and four-byte switch addresses. HDLC uses `0x7e` delimiters and `0x7d` escaping with XOR `0x20`. Discovery is broadcast; a signed connect response authenticates possession of the advertised Ed25519 key, not operator trust. Data packets carry the endpoint prefix on output and suffix on input. Duplicate suppression uses a shared 48-entry cache and a 750 ms window. The device reports endpoint liveness, path/via, logs, display updates, and CPU/task/memory telemetry. Hardware MTU is 1024 bytes.
+The parent is a spawning, reconnecting interface. Each child represents one eight-byte endpoint ID. A send on the parent itself does nothing; it is not a broadcast. When an endpoint expires, only its child is removed. If the device is lost, all its children end, and a reconnect can publish new ones. Failures in observers are reported without stopping processing.
 
-The parent is a spawning and reconnecting interface. Subscribe to `ChildConnected` before startup; child identities represent eight-byte endpoint IDs. The parent send is a no-op, not a broadcast. Endpoint expiry removes only that child; device loss ends all old children and reconnect can publish new children. Observer failures are reported without disabling processing.
+- **Framing.** HDLC with `0x7e` delimiters and `0x7d` escaping with XOR `0x20`.
+- **Discovery.** Discovery is broadcast. A signed connect response proves possession of the advertised Ed25519 key. It does not establish operator trust.
+- **Data.** Outgoing packets carry an endpoint ID prefix, and incoming packets an endpoint ID suffix.
+- **Duplicates.** Duplicate packets within 750 ms are suppressed using a 48-entry cache shared by the device.
+- **Peer expiry.** Endpoints expire after 20 seconds, checked every 22 seconds.
+- **Device reports.** The device reports endpoint liveness, path and via information, logs, display updates and CPU, task and memory telemetry.
 
 ### WDCL message details
 
-The protocol defines WDCL types 0–6 and four-byte switch addresses. Discovery and connection commands are signed over the remote switch ID. Packet delivery prefixes the outgoing endpoint ID and appends the incoming endpoint ID. Connection events use `0x3002`, local endpoint discovery `0x3003`, peer-alive `0x3102`, and peer-via `0x3104`. Display enable uses `0x0a00`; telemetry includes CPU, task, and memory observations. Unknown types, including type 6, are ignored because the pinned source declares but does not implement encapsulation handling.
+WDCL uses big-endian fields and four-byte switch addresses, and defines message types 0–6. Discovery and connection commands are signed over the remote switch ID. Event codes include connection `0x3002`, local endpoint discovery `0x3003`, peer-alive `0x3102` and peer-via `0x3104`. Display enable is `0x0a00`. Unknown types are ignored, including type 6: the pinned source declares encapsulation but does not implement it.
 
-The declared upstream `MAX_CHUNK` is 32768 bytes but the reference receive accumulator does not enforce it. The native frame decoder enforces its bound. Duplicate packet tracking is shared by the device and capped at 48 hashes over a 750 ms window. Peer expiry is checked every 22 seconds with a 20-second threshold. The device's serial bitrate is 3 Mbit/s; the 250 kbit/s interface bitrate is only the default network estimate.
+### Library API
 
-## Platform notes
+Use `WeavePacketInterface(portName, WeaveOptions)` or the owned stream-factory overload. Subscribe to `ChildConnected` before startup. `WeaveOptions` holds timer and resource limits that are not configuration keys:
 
-The native bearer uses the shared serial provider and owned streams. Windows x64 and Linux x64 are exercised by software suites; no physical Weave device has been verified. The upstream Android USB implementation is not a native Android adapter here. Android USB permissions, Bluetooth, mobile packaging, and untested platform drivers are not supported claims.
+| Option | Default |
+| --- | --- |
+| Handshake timeout | 2 seconds |
+| Reconnect delay | 5 seconds |
+| Peer expiry | 20 seconds, checked every 22 seconds |
+| Peer limit | 256 |
+| Receive queue | 256 frames |
+| Transmit queue | 256 frames or 256 KiB |
+| Display storage | 32 KiB |
 
 ## Differences from upstream
 
-The native implementation enforces a frame limit where upstream's declared `MAX_CHUNK=32768` is not enforced by its receive accumulator. Unknown WDCL types, including declared encapsulation type 6, are ignored because the pinned source has no processing implementation. Malformed frames, unbounded displays, and unchecked allocations are rejected or bounded. Startup failure is surfaced to the owner; reconnection uses owned cancellable work.
+- The native frame decoder enforces a frame limit. Upstream declares `MAX_CHUNK = 32768` but its receive accumulator does not enforce it.
+- Unknown WDCL types, including declared encapsulation type 6, are ignored because the pinned source has no processing for them.
+- Malformed frames, unbounded display data and unchecked allocations are rejected or bounded.
+- Startup failure is surfaced to the owner, and reconnection runs as owned, cancellable work.
+
+## Platform notes
+
+The interface uses the shared serial provider and owned streams. Software suites run on Windows x64 and Linux x64. No physical Weave device has been verified; physical-device testing is outside the current roadmap. The upstream Android USB implementation is not provided as a native Android adapter. Android USB permissions, Bluetooth, mobile packaging and untested platform drivers are not supported claims.
 
 ## Verification
 
-`Parity6WeaveTests` and `GenerateParity6WeaveVectors.py` exercise pinned WDCL discovery, handshake, packet delivery, display, command, and framing behavior with owned streams and recording adapters. The generator does not open a serial device. Tests do not establish physical serial, Bluetooth, Android, or live mixed-node interoperability.
+- `Parity6WeaveTests` exercises WDCL discovery, handshake, packet delivery, display, command and framing behaviour with owned streams and recording adapters.
+- `GenerateParity6WeaveVectors.py` generates the pinned reference vectors without opening a serial device.
+
+These tests do not establish physical serial, Bluetooth, Android or live mixed-node interoperability.
