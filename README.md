@@ -133,6 +133,10 @@ Windows rncp peer cases disclose a file-retention workaround in
 | macOS ARM64 | CI builds, runs the managed suite and an encrypted multi-megabyte native resource transfer; bounded rnsh terminal/native flows and actual Python roles verified; packaging not accepted |
 | Linux ARM/RISC-V, FreeBSD, Android, iOS | Not verified; a managed build is not platform support |
 
+Current acceptance is limited to the existing Windows, Linux x64 and macOS ARM64
+Actions targets and testable software behavior. Physical-device testing and
+other platform targets are outside the roadmap and remain unverified.
+
 ## Build and test
 
 ```sh

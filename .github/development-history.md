@@ -2,6 +2,17 @@
 
 Historical reference only: this file records milestone outcomes and verification evidence; active work is tracked in [TODO.md](../TODO.md), the original roadmap snapshot is [docs/archive/plan.md](../docs/archive/plan.md), and current-state documentation lives in `README.md` and `docs/`. Historical completion does not imply full Reticulum parity.
 
+## Acceptance scope adjustment
+
+On 2026-11-22, the user removed physical-hardware testing and other platforms
+such as Android from the current roadmap. The existing Actions matrix remains
+Windows x64, Linux x64 and macOS ARM64; no workflow or test was removed.
+Software-only interface work remains in scope where it can be exercised without
+physical devices. Prior device results remain historical evidence, while
+untested devices and out-of-scope targets remain unverified, not passed.
+Parity 7's remaining checklist entries were physical-only and were removed
+from active work, not retroactively marked as verified.
+
 ## Reference pins and provenance
 
 ### Root decluttering without changing build discovery

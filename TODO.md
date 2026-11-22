@@ -7,22 +7,21 @@ the [compatibility ledger](docs/compatibility-contracts.md) defines residual
 contracts and acceptance boundaries. [Completed entries](docs/archive/completed-todos.md)
 are archived rather than repeated here.
 
+Physical-device acceptance and targets outside the existing Windows, Linux x64
+and macOS ARM64 Actions matrix are out of scope; they remain unverified, not
+passed. Software-only tests do not establish hardware interoperability.
+
 - [ ] Parity 6 - Upstream interface coverage
-  - [ ] RNodeInterface and RNodeMultiInterface full software contracts (serial/TCP accepted; Windows BLE software slice implemented, remaining BLE discovery/platform/device acceptance outstanding)
-  - [ ] Desktop RNode BLE live-advertisement selection, Linux/macOS providers and physical platform/device acceptance (Windows cached paired-device provider is partial; local host has no Bluetooth adapter)
+  - [ ] RNodeInterface and RNodeMultiInterface remaining software contracts (serial/TCP accepted; Windows BLE software slice implemented)
+  - [ ] Desktop RNode BLE advertisement selection and Linux/macOS providers, with software-only acceptance (Windows cached paired-device provider is partial)
   - [ ] I2PInterface
-  - [ ] Android-specific adapters or documented native platform equivalents (deferred by user)
-  - [ ] Complete UDP/TCP/serial configuration and validate real serial/radio hardware
-  - [ ] Android USB/Bluetooth permission/adaptor contracts and on-device execution (deferred by user)
+  - [ ] Complete UDP/TCP/serial configuration and software acceptance
   - [ ] I2P public-tunnel delivery after persisted bearer restart (still fails for both .NET and pinned upstream); separate-router overlay, successful transport-enabled persisted startup (fresh succeeds, reused-state probe independently fails for native and pinned upstream candidates) and broader published-native acceptance remain outstanding
-  - [ ] Authorized physical serial/TNC/RNode/Multi/Weave and Android USB/Bluetooth/RF acceptance (one Windows RAK receive-only startup/reconfiguration/off/reopen verified; one radio only, RF acceptance explicitly retained as unverified; remaining devices/platform access/settings unavailable; see development history)
-- [ ] Parity 7 - Upstream utility coverage (software accepted; physical device acceptance outstanding)
-  - [ ] Remaining physical rnodeconf device/platform and RF acceptance (one RAK4631 verified; one radio cannot establish RF interoperability)
 - [ ] Parity 8 - Compatibility and release acceptance
   - [ ] Broader mesh acceptance: broader alternate-route topologies, cold initial-window resource-loss recovery, sustained Channel/resource soak and impaired native-binary/per-bearer matrices (pinned upstream cold-window cancellation is independently reproduced, not passing recovery)
-  - [ ] Windows, Linux and macOS managed/native feature flows; explicitly classify other upstream platform requirements
+  - [ ] Windows, Linux x64 and macOS ARM64 managed/native feature flows
   - [ ] Diagnose the earlier intermittent macOS reverse-send timeout (not reproduced in the subsequent five-repeat run); longer Channel/resource soak and broader impaired bearer matrices remain outstanding
-  - [ ] Android host/providers, desktop RNode BLE and other missing/partial applicable software identified in the compatibility ledger
-  - [ ] Per-interface interoperability and hardware evidence; untested platforms/devices remain unverified
+  - [ ] Desktop RNode BLE and other missing/partial in-scope software identified in the compatibility ledger
+  - [ ] Per-interface software interoperability where testable without physical hardware
 - [ ] CI/CD and automation
   - [ ] Expand shared advertised-claim scenarios for heterogeneous routing, broader application request boundaries and Channel/Buffer

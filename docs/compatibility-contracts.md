@@ -252,7 +252,9 @@ or invent a bundled application. The source anchors below are at the same pin.
 
 Each target is separate. A successful build, managed test, or RID declaration
 does not validate another target or every interface. `net10.0` is the library
-TFM, not an Android/iOS application.
+TFM, not an Android/iOS application. Current acceptance targets the existing
+Windows x64, Linux x64 and macOS ARM64 Actions matrix. Other targets and
+physical-device acceptance are outside the roadmap, not verified or passed.
 
 | OS / architecture / deployment | Current evidence | Status and boundary |
 | --- | --- | --- |
@@ -303,7 +305,8 @@ classifications.
 In particular, desktop RNode BLE is partial Windows software without physical
 acceptance or Linux/macOS providers; macOS rnsh has bounded execution acceptance,
 not installation or upstream interactive-UI acceptance.
-Android has no native host or USB/Bluetooth provider and is deferred. I2P
+Android has no native host or USB/Bluetooth provider and is outside the current
+roadmap. I2P
 local-destination persisted restart passes, while forced-public-tunnel restart
 fails for both .NET and upstream. Physical RF,
 per-bearer hardware operation, broader impaired/native mesh topologies, and
