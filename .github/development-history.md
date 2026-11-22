@@ -4205,4 +4205,31 @@ The operator and shared-backbone limitations noted above still apply.
   checks, with the pin initially absent and the expected pinned tree.
   The advertised head was `606a16911d64cdbcef8ea8babb85aa8fa2f78e79`.
   This does not establish that the additional interface prevents failures;
-  hosted acceptance remains pending until the actual Actions run completes.
+  the hosted run below provides one additional cross-platform observation.
+
+### Hosted two-gateway results
+
+PR #48 Build **45047706035** built and published all three native platforms
+for head `8c46291408fcde930707a62ad03af164e940f520`. Its downstream Test
+**45048061743** checked out PR merge commit
+`08a7a12040483c3c6fdad6342615542ba8e86985` and passed all jobs, including
+Unit, Integration, and both summary jobs. Static analysis **45047706022**
+also completed successfully; successful execution alone is not a claim that
+CodeQL found no issues.
+
+The 42 shared Compatibility cases each passed with no skips on each of
+Upstream, native Linux x64, native macOS arm64 and native Windows x64. T001
+passed in all four columns in the generated summary. The three uploaded
+candidate provenance files each record both configured gateways, an initially
+missing pin, 1,205,887 network bundle bytes, and the expected pinned tree.
+The advertised head remained `606a16911d64cdbcef8ea8babb85aa8fa2f78e79`.
+The canonical Linux source was reused for the pinned Python environment;
+the Upstream candidate independently fetched over Reticulum.
+
+Hosted Unit totals (passed / skipped) were Linux 1,445 / 5, macOS 1,445 / 5,
+and Windows 1,444 / 6. The uploaded `test-summary-1` artifact contains the
+separate Integration counts, skip reasons, and per-project and overall
+managed coverage. The Compatibility summary links its 42 rows to the
+executing merge commit. The tests use live loopback peers and the public
+seeded fetch; they do not prove a full network clone, physical bearer support,
+publisher authentication, route failover, or durable public-network reliability.
