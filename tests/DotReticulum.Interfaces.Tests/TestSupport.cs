@@ -63,7 +63,7 @@ internal static class TestSupport
         try
         {
             if (OperatingSystem.IsWindows()) socket.ExclusiveAddressUse = true;
-            // Binding without listening refuses connections while retaining the port.
+            // Binding without listening keeps the port owned while the peer is unavailable.
             socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
             return socket;
         }

@@ -4426,3 +4426,33 @@ encountered the lease; the controlled managed regression establishes that
 failure and retry explicitly. These local runs do not establish that all
 parallel races are eliminated. Linux and macOS were not exercised in this
 investigation; hosted CI remains separate evidence.
+
+### First hosted run and macOS fixture correction
+
+For `ca84c69256b5989bd9282c3ace3544620818229b`, Build **45071527162**
+published all three native platforms, and Static analysis **45071527285**
+completed. Its uploaded SARIF reports contained one existing Python CodeQL
+warning for the deliberately weak RSA test vector in
+`GenerateRnodeconfSigningVectors.py:23`; the preceding main run reported the
+same finding. The other three reports contained no findings.
+
+Test **45071849290** passed all 42 shared Compatibility cases for Upstream,
+Linux, macOS and Windows. All Unit jobs and Linux/Windows Integration passed,
+but macOS Integration failed
+`TcpPacketInterfaceTests.ClientConnectFailureThrowsAndInterfaceStaysDisposable`:
+the bound, non-listening socket left the connection pending until the five-second
+timeout, producing `OperationCanceledException` rather than the test's
+expected `SocketException`. The reconnect cases using that same fixture passed;
+this is not evidence that a bound socket always refuses connections on macOS.
+
+The exact-socket-error test now uses the non-connectable limited broadcast
+address instead of relying on how an unavailable local port responds. It still
+requires `SocketException` and checks that the interface remains disconnected
+and disposable. The shared fixture comment no longer promises a refusal.
+
+- `dotnet test tests\DotReticulum.Interfaces.Tests\DotReticulum.Interfaces.Tests.csproj -c Release --no-restore --nologo --filter 'FullyQualifiedName~ClientConnectFailureThrowsAndInterfaceStaysDisposable|FullyQualifiedName~InitialUnavailablePeerRecoversWithoutReplacingInterface|FullyQualifiedName~RetryLimitIsBoundedAndOfflineSendsAreNotQueued|FullyQualifiedName~ReconnectLimitCountsActualCallsNotAnExtraAttempt' --logger 'console;verbosity=normal'`:
+  7 passed on Windows.
+- `dotnet test DotReticulum.slnx -c Release --no-restore --nologo -v quiet`:
+  1,898 passed, 97 skipped, zero failed with default parallelism and live tests
+  disabled. The first hosted run predates this fixture correction and does not
+  establish its macOS result.
