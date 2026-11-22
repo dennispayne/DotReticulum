@@ -4122,3 +4122,53 @@ or timed out." No verified reference bundle was published. This independently
 distinguishes intermittent link establishment from a later stalled resource
 transfer; a specific relay, endpoint, or resource failure mechanism remains
 unconfirmed.
+
+## 2026-11-21: Multiple public gateway experiment
+
+On Windows, compared isolated fresh clients using the existing native
+`DotReticulum.Applications.exe` (version `1.5.7.124`, SHA-256
+`dc161d901a5f7770eb9f9154c468a95539422978f0d048c46f4c6a2ff5f18eed`).
+Each used `share_instance = no`, `enable_transport = no`, a fresh identity,
+the same single-default-branch request, and the same seed through
+`7f2b3b9b524c9386316379af1313b43a5e4f7a5d`; the target pin was confirmed
+absent before every fetch. The first seed came from the GitHub comparison
+mirror; the controls fetched that same seed from the first local repository.
+This is an incremental fetch, not a full network clone.
+
+The [RMAP service page](https://rmap.world/services.html) advertises
+`rmap.world:4242` as a public TCP entry point. The
+[ReticulumNet community page](https://www.reticulumnet.nl/en/community/)
+advertises `node.reticulumnet.nl:4242` as public and open. These are operator
+self-descriptions, not independently verified reputations, security policies,
+or guarantees. ReticulumNet also says its node is connected to RMAP, so these
+interfaces do not establish independent upstream routes.
+
+The initial dual-interface fetch finished in 27.8 seconds. Then the following
+sequential controls used `DotReticulum.Applications.exe rngit fetch
+rns://7649a50d84610232d1416b41d2896aff/reticulum/reticulum <repository.git>
+--config <config> --single-branch --timeout 300`, sampling established TCP
+connections by the native process ID:
+
+| Configured gateways | Connected gateways observed | Time | Result |
+| --- | --- | --- | --- |
+| RMAP | RMAP | 38.8 s | success; 12-hop path |
+| ReticulumNet | ReticulumNet | 27.6 s | success; 11-hop path |
+| Both | Both | 27.5 s | success; 11-hop path |
+
+Each control received 1,205,887 Git bundle bytes over Reticulum and passed
+`git --git-dir <repository.git> fsck --full --strict`; the target commit
+`a29bfb51c468945c96a1ee22cae0114e993e2391` and its tree
+`24d4c393de9fd57b933836cea68891fd953ab060` were verified. The advertised
+default HEAD was `606a16911d64cdbcef8ea8babb85aa8fa2f78e79`; that observation
+does not move the pin or authenticate the publisher. Durations include process
+startup; the table uses a sampling loop and is not a benchmark. Logs label
+interfaces by type only, so they do not identify which gateway carried the
+dual-interface transfer. These single successful trials do not establish
+reliability, failover, simultaneous multipath transfer, or a full-clone result.
+Neither the user's existing configuration nor CI gateway settings were changed.
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: passed,
+  zero warnings and errors.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo --logger
+  "console;verbosity=minimal"`: 1,887 passed, 97 skipped, 0 failed; no
+  reference environment was configured for this baseline.
