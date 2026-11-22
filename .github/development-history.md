@@ -4172,3 +4172,37 @@ Neither the user's existing configuration nor CI gateway settings were changed.
 - `dotnet test DotReticulum.slnx -c Release --no-build --nologo --logger
   "console;verbosity=minimal"`: 1,887 passed, 97 skipped, 0 failed; no
   reference environment was configured for this baseline.
+
+## 2026-11-22: Two gateways for Compatibility retrieval
+
+The shared Compatibility runner now supplies `rmap.world:4242` and
+`node.reticulumnet.nl:4242` as separate interfaces to both native candidates
+and the upstream retrieval baseline. The standalone retrieval script retains
+its single-gateway default; its optional second gateway and port are recorded
+in provenance. The claim asserts the configured gateway list against both
+candidate and canonical provenance. The pinned revision, required missing
+objects, nonzero network bytes and strict Git verification remain unchanged.
+An empty additional-gateway argument explicitly retains single-gateway mode.
+The operator and shared-backbone limitations noted above still apply.
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: passed,
+  zero warnings and errors.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo --logger
+  "console;verbosity=minimal"`: 1,887 passed, 97 skipped, 0 failed;
+  no verified reference environment was configured.
+- The Compatibility harness and Git retrieval claim ran with Pester 5.7.1:
+  18 passed, 2 explicitly skipped. The claim consumed the verified result
+  of the second native retrieval below. The module path was isolated because
+  this machine also has Pester 6 installed; loading both versions in one
+  PowerShell process fails.
+- `pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1`: 72 tracked
+  files analyzed, 0 findings. Compatibility discovery also completed.
+- Two fresh Windows native runs of `tests\Receive-Reference.ps1` with
+  `-Gateway rmap.world -AdditionalGateway node.reticulumnet.nl
+  -TimeoutSeconds 300` used the mirror-parent seed. The first discovered the
+  destination at 11 hops but failed to establish a link. The second reached
+  it at 12 hops, transferred 1,205,887 bundle bytes and passed strict Git
+  checks, with the pin initially absent and the expected pinned tree.
+  The advertised head was `606a16911d64cdbcef8ea8babb85aa8fa2f78e79`.
+  This does not establish that the additional interface prevents failures;
+  hosted acceptance remains pending until the actual Actions run completes.

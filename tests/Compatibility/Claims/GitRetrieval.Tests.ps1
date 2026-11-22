@@ -17,11 +17,12 @@ Describe 'Git over Reticulum reference retrieval' {
             Initialize-CompatibilityCandidate $Context
             $evidenceDirectory = Join-Path $Context.OutputDirectory 'upstream-retrieval'
             & (Join-Path $PSScriptRoot '..\..\Receive-Reference.ps1') -Python $Context.Python -Upstream $Context.Upstream `
-                -Revision $Context.Revision -Directory $evidenceDirectory -Gateway $Context.Gateway
+                -Revision $Context.Revision -Directory $evidenceDirectory -Gateway $Context.Gateway `
+                -AdditionalGateway $Context.AdditionalGateway
         }
         elseif ($Context.FetchReference) {
             & (Join-Path $PSScriptRoot '..\..\Receive-Reference.ps1') -Application $Context.Application `
-                -Directory $evidenceDirectory -Gateway $Context.Gateway
+                -Directory $evidenceDirectory -Gateway $Context.Gateway -AdditionalGateway $Context.AdditionalGateway
         }
         $evidence = Get-Content -LiteralPath (Join-Path $evidenceDirectory 'reference-provenance.json') -Raw | ConvertFrom-Json
         $canonical = Get-Content -LiteralPath (Join-Path $Context.ReferenceDirectory 'reference-provenance.json') -Raw | ConvertFrom-Json
@@ -29,6 +30,15 @@ Describe 'Git over Reticulum reference retrieval' {
         $evidence.pin | Should -BeExactly $Context.Revision
         $evidence.pinInitiallyMissing | Should -BeTrue
         $evidence.networkBundleBytes | Should -BeGreaterThan 0
+        $expectedGateways = @($Context.Gateway)
+        if ($Context.AdditionalGateway) { $expectedGateways += $Context.AdditionalGateway }
+        foreach ($retrieval in $evidence, $canonical) {
+            @($retrieval.gateways).Count | Should -Be $expectedGateways.Count
+            for ($index = 0; $index -lt $expectedGateways.Count; $index++) {
+                $retrieval.gateways[$index].host | Should -BeExactly $expectedGateways[$index]
+                $retrieval.gateways[$index].port | Should -Be 4242
+            }
+        }
         $evidence.pinTree | Should -Not -BeNullOrEmpty
         $evidence.pinTree | Should -BeExactly $canonical.pinTree
         $repository = Join-Path $evidenceDirectory 'repository.git'

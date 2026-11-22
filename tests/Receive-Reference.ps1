@@ -22,6 +22,8 @@ Fresh destination for the fetched repository, bundle, configuration and provenan
 .PARAMETER Gateway
 Reticulum TCP gateway hostname or IPv4 address.
 Defaults to rmap.world.
+.PARAMETER AdditionalGateway
+Optional second TCP gateway hostname or IPv4 address, using the same port.
 .PARAMETER Port
 Gateway TCP port, from 1 through 65535. Defaults to 4242.
 .PARAMETER TimeoutSeconds
@@ -38,15 +40,16 @@ param(
     [Parameter(ParameterSetName = 'Python')] [string] $Revision,
     [Parameter(Mandatory)] [string] $Directory,
     [string] $Gateway = 'rmap.world',
+    [AllowEmptyString()] [string] $AdditionalGateway = '',
     [ValidateRange(1, 65535)] [int] $Port = 4242,
     [ValidateRange(1, 3600)] [int] $TimeoutSeconds = 900
 )
 
 $ErrorActionPreference = 'Stop'
-if ($Gateway -notmatch '^[a-zA-Z0-9.-]+$') { throw 'Gateway must be a DNS hostname or IPv4 address.' }
-if (Test-Path -LiteralPath $Directory) { throw 'Fetch directory must be fresh.' }
 . (Join-Path $PSScriptRoot 'Pester\TestProcess.ps1')
 . (Join-Path $PSScriptRoot 'Compatibility\Support\Reference.ps1')
+$network = New-ReferenceGatewayConfiguration -Gateway $Gateway -AdditionalGateway $AdditionalGateway -Port $Port
+if (Test-Path -LiteralPath $Directory) { throw 'Fetch directory must be fresh.' }
 $pin = Get-CompatibilityReferenceRevision
 if (!$Revision) { $Revision = $pin }
 if ($Revision -ne $pin) { throw 'Reference retrieval revision must match the canonical pin.' }
@@ -72,17 +75,7 @@ $null = Invoke-Git @('--git-dir', $repository, 'fetch', '--no-tags',
 $null = Invoke-Git @('--git-dir', $repository, 'update-ref', 'refs/heads/main', $seed)
 $missing = Invoke-TestProcess git @('--git-dir', $repository, 'cat-file', '-e', "$pin^{commit}")
 if ($missing.Code -eq 0) { throw 'The target pin must be absent before the Reticulum fetch.' }
-@"
-[reticulum]
-share_instance = no
-enable_transport = no
-[interfaces]
-  [[CI gateway]]
-    type = TCPClientInterface
-    enabled = yes
-    target_host = $Gateway
-    target_port = $Port
-"@ | Set-Content -LiteralPath (Join-Path $config 'config') -Encoding utf8
+$network.Configuration | Set-Content -LiteralPath (Join-Path $config 'config') -Encoding utf8
 if ($Application) {
     $fetch = Invoke-TestProcess $applicationPath @('rngit', 'fetch', $url, $repository,
         '--config', $config, '--timeout', "$TimeoutSeconds", '--single-branch') -TimeoutSeconds ($TimeoutSeconds + 30)
@@ -173,6 +166,7 @@ $null = Invoke-Git @('--git-dir', $repository, 'bundle', 'create', $bundle, '--a
 [ordered]@{
     url = $url
     gateway = $Gateway
+    gateways = $network.Gateways
     seed = $seed
     seedSource = 'GitHub comparison mirror; only history through the parent of the pin'
     pin = $pin
