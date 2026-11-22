@@ -4456,3 +4456,56 @@ and disposable. The shared fixture comment no longer promises a refusal.
   1,898 passed, 97 skipped, zero failed with default parallelism and live tests
   disabled. The first hosted run predates this fixture correction and does not
   establish its macOS result.
+
+### Hosted correction verified
+
+For `7a7184dbe97366fd19542d7af737f33c28e3bcfb`, Build **45073382317**,
+Static analysis **45073382348**, and its downstream Test **45073773478**
+completed successfully. The formerly failing macOS connection-failure test
+passed in the uploaded Integration report, as did the affected reconnect
+cases. The Build uploaded and attested native and managed artifacts for all
+three platforms. Static analysis retained the same single pre-existing Python
+CodeQL warning described above; its other reports contained no findings.
+
+The rendered Compatibility summary contains 42 actual cases, each passing
+for Upstream and the Linux, macOS and Windows native candidates. The seeded
+Git retrieval case checked both configured gateways, an initially missing pin,
+nonzero network bundle bytes, matching pinned trees and strict Git integrity.
+This is not a full network clone or publisher authentication.
+
+The uploaded Unit and Integration reports show:
+
+| Platform | Unit passed / skipped | Integration passed / skipped |
+|---|---:|---:|
+| Linux x64 | 1452 / 9 | 721 / 20 |
+| macOS arm64 | 1452 / 9 | 710 / 31 |
+| Windows x64 | 1455 / 6 | 720 / 26 |
+
+There were no failures. Skips include platform-specific and opt-in cases; some
+Integration reports did not record reasons. Managed Unit and Integration
+coverage ran separately with live tests disabled; bounded native resource and
+Buffer checks enabled live mode and used the candidate-fetched Python
+reference. The uploaded summary retains the independent suite coverage and
+their union by source point. Merged managed coverage, shown as lines / branches,
+was:
+
+| Project | Linux x64 | macOS arm64 | Windows x64 |
+|---|---:|---:|---:|
+| DotReticulum.Applications | 76.39% / 63.04% | 76.60% / 63.23% | 76.67% / 63.50% |
+| DotReticulum.Core | 96.59% / 90.35% | 96.59% / 90.35% | 96.90% / 90.89% |
+| DotReticulum.Crypto | 94.83% / 94.00% | 94.83% / 94.00% | 94.83% / 94.00% |
+| DotReticulum.Interfaces | 86.59% / 75.83% | 82.16% / 73.24% | 82.18% / 73.01% |
+| DotReticulum.Transport | 91.72% / 79.80% | 91.63% / 79.83% | 91.49% / 79.56% |
+| **Overall** | 83.16% / 69.43% | 82.32% / 69.16% | 82.35% / 69.28% |
+
+The merged reports count each covered source point once across suites;
+managed-process coverage does not measure separately launched native code.
+Coverage badges run **45075082770** published commit `4265d20` from this Test.
+Only macOS runner-capacity notices appeared in the Build and Test annotations.
+The exact run monitors were:
+
+```powershell
+gh run watch 45073382317 --repo dennispayne/DotReticulum --compact --interval 20 --exit-status
+gh run watch 45073382348 --repo dennispayne/DotReticulum --compact --interval 20 --exit-status
+gh run watch 45073773478 --repo dennispayne/DotReticulum --compact --interval 20 --exit-status
+```
