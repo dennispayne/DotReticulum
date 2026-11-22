@@ -1,4 +1,5 @@
 using System.Globalization;
+using DotReticulum.Applications.Runtime;
 using DotReticulum.Core;
 
 namespace DotReticulum.Applications.Rngit;
@@ -18,15 +19,24 @@ public sealed class RngitHostStatistics
     private readonly RngitHostConfiguration configuration;
     private readonly Action<string>? diagnostic;
     private readonly TimeProvider clock;
+    private readonly Action<string, string> replaceFile;
     private Dictionary<object, object?> statistics = Initial();
     private int entries;
 
     public RngitHostStatistics(RngitHostConfiguration configuration, Action<string>? diagnostic = null, TimeProvider? clock = null)
+        : this(configuration, diagnostic, clock, static (staging, destination) => File.Move(staging, destination, overwrite: true))
+    {
+    }
+
+    internal RngitHostStatistics(RngitHostConfiguration configuration, Action<string>? diagnostic, TimeProvider? clock,
+        Action<string, string> replaceFile)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(replaceFile);
         this.configuration = configuration;
         this.diagnostic = diagnostic;
         this.clock = clock ?? TimeProvider.System;
+        this.replaceFile = replaceFile;
         try
         {
             if (!File.Exists(configuration.StatisticsPath))
@@ -208,7 +218,9 @@ public sealed class RngitHostStatistics
                 var bytes = MsgPack.Pack(statistics);
                 if (bytes.Length > MaxBytes) throw new InvalidDataException("Statistics exceed 16777216 bytes.");
                 Write(staging, bytes);
-                File.Move(staging, configuration.StatisticsPath, overwrite: true);
+                FileSystemSharingRetry.Execute(
+                    () => replaceFile(staging, configuration.StatisticsPath),
+                    () => !Directory.Exists(staging) && !Directory.Exists(configuration.StatisticsPath));
                 return true;
             }
             catch (Exception exception) when (PersistenceFailure(exception))

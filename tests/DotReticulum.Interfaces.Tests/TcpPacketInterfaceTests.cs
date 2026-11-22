@@ -207,11 +207,8 @@ public class TcpPacketInterfaceTests
     [Fact]
     public async Task ClientConnectFailureThrowsAndInterfaceStaysDisposable()
     {
-        var probe = new TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
-
+        using var offline = ReserveOfflineTcpPort();
+        var port = ((IPEndPoint)offline.LocalEndPoint!).Port;
         await using var client = new TcpClientPacketInterface("127.0.0.1", port);
         await Assert.ThrowsAsync<SocketException>(async () => await client.StartAsync(default));
         Assert.Throws<InvalidOperationException>(() => client.ReceiveAsync(default));

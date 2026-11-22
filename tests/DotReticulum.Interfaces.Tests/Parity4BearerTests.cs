@@ -49,27 +49,21 @@ public sealed class Parity4BearerTests
     [Fact]
     public async Task InitialUnavailablePeerRecoversWithoutReplacingInterface()
     {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
+        using var listener = ReserveOfflineTcpPort();
+        var port = ((IPEndPoint)listener.LocalEndPoint!).Port;
         await using var client = new TcpClientPacketInterface("127.0.0.1", port, reconnect: true,
             reconnectDelay: TimeSpan.FromMilliseconds(20), connectTimeout: TimeSpan.FromMilliseconds(200));
         var connected = 0;
         client.Connected += () => Interlocked.Increment(ref connected);
         await client.StartAsync(default);
         Assert.False(client.IsConnected);
-        listener = new TcpListener(IPAddress.Loopback, port);
-        listener.Start();
-        try
-        {
-            using var accepted = await listener.AcceptTcpClientAsync().WaitAsync(Patience);
-            await WaitFor(() => client.IsConnected && Volatile.Read(ref connected) == 1);
-            await using var inbound = client.ReceiveAsync(default).GetAsyncEnumerator();
-            await accepted.GetStream().WriteAsync(HdlcPacketFraming.Encode(MakePacket(3)));
-            Assert.Equal(3, TagOf(await Next(inbound)));
-        }
-        finally { listener.Stop(); }
+        listener.Listen(1);
+        using var accepted = await listener.AcceptAsync().WaitAsync(Patience);
+        await WaitFor(() => client.IsConnected && Volatile.Read(ref connected) == 1);
+        await using var inbound = client.ReceiveAsync(default).GetAsyncEnumerator();
+        await using var stream = new NetworkStream(accepted, ownsSocket: false);
+        await stream.WriteAsync(HdlcPacketFraming.Encode(MakePacket(3)));
+        Assert.Equal(3, TagOf(await Next(inbound)));
     }
 
     [Fact]
@@ -110,17 +104,16 @@ public sealed class Parity4BearerTests
     [Fact]
     public async Task RetryLimitIsBoundedAndOfflineSendsAreNotQueued()
     {
-        var probe = new TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
+        using var offline = ReserveOfflineTcpPort();
+        var port = ((IPEndPoint)offline.LocalEndPoint!).Port;
         await using var client = new TcpClientPacketInterface("127.0.0.1", port, reconnect: true,
             maxReconnectAttempts: 3, reconnectDelay: TimeSpan.FromMilliseconds(5),
             connectTimeout: TimeSpan.FromMilliseconds(200));
         await client.StartAsync(default);
         await client.SendAsync(MakePacket(1), default);
-        await using var inbound = client.ReceiveAsync(default).GetAsyncEnumerator();
-        Assert.False(await inbound.MoveNextAsync().AsTask().WaitAsync(Patience));
+        using var timeout = new CancellationTokenSource(Patience);
+        await using var inbound = client.ReceiveAsync(timeout.Token).GetAsyncEnumerator();
+        Assert.False(await inbound.MoveNextAsync());
         Assert.Equal(3, client.GetDiagnostics()["reconnect_attempts"]);
         Assert.False(client.IsConnected);
         Assert.Equal(0L, client.GetDiagnostics()["txb"]);
@@ -129,10 +122,8 @@ public sealed class Parity4BearerTests
     [Fact]
     public async Task DisposalCancelsLongReconnectDelayAndCancelledReceiver()
     {
-        var probe = new TcpListener(IPAddress.Loopback, 0);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
+        using var offline = ReserveOfflineTcpPort();
+        var port = ((IPEndPoint)offline.LocalEndPoint!).Port;
         var client = new TcpClientPacketInterface("127.0.0.1", port, reconnect: true,
             reconnectDelay: TimeSpan.FromHours(1), connectTimeout: TimeSpan.FromMilliseconds(200));
         await client.StartAsync(default);

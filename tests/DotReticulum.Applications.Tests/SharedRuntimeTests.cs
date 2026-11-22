@@ -292,10 +292,10 @@ public sealed class SharedRuntimeTests
     [Fact]
     public async Task RequiredSharedFailsRatherThanBecomingHostAndDisabledIsStandalone()
     {
-        using var probe = new TcpListener(Loopback);
-        probe.Start();
-        var port = ((IPEndPoint)probe.LocalEndpoint).Port;
-        probe.Stop();
+        using var offline = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        if (OperatingSystem.IsWindows()) offline.ExclusiveAddressUse = true;
+        offline.Bind(Loopback);
+        var port = ((IPEndPoint)offline.LocalEndPoint!).Port;
         await Assert.ThrowsAsync<IOException>(async () => await SharedInstanceSession.OpenAsync(new SharedInstanceOptions { Required = true, InstancePort = port }));
         await using var standalone = await SharedInstanceSession.OpenAsync(new SharedInstanceOptions { Enabled = false });
         Assert.Equal(SharedInstanceRole.Standalone, standalone.Role);

@@ -274,8 +274,9 @@ public sealed class RngitHostStatisticsTests : IDisposable
     {
         var diagnostics = new List<string>();
         var stats = Create(diagnostics.Add);
-        stats.RecordPush("group", "repo");
-        Assert.True(stats.Flush());
+        Assert.True(stats.IsAvailable, string.Join(Environment.NewLine, diagnostics));
+        Assert.True(stats.RecordPush("group", "repo"), string.Join(Environment.NewLine, diagnostics));
+        Assert.True(stats.Flush(), string.Join(Environment.NewLine, diagnostics));
         var old = File.ReadAllBytes(configuration.StatisticsPath);
         stats.RecordPush("group", "repo");
         File.Move(configuration.StatisticsPath, configuration.StatisticsPath + ".saved");
@@ -285,11 +286,76 @@ public sealed class RngitHostStatisticsTests : IDisposable
         Assert.Equal(old, File.ReadAllBytes(configuration.StatisticsPath + ".saved"));
         Directory.Delete(configuration.StatisticsPath);
         File.Move(configuration.StatisticsPath + ".saved", configuration.StatisticsPath);
-        Assert.True(stats.Flush());
+        Assert.True(stats.Flush(), string.Join(Environment.NewLine, diagnostics));
         Assert.Equal(2, Count(Create(), PushPath));
         Assert.Empty(Directory.GetFiles(directory, "*.new"));
         Assert.Single(diagnostics);
         Assert.Contains("Could not write", diagnostics[0]);
+    }
+
+    [WindowsPersistenceFact]
+    public async Task FlushRecoversAfterTemporaryWindowsSharingFailure()
+    {
+        var diagnostics = new List<string>();
+        var firstFailure = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        var attempts = 0;
+        var stats = new RngitHostStatistics(configuration, diagnostics.Add, clock, (staging, destination) =>
+        {
+            Interlocked.Increment(ref attempts);
+            try { File.Move(staging, destination, overwrite: true); }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                firstFailure.TrySetResult(exception.HResult);
+                if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException("Test did not release its file lease.");
+                throw;
+            }
+        });
+        Assert.True(stats.IsAvailable, string.Join(Environment.NewLine, diagnostics));
+        Assert.True(stats.RecordPush("group", "repo"));
+        var previous = File.ReadAllBytes(configuration.StatisticsPath);
+        Task<bool>? flush = null;
+        try
+        {
+            using (var lease = new FileStream(configuration.StatisticsPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                flush = Task.Run(stats.Flush);
+                var error = await firstFailure.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                Assert.Contains(error & 0xffff, new[] { 5, 32, 33 });
+                Assert.Equal(previous, File.ReadAllBytes(configuration.StatisticsPath));
+            }
+            release.Set();
+            Assert.True(await flush.WaitAsync(TimeSpan.FromSeconds(10)), string.Join(Environment.NewLine, diagnostics));
+            Assert.True(attempts >= 2);
+            Assert.Empty(diagnostics);
+            Assert.Equal(1, Count(Create(), PushPath));
+            Assert.Empty(Directory.GetFiles(directory, "*.new"));
+        }
+        finally
+        {
+            release.Set();
+            if (flush is not null) await flush.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+    }
+
+    [WindowsPersistenceFact]
+    public void FlushReportsPersistentWindowsSharingFailureAndPreservesCounters()
+    {
+        var diagnostics = new List<string>();
+        var stats = Create(diagnostics.Add);
+        Assert.True(stats.IsAvailable, string.Join(Environment.NewLine, diagnostics));
+        Assert.True(stats.RecordPush("group", "repo"));
+        var previous = File.ReadAllBytes(configuration.StatisticsPath);
+        using (var lease = new FileStream(configuration.StatisticsPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        {
+            Assert.False(stats.Flush());
+            Assert.Equal(previous, File.ReadAllBytes(configuration.StatisticsPath));
+            Assert.Single(diagnostics);
+            Assert.Contains("Could not write", diagnostics[0]);
+            Assert.Empty(Directory.GetFiles(directory, "*.new"));
+        }
+        Assert.True(stats.Flush(), string.Join(Environment.NewLine, diagnostics));
+        Assert.Equal(1, Count(Create(), PushPath));
     }
 
     [Fact]

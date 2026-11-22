@@ -45,6 +45,34 @@ public sealed class FileSystemSharingRetryTests
     }
 
     [WindowsPersistenceFact]
+    public void SynchronousWindowsFailureRetainsOriginalExceptionAndHasFiniteAttempts()
+    {
+        var failure = new IOException("busy", unchecked((int)0x80070020));
+        var attempts = 0;
+        var observed = Assert.Throws<IOException>(() => FileSystemSharingRetry.Execute(() =>
+        {
+            attempts++;
+            throw failure;
+        }));
+        Assert.Same(failure, observed);
+        Assert.Equal(9, attempts);
+    }
+
+    [WindowsPersistenceFact]
+    public void SynchronousRetryGuardStopsBeforeRetrying()
+    {
+        var failure = new IOException("busy", unchecked((int)0x80070020));
+        var attempts = 0;
+        var observed = Assert.Throws<IOException>(() => FileSystemSharingRetry.Execute(() =>
+        {
+            attempts++;
+            throw failure;
+        }, () => false));
+        Assert.Same(failure, observed);
+        Assert.Equal(1, attempts);
+    }
+
+    [WindowsPersistenceFact]
     public async Task ActualWindowsFileLeaseIsReleasedBeforeAtomicReplacementSucceeds()
     {
         var directory = Path.Combine(Path.GetTempPath(), "dotreticulum-rename-" + Guid.NewGuid().ToString("N"));

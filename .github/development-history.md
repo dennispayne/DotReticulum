@@ -4339,3 +4339,90 @@ pinned Python peers. On Windows the existing `rncp_win_shim.py` replaces
 upstream `shutil.move` with a copy when receiving, so that result is not an
 unmodified-upstream receive claim. No physical device or new Linux/macOS
 execution was involved.
+
+## 2026-11-22: Parallel local test investigation
+
+The earlier reconnect failures were not reproduced in four subsequent
+default-parallel baseline runs. The tests did, however, release an ephemeral
+TCP port before connecting to it. A controlled Windows probe demonstrated that
+another listener can claim that port, and that a client can also connect to
+itself and receive its own bytes. Neither observation establishes which
+condition caused the earlier failures. The offline fixtures now keep a bound,
+non-listening socket, with exclusive binding on Windows; the recovery test
+turns that same socket into a listener. Cancellation now bounds pending
+receives instead of letting async-enumerator disposal mask a timeout.
+
+The earlier statistics failure did not retain its diagnostic, so its cause
+remains unconfirmed. A separate Windows probe reproduced a plausible failure:
+a real handle without delete sharing caused atomic replacement to fail with
+access denied (`0x80070005`), and the same `RngitHostStatistics.Flush` succeeded
+after release. The diagnostic is now included in the original regression's
+assertions. Statistics replacement uses the existing Windows sharing-error
+classification with at most eight retries, nominal backoff totaling 910 ms,
+and directory guards. Exhausted retries still report failure, preserve the
+previous file and in-memory counters, and remove staging files. The controlled
+regression waits for an actual failed replacement before releasing the lease;
+it failed before this change and passes afterward. A second real-lease case
+checks the exhausted-retry and subsequent recovery paths.
+
+The pinned upstream `a29bfb51c468945c96a1ee22cae0114e993e2391`
+`RNS/Utilities/rngit/server.py:2089-2094` uses `os.rename` and logs errors
+without this bounded retry. The retry is a .NET Windows reliability difference,
+not evidence that the earlier intermittent failure had the same cause.
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: passed with
+  zero warnings and errors.
+- `dotnet test DotReticulum.slnx -c Release --nologo -v quiet`: three
+  consecutive default-parallel runs passed with 1,897 passed / 97 skipped /
+  zero failed each. After adding the exhausted-sharing test, a further run
+  passed with 1,898 passed / 97 skipped / zero failed. Opt-in live tests were
+  not enabled.
+- The affected interface, shared-runtime and statistics cases were exercised
+  together ten more times with default test parallelism: 100 passed, zero
+  skipped or failed. The repeated command was:
+
+  ```powershell
+  dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --filter 'FullyQualifiedName~RetryLimitIsBoundedAndOfflineSendsAreNotQueued|FullyQualifiedName~InitialUnavailablePeerRecoversWithoutReplacingInterface|FullyQualifiedName~ReconnectLimitCountsActualCallsNotAnExtraAttempt|FullyQualifiedName~ClientConnectFailureThrowsAndInterfaceStaysDisposable|FullyQualifiedName~RequiredSharedFailsRatherThanBecomingHostAndDisabledIsStandalone|FullyQualifiedName~RngitHostStatisticsTests.FlushRecoversAfterTemporaryWindowsSharingFailure|FullyQualifiedName~RngitHostStatisticsTests.FailedReplacementPreservesOldFileAndCountersForRetry'
+  ```
+
+- With `DOTRETICULUM_LIVE=0`, the final coverage run passed 1,898 tests with
+  97 explicit skips and zero failures. Five OpenCover reports were merged by
+  source point, not averaged:
+
+  ```powershell
+  dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet --settings tests\coverage.runsettings --collect:'XPlat Code Coverage' --results-directory C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files\coverage-parallel-fix-final
+  pwsh -NoProfile -File tests\Get-CoverageSummary.ps1 C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files\coverage-parallel-fix-final
+  ```
+
+  | Project | Lines | Branches |
+  |---|---:|---:|
+  | DotReticulum.Applications | 10006/13942 (71.77%) | 8488/14486 (58.59%) |
+  | DotReticulum.Core | 1846/1905 (96.90%) | 1159/1274 (90.97%) |
+  | DotReticulum.Crypto | 110/116 (94.83%) | 47/50 (94.00%) |
+  | DotReticulum.Interfaces | 4676/5690 (82.18%) | 2540/3479 (73.01%) |
+  | DotReticulum.Transport | 5123/5592 (91.61%) | 3260/4080 (79.90%) |
+  | **Overall** | 21761/27245 (79.87%) | 15494/23369 (66.30%) |
+
+The following Windows NativeAOT publish used MSVC `vcvars64.bat` in the same
+`cmd.exe` process, with the Visual Studio Installer on `PATH`:
+
+```powershell
+dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 --no-restore -o C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files\parallel-fix-native -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true --nologo -v quiet
+```
+
+The binary built from this working tree had SHA-256
+`78fd7e80995d8de3782fa34878c48eea9e88f94cd74af55a99f5537d83eda549`.
+Its help ran, and `NativeResourceTests.NativeListener_DecryptsDecompressesAndReturnsCompressedMultiMegabyteResource`
+passed with the native binary selected by `DOTRETICULUM_NATIVE_EXE`: a
+2,200,017-byte encrypted, compressed resource traveled in both directions
+between a managed peer and native `rncp`.
+
+A native `rngit` host and native Git helper also completed a loopback clone.
+During the host's scheduled statistics flush, a real Windows file lease was
+held while staging appeared, then released. The resulting persisted file
+reloaded with one recorded fetch and no staging file or write diagnostic.
+That native observation does not independently prove which replacement attempt
+encountered the lease; the controlled managed regression establishes that
+failure and retry explicitly. These local runs do not establish that all
+parallel races are eliminated. Linux and macOS were not exercised in this
+investigation; hosted CI remains separate evidence.

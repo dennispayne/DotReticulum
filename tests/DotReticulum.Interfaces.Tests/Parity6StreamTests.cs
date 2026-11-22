@@ -73,16 +73,15 @@ public sealed class Parity6StreamTests
     [InlineData(3)]
     public async Task ReconnectLimitCountsActualCallsNotAnExtraAttempt(int maximum)
     {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
+        using var offline = ReserveOfflineTcpPort();
+        var port = ((IPEndPoint)offline.LocalEndPoint!).Port;
         await using var client = new TcpClientPacketInterface("127.0.0.1", port, reconnect: true,
             maxReconnectAttempts: maximum, reconnectDelay: TimeSpan.FromMilliseconds(5),
             connectTimeout: TimeSpan.FromMilliseconds(200));
         await client.StartAsync(default);
-        await using var receiver = client.ReceiveAsync(default).GetAsyncEnumerator();
-        Assert.False(await receiver.MoveNextAsync().AsTask().WaitAsync(Patience));
+        using var timeout = new CancellationTokenSource(Patience);
+        await using var receiver = client.ReceiveAsync(timeout.Token).GetAsyncEnumerator();
+        Assert.False(await receiver.MoveNextAsync());
         var expected = Vectors.GetProperty("retry_limits").EnumerateArray().Single(
             item => item.GetProperty("maximum").GetInt32() == maximum).GetProperty("connect_calls").GetInt32();
         Assert.Equal(expected, client.GetDiagnostics()["reconnect_attempts"]);

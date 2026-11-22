@@ -278,10 +278,8 @@ public sealed class Parity6BackboneTests
     [LinuxBackboneFact]
     public async Task RetryExhaustionFaultsInsteadOfClaimingConnected()
     {
-        using var unused = new TcpListener(IPAddress.Loopback, 0);
-        unused.Start();
-        var port = ((IPEndPoint)unused.LocalEndpoint).Port;
-        unused.Stop();
+        using var offline = TestSupport.ReserveOfflineTcpPort();
+        var port = ((IPEndPoint)offline.LocalEndPoint!).Port;
         await using var client = new BackboneClientPacketInterface("127.0.0.1", port, new()
         {
             MaximumReconnectAttempts = 1, ReconnectDelay = TimeSpan.FromMilliseconds(20), ConnectTimeout = TimeSpan.FromSeconds(1),

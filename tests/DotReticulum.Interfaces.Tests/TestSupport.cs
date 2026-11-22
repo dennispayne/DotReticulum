@@ -57,6 +57,23 @@ internal static class TestSupport
         return ((IPEndPoint)s.LocalEndPoint!).Port;
     }
 
+    public static Socket ReserveOfflineTcpPort()
+    {
+        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        try
+        {
+            if (OperatingSystem.IsWindows()) socket.ExclusiveAddressUse = true;
+            // Binding without listening refuses connections while retaining the port.
+            socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            return socket;
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
+
     /// <summary>Two connected in-memory duplex streams (what one writes the other reads).</summary>
     public static (Stream A, Stream B) CreateDuplexPair()
     {
