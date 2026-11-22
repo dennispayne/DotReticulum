@@ -16,7 +16,7 @@ public static class RncpApp
           rncp -p                          Print this identity and listening destination, then exit
 
         Options:
-          --config <path>      Reticulum config directory or file (default ~/.dotreticulum)
+          --config <path>      Reticulum config directory or file (auto-discover; fallback ~/.reticulum)
           -l, --listen         Listen for incoming transfer requests
           -f, --fetch          Fetch <file> from the remote <destination> instead of sending
           -F, --allow-fetch    Listener: allow authenticated clients to fetch files

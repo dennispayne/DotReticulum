@@ -67,6 +67,7 @@ Describe 'Parity 7 native maintenance safety and placeholder processes' -Tag E2E
         $result = Invoke-TestProcess $executable ($prefix + @('rnodeconf', '--help'))
         $result.Code | Should -Be 0
         $result.Output | Should -Match 'authorize-device-write'
+        $result.Output | Should -Match '--baud-flash\s+BAUD.*921600'
         $result.Output | Should -Match 'NOT verified'
     }
 

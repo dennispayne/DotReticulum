@@ -214,6 +214,19 @@ public sealed class Parity7NetworkUtilitiesTests
     }
 
     [Fact]
+    public void MalformedBlackholeEntriesFailInsteadOfDisappearing()
+    {
+        var fields = new Dictionary<object, object?>();
+        foreach (var entry in new[]
+        {
+            new KeyValuePair<object, object?>("text-key", fields),
+            new KeyValuePair<object, object?>(new byte[15], fields),
+            new KeyValuePair<object, object?>(new byte[16], null),
+        })
+            Assert.Throws<InvalidDataException>(() => RnpathApp.WriteBlackholes([entry], null, TextWriter.Null));
+    }
+
+    [Fact]
     public void HashInputsAreStrictlySizedAndHexadecimal()
     {
         var expected = Enumerable.Range(0, 16).Select(value => (byte)value).ToArray();

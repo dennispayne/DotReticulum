@@ -136,7 +136,7 @@ Options:
   --duration <hours>       Blackhole duration
   --reason <text>          Blackhole reason
   -p, --blackholed-list    Read a transport's published blackhole list
-  -j, --json               Emit JSON for tables/lists
+  -j, --json               Emit JSON for path/rate tables, not blackhole lists
   -v, --verbose            Increase verbosity
 ```
 

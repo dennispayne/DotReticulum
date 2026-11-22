@@ -14,7 +14,7 @@ public static class RngitApp
         These commands transfer bare repositories; git must be on PATH.
         Use "rngit --help" for hosting/management and git-remote-rns for ordinary Git.
         Options:
-          --config <path>        .NET Reticulum config directory or file (default ~/.dotreticulum)
+          --config <path>        .NET Reticulum config directory or file (auto-discover; fallback ~/.reticulum)
           --timeout <seconds>    Overall deadline including path, link, transfers and local git (default 7200)
           --max-response <bytes> Maximum response resource size (default 268435456; buffered in memory)
           --single-branch        Transfer only the remote default branch (no other branches/tags)

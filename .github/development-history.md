@@ -4244,3 +4244,98 @@ managed coverage. The Compatibility summary links its 42 rows to the
 executing merge commit. The tests use live loopback peers and the public
 seeded fetch; they do not prove a full network clone, physical bearer support,
 publisher authentication, route failover, or durable public-network reliability.
+
+## 2026-11-22: Utility documentation findings
+
+Corrected the `rncp`, `rnx`, and direct `rngit` configuration help and
+documented Reticulum discovery and tool-specific identity paths. The generated
+`rngit` configuration sets a 360-minute announce interval; an existing
+configuration that omits it uses zero. Clarified that `rnpath --json` applies
+to path and rate tables, not blackhole lists, and documented `rnodeconf
+--baud-flash` and its ESP32-only effect.
+
+The process regression also exposed a separate `rnpath --blackholed` defect:
+the shared-management response decodes to a dictionary, which the utility had
+treated as empty. Populated dictionaries are now listed, empty responses retain
+their previous result, and malformed entries fail explicitly. The tests cover
+both baud boundaries and refusal outside them without accessing a device.
+
+Reference source was the verified RNS 1.5.7 checkout at
+`a29bfb51c468945c96a1ee22cae0114e993e2391`, tree
+`24d4c393de9fd57b933836cea68891fd953ab060`, with LXMF 1.2.1 in the isolated
+environment. Actual RNS import path and versions were checked. Source SHA-256:
+`rngit/server.py` `6257193aed6785359f4400da8d5413e7717ac5542e59666ac0f7f79e20975693`,
+`rnpath.py` `9674bdea46ed8c34fee3f4aafa9b675de51aa9e04bbee7cd27eb1f06f2c1ea2b`,
+`rnodeconf.py` `f8b43da8b25802dada7e437011f6282a25697365db94511d7451c1b64e993d0f`,
+and `Reticulum.py` `c655675a799413d9bb11d44ab90d56bc1f4fe339fee1ee5d108754dc8bf812d7`.
+The existing `GenerateRngitHostVectors.py` was executed against that checkout
+into an isolated temporary directory: generated-default and omitted intervals
+were 21,600 and 0 seconds respectively. Existing fixtures were not regenerated
+or relabelled. The generator executes the config method unmodified. Its
+separate statistics fixture fixes the day and removes the old file before a
+Windows rename, and avoids the upstream shared-default aliasing case; it does
+not establish unmodified Windows statistics persistence.
+
+```powershell
+$base = 'C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files'
+$root = Join-Path $base 'rngit-pages-reference\upstream'
+$python = Join-Path $base 'rngit-pages-reference\venv\Scripts\python.exe'
+$env:DOTRETICULUM_UPSTREAM = $root
+$env:PYTHONPATH = "$root;$(Resolve-Path 'tests\Interop')"
+& $python 'tests\DotReticulum.Applications.Tests\GenerateRngitHostVectors.py' --work-directory (Join-Path $base 'four-findings-reference-vectors\work') --output (Join-Path $base 'four-findings-reference-vectors\vectors.json')
+```
+
+- `dotnet build DotReticulum.slnx -c Release --no-restore --nologo -m:1 -v quiet`:
+  passed, zero warnings and errors.
+- `dotnet test tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj -c Release --no-restore --nologo --filter 'FullyQualifiedName~RnodeconfTests|FullyQualifiedName~RnodeconfFirmwareTests|FullyQualifiedName~RngitHostConfigurationTests|FullyQualifiedName~Parity7NetworkUtilitiesTests|FullyQualifiedName~RnsdConfigurationParityTests|FullyQualifiedName~ReticulumNodeTests|FullyQualifiedName~RncpRnxTests|FullyQualifiedName~BlackholeTests|FullyQualifiedName~SharedRuntimeTests' --logger 'console;verbosity=minimal'`:
+  220 passed, 5 skipped.
+- `dotnet test DotReticulum.slnx -c Release --no-build --no-restore --nologo -m:1 --logger 'console;verbosity=minimal'`:
+  1,894 passed, 97 skipped, none failed. Opt-in live xUnit tests were not enabled.
+  Two earlier default full-suite attempts had an unrelated statistics flush
+  failure, then two loopback reconnect failures; each passed in isolation and
+  the cause was not established. Serializing project execution passed the full
+  suite without changing assertions.
+- Pester 5.7.1 ran `Cli.Tests.ps1`, `Parity7NetworkUtilities.Tests.ps1`, and
+  `Parity7Device.Tests.ps1` against the managed application: 27 passed, one
+  hardware test skipped. Running those plus `Parity7Transfer.Tests.ps1`
+  against the Windows NativeAOT application gave 33 passed, one hardware test
+  skipped. Both used the verified Python environment where required.
+- `pwsh -NoProfile -File tools\Invoke-PowerShellAnalysis.ps1 -Report
+  C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files\four-findings-analysis-after.sarif`:
+  72 tracked files analyzed, zero findings.
+
+The native Pester invocation was:
+
+```powershell
+Import-Module Pester -RequiredVersion 5.7.1 -ErrorAction Stop
+$base = 'C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files'
+$app = Join-Path $base 'four-findings-native\DotReticulum.Applications.exe'
+$python = Join-Path $base 'rngit-pages-reference\venv\Scripts\python.exe'
+$upstream = Join-Path $base 'rngit-pages-reference\upstream'
+$containers = @(New-PesterContainer -Path 'tests\Pester\Cli.Tests.ps1' -Data @{Application=$app})
+foreach ($suite in 'NetworkUtilities','Device','Transfer') {
+    $containers += New-PesterContainer -Path "tests\Pester\Parity7$suite.Tests.ps1" -Data @{Application=$app;Python=$python;Upstream=$upstream}
+}
+$configuration = New-PesterConfiguration
+$configuration.Run.Container = $containers
+$configuration.Run.PassThru = $true
+$configuration.Output.Verbosity = 'Normal'
+$result = Invoke-Pester -Configuration $configuration
+if ($result.FailedCount -gt 0 -or $result.PassedCount -eq 0 -or $result.Result -ne 'Passed') { exit 1 }
+```
+
+For the native checks, MSVC `vcvars64.bat` and this publish ran in the same
+`cmd.exe` process, with the Visual Studio Installer on `PATH`:
+
+```powershell
+dotnet publish src\DotReticulum.Applications\DotReticulum.Applications.csproj -c Release -r win-x64 --no-restore -o C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files\four-findings-native -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true --nologo -v quiet
+```
+
+The published executable was version `1.5.7.134+418c69add9`, SHA-256
+`c59879a2c826d9697b7b85474798d014d87f11c94eec5947e2fe3b1dbecbbaf8`.
+It ran help, the affected utility processes, and authorized bidirectional
+multi-megabyte file transfers over loopback, including incompressible data and
+pinned Python peers. On Windows the existing `rncp_win_shim.py` replaces
+upstream `shutil.move` with a copy when receiving, so that result is not an
+unmodified-upstream receive claim. No physical device or new Linux/macOS
+execution was involved.

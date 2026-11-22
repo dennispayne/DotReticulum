@@ -174,6 +174,9 @@ Describe 'Parity 7 rnstatus, rnpath and rnprobe processes' -Tag E2E, NetworkUtil
     }
 
     It 'queries local daemon management and sends a real probe path request from separate CLI processes' -Tag 'Contract:UTIL-RNSTATUS-001', 'Contract:UTIL-RNPATH-001' {
+        $pathHelp = Invoke-NetworkUtility 'rnpath' @('--help')
+        $pathHelp.Code | Should -Be 0 -Because $pathHelp.Error
+        $pathHelp.Output | Should -Match '--json\s+.*path/rate tables, not blackhole lists'
         $shared = New-UtilityPort
         $control = New-UtilityPort
         $physical = New-UtilityPort
@@ -204,9 +207,16 @@ Describe 'Parity 7 rnstatus, rnpath and rnprobe processes' -Tag E2E, NetworkUtil
             $blocked = Invoke-NetworkUtility 'rnpath' @('--config', $clientConfig, '--blackhole', $unknown, '--reason', 'p7-process-test')
             $blocked.Code | Should -Be 0 -Because ($blocked.Output + $blocked.Error)
             $blocked.Output | Should -Match 'Blackholed identity'
+            $listed = Invoke-NetworkUtility 'rnpath' @('--config', $clientConfig, '--blackholed', '--json')
+            $listed.Code | Should -Be 0 -Because ($listed.Output + $listed.Error)
+            $listed.Output | Should -Match "$unknown.*blackholed.*p7-process-test"
+            $listed.Output | Should -Not -Match '^\s*[\[{]'
             $unblocked = Invoke-NetworkUtility 'rnpath' @('--config', $clientConfig, '--unblackhole', $unknown)
             $unblocked.Code | Should -Be 0 -Because ($unblocked.Output + $unblocked.Error)
             $unblocked.Output | Should -Match 'Lifted blackhole'
+            $empty = Invoke-NetworkUtility 'rnpath' @('--config', $clientConfig, '--blackholed', '--json')
+            $empty.Code | Should -Be 20
+            $empty.Output | Should -Match 'No blackholed identity data available'
 
             $probe = Invoke-NetworkUtility 'rnprobe' @('--config', $clientConfig, '--timeout', '0.1',
                 'app.aspect', $unknown)

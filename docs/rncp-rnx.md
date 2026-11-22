@@ -41,7 +41,7 @@ Usage:
   rncp -p                          Print this identity and listening destination, then exit
 
 Options:
-  --config <path>      Reticulum config directory or file (default ~/.dotreticulum)
+  --config <path>      Reticulum config directory or file (auto-discover; fallback ~/.reticulum)
   -l, --listen         Listen for incoming transfer requests
   -f, --fetch          Fetch <file> from the remote <destination> instead of sending
   -F, --allow-fetch    Listener: allow authenticated clients to fetch files
@@ -130,7 +130,7 @@ Usage:
   rnx -p                               Print this identity and listening destination, then exit
 
 Options:
-  --config <path>      Reticulum config directory or file (default ~/.dotreticulum)
+  --config <path>      Reticulum config directory or file (auto-discover; fallback ~/.reticulum)
   -l, --listen         Listen for incoming commands
   --allow-execution    Explicitly authorize the listener to start allowed peers' commands
   -p, --print-identity Print identity and destination and exit
@@ -201,7 +201,11 @@ A completed command returns 0 unless `-m` mirrors the remote status. Without `-m
 
 ## Configuration shared by both tools
 
-Both tools accept `--config <path>` for a Reticulum configuration directory or file, `-i <path>` for an identity file, and `-v`/`-q` to raise or lower logging verbosity. By default, identities are stored below the configured `storage/identities` directory. The tools attach to a shared native or pinned Python instance, or open their own runtime when the configuration sets `share_instance=no`; see [runtime operations](runtime-operations.md).
+Both tools accept `--config <path>` for a Reticulum configuration directory or file, `-i <path>` for an identity file, and `-v`/`-q` to raise or lower logging verbosity.
+
+Without `--config`, they search for an existing config in the system `/etc/reticulum` directory (on Windows, `\etc\reticulum` on the profile drive), then `~/.config/reticulum`. If neither exists, they use `~/.reticulum` and create a config there if needed. The default identity files are `<config directory>/storage/identities/rncp` and `<config directory>/storage/identities/rnx`; these are separate from the allowed-identities files below.
+
+The tools attach to a shared native or pinned Python instance, or open their own runtime when the configuration sets `share_instance=no`; see [runtime operations](runtime-operations.md).
 
 Allowed identities combine `-a` entries with the first existing file in this order:
 

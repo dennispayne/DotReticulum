@@ -483,8 +483,11 @@ public sealed class RnodeconfTests
         finally { Directory.Delete(folder, true); }
     }
 
-    [Fact]
-    public async Task ExtractionCapturesFiveExactSourcePartsWithoutExecutingAnyFirmware()
+    [Theory]
+    [InlineData("1200")]
+    [InlineData("460800")]
+    [InlineData("4000000")]
+    public async Task ExtractionCapturesFiveExactSourcePartsWithoutExecutingAnyFirmware(string baud)
     {
         var folder = OwnedDirectory();
         try
@@ -507,13 +510,49 @@ public sealed class RnodeconfTests
             using var error = new StringWriter();
             var result = await RnodeconfCli.RunWithServicesAsync(
                 ["SIM", "--extract", "--authorize-device-write", "--authorize-flash", "--authorize-unverified-device",
-                 "--state-dir", folder, "--flasher", Environment.ProcessPath!],
+                 "--state-dir", folder, "--flasher", Environment.ProcessPath!, "--baud-flash", baud],
                 TextWriter.Null, error, default, (_, _) => ValueTask.FromResult<Stream>(simulator), services);
             Assert.True(result == 0, error.ToString());
             Assert.Equal(5, calls.Count);
             Assert.Equal(new[] { "0x1000", "0x8000", "0xe000", "0x10000", "0x210000" }, calls.Select(c => c.Arguments[^3]));
-            Assert.All(calls, call => Assert.Contains("read_flash", call.Arguments));
+            Assert.All(calls, call =>
+            {
+                Assert.Contains("read_flash", call.Arguments);
+                var baudIndex = Array.IndexOf(call.Arguments.ToArray(), "--baud");
+                Assert.True(baudIndex >= 0);
+                Assert.Equal(baud, call.Arguments[baudIndex + 1]);
+            });
             Assert.True(File.Exists(Path.Combine(folder, "extracted", "extracted_rnode_firmware.version")));
+        }
+        finally { Directory.Delete(folder, true); }
+    }
+
+    [Theory]
+    [InlineData("1199")]
+    [InlineData("4000001")]
+    [InlineData("not-a-number")]
+    public async Task InvalidFlashBaudIsRejectedBeforeOpeningPortOrRunningTool(string baud)
+    {
+        var folder = OwnedDirectory();
+        try
+        {
+            var opened = false;
+            var toolRun = false;
+            var services = new RnodeconfServices
+            {
+                EnumeratePorts = () => [],
+                ExecuteTool = (_, _) => { toolRun = true; return Task.FromResult(0); }
+            };
+            using var error = new StringWriter();
+            var result = await RnodeconfCli.RunWithServicesAsync(
+                ["SIM", "--extract", "--authorize-device-write", "--authorize-flash", "--authorize-unverified-device",
+                 "--state-dir", folder, "--flasher", Environment.ProcessPath!, "--baud-flash", baud],
+                TextWriter.Null, error, default,
+                (_, _) => { opened = true; throw new InvalidOperationException("Unexpected serial access."); }, services);
+            Assert.Equal(1, result);
+            Assert.Contains("Invalid flash baud rate", error.ToString());
+            Assert.False(opened);
+            Assert.False(toolRun);
         }
         finally { Directory.Delete(folder, true); }
     }

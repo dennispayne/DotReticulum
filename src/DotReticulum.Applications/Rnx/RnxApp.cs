@@ -17,7 +17,7 @@ public static class RnxApp
           rnx -p                               Print this identity and listening destination, then exit
 
         Options:
-          --config <path>      Reticulum config directory or file (default ~/.dotreticulum)
+          --config <path>      Reticulum config directory or file (auto-discover; fallback ~/.reticulum)
           -l, --listen         Listen for incoming commands
           --allow-execution    Explicitly authorize the listener to start allowed peers' commands
           -p, --print-identity Print identity and destination and exit

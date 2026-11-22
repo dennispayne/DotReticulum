@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -83,8 +84,10 @@ public sealed class RnodeconfFirmwareTests
         finally { Directory.Delete(directory, true); }
     }
 
-    [Fact]
-    public async Task FlashPlansMatchExecutedUpstreamAndToolFailureIsNotSuccess()
+    [Theory]
+    [InlineData(921600)]
+    [InlineData(460800)]
+    public async Task FlashPlansMatchExecutedUpstreamAndToolFailureIsNotSuccess(int baud)
     {
         var directory = OwnedDirectory();
         try
@@ -95,13 +98,13 @@ public sealed class RnodeconfFirmwareTests
             foreach (var (platform, filename) in new[] { ((byte)0x70, "rnode_firmware_rak4631.zip"), ((byte)0x90, "rnode_firmware.hex"), ((byte)0x80, "rnode_firmware_tbeam.zip") })
             {
                 var artifact = new RnodeconfFirmwareArtifact("1.86", filename, Path.Combine(directory, filename), "");
-                var plan = RnodeconfFirmware.FlashPlan(platform, artifact, directory, "SIM", 921600, executable);
+                var plan = RnodeconfFirmware.FlashPlan(platform, artifact, directory, "SIM", baud, executable);
                 var reference = cases.GetProperty($"{platform:x2}/1.86/{filename}").EnumerateArray().Select(v => v.GetString()!).ToArray();
                 var expected = reference.Skip(reference[0] == "{python}" ? 2 : 1).Select(v => v
                     .Replace("{cache}", Path.Combine(directory, "update"), StringComparison.Ordinal)
                     .Replace("{version}", "1.86", StringComparison.Ordinal)
                     .Replace("{port}", "SIM", StringComparison.Ordinal)
-                    .Replace("{baud}", "921600", StringComparison.Ordinal))
+                    .Replace("{baud}", baud.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
                     .Select(v => v.Contains(directory, StringComparison.Ordinal) ? v.Replace('/', Path.DirectorySeparatorChar) : v);
                 Assert.Equal(expected, plan.Arguments);
                 var executed = false;

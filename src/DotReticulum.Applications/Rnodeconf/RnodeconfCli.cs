@@ -68,6 +68,7 @@ public static class RnodeconfCli
                   --key/-k --public/-P --sign/-S --rom/-r --eeprom-wipe --firmware-hash HEX
                   --update/-u --force-update/-U --flash/-f --autoinstall/-a --extract/-e
                   --fw-version VERSION --fw-url RELEASE_BASE --nocheck --use-extracted
+                  --baud-flash BAUD                  ESP32 flash/extract baud (default 921600)
                   --platform HEX --product HEX --model HEX --hwrev N --flasher INSTALLED_EXE
                   --list-models --list-ports --usb-serial USB_ID
                   --authorize-key-write --authorize-cache-write --authorize-eeprom

@@ -32,6 +32,33 @@ Describe 'DotReticulum CLI end-to-end' -Tag E2E {
         }
     }
 
+    It 'describes runtime config discovery and preserves tool identities under the selected config' -Tag 'Contract:UTIL-CLI-001' {
+        foreach ($tool in 'rncp', 'rnx') {
+            $help = Invoke-Cli @($tool, '--help')
+            $help.Code | Should -Be 0 -Because $help.Error
+            $help.Output | Should -Match 'auto-discover; fallback ~/\.reticulum'
+            $config = New-Item -ItemType Directory -Path (Join-Path $TestDrive $tool)
+            $configFile = Join-Path $config.FullName 'config'
+            "[reticulum]`nshare_instance = no`n[interfaces]" | Set-Content -LiteralPath $configFile
+            $configArgument = if ($tool -eq 'rncp') { $config.FullName } else { $configFile }
+            $first = Invoke-Cli @($tool, '--config', $configArgument, '-p')
+            $first.Code | Should -Be 0 -Because $first.Error
+            $identity = Join-Path $config.FullName "storage\identities\$tool"
+            Test-Path -LiteralPath $identity -PathType Leaf | Should -BeTrue
+            $saved = (Get-FileHash -LiteralPath $identity -Algorithm SHA256).Hash
+            $second = Invoke-Cli @($tool, '--config', $configArgument, '-p')
+            $second.Code | Should -Be 0 -Because $second.Error
+            (Get-FileHash -LiteralPath $identity -Algorithm SHA256).Hash | Should -Be $saved
+            [regex]::Match($first.Output, 'Identity\s*:\s*<([a-f0-9]{32})>').Groups[1].Value |
+                Should -Match '^[a-f0-9]{32}$'
+            [regex]::Match($second.Output, 'Identity\s*:\s*<([a-f0-9]{32})>').Groups[1].Value |
+                Should -Be ([regex]::Match($first.Output, 'Identity\s*:\s*<([a-f0-9]{32})>').Groups[1].Value)
+        }
+        $rngitHelp = Invoke-Cli @('rngit', 'clone', '--help')
+        $rngitHelp.Code | Should -Be 0 -Because $rngitHelp.Error
+        $rngitHelp.Output | Should -Match 'auto-discover; fallback ~/\.reticulum'
+    }
+
     It 'persists identity generation, preserves it on overwrite refusal and reloads the same public identity' -Tag 'Contract:UTIL-RNID-001' {
         $path = Join-Path $TestDrive 'private identity'
         $created = Invoke-Cli @('rnid', '--generate', $path)

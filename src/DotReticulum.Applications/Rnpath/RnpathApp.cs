@@ -35,7 +35,7 @@ public static class RnpathApp
           --duration <hours>       Blackhole duration
           --reason <text>          Blackhole reason
           -p, --blackholed-list    Read a transport's published blackhole list
-          -j, --json               Emit JSON for tables/lists
+          -j, --json               Emit JSON for path/rate tables, not blackhole lists
           -v, --verbose            Increase verbosity
         """;
 
@@ -123,7 +123,14 @@ public static class RnpathApp
         if (options.Blackholed)
         {
             var result = await node.CallManagementAsync(new Dictionary<object, object?> { ["get"] = "blackholed_identities" }, token).ConfigureAwait(false);
-            if (result is not IReadOnlyList<KeyValuePair<object, object?>> entries || entries.Count == 0)
+            IReadOnlyList<KeyValuePair<object, object?>> entries = result switch
+            {
+                Dictionary<object, object?> map => map.ToArray(),
+                IReadOnlyList<KeyValuePair<object, object?>> list => list,
+                null => [],
+                _ => throw new InvalidDataException("Invalid blackhole list response from management."),
+            };
+            if (entries.Count == 0)
             {
                 output.WriteLine("No blackholed identity data available");
                 return 20;
@@ -411,7 +418,9 @@ public static class RnpathApp
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         foreach (var (key, value) in entries)
         {
-            if (key is not byte[] hash || value is not Dictionary<object, object?> fields) continue;
+            if (key is not byte[] { Length: Identity.HashSize } hash ||
+                value is not Dictionary<object, object?> fields)
+                throw new InvalidDataException("Invalid blackhole entry in management response.");
             var until = fields.GetValueOrDefault("until") is { } expiration ? MsgPack.ToDouble(expiration) : 0;
             var reason = fields.GetValueOrDefault("reason") as string;
             var source = fields.GetValueOrDefault("source") as byte[] ?? [];

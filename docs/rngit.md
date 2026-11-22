@@ -186,7 +186,7 @@ A fetch into a seeded repository is an incremental fetch, not a full network clo
 
 ### Reticulum configuration for the direct client
 
-The direct client takes its .NET Reticulum configuration with `--config`. The directory form contains a `config` file. To reach a remote node through a gateway:
+The direct client takes its .NET Reticulum configuration with `--config`. The directory form contains a `config` file. Without this option it uses the usual Reticulum configuration discovery order, falling back to `~/.reticulum`; see [rncp and rnx](rncp-rnx.md#configuration-shared-by-both-tools). To reach a remote node through a gateway:
 
 ```ini
 [reticulum]
@@ -242,7 +242,7 @@ loglevel = 4
 | Section | Setting | Meaning | Default |
 | --- | --- | --- | --- |
 | `[rngit]` | `node_name` | Name shown on pages and in the page destination's app data | `Anonymous Git Node` |
-| `[rngit]` | `announce_interval` | Minutes between announces; zero disables periodic announces | |
+| `[rngit]` | `announce_interval` | Minutes between announces; zero disables periodic announces | 360 in a new config; 0 if omitted |
 | `[rngit]` | `mirror_interval` | Hours between mirror synchronizations; zero disables them | 24 |
 | `[rngit]` | `record_stats` | Record repository statistics | false |
 | `[rngit]` | `blocked_identities` | Identities disconnected after authentication | |

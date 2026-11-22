@@ -39,6 +39,7 @@ Usage: rnodeconf PORT [--info | --config | --eeprom-dump | --eeprom-backup]
   --key/-k --public/-P --sign/-S --rom/-r --eeprom-wipe --firmware-hash HEX
   --update/-u --force-update/-U --flash/-f --autoinstall/-a --extract/-e
   --fw-version VERSION --fw-url RELEASE_BASE --nocheck --use-extracted
+  --baud-flash BAUD                  ESP32 flash/extract baud (default 921600)
   --platform HEX --product HEX --model HEX --hwrev N --flasher INSTALLED_EXE
   --list-models --list-ports --usb-serial USB_ID
   --authorize-key-write --authorize-cache-write --authorize-eeprom
@@ -103,6 +104,8 @@ During manufacturing, a serial number is reserved before any device write and is
 ### Firmware
 
 `--fw-version` selects a release, `--fw-url` selects a custom release base and `--nocheck` disables the upstream-style version check. `--clear-cache`/`-C`, `--use-extracted`/`-E`, `--extract`/`-e`, `--update`/`-u`, `--force-update`/`-U`, `--flash`/`-f` and `--autoinstall`/`-a` control the firmware workflows. `--platform`, `--product`, `--model` and `--hwrev` select a target explicitly, and `--flasher` selects an independently installed flashing tool.
+
+`--baud-flash BAUD` sets the ESP32 tool's flashing and extraction rate, defaulting to 921600. The native utility accepts decimal values from 1200 through 4000000; the AVR and nRF52 plans use their own fixed rates. This setting does not change the 115200-baud maintenance connection.
 
 Limits and safeguards:
 
