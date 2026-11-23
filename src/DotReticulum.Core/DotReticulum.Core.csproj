@@ -6,6 +6,7 @@
   </ItemGroup>
 
   <PropertyGroup>
+    <Description>Reticulum identities, destinations, packet codec and interface manager for DotReticulum.</Description>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
