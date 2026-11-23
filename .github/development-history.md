@@ -76,10 +76,26 @@ synthetic package database showed the command returns zero, reports that it
 skipped the downgrade and retains the newer version. The test now verifies
 that report, the registered version and the installed payload. The macOS PKG
 built and its checksum matched, but expansion found no `rnid`, so system
-installation was not attempted. The next rehearsal will retain failed
-installers as separately named diagnostic artifacts and report the expanded
+installation was not attempted. The following rehearsal retained failed
+installers as separately named diagnostic artifacts and reported the expanded
 package layout; failed jobs still block release verification. No release was
 published.
+
+Manual Release rehearsal **45217355397** at **6251024** passed all five
+Windows installer tests and all six Linux tests, including Debian and RPM
+transactions. The macOS package was only 2,146 bytes: its distribution
+contained an empty choices outline and no payload. CPack's productbuild
+generator had built a component package without referencing it from the
+distribution. The macOS install rules now define one required Runtime
+component so that CPack includes the payload. This remains unverified until a
+new hosted run passes extraction and installation. RPM transactions use an
+isolated database with dependency checks disabled on Ubuntu; this is not
+acceptance on an RPM-based distribution. No release was published.
+An isolated Windows CMake configuration with the macOS host flag simulated
+registered a required Runtime component and installed the fixture executable,
+license and manifest beneath its temporary prefix. This does not verify a
+macOS PKG. Rebuilding the Windows MSI after the change passed four focused
+tests with the system-install test skipped on the shared machine.
 
 ## RNS 1.5.7 release preparation and roadmap
 
