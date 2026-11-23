@@ -411,11 +411,12 @@ Describe 'Native installer artifacts' -Tag Tooling {
                     $currentQuery.Output | Should -BeExactly $Version
                     Assert-Payload $bin $doc
                     (Get-Content -LiteralPath $sentinel -Raw) | Should -BeExactly 'preserve'
-                    $downgrade = Invoke-TestProcess $sudo @('dpkg', '--refuse-downgrade', '--install', $older) -TimeoutSeconds 180
-                    $downgrade.Code | Should -Not -Be 0
-                    ($downgrade.Output + $downgrade.Error) | Should -Match '(?i)downgrade'
+                    $downgrade = Invoke-TestProcess $sudo @('env', 'LC_ALL=C', 'dpkg', '--refuse-downgrade', '--install', $older) -TimeoutSeconds 180
+                    $downgrade.Code | Should -Be 0
+                    ($downgrade.Output + $downgrade.Error) | Should -Match '(?i)will not downgrade .* skipping'
                     $currentQuery = Invoke-Checked (Get-Command dpkg-query).Source @('-W', '-f=${Version}', 'dotreticulum')
                     $currentQuery.Output | Should -BeExactly $Version
+                    Assert-Payload $bin $doc
                     $null = Invoke-Checked $sudo @('dpkg', '--remove', 'dotreticulum')
                     foreach ($item in Get-InstalledRecords $bin $doc) { Test-Path -LiteralPath $item.Path | Should -BeFalse }
                     (Get-Content -LiteralPath $sentinel -Raw) | Should -BeExactly 'preserve'

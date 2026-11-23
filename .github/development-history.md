@@ -66,6 +66,17 @@ system transaction; it did not install anything on this shared machine.
 C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files\installer-fix-analysis.sarif`
 reported zero findings across 74 tracked files.
 
+Manual Release rehearsal **45214638206** at **f65ea01** passed all five
+Windows installer tests, including the guarded system transaction. Linux
+passed both package extractions and the isolated RPM upgrade, downgrade
+rejection and removal. Its Debian test installed the older package and
+upgraded it, then failed because it expected `dpkg --refuse-downgrade` to
+return a nonzero status. An unprivileged WSL dry run against an owned
+synthetic package database showed the command returns zero, reports that it
+skipped the downgrade and retains the newer version. The test now verifies
+that report, the registered version and the installed payload. The macOS job
+was still queued when this was recorded. No release was published.
+
 ## RNS 1.5.7 release preparation and roadmap
 
 Reorganized the remaining checklist around the next reference update,
