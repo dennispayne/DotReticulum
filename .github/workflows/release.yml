@@ -253,16 +253,13 @@ jobs:
 
       - name: Pack libraries
         run: |
-          # Nerdbank's NuGet version omits git height, so every release would reuse 1.5.7; use the tag's four-part version.
-          $versionOutput = @(dotnet msbuild src/DotReticulum.Core/DotReticulum.Core.csproj -getProperty:AssemblyFileVersion -p:Configuration=Release -t:GetBuildVersion)
+          $versionOutput = @(dotnet msbuild src/DotReticulum.Core/DotReticulum.Core.csproj -getProperty:NuGetPackageVersion -p:Configuration=Release -t:GetBuildVersion)
           if ($LASTEXITCODE -ne 0 -or $versionOutput.Count -eq 0) { throw 'Could not determine the package version.' }
           $version = $versionOutput[-1].Trim()
-          if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') { throw "Unexpected package version '$version'." }
           if ('${{ github.ref_type }}' -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
             throw "Tag $env:GITHUB_REF_NAME does not match package version $version."
           }
-          if ('${{ github.ref_type }}' -ne 'tag') { $version = "$version-dispatch.$($env:GITHUB_SHA.Substring(0, 12))" }
-          dotnet pack DotReticulum.slnx -c Release -o artifacts/nuget "-p:PackageVersion=$version" -p:ContinuousIntegrationBuild=true
+          dotnet pack DotReticulum.slnx -c Release -o artifacts/nuget -p:ContinuousIntegrationBuild=true
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $expected = 'Crypto', 'Core', 'Transport', 'Interfaces', 'Applications' | ForEach-Object { "DotReticulum.$_.$version" }
           $actual = @(Get-ChildItem artifacts/nuget -File | ForEach-Object Name | Sort-Object)

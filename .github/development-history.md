@@ -2,6 +2,38 @@
 
 Historical reference only: this file records milestone outcomes and verification evidence; active work is tracked in [TODO.md](../TODO.md), the original roadmap snapshot is [docs/archive/plan.md](../docs/archive/plan.md), and current-state documentation lives in `README.md` and `docs/`. Historical completion does not imply full Reticulum parity.
 
+## NuGet library packages
+
+The five `src` projects (Crypto, Core, Transport, Interfaces and Applications)
+are now NuGet packages so DotReticulum.Ecosystem can consume released
+versions instead of a Git submodule. Packing is opt-in through
+`src/Directory.Build.props`; tests and fixtures are not packed. Packages carry
+the Reticulum License file, `src/PACKAGE.md` (including the AI-assisted,
+unofficial disclosure), source-link repository metadata and `.snupkg` symbols.
+`version.json` sets the NuGet version precision to `revision`, so package
+versions match release tags (`1.5.7.<height>`); non-public builds get a
+`-g<commit>` prerelease suffix. Editing `version.json` without changing its
+version kept the height (`1.5.7.154` after the commit).
+
+`release.yml` gains a `nuget-pack` job that checks the tag matches the package
+version and that exactly the five expected packages and symbol packages were
+produced, and a tag-only `publish-nuget` job after the GitHub release. It uses
+NuGet trusted publishing through `NuGet/login` v1.2.0 (pinned to
+`8d196754b4036150537f80ac539e15c2f1028841`) with `id-token: write` scoped to
+that job and the nuget.org username from the `NUGET_USER` repository variable;
+missing configuration fails the job explicitly. Pushes use `--skip-duplicate`
+so a rerun after a partial push completes the set.
+
+Local evidence (Windows, 2026-11-23): `dotnet build DotReticulum.slnx -c
+Release` succeeded with 0 warnings and 0 errors; `dotnet pack DotReticulum.slnx
+-c Release -p:ContinuousIntegrationBuild=true` produced exactly the five
+`1.5.7.154-g5e09a3e94d` packages and symbols. A separate console project with an
+isolated `NuGet.Config` and package cache restored `DotReticulum.Applications`
+from that local feed (BouncyCastle and SharpZipLib from nuget.org), generated an
+identity and loaded `ReticulumNode` at assembly version `1.5.7.154`. No package
+has been published; the hosted pack job, nuget.org policy and Ecosystem
+migration remain unverified.
+
 ## Native installer packaging
 
 The release workflow now builds a Windows MSI, Linux DEB and RPM, and macOS
