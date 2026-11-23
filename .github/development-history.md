@@ -22,6 +22,22 @@ upstream-only Git retrieval when the reference link could not be established.
 The local run had no live-reference or native-executable opt-in configured.
 The retry does not establish that public-network retrieval is reliable.
 
+Release run **45194320118** for tag **v1.5.7.142** failed before publishing:
+macOS built and staged its native package but did not create an archive, and
+the other package jobs were cancelled. The workflow treated PowerShell's
+unset native `$LASTEXITCODE` as a failed packaging call, then exited
+successfully. It now checks the script invocation's success and explicitly
+fails on a packaging error.
+
+The new Pester regression executes the actual workflow staging step, verifies
+the archive and checksum with both unset and stale native exit codes, and
+requires packaging errors to fail. Both success cases failed before the fix.
+`tests/Invoke-PesterTests.ps1 -ToolingOnly` with isolated Pester **5.7.1**
+passed **133**, skipped **2**; PSScriptAnalyzer **1.24.0** reported zero findings
+across **72** tracked files. An initial unisolated Pester run failed six cases
+because installed Pester 5 and 6 assemblies were mixed; the isolated rerun did
+not change the tests.
+
 ## Completed stream writes and cancellation
 
 A deterministic stream regression showed that cancellation immediately after a

@@ -103,7 +103,7 @@ jobs:
           $version = if ('${{ github.ref_type }}' -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { "dispatch-$($env:GITHUB_SHA.Substring(0, 12))" }
           $name = "DotReticulum-$version-${{ matrix.rid }}"
           & ./tools/Invoke-DotReticulumPackaging.ps1 -Action Package -Rid '${{ matrix.rid }}' -PublishDirectory artifacts/native -OutputDirectory "artifacts/$name"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (!$?) { throw 'Release packaging failed.' }
           New-Item -ItemType Directory -Path artifacts/release | Out-Null
           $zip = Join-Path $PWD "artifacts/release/$name.zip"
           if ($IsWindows) {

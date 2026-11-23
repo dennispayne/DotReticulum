@@ -321,3 +321,65 @@ Describe 'Portable managed Build validation' -Tag Tooling {
         Test-Path -LiteralPath $results | Should -BeFalse
     }
 }
+
+Describe 'Release artifact staging' -Tag Tooling {
+    BeforeAll {
+        $workflowPath = Join-Path $PSScriptRoot '..\..\.github\workflows\release.yml'
+        $workflow = Get-Content -LiteralPath $workflowPath -Raw
+        $pattern = '(?m)^      - name: Stage package and create zip\r?\n        run: \|\r?\n(?<body>(?:^ {10}.*\r?\n)+)'
+        $match = [regex]::Match($workflow, $pattern)
+        if (!$match.Success) { throw 'Release artifact staging step was not found.' }
+        $script:releaseRid = if ($IsWindows) { 'win-x64' } elseif ($IsLinux) { 'linux-x64' } else { 'osx-arm64' }
+        $script:releaseStep = [regex]::Replace($match.Groups['body'].Value, '(?m)^ {10}', '').
+            Replace('${{ github.ref_type }}', 'tag').
+            Replace('${{ matrix.rid }}', $script:releaseRid)
+        if ($script:releaseStep.Contains('${{')) { throw 'Release staging contains an unresolved workflow expression.' }
+        $script:releasePackaging = Join-Path $PSScriptRoot '..\..\tools\Invoke-DotReticulumPackaging.ps1'
+        $script:releaseLicense = Join-Path $PSScriptRoot '..\..\LICENSE'
+    }
+
+    BeforeEach {
+        $script:releaseWorkspace = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $tools = Join-Path $script:releaseWorkspace 'tools'
+        $native = Join-Path $script:releaseWorkspace 'artifacts\native'
+        $null = New-Item -ItemType Directory -Path $tools, $native -Force
+        Copy-Item -LiteralPath $script:releasePackaging -Destination $tools
+        Copy-Item -LiteralPath $script:releaseLicense -Destination $script:releaseWorkspace
+        $script:releaseStepPath = Join-Path $script:releaseWorkspace 'Invoke-ReleaseStep.ps1'
+        $script:releaseName = "DotReticulum-1.5.7.42-$script:releaseRid"
+        $script:releaseZip = Join-Path $script:releaseWorkspace "artifacts\release\$script:releaseName.zip"
+        $script:releaseEnvironment = @{ GITHUB_REF_NAME = 'v1.5.7.42'; GITHUB_SHA = 'a' * 40 }
+    }
+
+    It 'creates a versioned archive and checksum when the native exit code is <State>' -ForEach @(
+        @{ State = 'unset'; Prefix = '' }
+        @{ State = 'stale'; Prefix = '$global:LASTEXITCODE = 17' }
+    ) {
+        $extension = if ($IsWindows) { '.exe' } else { '' }
+        Set-Content -LiteralPath (Join-Path $script:releaseWorkspace "artifacts\native\DotReticulum.Applications$extension") -Value 'test executable'
+        Set-Content -LiteralPath $script:releaseStepPath -Value "`$ErrorActionPreference = 'Stop'`n$Prefix`n$script:releaseStep"
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:releaseStepPath) `
+            -WorkingDirectory $script:releaseWorkspace -Environment $script:releaseEnvironment
+        $result.Code | Should -Be 0 -Because ($result.Output + $result.Error)
+        Test-Path -LiteralPath $script:releaseZip | Should -BeTrue
+        $hash = (Get-FileHash -LiteralPath $script:releaseZip -Algorithm SHA256).Hash.ToLowerInvariant()
+        (Get-Content -LiteralPath "$script:releaseZip.sha256" -Raw).Trim() | Should -BeExactly "$hash  $script:releaseName.zip"
+        $archive = [IO.Compression.ZipFile]::OpenRead($script:releaseZip)
+        try {
+            $names = @($archive.Entries.FullName)
+            $names | Should -Contain 'dotreticulum-package.json'
+            $names | Should -Contain 'LICENSE'
+            $names | Should -Contain "rngit$extension"
+        }
+        finally { $archive.Dispose() }
+    }
+
+    It 'fails explicitly when the packaging script rejects its input' {
+        Set-Content -LiteralPath $script:releaseStepPath -Value "`$ErrorActionPreference = 'Stop'`n$script:releaseStep"
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:releaseStepPath) `
+            -WorkingDirectory $script:releaseWorkspace -Environment $script:releaseEnvironment
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'Published native application'
+        Test-Path -LiteralPath $script:releaseZip | Should -BeFalse
+    }
+}
