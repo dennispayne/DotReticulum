@@ -51,13 +51,15 @@ The current target is **RNS 1.5.7**, upstream commit `a29bfb51c468945c96a1ee22ca
 
 ## Installation
 
-Published packages contain one native executable per tool, so you run `rnsd`, not `DotReticulum.Applications rnsd`. No .NET runtime is needed to run them. Building, packaging and installing the utilities is described in [Installing the utilities](docs/installation.md). Nothing is changed outside the install directory, and your `PATH` is yours to edit.
+Published packages contain one native executable per tool, so you run `rnsd`, not `DotReticulum.Applications rnsd`. No .NET runtime is needed to run them. Releases provide portable ZIPs; the release workflow also builds native Windows, Linux and macOS installers. The installers make system-wide changes, while the separate local installation script leaves `PATH` for you to edit. See [Installing the utilities](docs/installation.md) for locations, removal and limitations.
 
 To run a utility straight from source:
 
 ```sh
 dotnet run --project src/DotReticulum.Applications -- rnsd --help
 ```
+
+To use the stack from your own .NET 10 project, reference the NuGet packages, for example `dotnet add package DotReticulum.Applications`, which brings in Core, Crypto, Transport and Interfaces. No package has been published yet; the first will come from the next release tag.
 
 ## Building from source
 
@@ -110,7 +112,7 @@ This is bounded evidence, not comprehensive parity. For example, the Channel cas
 | --- | --- |
 | Windows x64 | Built, tested and NativeAOT-published; primary development platform |
 | Linux x64 | Built, tested and NativeAOT-published; Auto and Backbone live-tested |
-| macOS ARM64 | CI builds it, runs the managed suite and an encrypted multi-megabyte native resource transfer; bounded `rnsh` terminal/native flows and actual Python roles verified; packaging not accepted |
+| macOS ARM64 | CI builds it, runs the managed suite and an encrypted multi-megabyte native resource transfer; bounded `rnsh` terminal/native flows and actual Python roles verified; native PKG installation and reinstallation verified |
 | Linux ARM/RISC-V, FreeBSD, Android, iOS | Not verified; a managed build is not platform support |
 
 Current acceptance is limited to the existing Windows, Linux x64 and macOS ARM64 Actions targets and testable software behavior. Physical-device testing and other platform targets are outside the roadmap and remain unverified.
@@ -120,16 +122,18 @@ Current acceptance is limited to the existing Windows, Linux x64 and macOS ARM64
 A DotReticulum version is **the upstream RNS release it targets plus a build number**: `1.5.7.<height>`.
 
 - The first three components are the upstream RNS version, entered by hand in [`version.json`](version.json). They change only when the project's reference moves to a new upstream release.
-- The last component is the git height from [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning): the number of commits since `version.json` last changed. It rises with every commit and resets when the upstream number changes.
+- The last component is the git height from [Nerdbank.GitVersioning](https://github.com/dotnet/Nerdbank.GitVersioning): the number of commits since the version in `version.json` last changed. It rises with every commit and resets when the upstream number changes.
 - Tool `--version` output reports the upstream RNS version the tool is compatible with ("reference RNS 1.5.7").
 
 So `1.5.7.42` is the forty-second build aimed at RNS 1.5.7. A version number names the target, not completed parity. To move to a newer upstream, see [Moving to a new upstream release](.github/CONTRIBUTING.md#moving-to-a-new-upstream-release).
 
 ### Releases
 
-A release is a `v<version>` tag, such as `v1.5.7.42`, on `main`. Create it with `pwsh tools/New-ReleaseTag.ps1` and push it. The [Release workflow](.github/workflows/release.yml) then builds NativeAOT packages for `linux-x64`, `win-x64` and `osx-arm64`, zips them with SHA-256 checksums, and attaches them to a GitHub release. A manual run of the workflow builds the zips as artifacts without publishing them.
+A release is a `v<version>` tag, such as `v1.5.7.42`, on `main`. Create it with `pwsh tools/New-ReleaseTag.ps1` and push it. The [Release workflow](.github/workflows/release.yml) builds NativeAOT ZIPs and platform installers for `linux-x64`, `win-x64` and `osx-arm64`, and attaches them and SHA-256 checksums to a GitHub release. It also publishes the five `src` libraries to NuGet.org at the same version, using [trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing) rather than a stored API key. A manual run builds the same artifacts and packages without publishing anything.
 
-Each zip is the output of `tools/Invoke-DotReticulumPackaging.ps1`; see [installation](docs/installation.md). Platform support is only as strong as the recorded evidence. In particular, macOS package installation has not been accepted.
+Each ZIP contains the staged output of `tools/Invoke-DotReticulumPackaging.ps1`; the installers use the same staged files. Installers are unsigned, and the macOS package is not notarized. Existing releases are not changed retroactively. Platform support is only as strong as the recorded evidence; see [installation](docs/installation.md).
+
+NuGet publishing needs a nuget.org trusted-publishing policy for this repository's `release.yml`, and a `NUGET_USER` Actions variable holding the nuget.org username that owns the policy. Without the variable the NuGet job fails explicitly after the GitHub release is created. Packages are not signed by the project; nuget.org adds its repository signature.
 
 ## Contributing
 

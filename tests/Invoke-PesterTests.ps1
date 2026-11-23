@@ -19,6 +19,19 @@ Builds the presentation subprocess fixture and adds Git hosting, signing and med
 .PARAMETER NativePackaging
 Adds installation and package process tests. Requires Application to be a published
 native executable rather than a managed DLL.
+.PARAMETER InstallerDirectory
+Directory containing installers to exercise with -ToolingOnly. Also requires
+StagedPackageDirectory, InstallerVersion and InstallerBasename.
+.PARAMETER StagedPackageDirectory
+The validated staged package used to build the installers.
+.PARAMETER InstallerVersion
+The four-part application version used to build the installers.
+.PARAMETER InstallerBasename
+Installer filename prefix without an extension.
+.PARAMETER InstallerOnly
+Runs only the installer tests. Requires -ToolingOnly and the installer inputs.
+.PARAMETER InstallerSystemTest
+Also installs and removes packages on a disposable GitHub Actions runner.
 .PARAMETER Python
 Python interpreter for reference-dependent cases. Defaults to DOTRETICULUM_PYTHON.
 .PARAMETER Upstream
@@ -43,6 +56,12 @@ param(
     [switch] $GitRemote,
     [switch] $GitHosting,
     [switch] $NativePackaging,
+    [string] $InstallerDirectory,
+    [string] $StagedPackageDirectory,
+    [string] $InstallerVersion,
+    [string] $InstallerBasename,
+    [switch] $InstallerOnly,
+    [switch] $InstallerSystemTest,
     [string] $Python = $env:DOTRETICULUM_PYTHON,
     [string] $Upstream = $env:DOTRETICULUM_UPSTREAM,
     [switch] $AuthorizeRNodeFirmware,
@@ -53,6 +72,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if (($GitRemote -or $GitHosting -or $NativePackaging -or $AuthorizeRNodeFirmware) -and $ToolingOnly) { throw 'Application suites cannot be combined with -ToolingOnly.' }
+if ($InstallerDirectory -or $StagedPackageDirectory -or $InstallerVersion -or $InstallerBasename -or $InstallerOnly -or $InstallerSystemTest) {
+    if (!$ToolingOnly -or !$InstallerDirectory -or !$StagedPackageDirectory -or !$InstallerVersion -or !$InstallerBasename) {
+        throw 'Installer testing requires -ToolingOnly, -InstallerDirectory, -StagedPackageDirectory, -InstallerVersion and -InstallerBasename.'
+    }
+}
+if ($InstallerSystemTest -and ($env:GITHUB_ACTIONS -ne 'true' -or
+        $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:DOTRETICULUM_DISPOSABLE_INSTALL_TEST -ne '1')) {
+    throw 'System installation tests require an explicitly opted-in disposable GitHub-hosted runner.'
+}
 if ($AuthorizeRNodeFirmware -and (!$RNodeUsbSerial -or !$RNodeFirmwareVersion -or !$RNodeFlasher)) {
     throw '-AuthorizeRNodeFirmware requires -RNodeUsbSerial, -RNodeFirmwareVersion and -RNodeFlasher.'
 }
@@ -62,10 +90,23 @@ if (!$AuthorizeRNodeFirmware -and ($RNodeUsbSerial -or $RNodeFirmwareVersion -or
 if ($GitRemote -and ([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullOrWhiteSpace($Upstream))) {
     throw '-GitRemote requires -Python and -Upstream, or their DOTRETICULUM_* environment variables.'
 }
+if ($ToolingOnly -and !$PSBoundParameters.ContainsKey('Application')) { $Application = '' }
 Import-Module Pester -MinimumVersion 5.7.1 -ErrorAction Stop
-$containers = @(New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Coverage.Tests.ps1'))
-$containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\StaticAnalysis.Tests.ps1')
-$containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\BuildArtifacts.Tests.ps1')
+$containers = @()
+if (!$InstallerOnly) {
+    $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Coverage.Tests.ps1')
+    $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\StaticAnalysis.Tests.ps1')
+    $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\BuildArtifacts.Tests.ps1')
+}
+if ($InstallerDirectory) {
+    $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\NativeInstallers.Tests.ps1') -Data @{
+        InstallerDirectory = (Resolve-Path -LiteralPath $InstallerDirectory).Path
+        StagedPackageDirectory = (Resolve-Path -LiteralPath $StagedPackageDirectory).Path
+        Version = $InstallerVersion
+        Basename = $InstallerBasename
+        SystemTest = [bool]$InstallerSystemTest
+    }
+}
 if (!$ToolingOnly) {
     $resolved = (Resolve-Path -LiteralPath $Application).Path
     if ($NativePackaging) {

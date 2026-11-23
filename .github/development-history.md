@@ -2,6 +2,149 @@
 
 Historical reference only: this file records milestone outcomes and verification evidence; active work is tracked in [TODO.md](../TODO.md), the original roadmap snapshot is [docs/archive/plan.md](../docs/archive/plan.md), and current-state documentation lives in `README.md` and `docs/`. Historical completion does not imply full Reticulum parity.
 
+## NuGet library packages
+
+The five `src` projects (Crypto, Core, Transport, Interfaces and Applications)
+are now NuGet packages so DotReticulum.Ecosystem can consume released
+versions instead of a Git submodule. Packing is opt-in through
+`src/Directory.Build.props`; tests and fixtures are not packed. Packages carry
+the Reticulum License file, `src/PACKAGE.md` (including the AI-assisted,
+unofficial disclosure), source-link repository metadata and `.snupkg` symbols.
+`version.json` sets the NuGet version precision to `revision`, so package
+versions match release tags (`1.5.7.<height>`); non-public builds get a
+`-g<commit>` prerelease suffix. Editing `version.json` without changing its
+version kept the height (`1.5.7.154` after the commit).
+
+`release.yml` gains a `nuget-pack` job that checks the tag matches the package
+version and that exactly the five expected packages and symbol packages were
+produced, and a tag-only `publish-nuget` job after the GitHub release. It uses
+NuGet trusted publishing through `NuGet/login` v1.2.0 (pinned to
+`8d196754b4036150537f80ac539e15c2f1028841`) with `id-token: write` scoped to
+that job and the nuget.org username from the `NUGET_USER` repository variable;
+missing configuration fails the job explicitly. Pushes use `--skip-duplicate`
+so a rerun after a partial push completes the set.
+
+Local evidence (Windows, 2026-11-23): `dotnet build DotReticulum.slnx -c
+Release` succeeded with 0 warnings and 0 errors; `dotnet pack DotReticulum.slnx
+-c Release -p:ContinuousIntegrationBuild=true` produced exactly the five
+`1.5.7.154-g5e09a3e94d` packages and symbols. A separate console project with an
+isolated `NuGet.Config` and package cache restored `DotReticulum.Applications`
+from that local feed (BouncyCastle and SharpZipLib from nuget.org), generated an
+identity and loaded `ReticulumNode` at assembly version `1.5.7.154`.
+
+Hosted evidence: manual Release run 45232087077 showed the pack job's
+`GetBuildVersion` failing on a clean runner because Nerdbank.GitVersioning was
+not yet restored (cancelled); after adding `dotnet restore`, run 45232235903's
+**Pack NuGet packages** job at `dd917de` succeeded and produced exactly the five
+`1.5.7.156-gdd917de040` packages and symbol packages. The tag-only publish job
+was skipped for the dispatch. No package has been published; the nuget.org
+policy, OIDC exchange and Ecosystem migration remain unverified.
+
+## Native installer packaging
+
+The release workflow now builds a Windows MSI, Linux DEB and RPM, and macOS
+PKG from the same validated staged files used by the ZIPs. A manual workflow
+run uploads artifacts without publishing; a tagged run verifies the combined
+checksums before attaching the packages to its release. Windows Installer uses
+the upstream major and minor plus the full reachable Git commit count as its
+three-part version, so descendant release builds remain ordered despite MSI
+ignoring a fourth version component. It installs per-machine and adds its bin
+directory to machine PATH. Linux RPM post-processing does not strip the staged
+binaries, preserving their recorded hashes. The installers are unsigned, the
+macOS package is not notarized, and the RPM is built on Ubuntu rather than on
+an RPM-based distribution.
+
+Local Windows evidence, with live-reference tests disabled:
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: passed with
+  zero warnings and errors.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet`:
+  1,901 passed, 97 skipped, zero failed.
+- `tools\Invoke-PowerShellAnalysis.ps1`: PSScriptAnalyzer 1.24.0 reported zero
+  findings across 74 tracked scripts and modules.
+- The following command, with isolated Pester 5.7.1 and the session's CMake
+  and WiX tools on `PATH`, passed 141 tests with three explicit skips. The
+  system-install case was skipped because this machine is shared:
+
+  ```powershell
+  .\tests\Invoke-PesterTests.ps1 -ToolingOnly -InstallerDirectory C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files\installer-real-win\packages -StagedPackageDirectory C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files\installer-real-win\staged -InstallerVersion 1.5.7.143 -InstallerBasename DotReticulum-1.5.7.143-win-x64
+  ```
+- The Windows installer builder generated an MSI from the earlier rehearsal's
+  real NativeAOT executable (file version 1.5.7.143). Administrative extraction
+  verified every staged payload hash, the license, x64 metadata, utility
+  execution, the machine-PATH table entry and MSI upgrade identity; a distinct
+  lower-version MSI was built for the later upgrade test. No MSI was installed
+  on the shared machine.
+
+The local Windows run did not perform a system installation or verify
+Linux/macOS artifacts; hosted acceptance is recorded below.
+
+Manual Release rehearsal **45211847159** at **a40a2b9** built installers on
+all three platforms. Its Windows installer tests passed extraction, execution,
+an older-to-newer upgrade, downgrade rejection, machine PATH preservation and
+uninstall on the hosted runner. The job still failed because the unrelated
+tooling harness expected a managed application at its default build path; the
+release job had only published a native executable. Linux hit the same harness
+error and a line-wrapped guard-message assertion. The matrix cancelled the
+remaining Linux/macOS tests, so that run did not verify those installations or
+the combined checksums. The release step now runs only installer tests, while
+tooling-only runs no longer require a default application. The guard test
+accepts wrapped diagnostics, and all three jobs can finish independently. No
+release was published.
+
+On Windows, `dotnet build DotReticulum.slnx -c Release --verbosity quiet`
+passed without warnings and `dotnet test DotReticulum.slnx -c Release
+--verbosity quiet` passed 1,901 tests with 97 skips; live tests were disabled.
+With isolated Pester 5.7.1, `tests\Invoke-PesterTests.ps1 -ToolingOnly` passed
+139 tests with four skips. The focused `-ToolingOnly -InstallerOnly` run
+against the locally rebuilt MSI passed four tests and skipped the guarded
+system transaction; it did not install anything on this shared machine.
+`tools\Invoke-PowerShellAnalysis.ps1 -Report
+C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files\installer-fix-analysis.sarif`
+reported zero findings across 74 tracked files.
+
+Manual Release rehearsal **45214638206** at **f65ea01** passed all five
+Windows installer tests, including the guarded system transaction. Linux
+passed both package extractions and the isolated RPM upgrade, downgrade
+rejection and removal. Its Debian test installed the older package and
+upgraded it, then failed because it expected `dpkg --refuse-downgrade` to
+return a nonzero status. An unprivileged WSL dry run against an owned
+synthetic package database showed the command returns zero, reports that it
+skipped the downgrade and retains the newer version. The test now verifies
+that report, the registered version and the installed payload. The macOS PKG
+built and its checksum matched, but expansion found no `rnid`, so system
+installation was not attempted. The following rehearsal retained failed
+installers as separately named diagnostic artifacts and reported the expanded
+package layout; failed jobs still block release verification. No release was
+published.
+
+Manual Release rehearsal **45217355397** at **6251024** passed all five
+Windows installer tests and all six Linux tests, including Debian and RPM
+transactions. The macOS package was only 2,146 bytes: its distribution
+contained an empty choices outline and no payload. CPack's productbuild
+generator had built a component package without referencing it from the
+distribution. The macOS install rules now define one required Runtime
+component so that CPack includes the payload. RPM transactions use an isolated
+database with dependency checks disabled on Ubuntu; this is not acceptance on
+an RPM-based distribution. No release was published.
+An isolated Windows CMake configuration with the macOS host flag simulated
+registered a required Runtime component and installed the fixture executable,
+license and manifest beneath its temporary prefix. This does not verify a
+macOS PKG. Rebuilding the Windows MSI after the change passed four focused
+tests with the system-install test skipped on the shared machine.
+
+Manual Release rehearsal **45218850647**, at **24495e7**, succeeded on its
+second attempt. The first attempt passed all five Windows and six Linux
+installer tests, but GitHub could not acquire a macOS ARM64 runner because of
+capacity constraints. `gh run rerun 45218850647 --failed` reused the successful
+jobs and ran macOS on a hosted ARM64 runner. Pester 5.7.1 passed all three
+macOS tests: checksum, extracted payload hashes and architecture, native
+utility execution, and real installation, reinstallation and removal of
+owned files and receipt while preserving an unrelated file. The combined
+checksum job passed. The three ZIPs, four installers, individual sidecars and
+combined `SHA256SUMS.txt` were downloaded and independently verified with
+`Get-FileHash`. No release was published.
+
 ## RNS 1.5.7 release preparation and roadmap
 
 Reorganized the remaining checklist around the next reference update,
@@ -76,9 +219,9 @@ tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
 -c Release --no-build --nologo -v quiet --filter
 'FullyQualifiedName~NativeListener_DecryptsDecompressesAndReturnsCompressedMultiMegabyteResource'
 -- xUnit.MaxParallelThreads=1` passed **1**, skipped **0**, exercising an
-encrypted, compressed 2,200,017-byte round trip. macOS package installation
-and physical-device operation remain unverified. The earlier **v1.5.7.142**
-tag remains unpublished and was not reused.
+encrypted, compressed 2,200,017-byte round trip. Installation of that ZIP on
+macOS and physical-device operation were not verified in that release run.
+The earlier **v1.5.7.142** tag remains unpublished and was not reused.
 
 ## Completed stream writes and cancellation
 

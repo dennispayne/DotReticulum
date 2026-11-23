@@ -1,6 +1,6 @@
 # Installing native DotReticulum utilities
 
-This guide shows how to build the DotReticulum utilities as a native executable, stage them as a package, install them into a directory of your choice and check that they run.
+This guide covers native installers, portable release ZIPs, and building and installing the utilities into a directory of your choice.
 
 DotReticulum is experimental. Installing it does not make it an official Reticulum implementation, and a version number names the upstream release it targets, not completed parity.
 
@@ -24,7 +24,57 @@ You can build packages for these runtime identifiers (RIDs):
 | Linux x64 | `linux-x64` |
 | macOS ARM64 | `osx-arm64` |
 
-You can stage a package for any of these RIDs, but installation only accepts a package that matches the current host. On macOS, Actions has published and smoke-tested the native binary and staged a package; package installation remains unverified.
+Choose a package matching your operating system and architecture. The release workflow builds native installers for these targets; older releases may contain ZIPs only. The ZIP can also be extracted and used without installing.
+
+## Native installers
+
+The installers are attached to a release as **Assets**, not as GitHub Packages. Verify the download against the release's `SHA256SUMS.txt` before installing. The checksums detect accidental corruption; they are not signatures. The installers are unsigned, and the macOS package is not notarized, so the operating system may warn or block installation.
+
+Native installers modify system locations and require administrator privileges. They use the operating system's package facilities, not the collision and modified-file protections of the local script below. Check for existing utilities with the same names before installing.
+
+### Windows
+
+Run the `win-x64.msi` installer, or install it from an elevated terminal:
+
+```powershell
+msiexec /i .\DotReticulum-<version>-win-x64.msi
+```
+
+By default the MSI installs to `C:\Program Files\DotReticulum`, adds its `bin` directory to the machine `PATH`, and removes that entry on uninstall. If you choose another location, use a directory writable only by administrators. Open a new terminal to pick up the change. Remove the package through Installed apps, or with `msiexec /x` and the MSI file.
+
+A newer MSI from a descendant release commit upgrades an older one; Windows Installer rejects an older package when a newer one is installed. Windows Installer compares only three version components, so the MSI uses the upstream major and minor numbers and the total reachable Git commit count internally. The four-part DotReticulum version remains in the filename and product name. Building an MSI requires complete Git history; version ordering is intended for releases from `main`, not unrelated development branches.
+
+### Linux
+
+The `linux-x64.deb` and `linux-x64.rpm` packages install the utilities into `/usr/bin` and the license and manifest into `/usr/share/doc/dotreticulum`. Use only one package format on a system. On a compatible Debian-family system:
+
+```sh
+sudo apt install ./DotReticulum-<version>-linux-x64.deb
+sudo apt remove dotreticulum
+```
+
+On a compatible RPM-based system:
+
+```sh
+sudo dnf install ./DotReticulum-<version>-linux-x64.rpm
+sudo dnf remove dotreticulum
+```
+
+Package dependencies are detected from the native executables. The release packages are built on the Ubuntu Actions runner; other distributions, older C libraries and RPM-based hosts may have different dependency requirements and are not established by that build alone.
+
+### macOS
+
+The `osx-arm64.pkg` installs the utilities into `/usr/local/bin` and the license and manifest into `/usr/local/share/doc/dotreticulum`. It can be installed from the graphical installer or from a terminal:
+
+```sh
+sudo installer -pkg DotReticulum-<version>-osx-arm64.pkg -target /
+```
+
+macOS packages do not provide a general uninstall command. To remove this one, inspect its receipt with `pkgutil --pkgs` and `pkgutil --files <receipt-id>`, and remove its files individually after checking that they are still the files you intend to remove. The receipt begins with `net.dotreticulum.utilities`; `sudo pkgutil --forget <receipt-id>` removes the receipt, not the files. Keep unrelated or modified files.
+
+## Build and install locally
+
+The following steps build and stage a package from source, then use the separate PowerShell script to install it under a directory you choose.
 
 ## Prerequisites
 
@@ -32,7 +82,7 @@ You can stage a package for any of these RIDs, but installation only accepts a p
 - PowerShell 7, to run the packaging script.
 - The platform's NativeAOT toolchain: MSVC C++ build tools on Windows, `clang` and zlib development files on Linux, or Xcode tools on macOS.
 
-Installation needs no administrator rights.
+This local installation method needs no administrator rights and does not change `PATH`.
 
 ## Step 1: Publish the native executable
 
@@ -124,14 +174,23 @@ The script treats these as errors rather than overwriting or deleting anything:
 - Paths that escape the install root.
 - Package integrity failures.
 
+## Building native installers
+
+The shared CPack configuration under `tools/packaging` builds installers from a staged package on the matching host. It requires CMake and CPack 3.30 or later, plus WiX 4.0.6 and its matching UI extension on Windows, `dpkg-shlibdeps` and `rpmbuild` on Linux, or the Xcode package tools on macOS. Windows also needs complete Git history for the MSI version.
+
+For example, after staging `artifacts\package-win-x64`, use the version embedded in the published application:
+
+```powershell
+$version = (dotnet msbuild src\DotReticulum.Applications\DotReticulum.Applications.csproj `
+  -getProperty:AssemblyFileVersion -p:Configuration=Release -t:GetBuildVersion | Select-Object -Last 1).Trim()
+pwsh -NoProfile -File tools\New-NativeInstallers.ps1 -Rid win-x64 `
+  -PackageDirectory artifacts\package-win-x64 -Version $version -OutputDirectory artifacts\installers
+```
+
+The builder validates the staged files, refuses to overwrite an existing installer, and writes a SHA-256 sidecar for each output.
+
 ## What installation does not do
 
-These operations only stage and copy the native application. They do not:
-
-- Install services.
-- Create identities.
-- Configure interfaces.
-- Update `PATH`.
-- Enable remote execution, authorize device operations or perform any device or remote-command action.
+Neither method installs services, creates identities, configures interfaces, or enables remote execution, device operations or remote commands. The local script also does not change `PATH` or Git configuration.
 
 To configure and run a node after installing, start with `rnsd --help`.

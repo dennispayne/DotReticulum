@@ -335,6 +335,7 @@ Describe 'Release artifact staging' -Tag Tooling {
             Replace('${{ matrix.rid }}', $script:releaseRid)
         if ($script:releaseStep.Contains('${{')) { throw 'Release staging contains an unresolved workflow expression.' }
         $script:releasePackaging = Join-Path $PSScriptRoot '..\..\tools\Invoke-DotReticulumPackaging.ps1'
+        $script:nativeInstaller = Join-Path $PSScriptRoot '..\..\tools\New-NativeInstallers.ps1'
         $script:releaseLicense = Join-Path $PSScriptRoot '..\..\LICENSE'
     }
 
@@ -364,6 +365,9 @@ Describe 'Release artifact staging' -Tag Tooling {
         Test-Path -LiteralPath $script:releaseZip | Should -BeTrue
         $hash = (Get-FileHash -LiteralPath $script:releaseZip -Algorithm SHA256).Hash.ToLowerInvariant()
         (Get-Content -LiteralPath "$script:releaseZip.sha256" -Raw).Trim() | Should -BeExactly "$hash  $script:releaseName.zip"
+        $checksumBytes = [IO.File]::ReadAllBytes("$script:releaseZip.sha256")
+        $checksumBytes[-1] | Should -Be 10
+        $checksumBytes | Should -Not -Contain 13
         $archive = [IO.Compression.ZipFile]::OpenRead($script:releaseZip)
         try {
             $names = @($archive.Entries.FullName)
@@ -381,5 +385,127 @@ Describe 'Release artifact staging' -Tag Tooling {
         $result.Code | Should -Not -Be 0
         $result.Error | Should -Match 'Published native application'
         Test-Path -LiteralPath $script:releaseZip | Should -BeFalse
+    }
+
+    It 'validates staged packages without installing and rejects corrupt or mismatched input' {
+        $extension = if ($IsWindows) { '.exe' } else { '' }
+        Set-Content -LiteralPath (Join-Path $script:releaseWorkspace "artifacts\native\DotReticulum.Applications$extension") -Value 'test executable'
+        $package = Join-Path $script:releaseWorkspace 'package'
+        $staged = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:releasePackaging, '-Action', 'Package',
+            '-Rid', $script:releaseRid, '-PublishDirectory', (Join-Path $script:releaseWorkspace 'artifacts\native'),
+            '-OutputDirectory', $package)
+        $staged.Code | Should -Be 0 -Because $staged.Error
+        $valid = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:releasePackaging, '-Action', 'Validate',
+            '-Rid', $script:releaseRid, '-PackageDirectory', $package)
+        $valid.Code | Should -Be 0 -Because $valid.Error
+        $otherRid = if ($script:releaseRid -eq 'win-x64') { 'linux-x64' } else { 'win-x64' }
+        $mismatch = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:releasePackaging, '-Action', 'Validate',
+            '-Rid', $otherRid, '-PackageDirectory', $package)
+        $mismatch.Code | Should -Not -Be 0
+        $mismatch.Error | Should -Match 'does not match'
+        Add-Content -LiteralPath (Join-Path $package "rnid$extension") -Value 'corrupt'
+        $corrupt = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:releasePackaging, '-Action', 'Validate',
+            '-Rid', $script:releaseRid, '-PackageDirectory', $package)
+        $corrupt.Code | Should -Not -Be 0
+        $corrupt.Error | Should -Match 'integrity validation'
+    }
+
+    It 'rejects malformed installer versions before creating an output directory' {
+        $output = Join-Path $script:releaseWorkspace 'installer-output'
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:nativeInstaller, '-Rid', $script:releaseRid,
+            '-PackageDirectory', $script:releaseWorkspace, '-Version', '1.5.7', '-OutputDirectory', $output)
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'Invalid four-part application version'
+        Test-Path -LiteralPath $output | Should -BeFalse
+    }
+
+    It 'rejects a corrupt staged package before creating installers' {
+        $extension = if ($IsWindows) { '.exe' } else { '' }
+        Set-Content -LiteralPath (Join-Path $script:releaseWorkspace "artifacts\native\DotReticulum.Applications$extension") -Value 'test executable'
+        $package = Join-Path $script:releaseWorkspace 'package'
+        $staged = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:releasePackaging, '-Action', 'Package',
+            '-Rid', $script:releaseRid, '-PublishDirectory', (Join-Path $script:releaseWorkspace 'artifacts\native'),
+            '-OutputDirectory', $package)
+        $staged.Code | Should -Be 0 -Because $staged.Error
+        Add-Content -LiteralPath (Join-Path $package "rnid$extension") -Value 'corrupt'
+        $output = Join-Path $script:releaseWorkspace 'installer-output'
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:nativeInstaller, '-Rid', $script:releaseRid,
+            '-PackageDirectory', $package, '-Version', '1.5.7.42', '-OutputDirectory', $output)
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'integrity validation'
+        Test-Path -LiteralPath $output | Should -BeFalse
+    }
+
+    It 'runs tooling without a default application and honors an explicit application' {
+        $runnerDirectory = Join-Path $script:releaseWorkspace 'runner'
+        $fixtureDirectory = Join-Path $runnerDirectory 'Pester'
+        $null = New-Item -ItemType Directory -Path $fixtureDirectory -Force
+        $runner = Join-Path $runnerDirectory 'Invoke-PesterTests.ps1'
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\Invoke-PesterTests.ps1') -Destination $runner
+        @'
+BeforeAll {
+    if ($Application) { $null = Resolve-Path -LiteralPath $Application }
+}
+Describe 'Tooling fixture' {
+    It 'uses the selected application' {
+        [string]$Application | Should -BeExactly $env:EXPECTED_TOOLING_APPLICATION
+    }
+}
+'@ | Set-Content -LiteralPath (Join-Path $fixtureDirectory 'Coverage.Tests.ps1')
+        foreach ($name in 'StaticAnalysis', 'BuildArtifacts') {
+            "Describe '$name fixture' { It 'runs' { `$true | Should -BeTrue } }" |
+                Set-Content -LiteralPath (Join-Path $fixtureDirectory "$name.Tests.ps1")
+        }
+        $withoutApplication = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner, '-ToolingOnly') `
+            -Environment @{ EXPECTED_TOOLING_APPLICATION = '' }
+        $withoutApplication.Code | Should -Be 0 -Because ($withoutApplication.Output + $withoutApplication.Error)
+        $application = Join-Path $runnerDirectory 'candidate'
+        Set-Content -LiteralPath $application -Value 'explicit application'
+        $withApplication = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner, '-ToolingOnly', '-Application', $application) `
+            -Environment @{ EXPECTED_TOOLING_APPLICATION = $application }
+        $withApplication.Code | Should -Be 0 -Because ($withApplication.Output + $withApplication.Error)
+    }
+
+    It 'runs only the installer container when requested' {
+        $runnerDirectory = Join-Path $script:releaseWorkspace 'installer-runner'
+        $fixtureDirectory = Join-Path $runnerDirectory 'Pester'
+        $null = New-Item -ItemType Directory -Path $fixtureDirectory -Force
+        $runner = Join-Path $runnerDirectory 'Invoke-PesterTests.ps1'
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\Invoke-PesterTests.ps1') -Destination $runner
+        foreach ($name in 'Coverage', 'StaticAnalysis', 'BuildArtifacts') {
+            "Describe '$name fixture' { It 'must not run' { throw 'Unexpected tooling test.' } }" |
+                Set-Content -LiteralPath (Join-Path $fixtureDirectory "$name.Tests.ps1")
+        }
+        @'
+param([string] $InstallerDirectory, [string] $StagedPackageDirectory, [string] $Version, [string] $Basename, [bool] $SystemTest)
+Describe 'Installer fixture' {
+    It 'receives the installer inputs' {
+        $InstallerDirectory | Should -BeExactly $env:EXPECTED_INSTALLER_DIRECTORY
+        $StagedPackageDirectory | Should -BeExactly $env:EXPECTED_INSTALLER_DIRECTORY
+        $Version | Should -BeExactly '1.5.7.42'
+        $Basename | Should -BeExactly 'package'
+        $SystemTest | Should -BeFalse
+    }
+}
+'@ | Set-Content -LiteralPath (Join-Path $fixtureDirectory 'NativeInstallers.Tests.ps1')
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner, '-ToolingOnly', '-InstallerOnly',
+            '-InstallerDirectory', $runnerDirectory, '-StagedPackageDirectory', $runnerDirectory,
+            '-InstallerVersion', '1.5.7.42', '-InstallerBasename', 'package') `
+            -Environment @{ EXPECTED_INSTALLER_DIRECTORY = $runnerDirectory }
+        $result.Code | Should -Be 0 -Because ($result.Output + $result.Error)
+    }
+
+    It 'refuses system installation tests without <MissingGuard>' -ForEach @(
+        @{ MissingGuard = 'GitHub Actions'; Actions = 'false'; Runner = 'github-hosted'; OptIn = '1' }
+        @{ MissingGuard = 'a GitHub-hosted runner'; Actions = 'true'; Runner = 'self-hosted'; OptIn = '1' }
+        @{ MissingGuard = 'explicit opt-in'; Actions = 'true'; Runner = 'github-hosted'; OptIn = '0' }
+    ) {
+        $runner = Join-Path $PSScriptRoot '..\Invoke-PesterTests.ps1'
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner, '-ToolingOnly', '-InstallerOnly',
+            '-InstallerDirectory', $script:releaseWorkspace, '-StagedPackageDirectory', $script:releaseWorkspace,
+            '-InstallerVersion', '1.5.7.42', '-InstallerBasename', 'package', '-InstallerSystemTest') `
+            -Environment @{ GITHUB_ACTIONS = $Actions; RUNNER_ENVIRONMENT = $Runner; DOTRETICULUM_DISPOSABLE_INSTALL_TEST = $OptIn }
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match '(?s)disposable.*GitHub-hosted runner'
     }
 }

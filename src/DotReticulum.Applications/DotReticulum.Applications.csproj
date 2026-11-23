@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <PropertyGroup>
+    <Description>DotReticulum runtime host (ReticulumNode) and Reticulum utility implementations.</Description>
     <OutputType>Exe</OutputType>
     <ApplicationIcon>..\..\assets\branding\dotreticulum.ico</ApplicationIcon>
     <PublishAot>true</PublishAot>

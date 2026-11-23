@@ -1,8 +1,8 @@
 name: Release
 
 # Runs only for a pushed v<major>.<minor>.<patch>.<build> tag (create it with tools/New-ReleaseTag.ps1)
-# or a manual dispatch. A manual dispatch builds and uploads the zips as workflow artifacts without
-# publishing a GitHub release.
+# or a manual dispatch. A manual dispatch uploads packages as workflow artifacts without publishing
+# a GitHub release.
 on:
   push:
     tags:
@@ -22,7 +22,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -61,8 +61,22 @@ jobs:
         run: |
           sudo apt-get update -qq
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          sudo apt-get install -y clang zlib1g-dev
+          sudo apt-get install -y clang zlib1g-dev binutils dpkg-dev rpm cpio
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Install pinned WiX tooling
+        if: runner.os == 'Windows'
+        run: |
+          $version = (Get-Content tools/packaging/dotnet-tools.json -Raw | ConvertFrom-Json).tools.wix.version
+          $tools = Join-Path $env:RUNNER_TEMP 'dotreticulum-wix'
+          $env:WIX_EXTENSIONS = Join-Path $env:RUNNER_TEMP 'dotreticulum-wix-extensions'
+          New-Item -ItemType Directory -Path $env:WIX_EXTENSIONS -Force | Out-Null
+          dotnet tool install wix --version $version --tool-path $tools
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & (Join-Path $tools 'wix.exe') extension add --global "WixToolset.UI.wixext/$version"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $tools | Add-Content -LiteralPath $env:GITHUB_PATH
+          "WIX_EXTENSIONS=$env:WIX_EXTENSIONS" | Add-Content -LiteralPath $env:GITHUB_ENV
 
       - name: Run Core tests
         run: dotnet test tests/DotReticulum.Core.Tests/DotReticulum.Core.Tests.csproj -c Release --logger trx --results-directory TestResults/release
@@ -116,7 +130,42 @@ jobs:
             if ($code -ne 0) { exit $code }
           }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
-          "$hash  $name.zip" | Set-Content -LiteralPath "$zip.sha256" -Encoding ascii
+          [IO.File]::WriteAllText("$zip.sha256", "$hash  $name.zip`n", [Text.Encoding]::ASCII)
+
+      - name: Build native installers
+        run: |
+          $versionOutput = @(dotnet msbuild src/DotReticulum.Applications/DotReticulum.Applications.csproj -getProperty:AssemblyFileVersion -p:Configuration=Release -t:GetBuildVersion)
+          if ($LASTEXITCODE -ne 0 -or $versionOutput.Count -eq 0) { throw 'Could not determine the application version.' }
+          $version = $versionOutput[-1].Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') { throw "Unexpected application version '$version'." }
+          if ('${{ github.ref_type }}' -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Tag $env:GITHUB_REF_NAME does not match application version $version."
+          }
+          $archiveVersion = if ('${{ github.ref_type }}' -eq 'tag') { $version } else { "dispatch-$($env:GITHUB_SHA.Substring(0, 12))" }
+          $name = "DotReticulum-$archiveVersion-${{ matrix.rid }}"
+          & ./tools/New-NativeInstallers.ps1 -Rid '${{ matrix.rid }}' -PackageDirectory "artifacts/$name" `
+            -Version $version -PackageBasename $name -OutputDirectory artifacts/release
+          if (!$?) { throw 'Native installer generation failed.' }
+          "INSTALLER_VERSION=$version" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "INSTALLER_BASENAME=$name" | Add-Content -LiteralPath $env:GITHUB_ENV
+
+      - name: Verify native installers
+        env:
+          DOTRETICULUM_DISPOSABLE_INSTALL_TEST: '1'
+        run: |
+          ./tests/Install-Pester.ps1
+          $pester = @(Get-Module -ListAvailable Pester | Where-Object { $_.Version -eq [version]'5.7.1' } | Select-Object -First 1)
+          if ($pester.Count -ne 1) { throw 'Pester 5.7.1 is unavailable.' }
+          $modules = Join-Path $env:RUNNER_TEMP 'release-test-modules'
+          $pesterDirectory = Join-Path $modules 'Pester'
+          New-Item -ItemType Directory -Path $pesterDirectory -Force | Out-Null
+          Copy-Item -LiteralPath $pester[0].ModuleBase -Destination (Join-Path $pesterDirectory '5.7.1') -Recurse
+          $env:PSModulePath = @($modules, (Join-Path $PSHOME 'Modules')) -join [IO.Path]::PathSeparator
+          Import-Module Pester -RequiredVersion 5.7.1
+          ./tests/Invoke-PesterTests.ps1 -ToolingOnly -InstallerOnly -InstallerDirectory artifacts/release `
+            -StagedPackageDirectory "artifacts/$env:INSTALLER_BASENAME" `
+            -InstallerVersion $env:INSTALLER_VERSION -InstallerBasename $env:INSTALLER_BASENAME `
+            -InstallerSystemTest
 
       - name: Upload release files
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -126,9 +175,110 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload failed installer diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-diagnostics-${{ matrix.rid }}
+          path: |
+            artifacts/release/*.msi
+            artifacts/release/*.deb
+            artifacts/release/*.rpm
+            artifacts/release/*.pkg
+            artifacts/release/*.sha256
+          if-no-files-found: ignore
+          retention-days: 3
+
+  verify:
+    name: Verify release checksums
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download release files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+
+      - name: Check files and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s failglob
+          zips=(release/*.zip)
+          installers=(release/*.msi release/*.pkg release/*.deb release/*.rpm)
+          checksums=(release/*.sha256)
+          [[ ${#zips[@]} -eq 3 && ${#installers[@]} -eq 4 && ${#checksums[@]} -eq 7 ]]
+          for file in "${zips[@]}" "${installers[@]}"; do [[ -f "$file.sha256" ]]; done
+          (cd release && cat ./*.sha256 > SHA256SUMS.txt && sha256sum --check --strict SHA256SUMS.txt)
+
+      - name: Upload combined checksums
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-checksums
+          path: release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+  nuget-pack:
+    name: Pack NuGet packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Require a tagged commit on main
+        if: github.ref_type == 'tag'
+        run: |
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE -ne 0) { throw "Tag $env:GITHUB_REF_NAME is not on main." }
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Pack libraries
+        run: |
+          dotnet restore DotReticulum.slnx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $versionOutput = @(dotnet msbuild src/DotReticulum.Core/DotReticulum.Core.csproj -getProperty:NuGetPackageVersion -p:Configuration=Release -t:GetBuildVersion)
+          if ($LASTEXITCODE -ne 0 -or $versionOutput.Count -eq 0) { throw 'Could not determine the package version.' }
+          $version = $versionOutput[-1].Trim()
+          if ('${{ github.ref_type }}' -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Tag $env:GITHUB_REF_NAME does not match package version $version."
+          }
+          dotnet pack DotReticulum.slnx -c Release -o artifacts/nuget -p:ContinuousIntegrationBuild=true
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $expected = 'Crypto', 'Core', 'Transport', 'Interfaces', 'Applications' | ForEach-Object { "DotReticulum.$_.$version" }
+          $actual = @(Get-ChildItem artifacts/nuget -File | ForEach-Object Name | Sort-Object)
+          $wanted = @($expected | ForEach-Object { "$_.nupkg"; "$_.snupkg" } | Sort-Object)
+          if (Compare-Object $wanted $actual) { throw "Unexpected NuGet packages: $($actual -join ', ')" }
+
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nuget-packages
+          path: artifacts/nuget/
+          if-no-files-found: error
+          retention-days: 14
+
   publish:
     name: Publish GitHub release
-    needs: package
+    needs: [verify, nuget-pack]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -148,6 +298,46 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          cat release/*.sha256 > release/SHA256SUMS.txt
-          gh release create "$GITHUB_REF_NAME" release/*.zip release/SHA256SUMS.txt \
+          shopt -s failglob
+          (cd release && cat ./*.sha256 > SHA256SUMS.txt && sha256sum --check --strict SHA256SUMS.txt)
+          gh release create "$GITHUB_REF_NAME" release/*.zip release/*.msi release/*.pkg release/*.deb release/*.rpm release/SHA256SUMS.txt \
             --verify-tag --title "DotReticulum ${GITHUB_REF_NAME#v}" --generate-notes
+  publish-nuget:
+    name: Publish NuGet packages
+    needs: publish
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+    steps:
+      - name: Require a NuGet trusted-publishing user
+        env:
+          NUGET_USER: ${{ vars.NUGET_USER }}
+        run: |
+          if [[ -z "$NUGET_USER" ]]; then
+            echo '::error::Set the NUGET_USER repository variable to the nuget.org account that owns the trusted-publishing policy for release.yml.'
+            exit 1
+          fi
+
+      - name: Download NuGet packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nuget-packages
+          path: nuget
+
+      - name: Exchange OIDC token for a NuGet API key
+        id: login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Push packages
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          shopt -s failglob
+          for package in nuget/*.nupkg; do
+            dotnet nuget push "$package" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          done
