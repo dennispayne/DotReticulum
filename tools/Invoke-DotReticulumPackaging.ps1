@@ -2,13 +2,14 @@
 
 <#
 .SYNOPSIS
-Packages, installs, discovers or uninstalls native DotReticulum utilities.
+Packages, validates, installs, discovers or uninstalls native DotReticulum utilities.
 .DESCRIPTION
 Select an operation with -Action. Package requires Rid, PublishDirectory and
-OutputDirectory; Install uses PackageDirectory and InstallRoot. Discovery and
-uninstallation operate on InstallRoot.
+OutputDirectory; Validate checks PackageDirectory and an optional Rid. Install
+uses PackageDirectory and InstallRoot. Discovery and uninstallation operate
+on InstallRoot.
 .PARAMETER Action
-Operation to perform: Package, Install, Uninstall or Discover.
+Operation to perform: Package, Validate, Install, Uninstall or Discover.
 .PARAMETER Rid
 Target runtime identifier for Package: win-x64, linux-x64 or osx-arm64.
 .PARAMETER PublishDirectory
@@ -17,7 +18,7 @@ Required for Package.
 .PARAMETER OutputDirectory
 Destination for the staged package and its manifest. Required for Package.
 .PARAMETER PackageDirectory
-Staged package directory to validate and install. Required for Install.
+Staged package directory to validate or install. Required for Validate and Install.
 .PARAMETER InstallRoot
 Installation directory for Install, Uninstall or Discover. Ownership manifests
 bound installation and removal to the managed package files.
@@ -27,7 +28,7 @@ bound installation and removal to the managed package files.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('Package', 'Install', 'Uninstall', 'Discover')]
+    [ValidateSet('Package', 'Validate', 'Install', 'Uninstall', 'Discover')]
     [string] $Action,
     [ValidateSet('win-x64', 'linux-x64', 'osx-arm64')]
     [string] $Rid,
@@ -221,6 +222,14 @@ function Read-Package([string] $Directory) {
     return @{ Directory = $package; Manifest = $manifest }
 }
 
+function Invoke-Validate {
+    $package = Read-Package $PackageDirectory
+    if ($Rid -and $package.Manifest.rid -ne $Rid) {
+        throw "Package RID '$($package.Manifest.rid)' does not match '$Rid'."
+    }
+    Write-Output "Validated the native package for $($package.Manifest.rid) at $($package.Directory)"
+}
+
 function Read-InstallManifest([string] $Path) {
     if (!(Test-Path -LiteralPath $Path)) { return $null }
     $manifest = Read-Manifest $Path 'Installation manifest'
@@ -349,6 +358,7 @@ function Invoke-Discover {
 try {
     switch ($Action) {
         'Package' { Invoke-Package }
+        'Validate' { Invoke-Validate }
         'Install' { Invoke-Install }
         'Uninstall' { Invoke-Uninstall }
         'Discover' { Invoke-Discover }

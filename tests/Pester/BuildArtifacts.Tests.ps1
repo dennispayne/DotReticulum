@@ -382,4 +382,27 @@ Describe 'Release artifact staging' -Tag Tooling {
         $result.Error | Should -Match 'Published native application'
         Test-Path -LiteralPath $script:releaseZip | Should -BeFalse
     }
+
+    It 'validates staged packages without installing and rejects corrupt or mismatched input' {
+        $extension = if ($IsWindows) { '.exe' } else { '' }
+        Set-Content -LiteralPath (Join-Path $script:releaseWorkspace "artifacts\native\DotReticulum.Applications$extension") -Value 'test executable'
+        $package = Join-Path $script:releaseWorkspace 'package'
+        $staged = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:releasePackaging, '-Action', 'Package',
+            '-Rid', $script:releaseRid, '-PublishDirectory', (Join-Path $script:releaseWorkspace 'artifacts\native'),
+            '-OutputDirectory', $package)
+        $staged.Code | Should -Be 0 -Because $staged.Error
+        $valid = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:releasePackaging, '-Action', 'Validate',
+            '-Rid', $script:releaseRid, '-PackageDirectory', $package)
+        $valid.Code | Should -Be 0 -Because $valid.Error
+        $otherRid = if ($script:releaseRid -eq 'win-x64') { 'linux-x64' } else { 'win-x64' }
+        $mismatch = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:releasePackaging, '-Action', 'Validate',
+            '-Rid', $otherRid, '-PackageDirectory', $package)
+        $mismatch.Code | Should -Not -Be 0
+        $mismatch.Error | Should -Match 'does not match'
+        Add-Content -LiteralPath (Join-Path $package "rnid$extension") -Value 'corrupt'
+        $corrupt = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:releasePackaging, '-Action', 'Validate',
+            '-Rid', $script:releaseRid, '-PackageDirectory', $package)
+        $corrupt.Code | Should -Not -Be 0
+        $corrupt.Error | Should -Match 'integrity validation'
+    }
 }
