@@ -38,9 +38,8 @@ Local Windows evidence, with live-reference tests disabled:
   lower-version MSI was built for the later upgrade test. No MSI was installed
   on the shared machine.
 
-Actual system installation and the Linux/macOS artifacts require the guarded
-disposable Actions run; the local Windows evidence does not establish those
-outcomes.
+The local Windows run did not perform a system installation or verify
+Linux/macOS artifacts; hosted acceptance is recorded below.
 
 Manual Release rehearsal **45211847159** at **a40a2b9** built installers on
 all three platforms. Its Windows installer tests passed extraction, execution,
@@ -87,15 +86,26 @@ transactions. The macOS package was only 2,146 bytes: its distribution
 contained an empty choices outline and no payload. CPack's productbuild
 generator had built a component package without referencing it from the
 distribution. The macOS install rules now define one required Runtime
-component so that CPack includes the payload. This remains unverified until a
-new hosted run passes extraction and installation. RPM transactions use an
-isolated database with dependency checks disabled on Ubuntu; this is not
-acceptance on an RPM-based distribution. No release was published.
+component so that CPack includes the payload. RPM transactions use an isolated
+database with dependency checks disabled on Ubuntu; this is not acceptance on
+an RPM-based distribution. No release was published.
 An isolated Windows CMake configuration with the macOS host flag simulated
 registered a required Runtime component and installed the fixture executable,
 license and manifest beneath its temporary prefix. This does not verify a
 macOS PKG. Rebuilding the Windows MSI after the change passed four focused
 tests with the system-install test skipped on the shared machine.
+
+Manual Release rehearsal **45218850647**, at **24495e7**, succeeded on its
+second attempt. The first attempt passed all five Windows and six Linux
+installer tests, but GitHub could not acquire a macOS ARM64 runner because of
+capacity constraints. `gh run rerun 45218850647 --failed` reused the successful
+jobs and ran macOS on a hosted ARM64 runner. Pester 5.7.1 passed all three
+macOS tests: checksum, extracted payload hashes and architecture, native
+utility execution, and real installation, reinstallation and removal of
+owned files and receipt while preserving an unrelated file. The combined
+checksum job passed. The three ZIPs, four installers, individual sidecars and
+combined `SHA256SUMS.txt` were downloaded and independently verified with
+`Get-FileHash`. No release was published.
 
 ## RNS 1.5.7 release preparation and roadmap
 
@@ -171,9 +181,9 @@ tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
 -c Release --no-build --nologo -v quiet --filter
 'FullyQualifiedName~NativeListener_DecryptsDecompressesAndReturnsCompressedMultiMegabyteResource'
 -- xUnit.MaxParallelThreads=1` passed **1**, skipped **0**, exercising an
-encrypted, compressed 2,200,017-byte round trip. macOS package installation
-and physical-device operation remain unverified. The earlier **v1.5.7.142**
-tag remains unpublished and was not reused.
+encrypted, compressed 2,200,017-byte round trip. Installation of that ZIP on
+macOS and physical-device operation were not verified in that release run.
+The earlier **v1.5.7.142** tag remains unpublished and was not reused.
 
 ## Completed stream writes and cancellation
 
