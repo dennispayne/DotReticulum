@@ -253,6 +253,8 @@ jobs:
 
       - name: Pack libraries
         run: |
+          dotnet restore DotReticulum.slnx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $versionOutput = @(dotnet msbuild src/DotReticulum.Core/DotReticulum.Core.csproj -getProperty:NuGetPackageVersion -p:Configuration=Release -t:GetBuildVersion)
           if ($LASTEXITCODE -ne 0 -or $versionOutput.Count -eq 0) { throw 'Could not determine the package version.' }
           $version = $versionOutput[-1].Trim()
