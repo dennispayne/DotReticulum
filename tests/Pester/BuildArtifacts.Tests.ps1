@@ -436,13 +436,76 @@ Describe 'Release artifact staging' -Tag Tooling {
         Test-Path -LiteralPath $output | Should -BeFalse
     }
 
-    It 'refuses system installation tests outside an explicitly opted-in hosted runner' {
+    It 'runs tooling without a default application and honors an explicit application' {
+        $runnerDirectory = Join-Path $script:releaseWorkspace 'runner'
+        $fixtureDirectory = Join-Path $runnerDirectory 'Pester'
+        $null = New-Item -ItemType Directory -Path $fixtureDirectory -Force
+        $runner = Join-Path $runnerDirectory 'Invoke-PesterTests.ps1'
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\Invoke-PesterTests.ps1') -Destination $runner
+        @'
+BeforeAll {
+    if ($Application) { $null = Resolve-Path -LiteralPath $Application }
+}
+Describe 'Tooling fixture' {
+    It 'uses the selected application' {
+        [string]$Application | Should -BeExactly $env:EXPECTED_TOOLING_APPLICATION
+    }
+}
+'@ | Set-Content -LiteralPath (Join-Path $fixtureDirectory 'Coverage.Tests.ps1')
+        foreach ($name in 'StaticAnalysis', 'BuildArtifacts') {
+            "Describe '$name fixture' { It 'runs' { `$true | Should -BeTrue } }" |
+                Set-Content -LiteralPath (Join-Path $fixtureDirectory "$name.Tests.ps1")
+        }
+        $withoutApplication = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner, '-ToolingOnly') `
+            -Environment @{ EXPECTED_TOOLING_APPLICATION = '' }
+        $withoutApplication.Code | Should -Be 0 -Because ($withoutApplication.Output + $withoutApplication.Error)
+        $application = Join-Path $runnerDirectory 'candidate'
+        Set-Content -LiteralPath $application -Value 'explicit application'
+        $withApplication = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner, '-ToolingOnly', '-Application', $application) `
+            -Environment @{ EXPECTED_TOOLING_APPLICATION = $application }
+        $withApplication.Code | Should -Be 0 -Because ($withApplication.Output + $withApplication.Error)
+    }
+
+    It 'runs only the installer container when requested' {
+        $runnerDirectory = Join-Path $script:releaseWorkspace 'installer-runner'
+        $fixtureDirectory = Join-Path $runnerDirectory 'Pester'
+        $null = New-Item -ItemType Directory -Path $fixtureDirectory -Force
+        $runner = Join-Path $runnerDirectory 'Invoke-PesterTests.ps1'
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot '..\Invoke-PesterTests.ps1') -Destination $runner
+        foreach ($name in 'Coverage', 'StaticAnalysis', 'BuildArtifacts') {
+            "Describe '$name fixture' { It 'must not run' { throw 'Unexpected tooling test.' } }" |
+                Set-Content -LiteralPath (Join-Path $fixtureDirectory "$name.Tests.ps1")
+        }
+        @'
+param([string] $InstallerDirectory, [string] $StagedPackageDirectory, [string] $Version, [string] $Basename, [bool] $SystemTest)
+Describe 'Installer fixture' {
+    It 'receives the installer inputs' {
+        $InstallerDirectory | Should -BeExactly $env:EXPECTED_INSTALLER_DIRECTORY
+        $StagedPackageDirectory | Should -BeExactly $env:EXPECTED_INSTALLER_DIRECTORY
+        $Version | Should -BeExactly '1.5.7.42'
+        $Basename | Should -BeExactly 'package'
+        $SystemTest | Should -BeFalse
+    }
+}
+'@ | Set-Content -LiteralPath (Join-Path $fixtureDirectory 'NativeInstallers.Tests.ps1')
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner, '-ToolingOnly', '-InstallerOnly',
+            '-InstallerDirectory', $runnerDirectory, '-StagedPackageDirectory', $runnerDirectory,
+            '-InstallerVersion', '1.5.7.42', '-InstallerBasename', 'package') `
+            -Environment @{ EXPECTED_INSTALLER_DIRECTORY = $runnerDirectory }
+        $result.Code | Should -Be 0 -Because ($result.Output + $result.Error)
+    }
+
+    It 'refuses system installation tests without <MissingGuard>' -ForEach @(
+        @{ MissingGuard = 'GitHub Actions'; Actions = 'false'; Runner = 'github-hosted'; OptIn = '1' }
+        @{ MissingGuard = 'a GitHub-hosted runner'; Actions = 'true'; Runner = 'self-hosted'; OptIn = '1' }
+        @{ MissingGuard = 'explicit opt-in'; Actions = 'true'; Runner = 'github-hosted'; OptIn = '0' }
+    ) {
         $runner = Join-Path $PSScriptRoot '..\Invoke-PesterTests.ps1'
-        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner, '-ToolingOnly',
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner, '-ToolingOnly', '-InstallerOnly',
             '-InstallerDirectory', $script:releaseWorkspace, '-StagedPackageDirectory', $script:releaseWorkspace,
             '-InstallerVersion', '1.5.7.42', '-InstallerBasename', 'package', '-InstallerSystemTest') `
-            -Environment @{ GITHUB_ACTIONS = 'true'; RUNNER_ENVIRONMENT = 'self-hosted'; DOTRETICULUM_DISPOSABLE_INSTALL_TEST = '1' }
+            -Environment @{ GITHUB_ACTIONS = $Actions; RUNNER_ENVIRONMENT = $Runner; DOTRETICULUM_DISPOSABLE_INSTALL_TEST = $OptIn }
         $result.Code | Should -Not -Be 0
-        $result.Error | Should -Match 'disposable GitHub-hosted runner'
+        $result.Error | Should -Match '(?s)disposable.*GitHub-hosted runner'
     }
 }

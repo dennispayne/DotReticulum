@@ -28,6 +28,8 @@ The validated staged package used to build the installers.
 The four-part application version used to build the installers.
 .PARAMETER InstallerBasename
 Installer filename prefix without an extension.
+.PARAMETER InstallerOnly
+Runs only the installer tests. Requires -ToolingOnly and the installer inputs.
 .PARAMETER InstallerSystemTest
 Also installs and removes packages on a disposable GitHub Actions runner.
 .PARAMETER Python
@@ -58,6 +60,7 @@ param(
     [string] $StagedPackageDirectory,
     [string] $InstallerVersion,
     [string] $InstallerBasename,
+    [switch] $InstallerOnly,
     [switch] $InstallerSystemTest,
     [string] $Python = $env:DOTRETICULUM_PYTHON,
     [string] $Upstream = $env:DOTRETICULUM_UPSTREAM,
@@ -69,7 +72,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if (($GitRemote -or $GitHosting -or $NativePackaging -or $AuthorizeRNodeFirmware) -and $ToolingOnly) { throw 'Application suites cannot be combined with -ToolingOnly.' }
-if ($InstallerDirectory -or $StagedPackageDirectory -or $InstallerVersion -or $InstallerBasename -or $InstallerSystemTest) {
+if ($InstallerDirectory -or $StagedPackageDirectory -or $InstallerVersion -or $InstallerBasename -or $InstallerOnly -or $InstallerSystemTest) {
     if (!$ToolingOnly -or !$InstallerDirectory -or !$StagedPackageDirectory -or !$InstallerVersion -or !$InstallerBasename) {
         throw 'Installer testing requires -ToolingOnly, -InstallerDirectory, -StagedPackageDirectory, -InstallerVersion and -InstallerBasename.'
     }
@@ -87,10 +90,14 @@ if (!$AuthorizeRNodeFirmware -and ($RNodeUsbSerial -or $RNodeFirmwareVersion -or
 if ($GitRemote -and ([string]::IsNullOrWhiteSpace($Python) -or [string]::IsNullOrWhiteSpace($Upstream))) {
     throw '-GitRemote requires -Python and -Upstream, or their DOTRETICULUM_* environment variables.'
 }
+if ($ToolingOnly -and !$PSBoundParameters.ContainsKey('Application')) { $Application = '' }
 Import-Module Pester -MinimumVersion 5.7.1 -ErrorAction Stop
-$containers = @(New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Coverage.Tests.ps1'))
-$containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\StaticAnalysis.Tests.ps1')
-$containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\BuildArtifacts.Tests.ps1')
+$containers = @()
+if (!$InstallerOnly) {
+    $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\Coverage.Tests.ps1')
+    $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\StaticAnalysis.Tests.ps1')
+    $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\BuildArtifacts.Tests.ps1')
+}
 if ($InstallerDirectory) {
     $containers += New-PesterContainer -Path (Join-Path $PSScriptRoot 'Pester\NativeInstallers.Tests.ps1') -Data @{
         InstallerDirectory = (Resolve-Path -LiteralPath $InstallerDirectory).Path

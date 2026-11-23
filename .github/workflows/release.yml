@@ -22,7 +22,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -162,7 +162,7 @@ jobs:
           Copy-Item -LiteralPath $pester[0].ModuleBase -Destination (Join-Path $pesterDirectory '5.7.1') -Recurse
           $env:PSModulePath = @($modules, (Join-Path $PSHOME 'Modules')) -join [IO.Path]::PathSeparator
           Import-Module Pester -RequiredVersion 5.7.1
-          ./tests/Invoke-PesterTests.ps1 -ToolingOnly -InstallerDirectory artifacts/release `
+          ./tests/Invoke-PesterTests.ps1 -ToolingOnly -InstallerOnly -InstallerDirectory artifacts/release `
             -StagedPackageDirectory "artifacts/$env:INSTALLER_BASENAME" `
             -InstallerVersion $env:INSTALLER_VERSION -InstallerBasename $env:INSTALLER_BASENAME `
             -InstallerSystemTest

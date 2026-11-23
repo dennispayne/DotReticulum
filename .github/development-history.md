@@ -42,6 +42,30 @@ Actual system installation and the Linux/macOS artifacts require the guarded
 disposable Actions run; the local Windows evidence does not establish those
 outcomes.
 
+Manual Release rehearsal **45211847159** at **a40a2b9** built installers on
+all three platforms. Its Windows installer tests passed extraction, execution,
+an older-to-newer upgrade, downgrade rejection, machine PATH preservation and
+uninstall on the hosted runner. The job still failed because the unrelated
+tooling harness expected a managed application at its default build path; the
+release job had only published a native executable. Linux hit the same harness
+error and a line-wrapped guard-message assertion. The matrix cancelled the
+remaining Linux/macOS tests, so that run did not verify those installations or
+the combined checksums. The release step now runs only installer tests, while
+tooling-only runs no longer require a default application. The guard test
+accepts wrapped diagnostics, and all three jobs can finish independently. No
+release was published.
+
+On Windows, `dotnet build DotReticulum.slnx -c Release --verbosity quiet`
+passed without warnings and `dotnet test DotReticulum.slnx -c Release
+--verbosity quiet` passed 1,901 tests with 97 skips; live tests were disabled.
+With isolated Pester 5.7.1, `tests\Invoke-PesterTests.ps1 -ToolingOnly` passed
+139 tests with four skips. The focused `-ToolingOnly -InstallerOnly` run
+against the locally rebuilt MSI passed four tests and skipped the guarded
+system transaction; it did not install anything on this shared machine.
+`tools\Invoke-PowerShellAnalysis.ps1 -Report
+C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files\installer-fix-analysis.sarif`
+reported zero findings across 74 tracked files.
+
 ## RNS 1.5.7 release preparation and roadmap
 
 Reorganized the remaining checklist around the next reference update,
