@@ -30,9 +30,15 @@ Release` succeeded with 0 warnings and 0 errors; `dotnet pack DotReticulum.slnx
 `1.5.7.154-g5e09a3e94d` packages and symbols. A separate console project with an
 isolated `NuGet.Config` and package cache restored `DotReticulum.Applications`
 from that local feed (BouncyCastle and SharpZipLib from nuget.org), generated an
-identity and loaded `ReticulumNode` at assembly version `1.5.7.154`. No package
-has been published; the hosted pack job, nuget.org policy and Ecosystem
-migration remain unverified.
+identity and loaded `ReticulumNode` at assembly version `1.5.7.154`.
+
+Hosted evidence: manual Release run 45232087077 showed the pack job's
+`GetBuildVersion` failing on a clean runner because Nerdbank.GitVersioning was
+not yet restored (cancelled); after adding `dotnet restore`, run 45232235903's
+**Pack NuGet packages** job at `dd917de` succeeded and produced exactly the five
+`1.5.7.156-gdd917de040` packages and symbol packages. The tag-only publish job
+was skipped for the dispatch. No package has been published; the nuget.org
+policy, OIDC exchange and Ecosystem migration remain unverified.
 
 ## Native installer packaging
 
