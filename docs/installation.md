@@ -24,7 +24,7 @@ You can build packages for these runtime identifiers (RIDs):
 | Linux x64 | `linux-x64` |
 | macOS ARM64 | `osx-arm64` |
 
-You can stage a package for any of these RIDs, but installation only accepts a package that matches the current host. macOS packaging and execution have not been verified in this environment and are not a platform-support claim.
+You can stage a package for any of these RIDs, but installation only accepts a package that matches the current host. On macOS, Actions has published and smoke-tested the native binary and staged a package; package installation remains unverified.
 
 ## Prerequisites
 

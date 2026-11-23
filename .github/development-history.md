@@ -38,6 +38,27 @@ across **72** tracked files. An initial unisolated Pester run failed six cases
 because installed Pester 5 and 6 assemblies were mixed; the isolated rerun did
 not change the tests.
 
+Release rehearsal **45196171284**, manually dispatched at **ded614f**,
+successfully built and staged all three platform packages without publishing a
+release. Downloaded archives matched their SHA-256 files; all 16 manifest
+members and Unix executable permissions were verified. The Linux/macOS license
+matched the Git blob; the Windows license matched its CRLF checkout. A Windows
+executable extracted from the rehearsal archive reported **1.5.7.143** and
+passed `dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj
+-c Release --no-build --nologo -v quiet --filter
+"FullyQualifiedName~NativeListener_DecryptsDecompressesAndReturnsCompressedMultiMegabyteResource"
+-- xUnit.MaxParallelThreads=1` with `DOTRETICULUM_NATIVE_EXE` set to that
+executable: **1 passed**, zero skipped. This is native software evidence, not
+new live-Python or physical-device acceptance.
+Hosted Build **45196131664** and Static analysis **45196131608** also passed.
+The downloaded SARIF reports contain no Actions, C# or PowerShell findings;
+Python retains the documented weak-key warning for the legacy test vector.
+Hosted Test **45196894594** succeeded at `ded614f`: its summary reports all
+42 shared Compatibility cases passed for Upstream, Linux, macOS and Windows.
+Unit and Integration jobs also succeeded on all three platforms, with recorded
+skips; the Integration summary does not give a reason for some skips. The
+coverage-badge update from that run was integrated before preparing the tag.
+
 ## Completed stream writes and cancellation
 
 A deterministic stream regression showed that cancellation immediately after a
