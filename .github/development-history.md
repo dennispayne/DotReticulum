@@ -43,7 +43,7 @@ successfully built and staged all three platform packages without publishing a
 release. Downloaded archives matched their SHA-256 files; all 16 manifest
 members and Unix executable permissions were verified. The Linux/macOS license
 matched the Git blob; the Windows license matched its CRLF checkout. A Windows
-executable extracted from the rehearsal archive reported **1.5.7.143** and
+executable extracted from the rehearsal archive had file version **1.5.7.143** and
 passed `dotnet test tests/DotReticulum.Applications.Tests/DotReticulum.Applications.Tests.csproj
 -c Release --no-build --nologo -v quiet --filter
 "FullyQualifiedName~NativeListener_DecryptsDecompressesAndReturnsCompressedMultiMegabyteResource"
@@ -58,6 +58,27 @@ Hosted Test **45196894594** succeeded at `ded614f`: its summary reports all
 Unit and Integration jobs also succeeded on all three platforms, with recorded
 skips; the Integration summary does not give a reason for some skips. The
 coverage-badge update from that run was integrated before preparing the tag.
+
+Published [v1.5.7.145](https://github.com/dennispayne/DotReticulum/releases/tag/v1.5.7.145)
+from **f86c4de**; tagged Release run **45200055937** passed all three package
+jobs and publication. The actual downloaded release archives matched
+`SHA256SUMS.txt`; each contained all 16 manifest files with matching sizes and
+hashes, the expected license, and executable modes on Linux/macOS. The extracted
+Windows binary's file version was **1.5.7.145**, and `rncp --version` identified
+the 1.5.7 reference. The bare application's `--version` displays help rather
+than the file version.
+
+On Windows, the published package was installed, its 16 manifest files were
+discovered, `rncp --version` was executed, and uninstall removed owned files
+while preserving an unrelated marker. With `DOTRETICULUM_NATIVE_EXE` set to
+the extracted release binary, `dotnet test
+tests\DotReticulum.Applications.Tests\DotReticulum.Applications.Tests.csproj
+-c Release --no-build --nologo -v quiet --filter
+'FullyQualifiedName~NativeListener_DecryptsDecompressesAndReturnsCompressedMultiMegabyteResource'
+-- xUnit.MaxParallelThreads=1` passed **1**, skipped **0**, exercising an
+encrypted, compressed 2,200,017-byte round trip. macOS package installation
+and physical-device operation remain unverified. The earlier **v1.5.7.142**
+tag remains unpublished and was not reused.
 
 ## Completed stream writes and cancellation
 
