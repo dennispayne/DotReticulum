@@ -1,27 +1,30 @@
 # Remaining DotReticulum work
 
-This is the single active progress checklist, extracted from the unchecked
-items in the [archived plan](docs/archive/plan.md) on 2026-10-26.
-[Development history](.github/development-history.md) supplies evidence;
-the [compatibility ledger](docs/compatibility-contracts.md) defines residual
-contracts and acceptance boundaries. [Completed entries](docs/archive/completed-todos.md)
-are archived rather than repeated here.
+This is the single active checklist. The [compatibility ledger](docs/compatibility-contracts.md)
+details the remaining contracts, and the [development history](.github/development-history.md)
+records their evidence.
 
-Physical-device acceptance and targets outside the existing Windows, Linux x64
-and macOS ARM64 Actions matrix are out of scope; they remain unverified, not
-passed. Software-only tests do not establish hardware interoperability.
+DotReticulum covers the RNS stack and its bundled utilities. LXMF, LXST,
+NomadNet, Sideband and telemetry belong to [DotReticulum.Ecosystem](https://github.com/dennispayne/DotReticulum.Ecosystem).
+Acceptance is limited to software that can be exercised on the existing Windows
+x64, Linux x64 and macOS ARM64 Actions runners. Physical-device testing and
+other platforms are out of scope and remain unverified; software tests do not
+establish hardware interoperability.
 
-- [ ] Parity 6 - Upstream interface coverage
-  - [ ] RNodeInterface and RNodeMultiInterface remaining software contracts (serial/TCP accepted; Windows BLE software slice implemented)
-  - [ ] Desktop RNode BLE advertisement selection and Linux/macOS providers, with software-only acceptance (Windows cached paired-device provider is partial)
-  - [ ] I2PInterface
-  - [ ] Complete UDP/TCP/serial configuration and software acceptance
-  - [ ] I2P public-tunnel delivery after persisted bearer restart (still fails for both .NET and pinned upstream); separate-router overlay, successful transport-enabled persisted startup (fresh succeeds, reused-state probe independently fails for native and pinned upstream candidates) and broader published-native acceptance remain outstanding
-- [ ] Parity 8 - Compatibility and release acceptance
-  - [ ] Broader mesh acceptance: broader alternate-route topologies, cold initial-window resource-loss recovery, sustained Channel/resource soak and impaired native-binary/per-bearer matrices (pinned upstream cold-window cancellation is independently reproduced, not passing recovery)
-  - [ ] Windows, Linux x64 and macOS ARM64 managed/native feature flows
-  - [ ] Diagnose the earlier intermittent macOS reverse-send timeout (not reproduced in the subsequent five-repeat run); longer Channel/resource soak and broader impaired bearer matrices remain outstanding
-  - [ ] Desktop RNode BLE and other missing/partial in-scope software identified in the compatibility ledger
-  - [ ] Per-interface software interoperability where testable without physical hardware
-- [ ] CI/CD and automation
-  - [ ] Expand shared advertised-claim scenarios for heterogeneous routing, broader application request boundaries and Channel/Buffer
+## Reference and compatibility
+
+- [ ] Move to the next verified upstream release: fetch and review its changes, update the reference pin and version, and revalidate affected contracts.
+- [ ] Expand shared executable compatibility cases for advertised capabilities, including heterogeneous routing, application requests and Channel/Buffer.
+- [ ] Exercise the remaining managed and native feature flows and testable interface interoperability on all three CI platforms.
+
+## Network reliability
+
+- [ ] Broaden mesh acceptance for alternate routes, sustained Channel/resource operation, and impaired native and per-bearer paths.
+- [ ] Investigate cold initial-window resource-loss recovery; pinned upstream also cancels in the recorded impaired case.
+- [ ] Diagnose the intermittent macOS reverse-send timeout that did not recur in the five-repeat run.
+
+## Interfaces
+
+- [ ] Complete remaining UDP/TCP/serial configuration and other testable software contracts in the compatibility ledger.
+- [ ] Complete RNode/Multi software, including desktop BLE advertisement selection and Linux/macOS providers.
+- [ ] Complete I2P software and acceptance for separate routers, public-tunnel and persisted transport recovery, and broader native execution. Pinned upstream also fails the recorded public-tunnel restart and reused-state transport cases.

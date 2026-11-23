@@ -2,6 +2,26 @@
 
 Historical reference only: this file records milestone outcomes and verification evidence; active work is tracked in [TODO.md](../TODO.md), the original roadmap snapshot is [docs/archive/plan.md](../docs/archive/plan.md), and current-state documentation lives in `README.md` and `docs/`. Historical completion does not imply full Reticulum parity.
 
+## RNS 1.5.7 release preparation and roadmap
+
+Reorganized the remaining checklist around the next reference update,
+customer-visible compatibility, network reliability and software interfaces.
+The RNode, BLE and I2P software gaps remain open; physical-device acceptance
+and other platforms remain outside scope, not passed. Applications such as
+NomadNet and Sideband, and LXMF, LXST and telemetry work, remain in
+DotReticulum.Ecosystem.
+The reference and `version.json` still target RNS **1.5.7**.
+
+At source **7136c2d** and its coverage-only successor **7eb03e7**, Windows
+`dotnet build DotReticulum.slnx -c Release --nologo -v quiet` passed without
+warnings, and `dotnet test DotReticulum.slnx -c Release --nologo -v quiet`
+passed **1,901**, skipped **97**, with no failures. Hosted Build
+**45127591370** and Static analysis **45127591486** succeeded. Test
+**45128055077** passed all 13 jobs on attempt 2; attempt 1 failed the
+upstream-only Git retrieval when the reference link could not be established.
+The local run had no live-reference or native-executable opt-in configured.
+The retry does not establish that public-network retrieval is reliable.
+
 ## Completed stream writes and cancellation
 
 A deterministic stream regression showed that cancellation immediately after a
