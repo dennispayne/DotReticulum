@@ -1,0 +1,6 @@
+<CPackWiXPatch>
+  <CPackWiXFragment Id="CM_CP_bin.DotReticulum.Applications.exe">
+    <Environment Id="DotReticulumBinPath" Action="set" Name="PATH"
+      Value="[CM_DP_bin]" Part="last" Permanent="no" System="yes"/>
+  </CPackWiXFragment>
+</CPackWiXPatch>

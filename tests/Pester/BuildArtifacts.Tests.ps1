@@ -335,6 +335,7 @@ Describe 'Release artifact staging' -Tag Tooling {
             Replace('${{ matrix.rid }}', $script:releaseRid)
         if ($script:releaseStep.Contains('${{')) { throw 'Release staging contains an unresolved workflow expression.' }
         $script:releasePackaging = Join-Path $PSScriptRoot '..\..\tools\Invoke-DotReticulumPackaging.ps1'
+        $script:nativeInstaller = Join-Path $PSScriptRoot '..\..\tools\New-NativeInstallers.ps1'
         $script:releaseLicense = Join-Path $PSScriptRoot '..\..\LICENSE'
     }
 
@@ -364,6 +365,9 @@ Describe 'Release artifact staging' -Tag Tooling {
         Test-Path -LiteralPath $script:releaseZip | Should -BeTrue
         $hash = (Get-FileHash -LiteralPath $script:releaseZip -Algorithm SHA256).Hash.ToLowerInvariant()
         (Get-Content -LiteralPath "$script:releaseZip.sha256" -Raw).Trim() | Should -BeExactly "$hash  $script:releaseName.zip"
+        $checksumBytes = [IO.File]::ReadAllBytes("$script:releaseZip.sha256")
+        $checksumBytes[-1] | Should -Be 10
+        $checksumBytes | Should -Not -Contain 13
         $archive = [IO.Compression.ZipFile]::OpenRead($script:releaseZip)
         try {
             $names = @($archive.Entries.FullName)
@@ -404,5 +408,41 @@ Describe 'Release artifact staging' -Tag Tooling {
             '-Rid', $script:releaseRid, '-PackageDirectory', $package)
         $corrupt.Code | Should -Not -Be 0
         $corrupt.Error | Should -Match 'integrity validation'
+    }
+
+    It 'rejects malformed installer versions before creating an output directory' {
+        $output = Join-Path $script:releaseWorkspace 'installer-output'
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:nativeInstaller, '-Rid', $script:releaseRid,
+            '-PackageDirectory', $script:releaseWorkspace, '-Version', '1.5.7', '-OutputDirectory', $output)
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'Invalid four-part application version'
+        Test-Path -LiteralPath $output | Should -BeFalse
+    }
+
+    It 'rejects a corrupt staged package before creating installers' {
+        $extension = if ($IsWindows) { '.exe' } else { '' }
+        Set-Content -LiteralPath (Join-Path $script:releaseWorkspace "artifacts\native\DotReticulum.Applications$extension") -Value 'test executable'
+        $package = Join-Path $script:releaseWorkspace 'package'
+        $staged = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:releasePackaging, '-Action', 'Package',
+            '-Rid', $script:releaseRid, '-PublishDirectory', (Join-Path $script:releaseWorkspace 'artifacts\native'),
+            '-OutputDirectory', $package)
+        $staged.Code | Should -Be 0 -Because $staged.Error
+        Add-Content -LiteralPath (Join-Path $package "rnid$extension") -Value 'corrupt'
+        $output = Join-Path $script:releaseWorkspace 'installer-output'
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $script:nativeInstaller, '-Rid', $script:releaseRid,
+            '-PackageDirectory', $package, '-Version', '1.5.7.42', '-OutputDirectory', $output)
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'integrity validation'
+        Test-Path -LiteralPath $output | Should -BeFalse
+    }
+
+    It 'refuses system installation tests outside an explicitly opted-in hosted runner' {
+        $runner = Join-Path $PSScriptRoot '..\Invoke-PesterTests.ps1'
+        $result = Invoke-TestProcess $pwsh @('-NoProfile', '-File', $runner, '-ToolingOnly',
+            '-InstallerDirectory', $script:releaseWorkspace, '-StagedPackageDirectory', $script:releaseWorkspace,
+            '-InstallerVersion', '1.5.7.42', '-InstallerBasename', 'package', '-InstallerSystemTest') `
+            -Environment @{ GITHUB_ACTIONS = 'true'; RUNNER_ENVIRONMENT = 'self-hosted'; DOTRETICULUM_DISPOSABLE_INSTALL_TEST = '1' }
+        $result.Code | Should -Not -Be 0
+        $result.Error | Should -Match 'disposable GitHub-hosted runner'
     }
 }

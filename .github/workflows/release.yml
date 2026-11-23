@@ -1,8 +1,8 @@
 name: Release
 
 # Runs only for a pushed v<major>.<minor>.<patch>.<build> tag (create it with tools/New-ReleaseTag.ps1)
-# or a manual dispatch. A manual dispatch builds and uploads the zips as workflow artifacts without
-# publishing a GitHub release.
+# or a manual dispatch. A manual dispatch uploads packages as workflow artifacts without publishing
+# a GitHub release.
 on:
   push:
     tags:
@@ -61,8 +61,22 @@ jobs:
         run: |
           sudo apt-get update -qq
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          sudo apt-get install -y clang zlib1g-dev
+          sudo apt-get install -y clang zlib1g-dev binutils dpkg-dev rpm cpio
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Install pinned WiX tooling
+        if: runner.os == 'Windows'
+        run: |
+          $version = (Get-Content tools/packaging/dotnet-tools.json -Raw | ConvertFrom-Json).tools.wix.version
+          $tools = Join-Path $env:RUNNER_TEMP 'dotreticulum-wix'
+          $env:WIX_EXTENSIONS = Join-Path $env:RUNNER_TEMP 'dotreticulum-wix-extensions'
+          New-Item -ItemType Directory -Path $env:WIX_EXTENSIONS -Force | Out-Null
+          dotnet tool install wix --version $version --tool-path $tools
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & (Join-Path $tools 'wix.exe') extension add --global "WixToolset.UI.wixext/$version"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $tools | Add-Content -LiteralPath $env:GITHUB_PATH
+          "WIX_EXTENSIONS=$env:WIX_EXTENSIONS" | Add-Content -LiteralPath $env:GITHUB_ENV
 
       - name: Run Core tests
         run: dotnet test tests/DotReticulum.Core.Tests/DotReticulum.Core.Tests.csproj -c Release --logger trx --results-directory TestResults/release
@@ -116,7 +130,42 @@ jobs:
             if ($code -ne 0) { exit $code }
           }
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
-          "$hash  $name.zip" | Set-Content -LiteralPath "$zip.sha256" -Encoding ascii
+          [IO.File]::WriteAllText("$zip.sha256", "$hash  $name.zip`n", [Text.Encoding]::ASCII)
+
+      - name: Build native installers
+        run: |
+          $versionOutput = @(dotnet msbuild src/DotReticulum.Applications/DotReticulum.Applications.csproj -getProperty:AssemblyFileVersion -p:Configuration=Release -t:GetBuildVersion)
+          if ($LASTEXITCODE -ne 0 -or $versionOutput.Count -eq 0) { throw 'Could not determine the application version.' }
+          $version = $versionOutput[-1].Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') { throw "Unexpected application version '$version'." }
+          if ('${{ github.ref_type }}' -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Tag $env:GITHUB_REF_NAME does not match application version $version."
+          }
+          $archiveVersion = if ('${{ github.ref_type }}' -eq 'tag') { $version } else { "dispatch-$($env:GITHUB_SHA.Substring(0, 12))" }
+          $name = "DotReticulum-$archiveVersion-${{ matrix.rid }}"
+          & ./tools/New-NativeInstallers.ps1 -Rid '${{ matrix.rid }}' -PackageDirectory "artifacts/$name" `
+            -Version $version -PackageBasename $name -OutputDirectory artifacts/release
+          if (!$?) { throw 'Native installer generation failed.' }
+          "INSTALLER_VERSION=$version" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "INSTALLER_BASENAME=$name" | Add-Content -LiteralPath $env:GITHUB_ENV
+
+      - name: Verify native installers
+        env:
+          DOTRETICULUM_DISPOSABLE_INSTALL_TEST: '1'
+        run: |
+          ./tests/Install-Pester.ps1
+          $pester = @(Get-Module -ListAvailable Pester | Where-Object { $_.Version -eq [version]'5.7.1' } | Select-Object -First 1)
+          if ($pester.Count -ne 1) { throw 'Pester 5.7.1 is unavailable.' }
+          $modules = Join-Path $env:RUNNER_TEMP 'release-test-modules'
+          $pesterDirectory = Join-Path $modules 'Pester'
+          New-Item -ItemType Directory -Path $pesterDirectory -Force | Out-Null
+          Copy-Item -LiteralPath $pester[0].ModuleBase -Destination (Join-Path $pesterDirectory '5.7.1') -Recurse
+          $env:PSModulePath = @($modules, (Join-Path $PSHOME 'Modules')) -join [IO.Path]::PathSeparator
+          Import-Module Pester -RequiredVersion 5.7.1
+          ./tests/Invoke-PesterTests.ps1 -ToolingOnly -InstallerDirectory artifacts/release `
+            -StagedPackageDirectory "artifacts/$env:INSTALLER_BASENAME" `
+            -InstallerVersion $env:INSTALLER_VERSION -InstallerBasename $env:INSTALLER_BASENAME `
+            -InstallerSystemTest
 
       - name: Upload release files
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -126,9 +175,42 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  verify:
+    name: Verify release checksums
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download release files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+
+      - name: Check files and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s failglob
+          zips=(release/*.zip)
+          installers=(release/*.msi release/*.pkg release/*.deb release/*.rpm)
+          checksums=(release/*.sha256)
+          [[ ${#zips[@]} -eq 3 && ${#installers[@]} -eq 4 && ${#checksums[@]} -eq 7 ]]
+          for file in "${zips[@]}" "${installers[@]}"; do [[ -f "$file.sha256" ]]; done
+          (cd release && cat ./*.sha256 > SHA256SUMS.txt && sha256sum --check --strict SHA256SUMS.txt)
+
+      - name: Upload combined checksums
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-checksums
+          path: release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
   publish:
     name: Publish GitHub release
-    needs: package
+    needs: verify
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -148,6 +230,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          cat release/*.sha256 > release/SHA256SUMS.txt
-          gh release create "$GITHUB_REF_NAME" release/*.zip release/SHA256SUMS.txt \
+          shopt -s failglob
+          (cd release && cat ./*.sha256 > SHA256SUMS.txt && sha256sum --check --strict SHA256SUMS.txt)
+          gh release create "$GITHUB_REF_NAME" release/*.zip release/*.msi release/*.pkg release/*.deb release/*.rpm release/SHA256SUMS.txt \
             --verify-tag --title "DotReticulum ${GITHUB_REF_NAME#v}" --generate-notes

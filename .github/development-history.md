@@ -2,6 +2,46 @@
 
 Historical reference only: this file records milestone outcomes and verification evidence; active work is tracked in [TODO.md](../TODO.md), the original roadmap snapshot is [docs/archive/plan.md](../docs/archive/plan.md), and current-state documentation lives in `README.md` and `docs/`. Historical completion does not imply full Reticulum parity.
 
+## Native installer packaging
+
+The release workflow now builds a Windows MSI, Linux DEB and RPM, and macOS
+PKG from the same validated staged files used by the ZIPs. A manual workflow
+run uploads artifacts without publishing; a tagged run verifies the combined
+checksums before attaching the packages to its release. Windows Installer uses
+the upstream major and minor plus the full reachable Git commit count as its
+three-part version, so descendant release builds remain ordered despite MSI
+ignoring a fourth version component. It installs per-machine and adds its bin
+directory to machine PATH. Linux RPM post-processing does not strip the staged
+binaries, preserving their recorded hashes. The installers are unsigned, the
+macOS package is not notarized, and the RPM is built on Ubuntu rather than on
+an RPM-based distribution.
+
+Local Windows evidence, with live-reference tests disabled:
+
+- `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`: passed with
+  zero warnings and errors.
+- `dotnet test DotReticulum.slnx -c Release --no-build --nologo -v quiet`:
+  1,901 passed, 97 skipped, zero failed.
+- `tools\Invoke-PowerShellAnalysis.ps1`: PSScriptAnalyzer 1.24.0 reported zero
+  findings across 74 tracked scripts and modules.
+- The following command, with isolated Pester 5.7.1 and the session's CMake
+  and WiX tools on `PATH`, passed 141 tests with three explicit skips. The
+  system-install case was skipped because this machine is shared:
+
+  ```powershell
+  .\tests\Invoke-PesterTests.ps1 -ToolingOnly -InstallerDirectory C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files\installer-real-win\packages -StagedPackageDirectory C:\Users\dennis\.copilot\session-state\460eab2a-5040-44db-a926-f59d9697cf68\files\installer-real-win\staged -InstallerVersion 1.5.7.143 -InstallerBasename DotReticulum-1.5.7.143-win-x64
+  ```
+- The Windows installer builder generated an MSI from the earlier rehearsal's
+  real NativeAOT executable (file version 1.5.7.143). Administrative extraction
+  verified every staged payload hash, the license, x64 metadata, utility
+  execution, the machine-PATH table entry and MSI upgrade identity; a distinct
+  lower-version MSI was built for the later upgrade test. No MSI was installed
+  on the shared machine.
+
+Actual system installation and the Linux/macOS artifacts require the guarded
+disposable Actions run; the local Windows evidence does not establish those
+outcomes.
+
 ## RNS 1.5.7 release preparation and roadmap
 
 Reorganized the remaining checklist around the next reference update,

@@ -51,7 +51,7 @@ The current target is **RNS 1.5.7**, upstream commit `a29bfb51c468945c96a1ee22ca
 
 ## Installation
 
-Published packages contain one native executable per tool, so you run `rnsd`, not `DotReticulum.Applications rnsd`. No .NET runtime is needed to run them. Building, packaging and installing the utilities is described in [Installing the utilities](docs/installation.md). Nothing is changed outside the install directory, and your `PATH` is yours to edit.
+Published packages contain one native executable per tool, so you run `rnsd`, not `DotReticulum.Applications rnsd`. No .NET runtime is needed to run them. Releases provide portable ZIPs; the release workflow also builds native Windows, Linux and macOS installers. The installers make system-wide changes, while the separate local installation script leaves `PATH` for you to edit. See [Installing the utilities](docs/installation.md) for locations, removal and limitations.
 
 To run a utility straight from source:
 
@@ -127,9 +127,9 @@ So `1.5.7.42` is the forty-second build aimed at RNS 1.5.7. A version number nam
 
 ### Releases
 
-A release is a `v<version>` tag, such as `v1.5.7.42`, on `main`. Create it with `pwsh tools/New-ReleaseTag.ps1` and push it. The [Release workflow](.github/workflows/release.yml) then builds NativeAOT packages for `linux-x64`, `win-x64` and `osx-arm64`, zips them with SHA-256 checksums, and attaches them to a GitHub release. A manual run of the workflow builds the zips as artifacts without publishing them.
+A release is a `v<version>` tag, such as `v1.5.7.42`, on `main`. Create it with `pwsh tools/New-ReleaseTag.ps1` and push it. The [Release workflow](.github/workflows/release.yml) builds NativeAOT ZIPs and platform installers for `linux-x64`, `win-x64` and `osx-arm64`, and attaches them and SHA-256 checksums to a GitHub release. A manual run builds artifacts without publishing a release.
 
-Each zip is the output of `tools/Invoke-DotReticulumPackaging.ps1`; see [installation](docs/installation.md). Platform support is only as strong as the recorded evidence. In particular, macOS package installation has not been accepted.
+Each ZIP contains the staged output of `tools/Invoke-DotReticulumPackaging.ps1`; the installers use the same staged files. Installers are unsigned, and the macOS package is not notarized. Existing releases are not changed retroactively. Platform support is only as strong as the recorded evidence; see [installation](docs/installation.md).
 
 ## Contributing
 
