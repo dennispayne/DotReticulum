@@ -310,7 +310,13 @@ Describe 'Native installer artifacts' -Tag Tooling {
             $root = Join-Path $script:work 'pkg'
             $null = Invoke-Checked (Get-Command pkgutil).Source @('--expand-full', $package, $root)
             $rnid = @(Get-ChildItem -LiteralPath $root -File -Filter 'rnid' -Recurse)
-            $rnid.Count | Should -Be 1
+            if ($rnid.Count -ne 1) {
+                $entries = @(Get-ChildItem -LiteralPath $root -Force -Recurse | Select-Object -First 80 | ForEach-Object {
+                    "{0} [{1}] {2}" -f [IO.Path]::GetRelativePath($root, $_.FullName), $_.Attributes, $_.LinkTarget
+                }) -join "`n"
+                $payload = Invoke-TestProcess (Get-Command pkgutil).Source @('--payload-files', $package)
+                throw "Expected one expanded rnid; found $($rnid.Count).`nEntries:`n$entries`nPayload listing (exit $($payload.Code)):`n$($payload.Output)$($payload.Error)"
+            }
             $bin = $rnid[0].Directory.FullName
             $prefix = Split-Path -Parent $bin
             Assert-Payload $bin ([IO.Path]::Combine($prefix, 'share', 'doc', 'dotreticulum'))

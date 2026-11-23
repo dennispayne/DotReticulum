@@ -74,8 +74,12 @@ upgraded it, then failed because it expected `dpkg --refuse-downgrade` to
 return a nonzero status. An unprivileged WSL dry run against an owned
 synthetic package database showed the command returns zero, reports that it
 skipped the downgrade and retains the newer version. The test now verifies
-that report, the registered version and the installed payload. The macOS job
-was still queued when this was recorded. No release was published.
+that report, the registered version and the installed payload. The macOS PKG
+built and its checksum matched, but expansion found no `rnid`, so system
+installation was not attempted. The next rehearsal will retain failed
+installers as separately named diagnostic artifacts and report the expanded
+package layout; failed jobs still block release verification. No release was
+published.
 
 ## RNS 1.5.7 release preparation and roadmap
 
