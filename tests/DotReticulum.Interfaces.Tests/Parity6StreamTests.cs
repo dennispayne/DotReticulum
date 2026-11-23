@@ -423,6 +423,36 @@ public sealed class Parity6StreamTests
         Assert.False(serial.IsConnected);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CompletedFrameSurvivesConcurrentCancellation(bool cancelAfterWrite)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var stream = new CancelAfterCompletedOperationStream(cancellation, cancelAfterWrite);
+        await using var endpoint = new HdlcStreamEndpoint(stream);
+        var first = MakePacket(1);
+        var second = MakePacket(2);
+        await endpoint.SendAsync(first, cancellation.Token);
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.False(endpoint.IsDisposed);
+        await endpoint.SendAsync(second, default);
+        Assert.Equal(HdlcPacketFraming.Encode(first).Concat(HdlcPacketFraming.Encode(second)), stream.ToArray());
+    }
+
+    [Fact]
+    public async Task CancellationDuringPendingFlushClosesUncertainFrame()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var stream = new BlockingFlushStream();
+        await using var endpoint = new HdlcStreamEndpoint(stream);
+        var send = endpoint.SendAsync(MakePacket(1), cancellation.Token).AsTask();
+        await stream.Entered.Task.WaitAsync(Patience);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send.WaitAsync(Patience));
+        Assert.True(endpoint.IsDisposed);
+    }
+
     [Fact]
     public async Task SerialConfigurationValidatesWithoutOpeningHardware()
     {
@@ -435,6 +465,33 @@ public sealed class Parity6StreamTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new SerialPacketInterface("NOT_OPENED", dataBits: 9));
         Assert.Throws<ArgumentOutOfRangeException>(() => new SerialPacketInterface("NOT_OPENED", parity: Parity.Mark));
         Assert.Throws<ArgumentOutOfRangeException>(() => new SerialPacketInterface("NOT_OPENED", stopBits: StopBits.None));
+    }
+
+    private sealed class CancelAfterCompletedOperationStream(CancellationTokenSource cancellation, bool cancelAfterWrite) : MemoryStream
+    {
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            var result = base.WriteAsync(buffer, cancellationToken);
+            if (cancelAfterWrite) cancellation.Cancel();
+            return result;
+        }
+
+        public override Task FlushAsync(CancellationToken cancellationToken)
+        {
+            var result = base.FlushAsync(cancellationToken);
+            if (!cancelAfterWrite) cancellation.Cancel();
+            return result;
+        }
+    }
+
+    private sealed class BlockingFlushStream : MemoryStream
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public override Task FlushAsync(CancellationToken cancellationToken)
+        {
+            Entered.TrySetResult();
+            return Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
     }
 
     private sealed class BlockingDuplexStream(bool failWrites = false, bool ignoreReadCancellation = false,

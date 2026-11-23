@@ -2,6 +2,30 @@
 
 Historical reference only: this file records milestone outcomes and verification evidence; active work is tracked in [TODO.md](../TODO.md), the original roadmap snapshot is [docs/archive/plan.md](../docs/archive/plan.md), and current-state documentation lives in `README.md` and `docs/`. Historical completion does not imply full Reticulum parity.
 
+## Completed stream writes and cancellation
+
+A deterministic stream regression showed that cancellation immediately after a
+successful write or flush closed the shared HDLC stream even though the
+operation had completed. Both cases failed before the fix. Completed writes
+now proceed to a lifetime-owned flush, and a successfully completed operation
+wins the cancellation race. An actually interrupted write or pending flush
+still closes the stream to avoid reusing a possibly partial frame. This applies
+to the shared TCP/serial stream adapter and does not change the wire format.
+
+Windows Release `dotnet build DotReticulum.slnx -c Release --nologo -v quiet`
+passed without warnings; `dotnet test DotReticulum.slnx -c Release --no-build
+--nologo -v quiet --logger trx --results-directory
+artifacts\tests\completed-frame-cancellation` passed 1,901 tests with 97
+explicit skips. `Parity6StreamTests` passed 27 cases, including both completed
+operation races and cancellation of an unfinished write and flush. Strict
+`win-x64` NativeAOT publication passed; its `--help` and the
+`NativeListener_DecryptsDecompressesAndReturnsCompressedMultiMegabyteResource`
+test passed with a 2,200,017-byte encrypted, compressed round trip. Executable
+SHA-256: `9c2921c41b10558abe4242bf4996d4cd34c50d08433a7bb34224b83c2adf81ea`.
+This is local software evidence, not physical-device or new live-Python
+acceptance. A preceding concurrently loaded baseline hit a separate ephemeral
+port collision; the non-overlapping full run above passed.
+
 ## Acceptance scope adjustment
 
 On 2026-11-22, the user removed physical-hardware testing and other platforms

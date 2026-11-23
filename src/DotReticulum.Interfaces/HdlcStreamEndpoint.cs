@@ -148,7 +148,7 @@ internal sealed class HdlcStreamEndpoint : IAsyncDisposable
                 ? HdlcPacketFraming.Encode(packet, _maxFrameLength, validatePacket: validate)
                 : TcpKissFrameDecoder.Encode(packet.Span);
             await CompleteWriteAsync(_stream.WriteAsync(framed, linked.Token).AsTask(), linked.Token).ConfigureAwait(false);
-            await CompleteWriteAsync(_stream.FlushAsync(linked.Token), linked.Token).ConfigureAwait(false);
+            await CompleteWriteAsync(_stream.FlushAsync(_disposeCts.Token), linked.Token).ConfigureAwait(false);
             Interlocked.Add(ref _sentBytes, framed.Length);
             _sent?.Invoke(framed.Length);
         }
@@ -170,7 +170,7 @@ internal sealed class HdlcStreamEndpoint : IAsyncDisposable
             using var registration = cancellationToken.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), cancelled);
             await Task.WhenAny(pending, cancelled.Task).ConfigureAwait(false);
         }
-        if (cancellationToken.IsCancellationRequested)
+        if (cancellationToken.IsCancellationRequested && !pending.IsCompletedSuccessfully)
         {
             await DisposeAsync().ConfigureAwait(false);
             try { await pending.ConfigureAwait(false); }

@@ -132,7 +132,7 @@ The serial port runs with no handshake, but DTR and RTS stay asserted, as they d
 
 The standalone TCP client and serial constructors leave reconnection off by default. The daemon turns it on to match upstream. Server queue limits and `fixed_mtu` are also available as native options.
 
-Receive buffering is bounded at 256 queued frames plus the producer's frame and the frames decoded from one 4096-byte read buffer. Cancellation interrupts owned reads and writes. A write that failed ambiguously is not replayed after reconnecting.
+Receive buffering is bounded at 256 queued frames plus the producer's frame and the frames decoded from one 4096-byte read buffer. Cancellation interrupts owned reads and unfinished writes; an interrupted write or flush retires the stream because the frame may be partial. A successful write and flush win a concurrent cancellation and leave the stream usable. A write that failed ambiguously is not replayed after reconnecting.
 
 ## Differences from upstream
 
