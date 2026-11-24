@@ -37,8 +37,57 @@ Hosted evidence: manual Release run 45232087077 showed the pack job's
 not yet restored (cancelled); after adding `dotnet restore`, run 45232235903's
 **Pack NuGet packages** job at `dd917de` succeeded and produced exactly the five
 `1.5.7.156-gdd917de040` packages and symbol packages. The tag-only publish job
-was skipped for the dispatch. No package has been published; the nuget.org
-policy, OIDC exchange and Ecosystem migration remain unverified.
+was skipped for the dispatch.
+
+PR **#49** merged as `99275e6` after Build **45288177555**, Test **45288711831**
+and Static analysis **45288177350** succeeded. The Test run passed Unit,
+Integration and shared Compatibility jobs on all three platforms, plus
+Compatibility / Upstream, with platform and opt-in skips reported in its
+summary. Static analysis reported one Python warning for a 1024-bit RSA
+test-vector generator. The successful PR Test also triggered Coverage badges
+**45290775746**, which failed its guard because the Build was a PR build rather
+than a trusted main build; it did not publish badges.
+
+On the merged commit, Build **45290925214**, Test **45291509349** and Static
+analysis **45290925490** also succeeded. Unit passed/skipped counts were
+1,452/9 on Linux and macOS and 1,455/6 on Windows. Integration, including
+native CLI and contract cases, passed/skipped 735/20 on Linux, 724/31 on macOS
+and 734/26 on Windows. Shared live-reference Compatibility passed for upstream
+and all three native candidates. Physical hardware and other opt-in cases were
+not enabled; skip reasons and separate Unit/Integration coverage are in the
+`test-summary-1` artifact. The main static-analysis summary repeated the single
+Python test-vector warning. Coverage badges **45293397844** succeeded for the
+main Test.
+
+The merged Unit/Integration production coverage artifact reports covered/total
+lines and branches, respectively:
+
+| Project | Linux | macOS | Windows |
+| --- | --- | --- | --- |
+| Applications | 10649/13942, 9130/14486 | 10677/13942, 9158/14486 | 10693/13942, 9202/14486 |
+| Core | 1840/1905, 1151/1274 | 1840/1905, 1151/1274 | 1846/1905, 1159/1274 |
+| Crypto | 110/116, 47/50 | 110/116, 47/50 | 110/116, 47/50 |
+| Interfaces | 4925/5690, 2644/3481 | 4679/5690, 2549/3481 | 4680/5690, 2550/3481 |
+| Transport | 5134/5592, 3256/4080 | 5125/5592, 3262/4080 | 5122/5592, 3255/4080 |
+| Overall | 22658/27245, 16228/23371 | 22431/27245, 16167/23371 | 22451/27245, 16213/23371 |
+
+Release tag **v1.5.7.158** at `99275e6` ran Release **45291030263**. NativeAOT
+packaging and installer tests passed on Windows (5), Linux (6) and macOS (3);
+the seven release file checksums passed. The GitHub release contains three ZIPs,
+four installers and `SHA256SUMS.txt`; the earlier `v1.5.7.145` was unchanged.
+NuGet trusted publishing exchanged the GitHub OIDC token and pushed all five
+`1.5.7.158` packages and their symbols. All five became visible via the public
+NuGet v3 flat-container index. A separate .NET 10 consumer using only the
+nuget.org package source and a fresh package cache ran `dotnet build
+Consumer.csproj -c Release -p:UseAppHost=false --nologo -v quiet`: it restored
+all five matching versions and compiled with zero warnings and errors.
+Ecosystem's migration from the submodule remains unverified.
+
+The local full test run on 2026-11-23 was stopped after Windows Smart App
+Control blocked the locally built `RngitPresentationBackend.dll` fixture. Code
+Integrity logged event 3077 for the copied test fixture; no Windows security
+settings were changed. The hosted PR run above completed the corresponding
+Windows tests independently.
 
 ## Native installer packaging
 

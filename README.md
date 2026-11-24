@@ -59,7 +59,7 @@ To run a utility straight from source:
 dotnet run --project src/DotReticulum.Applications -- rnsd --help
 ```
 
-To use the stack from your own .NET 10 project, reference the NuGet packages, for example `dotnet add package DotReticulum.Applications`, which brings in Core, Crypto, Transport and Interfaces. No package has been published yet; the first will come from the next release tag.
+To use the stack from your own .NET 10 project, reference the NuGet packages, for example `dotnet add package DotReticulum.Applications`, which brings in Core, Crypto, Transport and Interfaces. Version `1.5.7.158` is available on NuGet.org.
 
 ## Building from source
 
