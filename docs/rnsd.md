@@ -46,7 +46,8 @@ Options:
   --exampleconfig       Print an example configuration to stdout and exit.
   -h, --help            Show this help.
 
-Unsupported configuration controls are errors; see docs/rnsd.md.
+Unsupported configuration controls are errors; see
+https://github.com/dennispayne/DotReticulum/blob/main/docs/rnsd.md
 Stop with Ctrl+C or SIGTERM.
 ```
 
