@@ -158,6 +158,8 @@ public static partial class RnsdConfigParser
         ["BackboneClientInterface"] = RnsdInterfaceType.Backbone,
     };
 
+    private static readonly string[] RuntimeAssignedInterfaceKeys = ["name", "selected_interface_mode", "configured_bitrate"];
+
     private sealed record InterfaceSection(string Name, Dictionary<string, string> Options)
     {
         public Dictionary<string, Dictionary<string, string>> Children { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -251,6 +253,9 @@ public static partial class RnsdConfigParser
         foreach (var definition in sections)
         {
             var (name, options) = definition;
+            // Upstream overwrites these runtime keys on load (Reticulum.py 1108-1112), so values
+            // persisted by Python tools are inert and must not reject the configuration.
+            foreach (var key in RuntimeAssignedInterfaceKeys) options.Remove(key);
             var enabled = (options.TryGetValue("interface_enabled", out var ie) && ParseBool(ie, "interface_enabled"))
                 | (options.TryGetValue("enabled", out var en) && ParseBool(en, "enabled"));
 

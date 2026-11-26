@@ -79,7 +79,7 @@ The file uses a supported subset of Reticulum's ConfigObj format:
 - comma-delimited lists, including quoted items containing commas and trailing list commas
 - `[[[Radio name]]]` for RNodeMulti radios inside their parent interface
 
-Duplicate settings or interfaces, unclosed quotes, unknown sections and ineffective controls are errors. Other deeper nesting and multiline or triple-quoted values are unsupported and diagnosed.
+Duplicate settings or interfaces, unclosed quotes, unknown sections and ineffective controls are errors. The exception is the runtime-assigned interface keys `name`, `selected_interface_mode` and `configured_bitrate`: upstream overwrites them on load, and Python tools may write them back to the file, so they are accepted and ignored. Other deeper nesting and multiline or triple-quoted values are unsupported and diagnosed.
 
 ### Global settings
 

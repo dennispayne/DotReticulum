@@ -71,6 +71,31 @@ public class RnsdConfigTests
     public void Parse_RejectsInvalidConfigurations(string text) => Assert.Throws<FormatException>(() => RnsdConfigParser.Parse(text));
 
     [Fact]
+    public void Parse_IgnoresRuntimeAssignedKeysPersistedByUpstreamTools()
+    {
+        var config = RnsdConfigParser.Parse("""
+            [interfaces]
+              [[Radio]]
+                type = RNodeInterface
+                enabled = true
+                port = COM8
+                frequency = 915000000
+                bandwidth = 125000
+                spreadingfactor = 8
+                codingrate = 5
+                txpower = 14
+                name = Stale Name
+                selected_interface_mode = 1
+                configured_bitrate = None
+            """);
+
+        var radio = Assert.Single(config.Interfaces);
+        Assert.Equal(("Radio", InterfaceMode.Full), (radio.Name, radio.Mode));
+        Assert.Null(radio.Get("name"));
+        Assert.Throws<FormatException>(() => RnsdConfigParser.Parse("[interfaces]\n[[Radio]]\ntype = RNodeInterface\nenabled = yes\nport = COM8\nnot_a_key = 1\n"));
+    }
+
+    [Fact]
     public void ExampleConfig_ParsesAndBuildsInterfaces()
     {
         var config = RnsdConfigParser.Parse(RnsdApp.ExampleConfig);
