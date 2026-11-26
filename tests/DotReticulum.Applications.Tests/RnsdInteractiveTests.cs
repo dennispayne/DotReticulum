@@ -13,6 +13,24 @@ public sealed class RnsdInteractiveTests : IDisposable
     }
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
+    [Fact]
+    public async Task VerboseLoggingNamesTheLoadedConfigurationFile()
+    {
+        var configFile = Path.GetFullPath(Path.Combine(_directory, "config"));
+        foreach (var (args, expected) in new[] { (new[] { "--config", _directory, "-i", "-v" }, true), (new[] { "--config", _directory, "-i" }, false) })
+        {
+            using var input = new StringReader("quit\n");
+            using var output = new StringWriter();
+            Assert.Equal(0, await RnsdApp.RunAsync(args, output, TextWriter.Null, CancellationToken.None, input));
+            Assert.Equal(expected, output.ToString().Contains($"Configuration loaded from {configFile}", StringComparison.Ordinal));
+        }
+
+        File.WriteAllText(configFile, "[interfaces]\n[[X]]\ntype = RNodeInterface\nenabled = yes\nport = COM8\nnot_a_key = 1\n");
+        using var error = new StringWriter();
+        Assert.Equal(1, await RnsdApp.RunAsync(["--config", _directory], TextWriter.Null, error, CancellationToken.None));
+        Assert.Contains($"could not parse the configuration at {configFile}: ", error.ToString());
+    }
+
     [Theory]
     [InlineData("help\nstatus\ninterfaces\npersist\nquit\n")]
     [InlineData("help\r\nstatus\rinterfaces\npersist\r\nexit")]

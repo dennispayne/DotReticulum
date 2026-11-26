@@ -155,8 +155,11 @@ public static class RnsdApp
         try
         {
             (configDir, configFile) = ResolveConfig(configArg);
+            configFile = Path.GetFullPath(configFile);
             created = RnsdConfigurationFiles.EnsureCreated(configDir, configFile);
-            config = RnsdConfigParser.Parse(await File.ReadAllTextAsync(configFile, stop).ConfigureAwait(false)) with { SourcePath = configFile };
+            var text = await File.ReadAllTextAsync(configFile, stop).ConfigureAwait(false);
+            try { config = RnsdConfigParser.Parse(text) with { SourcePath = configFile }; }
+            catch (FormatException ex) { return Fail(error, $"could not parse the configuration at {configFile}: {ex.Message}"); }
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested) { return 0; }
         catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException or ArgumentException)
@@ -167,6 +170,7 @@ public static class RnsdApp
         void Log(int messageLevel, string message) => logger.Log(messageLevel, message);
         if (created)
             Log(2, $"Default config file created at '{configFile}'. AutoInterface is disabled by default; no external interface is enabled. Explicitly enable network discovery or configure another interface and restart.");
+        Log(5, $"Configuration loaded from {configFile}");
 
         RnsdHost host;
         try

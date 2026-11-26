@@ -190,6 +190,8 @@ A configured `location_cmd` without authorization fails explicitly.
 
 `-v` and `-q` are repeatable, including clusters such as `-vvv`, `-qq` and mixed short clusters. Their difference is added to the configured `loglevel` **before** clamping to 0–8. As in the pinned reference, when there is no `loglevel` setting these adjustments leave the initial NOTICE level unchanged.
 
+As in the pinned reference, the resolved file is logged at VERBOSE (level 5) as `Configuration loaded from <full path>`, so the created config's level 4 shows it with `-v`. A configuration that cannot be parsed fails with `could not parse the configuration at <full path>: <reason>`.
+
 | Level | Name |
 |---|---|
 | 0–3 | Critical, Error, Warning, Notice |
